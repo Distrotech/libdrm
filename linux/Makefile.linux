@@ -32,12 +32,15 @@
 
 # *** Setup
 
-MODS=           gamma.o tdfx.o
+# **** End of SMP/MODVERSIONS detection
+
+MODS=           gamma.o tdfx.o mga.o i810.o
 LIBS=           libdrm.a
 PROGS=		drmstat
 
 DRMOBJS=	init.o memory.o proc.o auth.o context.o drawable.o bufs.o \
-		lists.o lock.o ioctl.o fops.o vm.o dma.o
+		lists.o lock.o ioctl.o fops.o vm.o dma.o ctxbitmap.o \
+		agpsupport.o
 DRMHEADERS=	drm.h drmP.h
 
 GAMMAOBJS=      gamma_drv.o gamma_dma.o
@@ -46,14 +49,22 @@ GAMMAHEADERS=   gamma_drv.h $(DRMHEADERS)
 TDFXOBJS=       tdfx_drv.o tdfx_context.o
 TDFXHEADERS=    tdfx_drv.h $(DRMHEADERS)
 
+MGAOBJS=	mga_drv.o mga_dma.o mga_bufs.o mga_state.o mga_context.o
+MGAHEADERS=	mga_drv.h mga_drm_public.h $(DRMHEADERS)
+
+I810OBJS=	i810_drv.o i810_dma.o i810_bufs.o i810_context.o
+I810HEADERS=	i810_drv.h i810_drm_public.h $(DRMHEADERS)
+
 PROGOBJS=       drmstat.po xf86drm.po xf86drmHash.po xf86drmRandom.po sigio.po
 PROGHEADERS=    xf86drm.h $(DRMHEADERS)
+
+INC=		/usr/include
 
 CFLAGS=		-O2 $(WARNINGS)
 WARNINGS=	-Wall -Wwrite-strings -Wpointer-arith -Wcast-align \
 		-Wstrict-prototypes -Wshadow -Wnested-externs \
 		-Winline -Wpointer-arith
-MODCFLAGS=      $(CFLAGS) -D__KERNEL__ -DMODULE -fomit-frame-pointer
+MODCFLAGS=      $(CFLAGS) -DDRM_AGP -D__KERNEL__ -DMODULE -fomit-frame-pointer
 PRGCFLAGS=      $(CFLAGS) -g -ansi -pedantic -DPOSIX_C_SOURCE=199309L \
 		-D_POSIX_SOURCE -D_XOPEN_SOURCE -D_BSD_SOURCE -D_SVID_SOURCE \
 		-I../../../../../../include -I../../../../../../../../include \
@@ -129,6 +140,12 @@ gamma.o: $(GAMMAOBJS) $(LIBS)
 tdfx.o: $(TDFXOBJS) $(LIBS)
 	$(LD) -r $^ -o $@
 
+mga.o: $(MGAOBJS) $(LIBS)
+	$(LD) -r $^ -o $@
+
+i810.o: $(I810OBJS) $(LIBS)
+	$(LD) -r $^ -o $@
+
 drmstat: $(PROGOBJS)
 	$(CC) $(PRGCFLAGS) $^ $(PRGLIBS) -o $@
 
@@ -150,8 +167,11 @@ ChangeLog:
 $(DRMOBJS): $(DRMHEADERS)
 $(GAMMAOBJS): $(GAMMAHEADERS)
 $(TDFXOBJS): $(TDFXHEADERS)
+$(MGAOBJS): $(MGAHEADERS)
+$(I810OBJS): $(I810HEADERS)
 $(PROGOBJS): $(PROGHEADERS)
 
 clean:
-	rm -f *.o *.po *~ core $(PROGS)
+	rm -f *.o *.a *.po *~ core $(PROGS)
+
 

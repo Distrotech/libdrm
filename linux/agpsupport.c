@@ -159,6 +159,8 @@ int drm_agp_alloc(struct inode *inode, struct file *filp, unsigned int cmd,
 			   -EFAULT);
 	if (!(entry = drm_alloc(sizeof(*entry), DRM_MEM_AGPLISTS)))
 		return -ENOMEM;
+   
+   	memset(entry, 0, sizeof(*entry));
 
 	pages = (request.size + PAGE_SIZE - 1) / PAGE_SIZE;
 	type = (u32) request.type;
@@ -253,9 +255,15 @@ int drm_agp_free(struct inode *inode, struct file *filp, unsigned int cmd,
 			   -EFAULT);
 	if (!(entry = drm_agp_lookup_entry(dev, request.handle)))
 		return -EINVAL;
+#if 0
 	if (entry->bound) drm_unbind_agp(entry->memory);
-	entry->prev->next = entry->next;
-	entry->next->prev = entry->prev;
+#endif
+   	if(entry->prev) entry->prev->next = entry->next;
+	if(entry->next) entry->next->prev = entry->prev;
+   	if((entry->next == NULL) && 
+	   (entry->prev == NULL)) {
+	   dev->agp->memory = NULL;
+	}
 	drm_free_agp(entry->memory, entry->pages);
 	drm_free(entry, sizeof(*entry), DRM_MEM_AGPLISTS);
 	return 0;
