@@ -509,8 +509,8 @@ static unsigned long copy_and_verify_from_user( u32 *to, const u32 *from, unsign
 	return copied;
 }
 
-static int mach64_dma_dispatch_vertex( drm_device_t *dev, void *buf, unsigned long used,
-				       int prim, int discard )
+static int mach64_dma_dispatch_vertex( drm_device_t *dev, int prim, void *buf, 
+				       unsigned long used, int discard )
 {
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
@@ -519,7 +519,7 @@ static int mach64_dma_dispatch_vertex( drm_device_t *dev, void *buf, unsigned lo
 	int verify_failed = 0;
 	DMALOCALS;
 
-	DRM_DEBUG( "%s: buf=%p used=%lu nbox=%d\n",
+	DRM_DEBUG( "%s: buf=%p used=%ld nbox=%d\n",
 		   __FUNCTION__, buf, used, sarea_priv->nbox );
 
 	if ( used ) {
@@ -786,10 +786,6 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 	drm_device_t *dev = priv->dev;
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
-#if 0
-	drm_device_dma_t *dma = dev->dma;
-	drm_buf_t *buf;
-#endif
 	drm_mach64_vertex_t vertex;
 
 	LOCK_TEST_WITH_RETURN( dev );
@@ -803,17 +799,9 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 			     sizeof(vertex) ) )
 		return -EFAULT;
 
-	DRM_DEBUG( "%s: pid=%d index=%d count=%d discard=%d\n",
+	DRM_DEBUG( "%s: pid=%d buf=%p used=%ld discard=%d\n",
 		   __FUNCTION__, current->pid,
-		   vertex.idx, vertex.count, vertex.discard );
-
-#if 0
-	if ( vertex.idx < 0 || vertex.idx >= dma->buf_count ) {
-		DRM_ERROR( "buffer index %d (of %d max)\n",
-			   vertex.idx, dma->buf_count - 1 );
-		return -EINVAL;
-	}
-#endif
+		   vertex.buf, vertex.used, vertex.discard );
 
 	if ( vertex.prim < 0 ||
 	     vertex.prim > MACH64_PRIM_POLYGON ) {
@@ -826,21 +814,8 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 	if ( sarea_priv->nbox > MACH64_NR_SAREA_CLIPRECTS )
 		sarea_priv->nbox = MACH64_NR_SAREA_CLIPRECTS;
 
-#if 0
-	buf = dma->buflist[vertex.idx];
-
-	if ( buf->pid != current->pid ) {
-		DRM_ERROR( "process %d using buffer owned by %d\n",
-			   current->pid, buf->pid );
-		return -EINVAL;
-	}
-
-	buf->used = vertex.count;
-#endif
-
-	/* FIXME: Update the IOCTL interface */
-	return mach64_dma_dispatch_vertex( dev, (void *)vertex.idx, vertex.count, 
-					   vertex.prim, vertex.discard );
+	return mach64_dma_dispatch_vertex( dev, vertex.prim, vertex.buf, 
+					   vertex.used, vertex.discard );
 }
 
 int mach64_dma_blit( struct inode *inode, struct file *filp,

@@ -228,8 +228,8 @@ typedef struct drm_mach64_clear {
 
 typedef struct drm_mach64_vertex {
 	int prim;
-	int idx;			/* Index of vertex buffer */
-	int count;			/* Number of vertices in buffer */
+	void *buf;			/* Address of vertex buffer */
+	unsigned long used;		/* Number of bytes in buffer */
 	int discard;			/* Client finished with buffer? */
 } drm_mach64_vertex_t;
 
