@@ -125,7 +125,7 @@ AGP := $(shell gcc -E -nostdinc -I$(TREE) picker.c 2>/dev/null \
 SIS := $(shell gcc -E -nostdinc -I$(TREE) picker.c 2>/dev/null \
 	| grep -s 'SIS = ' | cut -d' ' -f3)
 PARAMS := $(shell if fgrep kill_fasync $(TREE)/linux/fs.h \
-	| fgrep -q band; then echo 3; else echo 2; fi)
+	| egrep -q '(band|int, int)'; then echo 3; else echo 2; fi)
 MACHINE := $(shell echo `uname -m`)
 ifeq ($(AGP),0)
 AGP := $(shell gcc -E -nostdinc -I$(TREE) picker.c 2>/dev/null \
