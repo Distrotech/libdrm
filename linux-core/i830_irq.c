@@ -177,7 +177,7 @@ int i830_irq_wait( struct inode *inode, struct file *filp, unsigned int cmd,
 }
 
 
-/* drm_dma.h hooks
+/* drm_dma_tmp.h hooks
 */
 void DRM(driver_irq_preinstall)( drm_device_t *dev ) {
 	drm_i830_private_t *dev_priv =

@@ -221,7 +221,7 @@ static drm_ioctl_desc_t		  DRM(ioctls)[] = {
 
 	/* The DRM_IOCTL_DMA ioctl should be defined by the driver.
 	 */
-	[DRM_IOCTL_NR(DRM_IOCTL_CONTROL)]       = { DRM(control),     1, 1 },
+	[DRM_IOCTL_NR(DRM_IOCTL_CONTROL)]       = { DRM(control_ioctl),     1, 1 },
 #endif
 
 #if __REALLY_HAVE_AGP
@@ -241,7 +241,7 @@ static drm_ioctl_desc_t		  DRM(ioctls)[] = {
 #endif
 
 #if __HAVE_VBL_IRQ
-	[DRM_IOCTL_NR(DRM_IOCTL_WAIT_VBLANK)]   = { DRM(wait_vblank), 0, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_WAIT_VBLANK)]   = { DRM(wait_vblank_ioctl), 0, 0 },
 #endif
 
 	DRIVER_IOCTLS

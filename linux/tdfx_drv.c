@@ -78,7 +78,7 @@ static drm_pci_list_t DRM(idlist)[] = {
 #include "drm_auth.h"
 #include "drm_bufs.h"
 #include "drm_context.h"
-#include "drm_dma.h"
+#include "drm_dma_tmp.h"
 #include "drm_drawable.h"
 #include "drm_drv.h"
 

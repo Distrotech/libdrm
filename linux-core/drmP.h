@@ -117,6 +117,7 @@ typedef struct drm_device drm_device_t;
 #include "drm_sg.h"
 #include "drm_bufs.h"
 #include "drm_lock.h"
+#include "drm_dma.h"
 
 
 /***********************************************************************/
@@ -497,17 +498,6 @@ typedef struct drm_map_list {
 
 typedef drm_map_t drm_local_map_t;
 
-#if __HAVE_VBL_IRQ
-
-typedef struct drm_vbl_sig {
-	struct list_head	head;
-	unsigned int		sequence;
-	struct siginfo		info;
-	struct task_struct	*task;
-} drm_vbl_sig_t;
-
-#endif
-
 /**
  * DRM device structure.
  */
@@ -589,16 +579,8 @@ struct drm_device {
 #else
 	struct work_struct	work;
 #endif
-	/** \name VBLANK IRQ support */
-	/*@{*/
-#if __HAVE_VBL_IRQ
-   	wait_queue_head_t vbl_queue;	/**< VBLANK wait queue */
-   	atomic_t          vbl_received;
-	spinlock_t        vbl_lock;
-	drm_vbl_sig_t     vbl_sigs;	/**< signal list to send on VBLANK */
-	unsigned int      vbl_pending;
-#endif
-	/*@}*/
+	drm_vbl_data_t    vbl;		/**< VBLANK IRQ support */
+
 	cycles_t	  ctx_start;
 	cycles_t	  lck_start;
 
@@ -759,35 +741,6 @@ extern int	     DRM(getmagic)(struct inode *inode, struct file *filp,
 				   unsigned int cmd, unsigned long arg);
 extern int	     DRM(authmagic)(struct inode *inode, struct file *filp,
 				    unsigned int cmd, unsigned long arg);
-
-				/* DMA support (drm_dma.h) */
-#if __HAVE_DMA
-extern int	     DRM(dma_setup)(drm_device_t *dev);
-extern void	     DRM(dma_takedown)(drm_device_t *dev);
-extern void	     DRM(free_buffer)(drm_device_t *dev, drm_buf_t *buf);
-extern void	     DRM(reclaim_buffers)( struct file *filp );
-#if __HAVE_DMA_IRQ
-extern int           DRM(control)( struct inode *inode, struct file *filp,
-				   unsigned int cmd, unsigned long arg );
-extern int           DRM(irq_install)( drm_device_t *dev, int irq );
-extern int           DRM(irq_uninstall)( drm_device_t *dev );
-extern void          DRM(dma_service)( int irq, void *device,
-				       struct pt_regs *regs );
-extern void          DRM(driver_irq_preinstall)( drm_device_t *dev );
-extern void          DRM(driver_irq_postinstall)( drm_device_t *dev );
-extern void          DRM(driver_irq_uninstall)( drm_device_t *dev );
-#if __HAVE_VBL_IRQ
-extern int           DRM(wait_vblank)(struct inode *inode, struct file *filp,
-				      unsigned int cmd, unsigned long arg);
-extern int           DRM(vblank_wait)(drm_device_t *dev, unsigned int *vbl_seq);
-extern void          DRM(vbl_send_signals)( drm_device_t *dev );
-#endif
-#if __HAVE_DMA_IRQ_BH
-extern void          DRM(dma_immediate_bh)( void *dev );
-#endif
-#endif
-#endif /* __HAVE_DMA */
-
 
 				/* Stub support (drm_stub.h) */
 int                   DRM(stub_register)(const char *name,
