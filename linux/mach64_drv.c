@@ -35,7 +35,7 @@
 #include "ati_pcigart.h"
 
 
-#define DRIVER_AUTHOR		"Gareth Hughes"
+#define DRIVER_AUTHOR		"Gareth Hughes, Leif Delgass, José Fonseca"
 
 #define DRIVER_NAME		"mach64"
 #define DRIVER_DESC		"DRM module for the ATI Rage Pro"
