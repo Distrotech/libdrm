@@ -624,11 +624,17 @@ int mga_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 			    || (ioctl->auth_needed && !priv->authenticated)) {
 			retcode = -EACCES;
 		} else {
-			if(ioctl->needs_hvy_lock == 1)
+			if(ioctl->needs_hvy_lock == 1) {
+				if(priv->lock_depth != -1)
+					DRM_ERROR("Lock depth is bogus before an ioctl lock\n");
 				drm_big_fscking_lock_filp(dev, priv);
+			}
 			retcode = (func)(inode, filp, cmd, arg);
-			if(ioctl->needs_hvy_lock == 1)
+			if(ioctl->needs_hvy_lock == 1) {
+				if(priv->lock_depth != 0)
+					DRM_ERROR("Lock depth is bogus before an ioctl unlock\n");
 				drm_big_fscking_unlock_filp(dev, priv);
+			}
 		}
 	}
 

@@ -855,13 +855,16 @@ static __inline__ drm_file_t *drm_find_filp_by_current_pid(drm_device_t *dev)
 
 static __inline__ void drm_release_big_fscking_lock(drm_device_t *dev, drm_file_t *filp)
 {
-	if(filp->lock_depth >= 0)
+#if 1
+	if(filp->lock_depth >= 0) 
 		spin_unlock_irqrestore(&dev->big_fscking_lock, 
 				       filp->irq_flags);
+#endif
 }
 
 static __inline__ void drm_reacquire_big_fscking_lock(drm_device_t *dev, drm_file_t *filp)
 {
+#if 1
 	unsigned long flags;
 
 	if(filp->lock_depth >= 0) {
@@ -869,9 +872,11 @@ static __inline__ void drm_reacquire_big_fscking_lock(drm_device_t *dev, drm_fil
 		spin_lock_irqsave(&dev->big_fscking_lock, flags);
 		filp->irq_flags = flags;
 	}
+#endif
 }
 
 /* Enable interrupts around copy/to/from/user */
+#if 0
 #define drm_copy_to_user_ret(to,from,n,retval) do {\
    drm_file_t *filp = drm_find_filp_by_current_pid(dev);\
    if(filp == NULL) {\
@@ -899,7 +904,10 @@ static __inline__ void drm_reacquire_big_fscking_lock(drm_device_t *dev, drm_fil
    }\
    drm_reacquire_big_fscking_lock(dev, filp);\
 }while(0)
-
+#else
+#define drm_copy_to_user_ret(to,from,n,retval) copy_to_user_ret(to,from,n,retval)
+#define drm_copy_from_user_ret(to,from,n,retval) copy_from_user_ret(to,from,n,retval)
+#endif
 
 #if defined(CONFIG_AGP) || defined(CONFIG_AGP_MODULE)
 				/* AGP/GART support (agpsupport.c) */
