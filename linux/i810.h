@@ -62,6 +62,7 @@
 
 #define __HAVE_DMA_IRQ		0
 #define __HAVE_DMA_IRQ_BH	0
+#define __HAVE_SHARED_IRQ	1
 
 /* Buffer customization:
  */

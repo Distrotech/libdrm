@@ -183,7 +183,11 @@ static int i810_map_buffer(drm_buf_t *buf, struct file *filp)
 	if(buf_priv->currently_mapped == I810_BUF_MAPPED) return -EINVAL;
 
 	if(VM_DONTCOPY != 0) {
-		down(&current->mm->mmap_sem);
+#if LINUX_VERSION_CODE <= 0x020402
+		down( &current->mm->mmap_sem );
+#else
+		down_write( &current->mm->mmap_sem );
+#endif
 		old_fops = filp->f_op;
 		filp->f_op = &i810_buffer_fops;
 		dev_priv->mmap_buffer = buf;
@@ -199,7 +203,11 @@ static int i810_map_buffer(drm_buf_t *buf, struct file *filp)
 			retcode = (signed int)buf_priv->virtual;
 			buf_priv->virtual = 0;
 		}
-   		up(&current->mm->mmap_sem);
+#if LINUX_VERSION_CODE <= 0x020402
+		up( &current->mm->mmap_sem );
+#else
+		up_write( &current->mm->mmap_sem );
+#endif
 	} else {
 		buf_priv->virtual = buf_priv->kernel_virtual;
    		buf_priv->currently_mapped = I810_BUF_MAPPED;
@@ -215,7 +223,11 @@ static int i810_unmap_buffer(drm_buf_t *buf)
 	if(VM_DONTCOPY != 0) {
 		if(buf_priv->currently_mapped != I810_BUF_MAPPED)
 			return -EINVAL;
-		down(&current->mm->mmap_sem);
+#if LINUX_VERSION_CODE <= 0x020402
+		down( &current->mm->mmap_sem );
+#else
+		down_write( &current->mm->mmap_sem );
+#endif
 #if LINUX_VERSION_CODE < 0x020399
         	retcode = do_munmap((unsigned long)buf_priv->virtual,
 				    (size_t) buf->total);
@@ -224,7 +236,11 @@ static int i810_unmap_buffer(drm_buf_t *buf)
 				    (unsigned long)buf_priv->virtual,
 				    (size_t) buf->total);
 #endif
-   		up(&current->mm->mmap_sem);
+#if LINUX_VERSION_CODE <= 0x020402
+		up( &current->mm->mmap_sem );
+#else
+		up_write( &current->mm->mmap_sem );
+#endif
 	}
    	buf_priv->currently_mapped = I810_BUF_UNMAPPED;
    	buf_priv->virtual = 0;
@@ -339,8 +355,8 @@ static int i810_wait_ring(drm_device_t *dev, int n)
 		if (ring->head != last_head)
 		   end = jiffies + (HZ*3);
 
-		if (iters==1)
-		   printk("wait for space in ring\n");
+/*		if (iters==1) */
+/*		   printk("wait for space in ring\n"); */
 
 	   	iters++;
 		if((signed)(end - jiffies) <= 0) {
@@ -576,8 +592,8 @@ static void i810EmitTexVerified( drm_device_t *dev,
 	if (j & 1)
 		OUT_RING( 0 );
 
-	for (i = 0 ; i < I810_TEX_SETUP_SIZE ; i++)
-	   printk("texreg %d: %x\n", i, code[i]);
+/*	for (i = 0 ; i < I810_TEX_SETUP_SIZE ; i++) */
+/*	   printk("texreg %d: %x\n", i, code[i]); */
 
 	ADVANCE_LP_RING();
 }

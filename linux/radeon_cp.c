@@ -38,6 +38,12 @@
 
 #define RADEON_FIFO_DEBUG	0
 
+#if defined(__alpha__)
+# define PCIGART_ENABLED
+#else
+# undef PCIGART_ENABLED
+#endif
+
 
 /* CP microcode (from ATI) */
 static u32 radeon_cp_microcode[][2] = {
@@ -318,11 +324,21 @@ static void radeon_status( drm_radeon_private_t *dev_priv )
 		(unsigned int)RADEON_READ( RADEON_CP_RB_RPTR ) );
 	printk( "CP_RB_WTPR = 0x%08x\n",
 		(unsigned int)RADEON_READ( RADEON_CP_RB_WPTR ) );
+	printk( "AIC_CNTL = 0x%08x\n",
+		(unsigned int)RADEON_READ( RADEON_AIC_CNTL ) );
+	printk( "AIC_STAT = 0x%08x\n",
+		(unsigned int)RADEON_READ( RADEON_AIC_STAT ) );
+	printk( "AIC_PT_BASE = 0x%08x\n",
+		(unsigned int)RADEON_READ( RADEON_AIC_PT_BASE ) );
+	printk( "TLB_ADDR = 0x%08x\n",
+		(unsigned int)RADEON_READ( RADEON_AIC_TLB_ADDR ) );
+	printk( "TLB_DATA = 0x%08x\n",
+		(unsigned int)RADEON_READ( RADEON_AIC_TLB_DATA ) );
 }
 #endif
 
 
-/* =============================================================
+/* ================================================================
  * Engine, FIFO control
  */
 
@@ -393,7 +409,7 @@ static int radeon_do_wait_for_idle( drm_radeon_private_t *dev_priv )
 }
 
 
-/* =============================================================
+/* ================================================================
  * CP control, initialization
  */
 
@@ -401,6 +417,7 @@ static int radeon_do_wait_for_idle( drm_radeon_private_t *dev_priv )
 static void radeon_cp_load_microcode( drm_radeon_private_t *dev_priv )
 {
 	int i;
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
 	radeon_do_wait_for_idle( dev_priv );
 
@@ -419,6 +436,7 @@ static void radeon_cp_load_microcode( drm_radeon_private_t *dev_priv )
  */
 static void radeon_do_cp_flush( drm_radeon_private_t *dev_priv )
 {
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
 #if 0
 	u32 tmp;
 
@@ -432,6 +450,7 @@ static void radeon_do_cp_flush( drm_radeon_private_t *dev_priv )
 int radeon_do_cp_idle( drm_radeon_private_t *dev_priv )
 {
 	RING_LOCALS;
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
 	BEGIN_RING( 6 );
 
@@ -449,6 +468,7 @@ int radeon_do_cp_idle( drm_radeon_private_t *dev_priv )
 static void radeon_do_cp_start( drm_radeon_private_t *dev_priv )
 {
 	RING_LOCALS;
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
 	radeon_do_wait_for_idle( dev_priv );
 
@@ -472,6 +492,7 @@ static void radeon_do_cp_start( drm_radeon_private_t *dev_priv )
 static void radeon_do_cp_reset( drm_radeon_private_t *dev_priv )
 {
 	u32 cur_read_ptr;
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
 	cur_read_ptr = RADEON_READ( RADEON_CP_RB_RPTR );
 	RADEON_WRITE( RADEON_CP_RB_WPTR, cur_read_ptr );
@@ -485,6 +506,8 @@ static void radeon_do_cp_reset( drm_radeon_private_t *dev_priv )
  */
 static void radeon_do_cp_stop( drm_radeon_private_t *dev_priv )
 {
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
+
 	RADEON_WRITE( RADEON_CP_CSQ_CNTL, RADEON_CSQ_PRIDIS_INDDIS );
 
 	dev_priv->cp_running = 0;
@@ -503,8 +526,13 @@ static int radeon_do_engine_reset( drm_device_t *dev )
 	clock_cntl_index = RADEON_READ( RADEON_CLOCK_CNTL_INDEX );
 	mclk_cntl = RADEON_READ_PLL( dev, RADEON_MCLK_CNTL );
 
-	/* FIXME: remove magic number here and in radeon ddx driver!!! */
-	RADEON_WRITE_PLL( RADEON_MCLK_CNTL, mclk_cntl | 0x003f00000 );
+	RADEON_WRITE_PLL( RADEON_MCLK_CNTL, ( mclk_cntl |
+					      RADEON_FORCEON_MCLKA |
+					      RADEON_FORCEON_MCLKB |
+ 					      RADEON_FORCEON_YCLKA |
+					      RADEON_FORCEON_YCLKB |
+					      RADEON_FORCEON_MC |
+					      RADEON_FORCEON_AIC ) );
 
 	rbbm_soft_reset = RADEON_READ( RADEON_RBBM_SOFT_RESET );
 
@@ -546,18 +574,29 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev )
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	u32 ring_start, cur_read_ptr;
 	u32 tmp;
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
 	/* Initialize the memory controller */
 	RADEON_WRITE( RADEON_MC_FB_LOCATION,
 		      (dev_priv->agp_vm_start - 1) & 0xffff0000 );
-	RADEON_WRITE( RADEON_MC_AGP_LOCATION,
-		      (((dev_priv->agp_vm_start - 1 +
-			 dev_priv->agp_size) & 0xffff0000) |
-		       (dev_priv->agp_vm_start >> 16)) );
 
-	ring_start = (dev_priv->cp_ring->offset
-		      - dev->agp->base
-		      + dev_priv->agp_vm_start);
+	if ( !dev_priv->is_pci ) {
+		RADEON_WRITE( RADEON_MC_AGP_LOCATION,
+			      (((dev_priv->agp_vm_start - 1 +
+				 dev_priv->agp_size) & 0xffff0000) |
+			       (dev_priv->agp_vm_start >> 16)) );
+	}
+
+#if __REALLY_HAVE_AGP
+	if ( !dev_priv->is_pci )
+		ring_start = (dev_priv->cp_ring->offset
+			      - dev->agp->base
+			      + dev_priv->agp_vm_start);
+       else
+#endif
+		ring_start = (dev_priv->cp_ring->offset
+			      - dev->sg->handle
+			      + dev_priv->agp_vm_start);
 
 	RADEON_WRITE( RADEON_CP_RB_BASE, ring_start );
 
@@ -570,16 +609,28 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev )
 	*dev_priv->ring.head = cur_read_ptr;
 	dev_priv->ring.tail = cur_read_ptr;
 
-	RADEON_WRITE( RADEON_CP_RB_RPTR_ADDR, dev_priv->ring_rptr->offset );
+	if ( !dev_priv->is_pci ) {
+		RADEON_WRITE( RADEON_CP_RB_RPTR_ADDR,
+			      dev_priv->ring_rptr->offset );
+	} else {
+		drm_sg_mem_t *entry = dev->sg;
+		unsigned long tmp_ofs, page_ofs;
+
+		tmp_ofs = dev_priv->ring_rptr->offset - dev->sg->handle;
+		page_ofs = tmp_ofs >> PAGE_SHIFT;
+
+		RADEON_WRITE( RADEON_CP_RB_RPTR_ADDR,
+			      virt_to_bus(entry->pagelist[page_ofs]->virtual));
+
+		DRM_DEBUG( "ring rptr: offset=0x%08lx handle=0x%08lx\n",
+			   virt_to_bus(entry->pagelist[page_ofs]->virtual),
+			   entry->handle + tmp_ofs );
+	}
 
 	/* Set ring buffer size */
 	RADEON_WRITE( RADEON_CP_RB_CNTL, dev_priv->ring.size_l2qw );
 
 	radeon_do_wait_for_idle( dev_priv );
-
-	/* Turn off PCI GART */
-	tmp = RADEON_READ( RADEON_AIC_CNTL ) & ~RADEON_PCIGART_TRANSLATE_EN;
-	RADEON_WRITE( RADEON_AIC_CNTL, tmp );
 
 	/* Turn on bus mastering */
 	tmp = RADEON_READ( RADEON_BUS_CNTL ) & ~RADEON_BUS_MASTER_DIS;
@@ -596,8 +647,10 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev )
 static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 {
 	drm_radeon_private_t *dev_priv;
-	drm_radeon_depth_clear_t *depth_clear;
 	struct list_head *list;
+	u32 tmp;
+	drm_radeon_depth_clear_t *depth_clear;
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
 	dev_priv = DRM(alloc)( sizeof(drm_radeon_private_t), DRM_MEM_DRIVER );
 	if ( dev_priv == NULL )
@@ -608,11 +661,19 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 
 	dev_priv->is_pci = init->is_pci;
 
-	/* We don't support PCI cards until PCI GART is implemented.
-	 * Fail here so we can remove all checks for PCI cards around
-	 * the CP ring code.
+#if !defined(PCIGART_ENABLED)
+	/* PCI support is not 100% working, so we disable it here.
 	 */
 	if ( dev_priv->is_pci ) {
+		DRM_ERROR( "PCI GART not yet supported for Radeon!\n" );
+		DRM(free)( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
+		dev->dev_private = NULL;
+		return -EINVAL;
+	}
+#endif
+
+	if ( dev_priv->is_pci && !dev->sg ) {
+		DRM_ERROR( "PCI GART memory not allocated!\n" );
 		DRM(free)( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
 		dev->dev_private = NULL;
 		return -EINVAL;
@@ -621,6 +682,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	dev_priv->usec_timeout = init->usec_timeout;
 	if ( dev_priv->usec_timeout < 1 ||
 	     dev_priv->usec_timeout > RADEON_MAX_USEC_TIMEOUT ) {
+		DRM_DEBUG( "TIMEOUT problem!\n" );
 		DRM(free)( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
 		dev->dev_private = NULL;
 		return -EINVAL;
@@ -638,6 +700,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	 */
 	if ( ( init->cp_mode != RADEON_CSQ_PRIBM_INDDIS ) &&
 	     ( init->cp_mode != RADEON_CSQ_PRIBM_INDBM ) ) {
+		DRM_DEBUG( "BAD cp_mode (%x)!\n", init->cp_mode );
 		DRM(free)( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
 		dev->dev_private = NULL;
 		return -EINVAL;
@@ -732,15 +795,45 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 		(drm_radeon_sarea_t *)((u8 *)dev_priv->sarea->handle +
 				       init->sarea_priv_offset);
 
-	DRM_IOREMAP( dev_priv->cp_ring );
-	DRM_IOREMAP( dev_priv->ring_rptr );
-	DRM_IOREMAP( dev_priv->buffers );
+	if ( !dev_priv->is_pci ) {
+		DRM_IOREMAP( dev_priv->cp_ring );
+		DRM_IOREMAP( dev_priv->ring_rptr );
+		DRM_IOREMAP( dev_priv->buffers );
+	} else {
+		dev_priv->cp_ring->handle =
+			(void *)dev_priv->cp_ring->offset;
+		dev_priv->ring_rptr->handle =
+			(void *)dev_priv->ring_rptr->offset;
+		dev_priv->buffers->handle = (void *)dev_priv->buffers->offset;
+
+		DRM_DEBUG( "dev_priv->cp_ring->handle %p\n",
+			   dev_priv->cp_ring->handle );
+		DRM_DEBUG( "dev_priv->ring_rptr->handle %p\n",
+			   dev_priv->ring_rptr->handle );
+		DRM_DEBUG( "dev_priv->buffers->handle %p\n",
+			   dev_priv->buffers->handle );
+	}
+
 
 	dev_priv->agp_size = init->agp_size;
 	dev_priv->agp_vm_start = RADEON_READ( RADEON_CONFIG_APER_SIZE );
-	dev_priv->agp_buffers_offset = (dev_priv->buffers->offset
-					- dev->agp->base
-					+ dev_priv->agp_vm_start);
+#if __REALLY_HAVE_AGP
+	if ( !dev_priv->is_pci )
+		dev_priv->agp_buffers_offset = (dev_priv->buffers->offset
+						- dev->agp->base
+						+ dev_priv->agp_vm_start);
+	else
+#endif
+		dev_priv->agp_buffers_offset = (dev_priv->buffers->offset
+						- dev->sg->handle
+						+ dev_priv->agp_vm_start);
+
+	DRM_DEBUG( "dev_priv->agp_size %d\n",
+		   dev_priv->agp_size );
+	DRM_DEBUG( "dev_priv->agp_vm_start 0x%x\n",
+		   dev_priv->agp_vm_start );
+	DRM_DEBUG( "dev_priv->agp_buffers_offset 0x%lx\n",
+		   dev_priv->agp_buffers_offset );
 
 	dev_priv->ring.head = ((__volatile__ u32 *)
 			       dev_priv->ring_rptr->handle);
@@ -784,6 +877,44 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	RADEON_WRITE( RADEON_LAST_CLEAR_REG,
 		      dev_priv->sarea_priv->last_clear );
 
+	if ( dev_priv->is_pci ) {
+		dev_priv->phys_pci_gart = DRM(ati_pcigart_init)( dev );
+		if ( !dev_priv->phys_pci_gart ) {
+			DRM_ERROR( "failed to init PCI GART!\n" );
+			DRM(free)( dev_priv, sizeof(*dev_priv),
+				   DRM_MEM_DRIVER );
+			dev->dev_private = NULL;
+			return -EINVAL;
+		}
+		/* Turn on PCI GART
+		 */
+		tmp = RADEON_READ( RADEON_AIC_CNTL )
+		      | RADEON_PCIGART_TRANSLATE_EN;
+		RADEON_WRITE( RADEON_AIC_CNTL, tmp );
+
+		/* set PCI GART page-table base address
+		 */
+		RADEON_WRITE( RADEON_AIC_PT_BASE,
+			      virt_to_bus( (void *)dev_priv->phys_pci_gart ) );
+
+		/* set address range for PCI address translate
+		 */
+		RADEON_WRITE( RADEON_AIC_LO_ADDR, dev_priv->agp_vm_start );
+		RADEON_WRITE( RADEON_AIC_HI_ADDR, dev_priv->agp_vm_start
+						  + dev_priv->agp_size - 1);
+
+		/* Turn off AGP aperture -- is this required for PCIGART?
+		 */
+		RADEON_WRITE( RADEON_MC_AGP_LOCATION, 0xffffffc0 ); /* ?? */
+		RADEON_WRITE( RADEON_AGP_COMMAND, 0 ); /* clear AGP_COMMAND */
+	} else {
+		/* Turn off PCI GART
+		 */
+		tmp = RADEON_READ( RADEON_AIC_CNTL )
+		      & ~RADEON_PCIGART_TRANSLATE_EN;
+		RADEON_WRITE( RADEON_AIC_CNTL, tmp );
+	}
+
 	radeon_cp_load_microcode( dev_priv );
 	radeon_cp_init_ring_buffer( dev );
 	radeon_do_engine_reset( dev );
@@ -797,12 +928,16 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 
 int radeon_do_cleanup_cp( drm_device_t *dev )
 {
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
+
 	if ( dev->dev_private ) {
 		drm_radeon_private_t *dev_priv = dev->dev_private;
 
-		DRM_IOREMAPFREE( dev_priv->cp_ring );
-		DRM_IOREMAPFREE( dev_priv->ring_rptr );
-		DRM_IOREMAPFREE( dev_priv->buffers );
+		if ( !dev_priv->is_pci ) {
+			DRM_IOREMAPFREE( dev_priv->cp_ring );
+			DRM_IOREMAPFREE( dev_priv->ring_rptr );
+			DRM_IOREMAPFREE( dev_priv->buffers );
+		}
 
 		DRM(free)( dev->dev_private, sizeof(drm_radeon_private_t),
 			   DRM_MEM_DRIVER );
@@ -953,7 +1088,7 @@ int radeon_engine_reset( struct inode *inode, struct file *filp,
 }
 
 
-/* =============================================================
+/* ================================================================
  * Fullscreen mode
  */
 
@@ -1014,7 +1149,7 @@ int radeon_fullscreen( struct inode *inode, struct file *filp,
 }
 
 
-/* =============================================================
+/* ================================================================
  * Freelist management
  */
 #define RADEON_BUFFER_USED	0xffffffff
@@ -1153,7 +1288,7 @@ void radeon_freelist_reset( drm_device_t *dev )
 }
 
 
-/* =============================================================
+/* ================================================================
  * CP command submission
  */
 
@@ -1170,7 +1305,10 @@ int radeon_wait_ring( drm_radeon_private_t *dev_priv, int n )
 	}
 
 	/* FIXME: This return value is ignored in the BEGIN_RING macro! */
+#if RADEON_FIFO_DEBUG
+	radeon_status( dev_priv );
 	DRM_ERROR( "failed!\n" );
+#endif
 	return -EBUSY;
 }
 

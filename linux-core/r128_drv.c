@@ -33,12 +33,13 @@
 #include "r128.h"
 #include "drmP.h"
 #include "r128_drv.h"
+#include "ati_pcigart.h"
 
 #define DRIVER_AUTHOR		"Gareth Hughes, VA Linux Systems Inc."
 
 #define DRIVER_NAME		"r128"
 #define DRIVER_DESC		"ATI Rage 128"
-#define DRIVER_DATE		"20010308"
+#define DRIVER_DATE		"20010624"
 
 #define DRIVER_MAJOR		2
 #define DRIVER_MINOR		1
@@ -88,3 +89,4 @@
 #include "drm_proc.h"
 #include "drm_vm.h"
 #include "drm_stub.h"
+#include "drm_scatter.h"

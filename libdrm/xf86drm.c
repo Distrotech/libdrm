@@ -27,7 +27,7 @@
  * Authors: Rickard E. (Rik) Faith <faith@valinux.com>
  *	    Kevin E. Martin <martin@valinux.com>
  *
- * $XFree86: xc/programs/Xserver/hw/xfree86/os-support/linux/drm/xf86drm.c,v 1.17 2000/09/24 13:51:32 alanh Exp $
+ * $XFree86: xc/programs/Xserver/hw/xfree86/os-support/linux/drm/xf86drm.c,v 1.22 2001/05/19 00:26:45 dawes Exp $
  *
  */
 
@@ -35,11 +35,9 @@
 # include "xf86.h"
 # include "xf86_OSproc.h"
 # include "xf86_ansic.h"
-# include "xf86Priv.h"
 # define _DRM_MALLOC xalloc
 # define _DRM_FREE   xfree
 # ifndef XFree86LOADER
-#  include <sys/stat.h>
 #  include <sys/mman.h>
 # endif
 #else
@@ -53,6 +51,7 @@
 # include <signal.h>
 # include <sys/types.h>
 # include <sys/stat.h>
+# define stat_t struct stat
 # include <sys/ioctl.h>
 # include <sys/mman.h>
 # include <sys/time.h>
@@ -68,10 +67,12 @@ extern int xf86RemoveSIGIOHandler(int fd);
 # endif
 #endif
 
-#ifdef __alpha__
+/* No longer needed with CVS kernel modules on alpha 
+#if defined(__alpha__) && defined(__linux__)
 extern unsigned long _bus_base(void);
 #define BUS_BASE _bus_base()
 #endif
+*/
 
 /* Not all systems have MAP_FAILED defined */
 #ifndef MAP_FAILED
@@ -141,11 +142,7 @@ static char *drmStrdup(const char *s)
 
 static unsigned long drmGetKeyFromFd(int fd)
 {
-#ifdef XFree86LOADER
-    struct xf86stat st;
-#else
-    struct stat     st;
-#endif
+    stat_t     st;
 
     st.st_rdev = 0;
     fstat(fd, &st);
@@ -174,11 +171,7 @@ static drmHashEntry *drmGetEntry(int fd)
 
 static int drmOpenDevice(long dev, int minor)
 {
-#ifdef XFree86LOADER
-    struct xf86stat st;
-#else
-    struct stat     st;
-#endif
+    stat_t          st;
     char            buf[64];
     int             fd;
     mode_t          dirmode = DRM_DEV_DIRMODE;
@@ -225,13 +218,13 @@ static int drmOpenDevice(long dev, int minor)
     return -errno;
 }
 
-int drmOpenMinor(int minor, int create)
+static int drmOpenMinor(int minor, int create)
 {
     int  fd;
     char buf[64];
-
+    
     if (create) return drmOpenDevice(makedev(DRM_MAJOR, minor), minor);
-
+    
     sprintf(buf, DRM_DEV_NAME, DRM_DIR_NAME, minor);
     if ((fd = open(buf, O_RDWR, 0)) >= 0) return fd;
     return -errno;
@@ -252,7 +245,7 @@ int drmAvailable(void)
 	if (!access("/proc/dri/0", R_OK)) return 1;
 	return 0;
     }
-
+    
     if ((version = drmGetVersion(fd))) {
 	retval = 1;
 	drmFreeVersion(version);
@@ -267,7 +260,7 @@ static int drmOpenByBusid(const char *busid)
     int        i;
     int        fd;
     const char *buf;
-
+    
     for (i = 0; i < DRM_MAX_MINOR; i++) {
 	if ((fd = drmOpenMinor(i, 0)) >= 0) {
 	    buf = drmGetBusid(fd);
@@ -287,7 +280,7 @@ static int drmOpenByName(const char *name)
     int           i;
     int           fd;
     drmVersionPtr version;
-
+    
     if (!drmAvailable()) {
 #if !defined(XFree86Server)
 	return -1;
@@ -319,7 +312,7 @@ static int drmOpenByName(const char *name)
 	char proc_name[64], buf[512];
 	char *driver, *pt, *devstring;
 	int  retcode;
-
+	
 	sprintf(proc_name, "/proc/dri/%d/name", i);
 	if ((fd = open(proc_name, 0, 0)) >= 0) {
 	    retcode = read(fd, buf, sizeof(buf)-1);
@@ -499,11 +492,12 @@ int drmAddMap(int fd,
     drm_map_t map;
 
     map.offset  = offset;
+/* No longer needed with CVS kernel modules on alpha
 #ifdef __alpha__
-    /* Make sure we add the bus_base to all but shm */
     if (type != DRM_SHM)
 	map.offset += BUS_BASE;
 #endif
+*/
     map.size    = size;
     map.handle  = 0;
     map.type    = type;
@@ -1005,6 +999,28 @@ unsigned int drmAgpDeviceId(int fd)
 
     if (ioctl(fd, DRM_IOCTL_AGP_INFO, &i)) return 0;
     return i.id_device;
+}
+
+int drmScatterGatherAlloc(int fd, unsigned long size, unsigned long *handle)
+{
+    drm_scatter_gather_t sg;
+
+    *handle = 0;
+    sg.size   = size;
+    sg.handle = 0;
+    if (ioctl(fd, DRM_IOCTL_SG_ALLOC, &sg)) return -errno;
+    *handle = sg.handle;
+    return 0;
+}
+
+int drmScatterGatherFree(int fd, unsigned long handle)
+{
+    drm_scatter_gather_t sg;
+
+    sg.size   = 0;
+    sg.handle = handle;
+    if (ioctl(fd, DRM_IOCTL_SG_FREE, &sg)) return -errno;
+    return 0;
 }
 
 int drmError(int err, const char *label)

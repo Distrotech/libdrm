@@ -39,7 +39,7 @@
 
 #define DRIVER_NAME		"i810"
 #define DRIVER_DESC		"Intel i810"
-#define DRIVER_DATE		"20010215"
+#define DRIVER_DATE		"20010624"
 
 #define DRIVER_MAJOR		1
 #define DRIVER_MINOR		1
