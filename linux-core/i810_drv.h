@@ -31,7 +31,6 @@
 
 #ifndef _I810_DRV_H_
 #define _I810_DRV_H_
-#include "i810_drm_public.h"
 
 typedef struct _drm_i810_ring_buffer{
 	int tail_mask;

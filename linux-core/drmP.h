@@ -53,7 +53,7 @@
 #include <linux/agp_backend.h>
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,0)
-#include <linux/spinlock.h>
+#include <linux/tqueue.h>
 #include <linux/poll.h>
 #endif
 #include "drm.h"

@@ -119,10 +119,10 @@ DRMOBJS += agpsupport.o
 MODS += mga.o i810.o
 
 MGAOBJS=	mga_drv.o mga_dma.o mga_bufs.o mga_state.o mga_context.o
-MGAHEADERS=	mga_drv.h mga_drm_public.h $(DRMHEADERS)
+MGAHEADERS=	mga_drv.h $(DRMHEADERS)
 
 I810OBJS=	i810_drv.o i810_dma.o i810_bufs.o i810_context.o
-I810HEADERS=	i810_drv.h i810_drm_public.h $(DRMHEADERS)
+I810HEADERS=	i810_drv.h $(DRMHEADERS)
 endif
 
 all::;@echo KERNEL HEADERS IN $(TREE): SMP=${SMP} MODVERSIONS=${MODVERSIONS} \

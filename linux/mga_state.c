@@ -36,7 +36,7 @@
 #include "drm.h"
 
 static void mgaEmitClipRect( drm_mga_private_t *dev_priv, 
-			     xf86drmClipRectRec *box )
+			     drm_clip_rect_t *box )
 {
    	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	unsigned int *regs = sarea_priv->ContextState;
@@ -546,7 +546,7 @@ static void mga_dma_dispatch_clear( drm_device_t *dev, int flags,
       	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	unsigned int *regs = sarea_priv->ContextState;
 	int nbox = sarea_priv->nbox;
-	xf86drmClipRectRec *pbox = sarea_priv->boxes;
+	drm_clip_rect_t *pbox = sarea_priv->boxes;
 	unsigned int cmd;
 	int i;
    	int primary_needed;
@@ -629,7 +629,7 @@ static void mga_dma_dispatch_swap( drm_device_t *dev )
       	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	unsigned int *regs = sarea_priv->ContextState;
 	int nbox = sarea_priv->nbox;
-	xf86drmClipRectRec *pbox = sarea_priv->boxes;
+	drm_clip_rect_t *pbox = sarea_priv->boxes;
 	int i;
    	int primary_needed;
    	PRIMLOCALS;
@@ -687,11 +687,15 @@ int mga_clear_bufs(struct inode *inode, struct file *filp,
    	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
       	__volatile__ unsigned int *status = 
      		(__volatile__ unsigned int *)dev_priv->status_page;
-
 	drm_mga_clear_t clear;
 
    	copy_from_user_ret(&clear, (drm_mga_clear_t *)arg, sizeof(clear), 
 			   -EFAULT);
+
+	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
+		DRM_ERROR("mga_clear_bufs called without lock held\n");
+		return -EINVAL;
+	}
    
    	if (sarea_priv->nbox > MGA_NR_SAREA_CLIPRECTS)
      		sarea_priv->nbox = MGA_NR_SAREA_CLIPRECTS;
@@ -718,6 +722,11 @@ int mga_swap_bufs(struct inode *inode, struct file *filp,
       	__volatile__ unsigned int *status = 
      		(__volatile__ unsigned int *)dev_priv->status_page;
    
+	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
+		DRM_ERROR("mga_swap_bufs called without lock held\n");
+		return -EINVAL;
+	}
+
       	if (sarea_priv->nbox > MGA_NR_SAREA_CLIPRECTS)
      		sarea_priv->nbox = MGA_NR_SAREA_CLIPRECTS;
 
@@ -751,6 +760,11 @@ int mga_iload(struct inode *inode, struct file *filp,
    	DRM_DEBUG("Starting Iload\n");
  	copy_from_user_ret(&iload, (drm_mga_iload_t *)arg, sizeof(iload),
  			   -EFAULT);
+
+	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
+		DRM_ERROR("mga_iload called without lock held\n");
+		return -EINVAL;
+	}
 
    	buf = dma->buflist[ iload.idx ];
 	buf_priv = buf->dev_private;
@@ -795,6 +809,10 @@ int mga_vertex(struct inode *inode, struct file *filp,
 	copy_from_user_ret(&vertex, (drm_mga_vertex_t *)arg, sizeof(vertex),
 			   -EFAULT);
    
+	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
+		DRM_ERROR("mga_vertex called without lock held\n");
+		return -EINVAL;
+	}
 
 	DRM_DEBUG("mga_vertex\n");
 
@@ -858,6 +876,11 @@ int mga_dma(struct inode *inode, struct file *filp, unsigned int cmd,
    	copy_from_user_ret(&d, (drm_dma_t *)arg, sizeof(d), -EFAULT);
 	DRM_DEBUG("%d %d: %d send, %d req\n",
 		  current->pid, d.context, d.send_count, d.request_count);
+
+	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
+		DRM_ERROR("mga_dma called without lock held\n");
+		return -EINVAL;
+	}
 
 	/* Please don't send us buffers.
 	 */

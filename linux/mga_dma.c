@@ -787,7 +787,7 @@ static int mga_dma_initialize(drm_device_t *dev, drm_mga_init_t *init) {
 		  dev_priv->mAccess);
    
 	memcpy(&dev_priv->WarpIndex, &init->WarpIndex, 
-	       sizeof(mgaWarpIndex) * MGA_MAX_WARP_PIPES);
+	       sizeof(drm_mga_warp_index_t) * MGA_MAX_WARP_PIPES);
 
    	for (i = 0 ; i < MGA_MAX_WARP_PIPES ; i++) 
 		DRM_DEBUG("warp pipe %d: installed: %d phys: %lx size: %x\n",
@@ -1116,7 +1116,12 @@ int mga_flush_ioctl(struct inode *inode, struct file *filp,
 	int		 i;
  
 	copy_from_user_ret(&lock, (drm_lock_t *)arg, sizeof(lock), -EFAULT);
-   
+
+	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
+		DRM_ERROR("mga_flush_ioctl called without lock held\n");
+		return -EINVAL;
+	}
+
    	if(lock.flags & _DRM_LOCK_FLUSH || lock.flags & _DRM_LOCK_FLUSH_ALL) {
 		mga_flush_queue(dev);
 

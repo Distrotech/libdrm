@@ -33,7 +33,6 @@
 
 #define __NO_VERSION__
 #include "drmP.h"
-#include "i810_drm_public.h"
 #include "i810_drv.h"
 
 #include <linux/interrupt.h>	/* For task queue support */
@@ -406,7 +405,7 @@ static void i810_dma_dispatch_vertex(drm_device_t *dev,
    	drm_i810_private_t *dev_priv = dev->dev_private;
 	drm_i810_buf_priv_t *buf_priv = buf->dev_private;
    	drm_i810_sarea_t *sarea_priv = dev_priv->sarea_priv;
-   	xf86drmClipRectRec *box = sarea_priv->boxes;
+   	drm_clip_rect_t *box = sarea_priv->boxes;
    	int nbox = sarea_priv->nbox;
 	unsigned long address = (unsigned long)buf->bus_address;
 	unsigned long start = address - dev->agp->base;     
@@ -821,6 +820,11 @@ int i810_flush_ioctl(struct inode *inode, struct file *filp,
    	drm_device_t	  *dev	  = priv->dev;
    
    	DRM_DEBUG("i810_flush_ioctl\n");
+   	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
+		DRM_ERROR("i810_flush_ioctl called without lock held\n");
+		return -EINVAL;
+	}
+
    	i810_flush_queue(dev);
    	return 0;
 }
@@ -869,6 +873,11 @@ int i810_dma_general(struct inode *inode, struct file *filp,
 	DRM_DEBUG("i810 dma general idx %d used %d\n",
 		  general.idx, general.used);
    
+   	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
+		DRM_ERROR("i810_dma_general called without lock held\n");
+		return -EINVAL;
+	}
+
 	retcode = i810DmaGeneral(dev, &general);
 	sarea_priv->last_enqueue = dev_priv->counter-1;
    	sarea_priv->last_dispatch = (int) hw_status[5];
@@ -890,7 +899,11 @@ int i810_dma_vertex(struct inode *inode, struct file *filp,
 
 	copy_from_user_ret(&vertex, (drm_i810_vertex_t *)arg, sizeof(vertex),
 			   -EFAULT);
-   
+   	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
+		DRM_ERROR("i810_dma_vertex called without lock held\n");
+		return -EINVAL;
+	}
+
 	DRM_DEBUG("i810 dma vertex, idx %d used %d discard %d\n",
 		  vertex.idx, vertex.used, vertex.discard);
 
@@ -933,6 +946,11 @@ int i810_dma(struct inode *inode, struct file *filp, unsigned int cmd,
    	copy_from_user_ret(&d, (drm_dma_t *)arg, sizeof(d), -EFAULT);
 	DRM_DEBUG("%d %d: %d send, %d req\n",
 		  current->pid, d.context, d.send_count, d.request_count);
+   
+	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
+		DRM_ERROR("i810_dma called without lock held\n");
+		return -EINVAL;
+	}
 
 	/* Please don't send us buffers.
 	 */

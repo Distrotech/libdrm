@@ -31,7 +31,6 @@
 
 #ifndef _MGA_DRV_H_
 #define _MGA_DRV_H_
-#include "mga_drm_public.h"
 
 typedef struct {
    	unsigned int num_dwords;
@@ -70,7 +69,7 @@ typedef struct _drm_mga_private {
    	int stride;
    	int sgram;
 	int use_agp;
-   	mgaWarpIndex WarpIndex[MGA_MAX_G400_PIPES];
+   	drm_mga_warp_index_t WarpIndex[MGA_MAX_G400_PIPES];
 	unsigned int WarpPipe;
    	__volatile__ unsigned long softrap_age;
    	u32 dispatch_lock;
