@@ -188,6 +188,7 @@ int mach64_do_wait_for_dma( drm_mach64_private_t *dev_priv )
 
 int mach64_do_dma_idle( drm_mach64_private_t *dev_priv ) {
 	int ret;
+	u32 reg;
 
 	/* wait for completion */
 	if ( (ret = mach64_do_wait_for_idle( dev_priv )) < 0 ) {
@@ -196,6 +197,13 @@ int mach64_do_dma_idle( drm_mach64_private_t *dev_priv ) {
 		return ret;
 	}
 
+	/* FIXME: Is this necessary? It's not done in the  Bus Mastering sample code. In fact the opposite it's done... */
+	reg = MACH64_READ( MACH64_BUS_CNTL );
+	MACH64_WRITE( MACH64_BUS_CNTL, reg | MACH64_BUS_MASTER_DIS | MACH64_BUS_EXT_REG_EN );
+	
+        /* restore SRC_CNTL to disable busmastering */
+        MACH64_WRITE( MACH64_SRC_CNTL, 0 );
+	
 	/* clean up after pass */
 	mach64_do_release_used_buffers( dev_priv );
 	return 0;
@@ -829,12 +837,6 @@ static int mach64_do_dispatch_real_dma( drm_mach64_private_t *dev_priv )
 			p[idx++] = cpu_to_le32(DMAREG(MACH64_LAST_DISPATCH_REG));
 			p[idx++] = cpu_to_le32(dev_priv->sarea_priv->last_dispatch);
 #endif
-			reg = MACH64_READ( MACH64_BUS_CNTL );
-			reg |= MACH64_BUS_MASTER_DIS | MACH64_BUS_EXT_REG_EN;
-			p[idx++] = cpu_to_le32(DMAREG(MACH64_BUS_CNTL));
-			p[idx++] = cpu_to_le32(reg);
-			p[idx++] = cpu_to_le32(DMAREG(MACH64_SRC_CNTL));
-			p[idx++] = cpu_to_le32(0);
 			bytes += (idx-start)*sizeof(u32);
 		}
 
