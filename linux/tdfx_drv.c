@@ -30,9 +30,19 @@
  *    Gareth Hughes <gareth@valinux.com>
  */
 
+#ifdef __linux__
 #include <linux/config.h>
+#endif
+
+#ifdef __FreeBSD__
+#include <sys/types.h>
+#include <sys/bus.h>
+#include <pci/pcivar.h>
+#include <opt_drm_linux.h>
+#endif
+
 #include "tdfx.h"
-#include "drmP.h"
+#include "drmP.h
 
 #define DRIVER_AUTHOR		"VA Linux Systems Inc."
 
