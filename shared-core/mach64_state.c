@@ -637,6 +637,8 @@ static int mach64_dma_dispatch_blit( DRMFILE filp, drm_device_t *dev,
 		break;
 	case MACH64_DATATYPE_ARGB1555:
 	case MACH64_DATATYPE_RGB565:
+	case MACH64_DATATYPE_VYUY422:
+	case MACH64_DATATYPE_YVYU422:
 	case MACH64_DATATYPE_ARGB4444:
 		dword_shift = 1;
 		break;
