@@ -1,4 +1,4 @@
-/* mach64_dma.c -- DMA support for mach64 (Rage Pro) driver -*- linux-c -*-
+/* mach64_state.c -- State support for mach64 (Rage Pro) driver -*- linux-c -*-
  * Created: Sun Dec 03 19:20:26 2000 by gareth@valinux.com
  *
  * Copyright 2000 Gareth Hughes
