@@ -27,7 +27,7 @@
  * Authors:
  *    Kevin E. Martin <martin@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
- *    Keith Whitwell <keith_whitwell@yahoo.com>
+ *    Keith Whitwell <keith@tungstengraphics.com>
  */
 
 #ifndef __RADEON_DRM_H__
@@ -355,6 +355,7 @@ typedef struct {
 	int ctx_owner;
         int pfState;                /* number of 3d windows (0,1,2ormore) */
         int pfCurrentPage;	    /* which buffer is being displayed? */
+	int crtc2_base;		    /* CRTC2 frame offset */
 } drm_radeon_sarea_t;
 
 
