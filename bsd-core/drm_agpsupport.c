@@ -31,12 +31,10 @@
 
 #include "drmP.h"
 
-#ifdef __FreeBSD__
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #if __REALLY_HAVE_AGP
 #include <sys/agpio.h>
-#endif
 #endif
 
 int DRM(agp_info)(DRM_OS_IOCTL)
