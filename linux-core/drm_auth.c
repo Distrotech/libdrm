@@ -131,7 +131,7 @@ int DRM(getmagic)(DRM_OS_IOCTL)
 
 #ifdef __FreeBSD__
 	if (first) {
-		DRM_OS_SPININIT(&lock, "drm getmagic");
+		DRM_OS_SPININIT(lock, "drm getmagic");
 		first = 0;
 	}
 #endif /* __FreeBSD__ */

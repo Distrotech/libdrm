@@ -102,7 +102,7 @@ void DRM(mem_init)(void)
 #endif /* __linux__ */
 
 #ifdef __FreeBSD__
-	DRM_OS_SPININIT(&DRM(mem_lock), "drm memory");
+	DRM_OS_SPININIT(DRM(mem_lock), "drm memory");
 #endif /* __FreeBSD__ */
 
 	for (mem = DRM(mem_stats); mem->name; ++mem) {

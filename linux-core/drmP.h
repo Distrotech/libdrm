@@ -249,8 +249,8 @@ typedef struct drm_waitlist {
 	drm_buf_t	  **rp;		/* Read pointer			   */
 	drm_buf_t	  **wp;		/* Write pointer		   */
 	drm_buf_t	  **end;	/* End pointer			   */
-	spinlock_t	  read_lock;
-	spinlock_t	  write_lock;
+	DRM_OS_SPINTYPE	  read_lock;
+	DRM_OS_SPINTYPE	  write_lock;
 } drm_waitlist_t;
 
 typedef struct drm_freelist {
@@ -262,7 +262,7 @@ typedef struct drm_freelist {
 	int		  low_mark;    /* Low water mark		   */
 	int		  high_mark;   /* High water mark		   */
 	atomic_t	  wfh;	       /* If waiting for high mark	   */
-	spinlock_t        lock;
+	DRM_OS_SPINTYPE   lock;
 } drm_freelist_t;
 
 typedef struct drm_buf_entry {

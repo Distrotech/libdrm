@@ -39,8 +39,7 @@
 #endif
 #endif
 
-int DRM(agp_info)(dev_t kdev, u_long cmd, caddr_t data,
-	     int flags, struct proc *p)
+int DRM(agp_info)(DRM_OS_IOCTL)
 {
 	drm_device_t	*dev	= kdev->si_drv1;
 	struct agp_info *kern;
@@ -64,8 +63,7 @@ int DRM(agp_info)(dev_t kdev, u_long cmd, caddr_t data,
 	return 0;
 }
 
-int DRM(agp_acquire)(dev_t kdev, u_long cmd, caddr_t data,
-		int flags, struct proc *p)
+int DRM(agp_acquire)(DRM_OS_IOCTL)
 {
 	drm_device_t *dev = kdev->si_drv1;
 	int          retcode;
@@ -77,8 +75,7 @@ int DRM(agp_acquire)(dev_t kdev, u_long cmd, caddr_t data,
 	return 0;
 }
 
-int DRM(agp_release)(dev_t kdev, u_long cmd, caddr_t data,
-		int flags, struct proc *p)
+int DRM(agp_release)(DRM_OS_IOCTL)
 {
 	drm_device_t *dev = kdev->si_drv1;
 
@@ -99,8 +96,7 @@ void DRM(agp_do_release)(void)
 		agp_release(agpdev);
 }
 
-int DRM(agp_enable)(dev_t kdev, u_long cmd, caddr_t data,
-	       int flags, struct proc *p)
+int DRM(agp_enable)(DRM_OS_IOCTL)
 {
 	drm_device_t   *dev = kdev->si_drv1;
 	drm_agp_mode_t mode;
@@ -116,8 +112,7 @@ int DRM(agp_enable)(dev_t kdev, u_long cmd, caddr_t data,
 	return 0;
 }
 
-int DRM(agp_alloc)(dev_t kdev, u_long cmd, caddr_t data,
-		  int flags, struct proc *p)
+int DRM(agp_alloc)(DRM_OS_IOCTL)
 {
 	drm_device_t     *dev = kdev->si_drv1;
 	drm_agp_buffer_t request;
@@ -172,8 +167,7 @@ static drm_agp_mem_t * DRM(agp_lookup_entry)(drm_device_t *dev, void *handle)
 	return NULL;
 }
 
-int DRM(agp_unbind)(dev_t kdev, u_long cmd, caddr_t data,
-	       int flags, struct proc *p)
+int DRM(agp_unbind)(DRM_OS_IOCTL)
 {
 	drm_device_t      *dev = kdev->si_drv1;
 	drm_agp_binding_t request;
@@ -195,8 +189,7 @@ int DRM(agp_unbind)(dev_t kdev, u_long cmd, caddr_t data,
 		return retcode;
 }
 
-int DRM(agp_bind)(dev_t kdev, u_long cmd, caddr_t data,
-		 int flags, struct proc *p)
+int DRM(agp_bind)(DRM_OS_IOCTL)
 {
 	drm_device_t      *dev = kdev->si_drv1;
 	drm_agp_binding_t request;
@@ -218,8 +211,7 @@ int DRM(agp_bind)(dev_t kdev, u_long cmd, caddr_t data,
 	return 0;
 }
 
-int DRM(agp_free)(dev_t kdev, u_long cmd, caddr_t data,
-		 int flags, struct proc *p)
+int DRM(agp_free)(DRM_OS_IOCTL)
 {
 	drm_device_t     *dev = kdev->si_drv1;
 	drm_agp_buffer_t request;

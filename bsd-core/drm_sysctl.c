@@ -166,9 +166,9 @@ static int DRM(vm_info)DRM_SYSCTL_HANDLER_ARGS
 	drm_device_t *dev = arg1;
 	int	     ret;
 
-	lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, curproc);
+	DRM_OS_LOCK;
 	ret = DRM(_vm_info)(oidp, arg1, arg2, req);
-	lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc);
+	DRM_OS_UNLOCK;
 
 	return ret;
 }
@@ -217,9 +217,9 @@ static int DRM(queues_info) DRM_SYSCTL_HANDLER_ARGS
 	drm_device_t *dev = arg1;
 	int	     ret;
 
-	lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, curproc);
+	DRM_OS_LOCK;
 	ret = DRM(_queues_info)(oidp, arg1, arg2, req);
-	lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc);
+	DRM_OS_UNLOCK;
 	return ret;
 }
 
@@ -267,9 +267,9 @@ static int DRM(bufs_info) DRM_SYSCTL_HANDLER_ARGS
 	drm_device_t *dev = arg1;
 	int	     ret;
 
-	lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, curproc);
+	DRM_OS_LOCK;
 	ret = DRM(_bufs_info)(oidp, arg1, arg2, req);
-	lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc);
+	DRM_OS_UNLOCK;
 	return ret;
 }
 
@@ -301,9 +301,9 @@ static int DRM(clients_info)DRM_SYSCTL_HANDLER_ARGS
 	drm_device_t *dev = arg1;
 	int	     ret;
 
-	lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, curproc);
+	DRM_OS_LOCK;
 	ret = DRM(_clients_info)(oidp, arg1, arg2, req);
-	lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc);
+	DRM_OS_UNLOCK;
 	return ret;
 }
 
@@ -386,9 +386,9 @@ static int DRM(vma_info)DRM_SYSCTL_HANDLER_ARGS
 	drm_device_t *dev = arg1;
 	int	     ret;
 
-	lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, curproc);
+	DRM_OS_LOCK;
 	ret = DRM(_vma_info)(oidp, arg1, arg2, req);
-	lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc);
+	DRM_OS_UNLOCK;
 	return ret;
 }
 #endif
@@ -515,9 +515,9 @@ static int DRM(histo_info)DRM_SYSCTL_HANDLER_ARGS
 	drm_device_t *dev = arg1;
 	int	     ret;
 
-	lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, curproc);
+	DRM_OS_LOCK;
 	ret = _drm_histo_info(oidp, arg1, arg2, req);
-	lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc);
+	DRM_OS_UNLOCK;
 	return ret;
 }
 #endif

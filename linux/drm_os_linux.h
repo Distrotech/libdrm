@@ -257,6 +257,7 @@ do {									\
 
 #define DRM_OS_LOCK 	up(&dev->struct_sem)
 #define DRM_OS_UNLOCK 	down(&dev->struct_sem)
+#define DRM_OS_SPINTYPE spinlock_t
 #define DRM_OS_SPININIT(l,name)	
 #define DRM_OS_SPINLOCK(l)	spin_lock(l)
 #define DRM_OS_SPINUNLOCK(u)	spin_unlock(u)

@@ -9,7 +9,7 @@ XCOMM dependencies are stuck in drmP.h
 includes:: tdfxinc mgainc gammainc r128inc radeoninc sisinc i810inc
 
 clean::
-	rm -f tdfx/tdfx* mga/mga* gamma/gamma* r128/r128* radeon/radeon* sis/sis* i810/i810*
+	$(RM) tdfx/tdfx* mga/mga* gamma/gamma* r128/r128* radeon/radeon* sis/sis* i810/i810*
 
 LINUXDRM = ../$(XF86OSSRC)/linux/drm/kernel
 

@@ -276,7 +276,7 @@ int DRM(getclient)( DRM_OS_IOCTL )
 			client.uid   = pt->uid;
 			client.magic = pt->magic;
 			client.iocs  = pt->ioctl_count;
-			lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc);
+			DRM_OS_UNLOCK;
 
 			*(drm_client_t *)data = client;
 			return 0;
