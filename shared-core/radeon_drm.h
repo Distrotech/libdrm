@@ -367,6 +367,8 @@ typedef struct {
 #define DRM_IOCTL_RADEON_ALLOC      DRM_IOWR( 0x53, drm_radeon_mem_alloc_t)
 #define DRM_IOCTL_RADEON_FREE       DRM_IOW( 0x54, drm_radeon_mem_free_t)
 #define DRM_IOCTL_RADEON_INIT_HEAP  DRM_IOW( 0x55, drm_radeon_mem_init_heap_t)
+#define DRM_IOCTL_RADEON_IRQ_EMIT   DRM_IOR( 0x56, drm_radeon_irq_emit_t)
+#define DRM_IOCTL_RADEON_IRQ_WAIT   DRM_IOW( 0x57, drm_radeon_irq_wait_t)
 
 typedef struct drm_radeon_init {
 	enum {
@@ -502,16 +504,19 @@ typedef struct drm_radeon_indirect {
 /* 1.3: An ioctl to get parameters that aren't available to the 3d
  * client any other way.  
  */
-#define RADEON_PARAM_AGP_BUFFER_OFFSET 0x1
-#define RADEON_PARAM_LAST_FRAME 0x2
-#define RADEON_PARAM_LAST_DISPATCH 0x3
-#define RADEON_PARAM_LAST_CLEAR 0x4
+#define RADEON_PARAM_AGP_BUFFER_OFFSET   1
+#define RADEON_PARAM_LAST_FRAME          2
+#define RADEON_PARAM_LAST_DISPATCH       3
+#define RADEON_PARAM_LAST_CLEAR          4
+#define RADEON_PARAM_IRQ_ACTIVE          5
 
 typedef struct drm_radeon_getparam {
 	int param;
 	int *value;
 } drm_radeon_getparam_t;
 
+/* 1.6: Set up a memory manager for regions of shared memory:
+ */
 #define RADEON_MEM_REGION_AGP 1
 #define RADEON_MEM_REGION_FB  2
 
@@ -532,5 +537,17 @@ typedef struct drm_radeon_mem_init_heap {
 	int size;
 	int start;	
 } drm_radeon_mem_init_heap_t;
+
+
+/* 1.6: Userspace can request & wait on irq's:
+ */
+typedef struct drm_radeon_irq_emit {
+	int *irq_seq;
+} drm_radeon_irq_emit_t;
+
+typedef struct drm_radeon_irq_wait {
+	int irq_seq;
+} drm_radeon_irq_wait_t;
+
 
 #endif
