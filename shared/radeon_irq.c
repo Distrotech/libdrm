@@ -50,13 +50,13 @@
  *    - as above, but wait with lock held???
  */
 
-void DRM(dma_service)(int irq, void *device, struct pt_regs *regs)
+void DRM(dma_service)( DRM_IRQ_ARGS )
 {
-	drm_device_t *dev = (drm_device_t *)device;
+	drm_device_t *dev = (drm_device_t *) arg;
 	drm_radeon_private_t *dev_priv = 
 	   (drm_radeon_private_t *)dev->dev_private;
    	u32 temp;
-	
+
 	/* Need to wait for fifo to drain?
 	 */
 	temp = RADEON_READ(RADEON_GEN_INT_STATUS);  
@@ -65,23 +65,33 @@ void DRM(dma_service)(int irq, void *device, struct pt_regs *regs)
 	RADEON_WRITE(RADEON_GEN_INT_STATUS, temp);  
 
 	atomic_inc(&dev_priv->irq_received);
+#ifdef __linux__
 	queue_task(&dev->tq, &tq_immediate);  
 	mark_bh(IMMEDIATE_BH);  
+#endif /* __linux__ */
+#ifdef __FreeBSD__
+	taskqueue_enqueue(taskqueue_swi, &dev->task);
+#endif /* __FreeBSD__ */
 }
 
-void DRM(dma_immediate_bh)(void *device)
+void DRM(dma_immediate_bh)( DRM_TASKQUEUE_ARGS )
 {
-	drm_device_t *dev = (drm_device_t *) device;
+	drm_device_t *dev = (drm_device_t *) arg;
 	drm_radeon_private_t *dev_priv = 
 	   (drm_radeon_private_t *)dev->dev_private;
 
+#ifdef __linux__
 	wake_up_interruptible(&dev_priv->irq_queue); 
+#endif /* __linux__ */
+#ifdef __FreeBSD__
+	wakeup( &dev_priv->irq_queue );
+#endif
 }
 
 
 int radeon_emit_irq(drm_device_t *dev)
 {
-   	drm_radeon_private_t *dev_priv = dev->dev_private;
+	drm_radeon_private_t *dev_priv = dev->dev_private;
 	RING_LOCALS;
 
 	atomic_inc(&dev_priv->irq_emitted);
@@ -98,10 +108,12 @@ int radeon_emit_irq(drm_device_t *dev)
 
 int radeon_wait_irq(drm_device_t *dev, int irq_nr)
 {
-	DECLARE_WAITQUEUE(entry, current);
   	drm_radeon_private_t *dev_priv = 
 	   (drm_radeon_private_t *)dev->dev_private;
+#ifdef __linux__
+	DECLARE_WAITQUEUE(entry, current);
 	unsigned long end = jiffies + HZ*3;
+#endif /* __linux__ */
 	int ret = 0;
 
 /* 	if (atomic_read(&dev_priv->irq_received) >= irq_nr)  */
@@ -109,16 +121,17 @@ int radeon_wait_irq(drm_device_t *dev, int irq_nr)
 
 	dev_priv->stats.boxes |= RADEON_BOX_WAIT_IDLE;
 
-   	add_wait_queue(&dev_priv->irq_queue, &entry);
+#ifdef __linux__
+	add_wait_queue(&dev_priv->irq_queue, &entry);
 
-   	for (;;) {
+	for (;;) {
 		current->state = TASK_INTERRUPTIBLE;
 	   	if (atomic_read(&dev_priv->irq_received) >= irq_nr) 
 		   break;
 		if((signed)(end - jiffies) <= 0) {
 		   	ret = -EBUSY;	/* ? */
 			break;
-		}	   
+		}
 	      	schedule_timeout(HZ*3);
 	      	if (signal_pending(current)) {
 		   	ret = -EINTR;
@@ -129,6 +142,15 @@ int radeon_wait_irq(drm_device_t *dev, int irq_nr)
 	current->state = TASK_RUNNING;
 	remove_wait_queue(&dev_priv->irq_queue, &entry);
 	return ret;
+#endif /* __linux__ */
+	
+#ifdef __FreeBSD__
+	ret = tsleep( &dev_priv->irq_queue, PZERO | PCATCH, \
+		"rdnirq", 3*hz );
+	if ( (ret == EWOULDBLOCK) || (ret == EINTR) )
+		return DRM_ERR(EBUSY);
+	return ret;
+#endif /* __FreeBSD__ */
 }
 
 
@@ -158,7 +180,7 @@ int radeon_irq_emit( DRM_IOCTL_ARGS )
 				  sizeof(emit) );
 
 	result = radeon_emit_irq( dev );
-		
+
 	if ( DRM_COPY_TO_USER( emit.irq_seq, &result, sizeof(int) ) ) {
 		DRM_ERROR( "copy_to_user\n" );
 		return DRM_ERR(EFAULT);
