@@ -129,7 +129,7 @@ int radeon_wait_irq(drm_device_t *dev, int irq_nr)
 	   	if (atomic_read(&dev_priv->irq_received) >= irq_nr) 
 		   break;
 		if((signed)(end - jiffies) <= 0) {
-		   	ret = -EBUSY;	/* ? */
+		   	ret = -EBUSY;	/* Lockup?  Missed irq? */
 			break;
 		}
 	      	schedule_timeout(HZ*3);

@@ -104,7 +104,8 @@
  *
  * DRM infrastructure takes care of reclaiming dma buffers.
  */
-#define DRIVER_RELEASE() do {						\
+#define DRIVER_PRERELEASE() do {					\
+	printk("%s\n", __FUNCTION__); \
 	if ( dev->dev_private ) {					\
 		drm_radeon_private_t *dev_priv = dev->dev_private;	\
 		if ( dev_priv->page_flipping ) {			\

@@ -1225,6 +1225,7 @@ static int radeon_cp_dispatch_texture( drm_device_t *dev,
 	return ret;
 }
 
+
 static void radeon_cp_dispatch_stipple( drm_device_t *dev, u32 *stipple )
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;

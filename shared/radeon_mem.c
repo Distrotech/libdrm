@@ -132,6 +132,16 @@ static void free_block( struct mem_block *p )
 	}
 }
 
+static void print_heap( struct mem_block *heap )
+{
+	struct mem_block *p;
+
+	for (p = heap->next ; p != heap ; p = p->next) 
+		printk("0x%x..0x%x (0x%x) -- owner %d\n",
+		       p->start, p->start + p->size,
+		       p->size, p->pid);
+}
+
 /* Initialize.  How to check for an uninitialized heap?
  */
 static int init_heap(struct mem_block **heap, int start, int size)
@@ -166,10 +176,18 @@ void radeon_mem_release( struct mem_block *heap )
 	int pid = DRM_CURRENTPID;
 	struct mem_block *p;
 
+	printk("%s\n", __FUNCTION__);
+
 	for (p = heap->next ; p != heap ; p = p->next) {
-		if (p->pid == pid) 
+		if (p->pid == pid) {
+			printk("%s free 0x%x owner %d\n", __FUNCTION__,  
+			       p->start, p->pid);
 			p->pid = 0;
+		}
 	}
+
+	printk("%s stage 1:\n", __FUNCTION__);
+	print_heap(heap);
 
 	/* Assumes a single contiguous range.  Needs a special pid in
 	 * 'heap' to stop it being subsumed.
@@ -183,6 +201,9 @@ void radeon_mem_release( struct mem_block *heap )
 			kfree(q);
 		}
 	}
+
+	printk("%s stage 2:\n", __FUNCTION__);
+	print_heap(heap);
 }
 
 /* Shutdown.
@@ -210,9 +231,9 @@ static struct mem_block **get_heap( drm_radeon_private_t *dev_priv,
 {
 	switch( region ) {
 	case RADEON_MEM_REGION_AGP:
-		return &dev_priv->fb_heap;
+ 		return &dev_priv->agp_heap; 
 	case RADEON_MEM_REGION_FB:
-		return &dev_priv->agp_heap;
+		return &dev_priv->fb_heap;
 	default:
 		return 0;
 	}
@@ -225,8 +246,10 @@ int radeon_mem_alloc( DRM_IOCTL_ARGS )
 	drm_radeon_mem_alloc_t alloc;
 	struct mem_block *block, **heap;
 
+	printk("%s\n", __FUNCTION__);
+
 	if ( !dev_priv ) {
-		DRM_ERROR( "%s called with no initialization\n", __func__ );
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
 		return DRM_ERR(EINVAL);
 	}
 
@@ -245,6 +268,13 @@ int radeon_mem_alloc( DRM_IOCTL_ARGS )
 
 	block = alloc_block( *heap, alloc.size, alloc.alignment,
 			     DRM_CURRENTPID );
+
+	if (!block) 
+		return DRM_ERR(ENOMEM);
+
+	printk("%s start 0x%x size 0x%x\n", __FUNCTION__,
+	       block->start, block->size);
+	print_heap(*heap);
 		
 	if ( DRM_COPY_TO_USER( alloc.region_offset, &block->start, 
 			       sizeof(int) ) ) {
@@ -264,8 +294,10 @@ int radeon_mem_free( DRM_IOCTL_ARGS )
 	drm_radeon_mem_free_t memfree;
 	struct mem_block *block, **heap;
 
+	printk("%s\n", __FUNCTION__);
+
 	if ( !dev_priv ) {
-		DRM_ERROR( "%s called with no initialization\n", __func__ );
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
 		return DRM_ERR(EINVAL);
 	}
 
@@ -294,8 +326,10 @@ int radeon_mem_init_heap( DRM_IOCTL_ARGS )
 	drm_radeon_mem_init_heap_t initheap;
 	struct mem_block **heap;
 
+	printk("%s\n", __FUNCTION__);
+
 	if ( !dev_priv ) {
-		DRM_ERROR( "%s called with no initialization\n", __func__ );
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
 		return DRM_ERR(EINVAL);
 	}
 
