@@ -402,6 +402,10 @@ void mga_fire_primary(drm_device_t *dev, drm_mga_prim_buf_t *prim)
    
  	/* We never check for overflow, b/c there is always room */
     	PRIMPTR(prim);
+   	if(num_dwords <= 0) {
+	   DRM_ERROR("num_dwords == 0 when dispatched\n");
+	   goto out_prim_wait;
+	}
  	PRIMOUTREG( MGAREG_DMAPAD, 0);
  	PRIMOUTREG( MGAREG_DMAPAD, 0);
        	PRIMOUTREG( MGAREG_DWGSYNC, dev_priv->last_sync_tag);
@@ -447,8 +451,18 @@ void mga_fire_primary(drm_device_t *dev, drm_mga_prim_buf_t *prim)
     	atomic_inc(&dev_priv->pending_bufs);
 	atomic_inc(&dma->total_lost);
        	MGA_WRITE(MGAREG_PRIMADDRESS, phys_head | TT_GENERAL);
- 	MGA_WRITE(MGAREG_PRIMEND, (phys_head + num_dwords * 4) | use_agp);
+ 	MGA_WRITE(MGAREG_PRIMEND, (phys_head + num_dwords * 4) | use_agp);	
+	return;
+
 out_prim_wait:
+     	{
+	   prim->num_dwords = 0;
+	   prim->sec_used = 0;
+	   clear_bit(0, &prim->in_use);
+	   clear_bit(0, &prim->swap_pending);
+	   clear_bit(0, &dev_priv->dispatch_lock);
+	   atomic_dec(&dev_priv->pending_bufs);
+	}
 }
 
 int mga_advance_primary(drm_device_t *dev)
@@ -508,24 +522,9 @@ static inline int mga_decide_to_fire(drm_device_t *dev)
 	   	atomic_inc(&dma->total_prio);
 	   	return 1;
 	}
-      	if(atomic_read(&dev_priv->pending_bufs) <= (MGA_NUM_PRIM_BUFS - 3)) {
-	   
-	   	if(test_bit(0, &dev_priv->next_prim->swap_pending)) {
-		   	atomic_inc(&dma->total_dmas);
-		   	return 1;
-		}
-	}
-   	if(atomic_read(&dev_priv->pending_bufs) <= (MGA_NUM_PRIM_BUFS / 2)) {
-	   if(dev_priv->next_prim->sec_used >= (MGA_DMA_BUF_NR / 8)) {
-	      atomic_inc(&dma->total_hit);
-	      return 1;
-	   }
-	}
-      	if(atomic_read(&dev_priv->pending_bufs) >= (MGA_NUM_PRIM_BUFS / 2)) {
-	   if(dev_priv->next_prim->sec_used >= (MGA_DMA_BUF_NR / 4)) {
-	      	atomic_inc(&dma->total_missed_free);
-	      	return 1;
-	   }
+   	if(test_bit(0, &dev_priv->next_prim->swap_pending)) {
+	   	atomic_inc(&dma->total_dmas);
+	   	return 1;
 	}
 
    	atomic_inc(&dma->total_tried);
@@ -608,9 +607,6 @@ static void mga_dma_service(int irq, void *device, struct pt_regs *regs)
     	dev_priv->next_prim = dev_priv->prim_bufs[next_idx];
     	last_prim_buffer->num_dwords = 0;
     	last_prim_buffer->sec_used = 0;
-       	clear_bit(0, &last_prim_buffer->in_use);
-      	last_prim_buffer->num_dwords = 0;
-   	last_prim_buffer->sec_used = 0;
       	clear_bit(0, &last_prim_buffer->in_use);
       	clear_bit(0, &last_prim_buffer->swap_pending);
       	clear_bit(0, &dev_priv->dispatch_lock);
