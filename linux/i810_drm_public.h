@@ -80,18 +80,19 @@ typedef struct {
 	xf86drmClipRectRec boxes[I810_NR_SAREA_CLIPRECTS];
 
 	/* Maintain an LRU of contiguous regions of texture space.  If
-	 * you think you own a region of texture memory, and it has an age
-	 * different to the one you set, then you are mistaken and it has
-	 * been stolen by another client.  If texAge hasn't changed, there 
-	 * is no need to walk the list.
+	 * you think you own a region of texture memory, and it has an
+	 * age different to the one you set, then you are mistaken and
+	 * it has been stolen by another client.  If global texAge
+	 * hasn't changed, there is no need to walk the list.
 	 *
-	 * These regions can be used as a proxy for the fine-grained texture
-	 * information of other clients - by maintaining them in the same
-	 * lru which is used to age their own textures, clients have an
-	 * approximate lru for the whole of global texture space, and can
-	 * make informed decisions as to which areas to kick out.  There is
-	 * no need to choose whether to kick out your own texture or someone
-	 * else's - simply eject them all in LRU order.
+	 * These regions can be used as a proxy for the fine-grained
+	 * texture information of other clients - by maintaining them
+	 * in the same lru which is used to age their own textures,
+	 * clients have an approximate lru for the whole of global
+	 * texture space, and can make informed decisions as to which
+	 * areas to kick out.  There is no need to choose whether to
+	 * kick out your own texture or someone else's - simply eject
+	 * them all in LRU order.  
 	 */
 	i810TexRegion texList[I810_NR_TEX_REGIONS+1]; /* Last elt is sentinal */
 
