@@ -604,7 +604,7 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 				/* Install handler */
 #ifdef __linux__
 	retcode = request_irq( dev->irq, DRM(dma_service),
-			   DRM_IRQ_TYPE,, dev->devname, dev );
+			   DRM_IRQ_TYPE, dev->devname, dev );
 	if ( retcode < 0 ) {
 #endif
 #ifdef __FreeBSD__

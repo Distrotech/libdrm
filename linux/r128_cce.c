@@ -344,9 +344,6 @@ static void r128_cce_init_ring_buffer( drm_device_t *dev )
 	SET_RING_HEAD( &dev_priv->ring, 0 );
 
 #if __REALLY_HAVE_SG
-/* #define DRM_OS_VTOPHYS(x) vtophys(x) */
-#define DRM_OS_VTOPHYS(x) virt_to_bus(x)
-
 	if ( !dev_priv->is_pci ) {
 #endif
 		R128_WRITE( R128_PM4_BUFFER_DL_RPTR_ADDR,
