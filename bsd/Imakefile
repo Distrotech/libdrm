@@ -6,47 +6,26 @@ XCOMM We need to use Linux headers to avoid skew, OS dependencies will be
 XCOMM held in a drm_os.h file (eventually/hopefully). Currently these
 XCOMM dependencies are stuck in drmP.h
 
-LinkFile(gamma/gamma.h,$(XF86OSSRC)/linux/drm/kernel/gamma.h)
-LinkFile(gamma/gamma_drv.h,$(XF86OSSRC)/linux/drm/kernel/gamma_drv.h)
-LinkFile(gamma/gamma_drv.c,$(XF86OSSRC)/linux/drm/kernel/gamma_drv.c)
-LinkFile(gamma/gamma_dma.c,$(XF86OSSRC)/linux/drm/kernel/gamma_dma.c)
+includes:: tdfxinc mgainc gammainc r128inc radeoninc sisinc i810inc
 
-LinkFile(mga/mga.h,$(XF86OSSRC)/linux/drm/kernel/mga.h)
-LinkFile(mga/mga_drv.h,$(XF86OSSRC)/linux/drm/kernel/mga_drv.h)
-LinkFile(mga/mga_ucode.h,$(XF86OSSRC)/linux/drm/kernel/mga_ucode.h)
-LinkFile(mga/mga_dma.c,$(XF86OSSRC)/linux/drm/kernel/mga_dma.c)
-LinkFile(mga/mga_drv.c,$(XF86OSSRC)/linux/drm/kernel/mga_drv.c)
-LinkFile(mga/mga_state.c,$(XF86OSSRC)/linux/drm/kernel/mga_state.c)
-LinkFile(mga/mga_warp.c,$(XF86OSSRC)/linux/drm/kernel/mga_warp.c)
+clean::
+	rm -f tdfx/tdfx* mga/mga* gamma/gamma* r128/r128* radeon/radeon* sis/sis* i810/i810*
 
-LinkFile(tdfx/tdfx.h,$(XF86OSSRC)/linux/drm/kernel/tdfx.h)
-LinkFile(tdfx/tdfx_drv.c,$(XF86OSSRC)/linux/drm/kernel/tdfx_drv.c)
+LINUXDRM = ../$(XF86OSSRC)/linux/drm/kernel
 
-LinkFile(r128/r128.h,$(XF86OSSRC)/linux/drm/kernel/r128.h)
-LinkFile(r128/r128_cce.c,$(XF86OSSRC)/linux/drm/kernel/r128_cce.c)
-LinkFile(r128/r128_drv.c,$(XF86OSSRC)/linux/drm/kernel/r128_drv.c)
-LinkFile(r128/r128_drv.h,$(XF86OSSRC)/linux/drm/kernel/r128_drv.h)
-LinkFile(r128/r128_state.c,$(XF86OSSRC)/linux/drm/kernel/r128_state.c)
+LinkFileList(gammainc, $(LINUXDRM)/gamma.h $(LINUXDRM)/gamma_drv.h $(LINUXDRM)/gamma_drv.c $(LINUXDRM)/gamma_dma.c, gamma, .)
 
-LinkFile(radeon/radeon.h,$(XF86OSSRC)/linux/drm/kernel/radeon.h)
-LinkFile(radeon/radeon_context.c,$(XF86OSSRC)/linux/drm/kernel/radeon_context.c)
-LinkFile(radeon/radeon_drv.h,$(XF86OSSRC)/linux/drm/kernel/radeon_drv.h)
-LinkFile(radeon/radeon_bufs.c,$(XF86OSSRC)/linux/drm/kernel/radeon_bufs.c)
-LinkFile(radeon/radeon_cp.c,$(XF86OSSRC)/linux/drm/kernel/radeon_cp.c)
-LinkFile(radeon/radeon_drv.c,$(XF86OSSRC)/linux/drm/kernel/radeon_drv.c)
-LinkFile(radeon/radeon_state.c,$(XF86OSSRC)/linux/drm/kernel/radeon_state.c)
+LinkFileList(mgainc, $(LINUXDRM)/mga.h $(LINUXDRM)/mga_drv.h $(LINUXDRM)/mga_ucode.h $(LINUXDRM)/mga_dma.c $(LINUXDRM)/mga_drv.c $(LINUXDRM)/mga_state.c $(LINUXDRM)/mga_warp.c, mga, .)
 
-LinkFile(i810/i810.h,$(XF86OSSRC)/linux/drm/kernel/i810.h)
-LinkFile(i810/i810_dma.c,$(XF86OSSRC)/linux/drm/kernel/i810_dma.c)
-LinkFile(i810/i810_drv.c,$(XF86OSSRC)/linux/drm/kernel/i810_drv.c)
-LinkFile(i810/i810_drv.h,$(XF86OSSRC)/linux/drm/kernel/i810_drv.h)
+LinkFileList(tdfxinc, $(LINUXDRM)/tdfx.h $(LINUXDRM)/tdfx_drv.c, tdfx, .)
 
-LinkFile(sis/sis_context.c,$(XF86OSSRC)/linux/drm/kernel/sis_context.c)
-LinkFile(sis/sis_drv.c,$(XF86OSSRC)/linux/drm/kernel/sis_drv.c)
-LinkFile(sis/sis_drv.h,$(XF86OSSRC)/linux/drm/kernel/sis_drv.h)
-LinkFile(sis/sis_ds.h,$(XF86OSSRC)/linux/drm/kernel/sis_ds.h)
-LinkFile(sis/sis_ds.c,$(XF86OSSRC)/linux/drm/kernel/sis_ds.c)
-LinkFile(sis/sis_mm.c,$(XF86OSSRC)/linux/drm/kernel/sis_mm.c)
+LinkFileList(r128inc, $(LINUXDRM)/r128.h $(LINUXDRM)/r128_cce.c $(LINUXDRM)/r128_drv.c $(LINUXDRM)/r128_drv.h $(LINUXDRM)/r128_state.c, r128, .)
+
+LinkFileList(radeoninc, $(LINUXDRM)/radeon.h $(LINUXDRM)/radeon_context.c $(LINUXDRM)/radeon_drv.h $(LINUXDRM)/radeon_bufs.c $(LINUXDRM)/radeon_cp.c $(LINUXDRM)/radeon_drv.c $(LINUXDRM)/radeon_state.c, radeon, .)
+
+LinkFileList(i810inc, $(LINUXDRM)/i810.h $(LINUXDRM)/i810_dma.c $(LINUXDRM)/i810_drv.c $(LINUXDRM)/i810_drv.h, i810, .)
+
+LinkFileList(sisinc, $(LINUXDRM)/sis_context.c $(LINUXDRM)/sis_drv.c $(LINUXDRM)/sis_drv.h $(LINUXDRM)/sis_ds.h $(LINUXDRM)/sis_ds.c $(LINUXDRM)/sis_mm.c, sis, .)
 
 LinkSourceFile(ati_pcigart.h,$(XF86OSSRC)/linux/drm/kernel)
 LinkSourceFile(drm_agpsupport.h,$(XF86OSSRC)/linux/drm/kernel)
