@@ -148,6 +148,7 @@ typedef struct drm_mach64_init {
 	} func;
 
 	unsigned int sarea_priv_offset;
+	int is_pci;
 
 	unsigned int fb_bpp;
 	unsigned int front_offset, front_pitch;

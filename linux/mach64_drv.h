@@ -31,6 +31,7 @@
 
 typedef struct drm_mach64_private {
 	drm_mach64_sarea_t *sarea_priv;
+	int is_pci;
 
 	unsigned int fb_bpp;
 	unsigned int front_offset, front_pitch;

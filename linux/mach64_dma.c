@@ -93,13 +93,11 @@ static void scratch_reg0_test(drm_mach64_private_t *dev_priv )
 static void dump_engine_info( drm_mach64_private_t *dev_priv )
 {
 	DRM_INFO( "\n" );
-#if 0 /* disable while is_pci is not implemented */
 	if ( !dev_priv->is_pci)
 	{
 		DRM_INFO( "           AGP_BASE = 0x%08x\n", MACH64_READ( MACH64_AGP_BASE ) );
 		DRM_INFO( "           AGP_CNTL = 0x%08x\n", MACH64_READ( MACH64_AGP_CNTL ) );
 	}
-#endif
 	DRM_INFO( "     ALPHA_TST_CNTL = 0x%08x\n", MACH64_READ( MACH64_ALPHA_TST_CNTL ) );
 	DRM_INFO( "\n" );
 	DRM_INFO( "         BM_COMMAND = 0x%08x\n", MACH64_READ( MACH64_BM_COMMAND ) );
@@ -327,11 +325,12 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 	dev_priv = DRM(alloc)( sizeof(drm_mach64_private_t), DRM_MEM_DRIVER );
 	if ( dev_priv == NULL )
 		return -ENOMEM;
-	dev->dev_private = (void *) dev_priv;	/* FIXME: Should this be done here? */
 	
 	memset( dev_priv, 0, sizeof(drm_mach64_private_t) );
 
-	dev_priv->fb_bpp		= init->fb_bpp;
+	dev_priv->is_pci	= init->is_pci;
+		
+	dev_priv->fb_bpp	= init->fb_bpp;
 	dev_priv->front_offset  = init->front_offset;
 	dev_priv->front_pitch   = init->front_pitch;
 	dev_priv->back_offset   = init->back_offset;
@@ -379,37 +378,31 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 	   	DRM_ERROR("can not find mmio map!\n");
 	   	return -EINVAL;
 	}
-	DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
-	if(!dev_priv->buffers) {
-		dev->dev_private = (void *)dev_priv;
-	   	mach64_do_dma_cleanup(dev);
-	   	DRM_ERROR("can not find dma buffer map!\n");
-	   	return -EINVAL;
-	}
 
 	dev_priv->sarea_priv = (drm_mach64_sarea_t *)
 		((u8 *)dev_priv->sarea->handle +
 		 init->sarea_priv_offset);
 
-	DRM_IOREMAP( dev_priv->buffers );
-	if(!dev_priv->buffers->handle) {
-		dev->dev_private = (void *) dev_priv;
-	   	mach64_do_dma_cleanup(dev);
-	   	DRM_ERROR("can not ioremap virtual address for"
-			  " dma buffer\n");
-	   	return -ENOMEM;
+	if( !dev_priv->is_pci ) {
+		DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
+		if( !dev_priv->buffers ) {
+			dev->dev_private = (void *)dev_priv;
+			mach64_do_dma_cleanup( dev );
+			DRM_ERROR( "can not find dma buffer map!\n" );
+			return -EINVAL;
+		}
+		DRM_IOREMAP( dev_priv->buffers );
+		if( !dev_priv->buffers->handle ) {
+			dev->dev_private = (void *) dev_priv;
+			mach64_do_dma_cleanup( dev );
+			DRM_ERROR( "can not ioremap virtual address for"
+				   " dma buffer\n" );
+			return -ENOMEM;
+		}
 	}
 
-	DRM_INFO( "init->fb = 0x%08x\n", init->fb_offset );
-	DRM_INFO( "init->mmio_offset = 0x%08x\n", init->mmio_offset );
-	DRM_INFO( "mmio->offset=0x%08lx mmio->handle=0x%08lx\n",
-		  dev_priv->mmio->offset, (unsigned long) dev_priv->mmio->handle );
-	DRM_INFO( "buffers->offset=0x%08lx buffers->handle=0x%08lx\n",
-		  dev_priv->buffers->offset, (unsigned long) dev_priv->buffers->handle );
-
-
 	tmp = MACH64_READ( MACH64_BUS_CNTL );
-	tmp = ( tmp | 0x08000000 ) & ~MACH64_BUS_MASTER_DIS;
+	tmp = ( tmp | MACH64_BUS_EXT_REG_EN ) & ~MACH64_BUS_MASTER_DIS;
 	MACH64_WRITE( MACH64_BUS_CNTL, tmp );
 
 	tmp = MACH64_READ( MACH64_GUI_CNTL );
@@ -418,19 +411,22 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 	DRM_INFO( "GUI_STAT=0x%08x\n", MACH64_READ( MACH64_GUI_STAT ) );
 	DRM_INFO( "GUI_CNTL=0x%08x\n", MACH64_READ( MACH64_GUI_CNTL ) );
 
+	dev->dev_private = (void *) dev_priv;
+	
 	bm_dma_test( dev_priv );
+
+	
 	return 0;
 }
 
 static int mach64_do_dma_cleanup( drm_device_t *dev )
 {
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
-	dump_engine_info( dev->dev_private );	
 	
 	if ( dev->dev_private ) {
 		drm_mach64_private_t *dev_priv = dev->dev_private;
 		
-		if(dev_priv->buffers->handle) {
+		if(dev_priv->buffers) {
 			DRM_IOREMAPFREE( dev_priv->buffers );
 		}
 		DRM(free)( dev_priv, sizeof(drm_mach64_private_t),
