@@ -28,6 +28,7 @@
  *	   Jeff Hartmann <jhartmann@valinux.com>
  *
  */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/os-support/linux/drm/kernel/mga_context.c,v 1.4 2000/08/28 02:43:15 tsi Exp $ */
 
 #define __NO_VERSION__
 #include "drmP.h"
@@ -35,9 +36,7 @@
 
 static int mga_alloc_queue(drm_device_t *dev)
 {
-   	int temp = drm_ctxbitmap_next(dev);
-   	DRM_DEBUG("mga_alloc_queue: %d\n", temp);
-	return temp;
+   	return drm_ctxbitmap_next(dev);
 }
 
 int mga_context_switch(drm_device_t *dev, int old, int new)
@@ -102,7 +101,6 @@ int mga_resctx(struct inode *inode, struct file *filp, unsigned int cmd,
 	drm_ctx_t	ctx;
 	int		i;
 
-	DRM_DEBUG("%d\n", DRM_RESERVED_CONTEXTS);
 	if (copy_from_user(&res, (drm_ctx_res_t *)arg, sizeof(res)))
 		return -EFAULT;
 	if (res.count >= DRM_RESERVED_CONTEXTS) {
@@ -135,8 +133,6 @@ int mga_addctx(struct inode *inode, struct file *filp, unsigned int cmd,
 		ctx.handle = mga_alloc_queue(dev);
 	}
         if (ctx.handle == -1) {
-		DRM_DEBUG("Not enough free contexts.\n");
-				/* Should this return -EBUSY instead? */
 		return -ENOMEM;
 	}
 	DRM_DEBUG("%d\n", ctx.handle);
@@ -204,6 +200,8 @@ int mga_rmctx(struct inode *inode, struct file *filp, unsigned int cmd,
 	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
 		return -EFAULT;
 	DRM_DEBUG("%d\n", ctx.handle);
+	if(ctx.handle == DRM_KERNEL_CONTEXT+1) priv->remove_auth_on_close = 1;
+
       	if(ctx.handle != DRM_KERNEL_CONTEXT) {
 	   	drm_ctxbitmap_free(dev, ctx.handle);
 	}

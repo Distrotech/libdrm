@@ -28,6 +28,7 @@
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  * 
  */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/os-support/linux/drm/kernel/drmP.h,v 1.9 2000/08/28 02:43:14 tsi Exp $ */
 
 #ifndef _DRM_P_H_
 #define _DRM_P_H_
@@ -53,10 +54,12 @@
 #include <linux/sched.h>
 #include <linux/smp_lock.h>	/* For (un)lock_kernel */
 #include <linux/mm.h>
+#if defined(__alpha__) || defined(__powerpc__)
+#include <asm/pgtable.h> /* For pte_wrprotect */
+#endif
 #include <asm/io.h>
 #include <asm/mman.h>
 #include <asm/uaccess.h>
-#include <asm/pgtable.h>
 #ifdef CONFIG_MTRR
 #include <asm/mtrr.h>
 #endif
@@ -276,7 +279,7 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 #define cmpxchg(ptr,o,n)						\
   ((__typeof__(*(ptr)))__cmpxchg((ptr),(unsigned long)(o),		\
 				 (unsigned long)(n),sizeof(*(ptr))))
-#endif /* i386 & alpha */
+#endif /* i386, powerpc & alpha */
 
 				/* Macros to make printk easier */
 #define DRM_ERROR(fmt, arg...) \
@@ -454,6 +457,7 @@ typedef struct drm_file {
 	struct drm_file	  *next;
 	struct drm_file	  *prev;
 	struct drm_device *dev;
+	int 		  remove_auth_on_close;
 } drm_file_t;
 
 

@@ -11,11 +11,11 @@
  * the rights to use, copy, modify, merge, publish, distribute, sublicense,
  * and/or sell copies of the Software, and to permit persons to whom the
  * Software is furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice (including the next
  * paragraph) shall be included in all copies or substantial portions of the
  * Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
@@ -23,11 +23,12 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
- * 
+ *
  * Authors: Rickard E. (Rik) Faith <faith@valinux.com>
  *          Kevin E. Martin <martin@valinux.com>
  *
  */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/os-support/linux/drm/kernel/r128_drv.h,v 1.4 2000/08/28 02:43:16 tsi Exp $ */
 
 #ifndef _R128_DRV_H_
 #define _R128_DRV_H_
@@ -200,17 +201,17 @@ extern int  r128_context_switch_complete(drm_device_t *dev, int new);
 #ifdef __powerpc__
 
 static __inline__ void
-WriteMmio32Le(void *base, const unsigned long offset,
+WriteMmio32Le(int *base, const unsigned long offset,
                   const unsigned long val)
 {
         __asm__ __volatile__(
                         "stwbrx %1,%2,%3\n\t"
-                        : "=m" (*(volatile unsigned char *)(base+offset))
+                        : "=m" (*(volatile int *)(base+offset))
                         : "r" (val), "b" (base), "r" (offset));
 }
 
 static __inline__ unsigned int
-ReadMmio32Le(void *base, const unsigned long offset)
+ReadMmio32Le(int *base, const unsigned long offset)
 {
         register unsigned int val;
         __asm__ __volatile__(
@@ -218,34 +219,27 @@ ReadMmio32Le(void *base, const unsigned long offset)
                         "eieio"
                         : "=r" (val)
                         : "b" (base), "r" (offset),
-                        "m" (*(volatile unsigned char *)(base+offset)));
+                        "m" (*(volatile int *)(base+offset)));
         return(val);
 }
 
-#define R128_BASE(reg)		((u32)(dev_priv->mmio->handle))
-#define R128_ADDR(reg)		(R128_BASE(reg) + reg)
+#define R128_READ(reg)		ReadMmio32Le((int *)R128_BASE(reg),reg)
+#define R128_WRITE(reg,val)	WriteMmio32Le((int *)R128_BASE(reg),reg,val)
 
-#define R128_READ(reg)		ReadMmio32Le(R128_BASE(reg),reg)
-#define R128_WRITE(reg,val)	WriteMmio32Le(R128_BASE(reg),reg,val)
-
-#define R128_DEREF8(reg)	*(__volatile__ char *)R128_ADDR(reg)
-#define R128_READ8(reg)		R128_DEREF8(reg)
-#define R128_WRITE8(reg,val)	do { R128_DEREF8(reg) = val; } while (0)
-
-#else	/* ! __powerpc__ */
-
-#define R128_BASE(reg)		((u32)(dev_priv->mmio->handle))
-#define R128_ADDR(reg)		(R128_BASE(reg) + reg)
+#else	/* ! __powerpc__; FIXME: other big endian machines need their own code here */
 
 #define R128_DEREF(reg)		*(__volatile__ int *)R128_ADDR(reg)
 #define R128_READ(reg)		R128_DEREF(reg)
 #define R128_WRITE(reg,val)	do { R128_DEREF(reg) = val; } while (0)
 
+#endif	/* __powerpc__ */
+
+#define R128_BASE(reg)		((unsigned long)(dev_priv->mmio->handle))
+#define R128_ADDR(reg)		(R128_BASE(reg) + reg)
+
 #define R128_DEREF8(reg)	*(__volatile__ char *)R128_ADDR(reg)
 #define R128_READ8(reg)		R128_DEREF8(reg)
 #define R128_WRITE8(reg,val)	do { R128_DEREF8(reg) = val; } while (0)
-
-#endif	/* __powerpc__ */
 
 #define R128_WRITE_PLL(addr,val)                                              \
 do {                                                                          \
