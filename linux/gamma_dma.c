@@ -38,23 +38,28 @@
 #include <linux/delay.h>
 
 #define OLDDMA 	1
+#define QUEUED_DMA 1
 
 static inline void gamma_dma_dispatch(drm_device_t *dev, unsigned long address,
 				      unsigned long length)
 {
-#if OLDDMA
+#if !QUEUED_DMA
 	GAMMA_WRITE(GAMMA_DMAADDRESS, virt_to_phys((void *)address));
-
 	while (GAMMA_READ(GAMMA_GCOMMANDSTATUS) != 4);
-
 	GAMMA_WRITE(GAMMA_DMACOUNT, length / 4);
 #else
-	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 4);
-
+	mb();
+	while ( GAMMA_READ(GAMMA_INFIFOSPACE) < 6);
 	GAMMA_WRITE(GAMMA_OUTPUTFIFO, GAMMA_DMAADDRTAG);
-	GAMMA_WRITE(GAMMA_OUTPUTFIFO, virt_to_phys((void *)address));
-	GAMMA_WRITE(GAMMA_OUTPUTFIFO, GAMMA_DMACOUNTTAG);
-	GAMMA_WRITE(GAMMA_OUTPUTFIFO, length / 4);
+	if (!dev->agp) {
+		GAMMA_WRITE(GAMMA_OUTPUTFIFO+4, virt_to_phys((void*)address));
+	} else {
+		GAMMA_WRITE(GAMMA_OUTPUTFIFO+4, address);
+	}
+	GAMMA_WRITE(GAMMA_OUTPUTFIFO+8, GAMMA_DMACOUNTTAG);
+	GAMMA_WRITE(GAMMA_OUTPUTFIFO+12, length / 4);
+	GAMMA_WRITE(GAMMA_OUTPUTFIFO+16, GAMMA_COMMANDINTTAG);
+	GAMMA_WRITE(GAMMA_OUTPUTFIFO+20, 1); /* PAUSE DMA UNTIL COMPLETE */
 #endif
 }
 
@@ -80,7 +85,6 @@ void gamma_dma_quiescent_dual(drm_device_t *dev)
 	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 3);
 
 	GAMMA_WRITE(GAMMA_BROADCASTMASK, 3);
-
 	GAMMA_WRITE(GAMMA_FILTERMODE, 1 << 10);
 	GAMMA_WRITE(GAMMA_SYNC, 0);
 
@@ -95,17 +99,21 @@ void gamma_dma_quiescent_dual(drm_device_t *dev)
 	} while (GAMMA_READ(GAMMA_OUTPUTFIFO + 0x10000) != GAMMA_SYNC_TAG);
 }
 
-#if OLDDMA
 void gamma_dma_ready(drm_device_t *dev)
 {
+#if !QUEUED_DMA
 	while (GAMMA_READ(GAMMA_DMACOUNT));
+#endif
 }
 
 static inline int gamma_dma_is_ready(drm_device_t *dev)
 {
-	return !GAMMA_READ(GAMMA_DMACOUNT);
-}
+#if !QUEUED_DMA!QUEUED_DMA!QUEUED_DMA!QUEUED_DMA!QUEUED_DMA!QUEUED_DMA!QUEUED_DMA!QUEUED_DMA
+	return(!GAMMA_READ(GAMMA_DMACOUNT));
+#else
+	return(GAMMA_READ(GAMMA_GCOMMANDSTATUS) & 0x04);
 #endif
+}
 
 void gamma_dma_service(int irq, void *device, struct pt_regs *regs)
 {
@@ -114,10 +122,14 @@ void gamma_dma_service(int irq, void *device, struct pt_regs *regs)
 
 	atomic_inc(&dev->counts[6]); /* _DRM_STAT_IRQ */
 
-#if OLDDMA
+#if !QUEUED_DMA
 	GAMMA_WRITE(GAMMA_GDELAYTIMER, 0xc350/2); /* 0x05S */
 	GAMMA_WRITE(GAMMA_GCOMMANDINTFLAGS, 8);
 	GAMMA_WRITE(GAMMA_GINTFLAGS, 0x2001);
+#else
+	GAMMA_WRITE(GAMMA_GCOMMANDINTFLAGS, 4);
+	GAMMA_WRITE(GAMMA_GINTFLAGS, 0x2000);
+#endif
 	if (gamma_dma_is_ready(dev)) {
 				/* Free previous buffer */
 		if (test_and_set_bit(0, &dev->dma_flag)) return;
@@ -131,7 +143,6 @@ void gamma_dma_service(int irq, void *device, struct pt_regs *regs)
 		queue_task(&dev->tq, &tq_immediate);
 		mark_bh(IMMEDIATE_BH);
 	}
-#endif
 }
 
 /* Only called by gamma_dma_schedule. */
@@ -647,6 +658,7 @@ static int gamma_do_init_dma( drm_device_t *dev, drm_gamma_init_t *init )
 #endif
 	DRM_IOREMAP( dev_priv->buffers );
 
+	GAMMA_WRITE( GAMMA_GDMACONTROL, GAMMA_USE_AGP );
 #if 0
 	dev_priv->prim.status = (u32 *)dev_priv->status->handle;
 

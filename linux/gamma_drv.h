@@ -32,7 +32,6 @@
 #ifndef _GAMMA_DRV_H_
 #define _GAMMA_DRV_H_
 
-
 typedef struct drm_gamma_private {
 	drm_gamma_sarea_t *sarea_priv;
 	drm_map_t *sarea;
@@ -97,9 +96,11 @@ extern int  gamma_found(void);
 #define GAMMA_FILTERMODE       0x8c00
 #define GAMMA_GCOMMANDINTFLAGS 0x0c50
 #define GAMMA_GCOMMANDMODE     0x0c40
+#define		GAMMA_QUEUED_DMA_MODE		1<<1
 #define GAMMA_GCOMMANDSTATUS   0x0c60
 #define GAMMA_GDELAYTIMER      0x0c38
 #define GAMMA_GDMACONTROL      0x0060
+#define 	GAMMA_USE_AGP			1<<1
 #define GAMMA_GINTENABLE       0x0808
 #define GAMMA_GINTFLAGS	       0x0810
 #define GAMMA_INFIFOSPACE      0x0018
@@ -108,7 +109,9 @@ extern int  gamma_found(void);
 #define GAMMA_SYNC	       0x8c40
 #define GAMMA_SYNC_TAG	       0x0188
 
+#define GAMMA_PASSTHROUGH	0x1FE
 #define GAMMA_DMAADDRTAG	0x530
 #define GAMMA_DMACOUNTTAG	0x531
+#define GAMMA_COMMANDINTTAG	0x532
 
 #endif
