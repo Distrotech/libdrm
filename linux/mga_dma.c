@@ -70,7 +70,7 @@ int mga_do_wait_for_idle( drm_mga_private_t *dev_priv )
 	DRM_ERROR( "failed!\n" );
 	DRM_INFO( "   status=0x%08x\n", status );
 #endif
-	return -EBUSY;
+	DRM_OS_RETURN(EBUSY);
 }
 
 int mga_do_dma_idle( drm_mga_private_t *dev_priv )
@@ -88,7 +88,7 @@ int mga_do_dma_idle( drm_mga_private_t *dev_priv )
 #if MGA_DMA_DEBUG
 	DRM_ERROR( "failed! status=0x%08x\n", status );
 #endif
-	return -EBUSY;
+	DRM_OS_RETURN(EBUSY);
 }
 
 int mga_do_dma_reset( drm_mga_private_t *dev_priv )
@@ -308,7 +308,7 @@ static int mga_freelist_init( drm_device_t *dev )
 	dev_priv->head = DRM(alloc)( sizeof(drm_mga_freelist_t),
 				     DRM_MEM_DRIVER );
 	if ( dev_priv->head == NULL )
-		return -ENOMEM;
+		DRM_OS_RETURN(ENOMEM);
 
 	memset( dev_priv->head, 0, sizeof(drm_mga_freelist_t) );
 	SET_AGE( &dev_priv->head->age, MGA_BUFFER_USED, 0 );
@@ -320,7 +320,7 @@ static int mga_freelist_init( drm_device_t *dev )
 		entry = DRM(alloc)( sizeof(drm_mga_freelist_t),
 				    DRM_MEM_DRIVER );
 		if ( entry == NULL )
-			return -ENOMEM;
+			DRM_OS_RETURN(ENOMEM);
 
 		memset( entry, 0, sizeof(drm_mga_freelist_t) );
 
@@ -464,7 +464,7 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 
 	dev_priv = DRM(alloc)( sizeof(drm_mga_private_t), DRM_MEM_DRIVER );
 	if ( !dev_priv )
-		return -ENOMEM;
+		DRM_OS_RETURN(ENOMEM);
 	dev->dev_private = (void *)dev_priv;
 
 	memset( dev_priv, 0, sizeof(drm_mga_private_t) );
@@ -589,7 +589,7 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 	if ( mga_freelist_init( dev ) < 0 ) {
 		DRM_ERROR( "could not initialize freelist\n" );
 		mga_do_cleanup_dma( dev );
-		return -ENOMEM;
+		DRM_OS_RETURN(ENOMEM);
 	}
 
 	return 0;

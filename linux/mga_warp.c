@@ -105,7 +105,7 @@ static int mga_warp_install_g400_microcode( drm_mga_private_t *dev_priv )
 	if ( size > dev_priv->warp->size ) {
 		DRM_ERROR( "microcode too large! (%u > %lu)\n",
 			   size, dev_priv->warp->size );
-		return -ENOMEM;
+		DRM_OS_RETURN(ENOMEM);
 	}
 
 	memset( dev_priv->warp_pipe_phys, 0,
@@ -142,7 +142,7 @@ static int mga_warp_install_g200_microcode( drm_mga_private_t *dev_priv )
 	if ( size > dev_priv->warp->size ) {
 		DRM_ERROR( "microcode too large! (%u > %lu)\n",
 			   size, dev_priv->warp->size );
-		return -ENOMEM;
+		DRM_OS_RETURN(ENOMEM);
 	}
 
 	memset( dev_priv->warp_pipe_phys, 0,
@@ -171,7 +171,7 @@ int mga_warp_install_microcode( drm_device_t *dev )
 	case MGA_CARD_TYPE_G200:
 		return mga_warp_install_g200_microcode( dev_priv );
 	default:
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 	}
 }
 
@@ -198,7 +198,7 @@ int mga_warp_init( drm_device_t *dev )
 		MGA_WRITE( MGA_WVRTXSZ, 7 );
 		break;
 	default:
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 	}
 
 	MGA_WRITE( MGA_WMISC, (MGA_WUCODECACHE_ENABLE |
@@ -208,7 +208,7 @@ int mga_warp_init( drm_device_t *dev )
 	if ( wmisc != WMISC_EXPECTED ) {
 		DRM_ERROR( "WARP engine config failed! 0x%x != 0x%x\n",
 			   wmisc, WMISC_EXPECTED );
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 	}
 
 	return 0;
