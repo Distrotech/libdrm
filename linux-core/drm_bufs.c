@@ -147,7 +147,14 @@ int DRM(addmap)( DRM_OS_IOCTL )
 		break;
 
 	case _DRM_SHM:
+#ifdef __linux__
 		map->handle = vmalloc_32(map->size);
+#endif
+#ifdef __FreeBSD__
+		map->handle = (void *)DRM(alloc_pages)( DRM(order)(map->size)
+						      /* PAGE_SHIFT*/,  /* FIXME: True?  AFAICT, contigmalloc wants bytes, not pages */
+						      DRM_MEM_SAREA );
+#endif
 		DRM_DEBUG( "%ld %d %p\n",
 			   map->size, DRM(order)( map->size ), map->handle );
 		if ( !map->handle ) {
@@ -231,11 +238,11 @@ int DRM(rmmap)( DRM_OS_IOCTL )
 #ifdef __linux__
 	struct list_head *list;
 	drm_map_list_t *r_list;
+	drm_vma_entry_t *pt, *prev;
 #endif
 #ifdef __FreeBSD__
 	drm_map_list_entry_t *list;
 #endif
-	drm_vma_entry_t *pt, *prev;
 	drm_map_t *map;
 	drm_map_t request;
 	int found_maps = 0;
@@ -307,7 +314,12 @@ int DRM(rmmap)( DRM_OS_IOCTL )
 			DRM(ioremapfree)(map->handle, map->size);
 			break;
 		case _DRM_SHM:
+#ifdef __linux__
 			vfree(map->handle);
+#endif
+#ifdef __FreeBSD__
+			DRM(free_pages)( (unsigned long)map->handle, DRM(order)(map->size), DRM_MEM_SAREA );
+#endif
 			break;
 		case _DRM_AGP:
 		case _DRM_SCATTER_GATHER:

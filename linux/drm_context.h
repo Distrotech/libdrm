@@ -269,7 +269,12 @@ int DRM(context_switch_complete)( drm_device_t *dev, int new )
 
 #endif
         clear_bit( 0, &dev->context_flag );
+#ifdef __linux__
         wake_up( &dev->context_wait );
+#endif
+#ifdef __FreeBSD__
+	wakeup( &dev->context_wait );
+#endif
 
         return 0;
 }
@@ -594,8 +599,8 @@ int DRM(addctx)( DRM_OS_IOCTL )
 	DRM_OS_DEVICE;
 	drm_ctx_t	ctx;
 
-	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( ctx, (drm_ctx_t *)data, sizeof(ctx) );
+
 	if ((ctx.handle = DRM(alloc_queue)(dev)) == DRM_KERNEL_CONTEXT) {
 				/* Init kernel's context and get a new one. */
 		DRM(init_queue)(dev, dev->queuelist[ctx.handle], &ctx);
@@ -603,8 +608,9 @@ int DRM(addctx)( DRM_OS_IOCTL )
 	}
 	DRM(init_queue)(dev, dev->queuelist[ctx.handle], &ctx);
 	DRM_DEBUG("%d\n", ctx.handle);
-	if (copy_to_user((drm_ctx_t *)arg, &ctx, sizeof(ctx)))
-		DRM_OS_RETURN(EFAULT);
+	
+	DRM_OS_KRNTOUSR( (drm_ctx_t *)data, ctx, sizeof(ctx) );
+
 	return 0;
 }
 
@@ -614,8 +620,7 @@ int DRM(modctx)( DRM_OS_IOCTL )
 	drm_ctx_t	ctx;
 	drm_queue_t	*q;
 
-	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( ctx, (drm_ctx_t *)data, sizeof(ctx) );
 
 	DRM_DEBUG("%d\n", ctx.handle);
 
@@ -647,8 +652,7 @@ int DRM(getctx)( DRM_OS_IOCTL )
 	drm_ctx_t	ctx;
 	drm_queue_t	*q;
 
-	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( ctx, (drm_ctx_t *)data, sizeof(ctx) );
 
 	DRM_DEBUG("%d\n", ctx.handle);
 
@@ -666,8 +670,7 @@ int DRM(getctx)( DRM_OS_IOCTL )
 	ctx.flags = q->flags;
 	atomic_dec(&q->use_count);
 
-	if (copy_to_user((drm_ctx_t *)arg, &ctx, sizeof(ctx)))
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNTOUSR( (drm_ctx_t *)data, ctx, sizeof(ctx) );
 
 	return 0;
 }
@@ -677,8 +680,8 @@ int DRM(switchctx)( DRM_OS_IOCTL )
 	DRM_OS_DEVICE;
 	drm_ctx_t	ctx;
 
-	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( ctx, (drm_ctx_t *)data, sizeof(ctx) );
+
 	DRM_DEBUG("%d\n", ctx.handle);
 	return DRM(context_switch)(dev, dev->last_context, ctx.handle);
 }
@@ -688,8 +691,8 @@ int DRM(newctx)( DRM_OS_IOCTL )
 	DRM_OS_DEVICE;
 	drm_ctx_t	ctx;
 
-	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( ctx, (drm_ctx_t *)data, sizeof(ctx) );
+
 	DRM_DEBUG("%d\n", ctx.handle);
 	DRM(context_switch_complete)(dev, ctx.handle);
 
@@ -703,8 +706,8 @@ int DRM(rmctx)( DRM_OS_IOCTL )
 	drm_queue_t	*q;
 	drm_buf_t	*buf;
 
-	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( ctx, (drm_ctx_t *)data, sizeof(ctx) );
+
 	DRM_DEBUG("%d\n", ctx.handle);
 
 	if (ctx.handle >= dev->queue_count) DRM_OS_RETURN(EINVAL);

@@ -307,6 +307,15 @@ extern int	DRM(rmdraw)( DRM_OS_IOCTL );
 extern int	DRM(getmagic)( DRM_OS_IOCTL );
 extern int	DRM(authmagic)( DRM_OS_IOCTL );
 
+/* Device support (drm_fops.h) */
+extern int	DRM(flush)(struct file *filp);
+extern int	DRM(release_fuck)(struct inode *inode, struct file *filp);
+extern int	DRM(fasync)(int fd, struct file *filp, int on);
+extern ssize_t	DRM(read)(struct file *filp, char *buf, size_t count,
+			       loff_t *off);
+extern unsigned int  DRM(poll)(struct file *filp,
+			       struct poll_table_struct *wait);
+
 /* Locking IOCTL support (drm_lock.h) */
 extern int	DRM(block)( DRM_OS_IOCTL );
 extern int	DRM(unblock)( DRM_OS_IOCTL );
@@ -340,14 +349,11 @@ extern int	DRM(agp_unbind)( DRM_OS_IOCTL );
 extern int	DRM(agp_bind)( DRM_OS_IOCTL );
 #endif
 
-/* Stub support (drm_stub.h) */
-extern int	DRM(stub_register)(const char *name,
-				 struct file_operations *fops,
-				 drm_device_t *dev);
-extern int	DRM(stub_unregister)(int minor);
-
 /* Scatter Gather Support (drm_scatter.h) */
 #if __HAVE_SG
 extern int	DRM(sg_alloc)( DRM_OS_IOCTL );
 extern int	DRM(sg_free)( DRM_OS_IOCTL );
 #endif
+
+/* Mapping support (drm_vm.h) */
+extern int	DRM(mmap)(struct file *filp, struct vm_area_struct *vma);

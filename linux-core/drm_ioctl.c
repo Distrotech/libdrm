@@ -120,8 +120,14 @@ int DRM(getmap)( DRM_OS_IOCTL )
 {
 	DRM_OS_DEVICE;
 	drm_map_t    map;
+#ifdef __linux__
 	drm_map_list_t *r_list = NULL;
 	struct list_head *list;
+#endif
+#ifdef __FreeBSD__
+	drm_map_t    *mapinlist;
+	drm_map_list_entry_t *list;
+#endif
 	int          idx;
 	int	     i;
 
@@ -136,6 +142,7 @@ int DRM(getmap)( DRM_OS_IOCTL )
 	}
 
 	i = 0;
+#ifdef __linux__
 	list_for_each(list, &dev->maplist->head) {
 		if(i == idx) {
 			r_list = (drm_map_list_t *)list;
@@ -154,7 +161,29 @@ int DRM(getmap)( DRM_OS_IOCTL )
 	map.flags  = r_list->map->flags;
 	map.handle = r_list->map->handle;
 	map.mtrr   = r_list->map->mtrr;
+#endif
+#ifdef __FreeBSD__
+	TAILQ_FOREACH(list, dev->maplist, link) {
+		mapinlist = list->map;
+		if (i==idx) {
+			map.offset = mapinlist->offset;
+			map.size   = mapinlist->size;
+			map.type   = mapinlist->type;
+			map.flags  = mapinlist->flags;
+			map.handle = mapinlist->handle;
+			map.mtrr   = mapinlist->mtrr;
+			break;
+		}
+		i++;
+	}
+#endif
+
 	DRM_OS_UNLOCK;
+
+#ifdef __FreeBSD__
+ 	if (!list)
+		return EINVAL;
+#endif
 
 	DRM_OS_KRNTOUSR( (drm_map_t *)data, map, sizeof(map) );
 

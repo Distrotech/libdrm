@@ -283,6 +283,7 @@ int DRM(write_string)(drm_device_t *dev, const char *s)
 		send -= count;
 	}
 
+#ifdef __linux__
 #if LINUX_VERSION_CODE < 0x020315 && !defined(KILLFASYNCHASTHREEPARAMETERS)
 	/* The extra parameter to kill_fasync was added in 2.3.21, and is
            _not_ present in _stock_ 2.2.14 and 2.2.15.  However, some
@@ -303,9 +304,27 @@ int DRM(write_string)(drm_device_t *dev, const char *s)
 #endif
 	DRM_DEBUG("waking\n");
 	wake_up_interruptible(&dev->buf_readers);
+#endif
+
+#ifdef __FreeBSD__
+	if (dev->buf_selecting) {
+		dev->buf_selecting = 0;
+		selwakeup(&dev->buf_sel);
+	}
+		
+	DRM_DEBUG("dev->buf_sigio=%p\n", dev->buf_sigio);
+	if (dev->buf_sigio) {
+		DRM_DEBUG("dev->buf_sigio->sio_pgid=%d\n", dev->buf_sigio->sio_pgid);
+		pgsigio(dev->buf_sigio, SIGIO, 0);
+	}
+	DRM_DEBUG("waking\n");
+	wakeup(&dev->buf_rp);
+#endif
+
 	return 0;
 }
 
+#ifdef __linux__
 unsigned int DRM(poll)(struct file *filp, struct poll_table_struct *wait)
 {
 	DRM_OS_DEVICE;
@@ -314,3 +333,24 @@ unsigned int DRM(poll)(struct file *filp, struct poll_table_struct *wait)
 	if (dev->buf_wp != dev->buf_rp) return POLLIN | POLLRDNORM;
 	return 0;
 }
+#endif
+#ifdef __FreeBSD__
+int DRM(poll)(dev_t kdev, int events, struct proc *p)
+{
+	drm_device_t  *dev    = kdev->si_drv1;
+	int           s;
+	int	      revents = 0;
+
+	s = spldrm();
+	if (events & (POLLIN | POLLRDNORM)) {
+		int left  = (dev->buf_rp + DRM_BSZ - dev->buf_wp) % DRM_BSZ;
+		if (left > 0)
+			revents |= events & (POLLIN | POLLRDNORM);
+		else
+			selrecord(p, &dev->buf_sel);
+	}
+	splx(s);
+
+	return revents;
+}
+#endif

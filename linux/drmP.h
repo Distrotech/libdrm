@@ -409,7 +409,7 @@ typedef struct drm_sigdata {
 	drm_hw_lock_t *lock;
 } drm_sigdata_t;
 
-#ifdef __linux
+#ifdef __linux__
 typedef struct drm_map_list {
 	struct list_head	head;
 	drm_map_t		*map;
@@ -526,12 +526,13 @@ typedef struct drm_device {
 	char		  *buf_rp;	/* Read pointer			   */
 	char		  *buf_wp;	/* Write pointer		   */
 	char		  *buf_end;	/* End pointer			   */
-#ifdef __linux
+#ifdef __linux__
 	struct fasync_struct *buf_async;/* Processes waiting for SIGIO	   */
 #endif
 #ifdef __FreeBSD__
 	struct sigio      *buf_sigio;	/* Processes waiting for SIGIO     */
 	struct selinfo    buf_sel;	/* Workspace for select/poll       */
+	int               buf_selecting;/* True if poll sleeper            */
 #endif
 	wait_queue_head_t buf_readers;	/* Processes waiting to read	   */
 	wait_queue_head_t buf_writers;	/* Processes waiting to ctx switch */
@@ -565,20 +566,14 @@ extern int           DRM(open)(struct inode *inode, struct file *filp);
 extern int           DRM(release)(struct inode *inode, struct file *filp);
 #endif
 
-				/* Device support (drm_fops.h) */
+extern int	     DRM(write_string)(drm_device_t *dev, const char *s);
 #ifdef __linux__
 extern int	     DRM(open_helper)(struct inode *inode, struct file *filp,
 				      drm_device_t *dev);
-extern int	     DRM(flush)(struct file *filp);
-extern int	     DRM(release_fuck)(struct inode *inode, struct file *filp);
-extern int	     DRM(fasync)(int fd, struct file *filp, int on);
-extern ssize_t	     DRM(read)(struct file *filp, char *buf, size_t count,
-			       loff_t *off);
-extern int	     DRM(write_string)(drm_device_t *dev, const char *s);
-extern unsigned int  DRM(poll)(struct file *filp,
-			       struct poll_table_struct *wait);
 #endif
 #ifdef __FreeBSD__
+extern int           DRM(open_helper)(dev_t kdev, int flags, int fmt, 
+					struct proc *p, drm_device_t *dev);
 extern drm_file_t    *DRM(find_file_by_proc)(drm_device_t *dev, struct proc *p);
 #endif
 
@@ -616,7 +611,6 @@ extern void	     DRM(vm_close)(struct vm_area_struct *vma);
 extern void	     DRM(vm_shm_close)(struct vm_area_struct *vma);
 extern int	     DRM(mmap_dma)(struct file *filp,
 				   struct vm_area_struct *vma);
-extern int	     DRM(mmap)(struct file *filp, struct vm_area_struct *vma);
 
 				/* Memory management support (drm_memory.h) */
 extern void	     DRM(mem_init)(void);
@@ -655,6 +649,8 @@ extern int	     DRM(context_switch_complete)(drm_device_t *dev, int new);
 #if __HAVE_CTX_BITMAP
 extern int	     DRM(ctxbitmap_init)( drm_device_t *dev );
 extern void	     DRM(ctxbitmap_cleanup)( drm_device_t *dev );
+extern void          DRM(ctxbitmap_free)( drm_device_t *dev, int ctx_handle );
+extern int           DRM(ctxbitmap_next)( drm_device_t *dev );
 #endif
 
 				/* Locking IOCTL support (drm_lock.h) */
@@ -751,6 +747,19 @@ extern int            DRM(proc_cleanup)(int minor,
 #if __HAVE_SG
 				/* Scatter Gather Support (drm_scatter.h) */
 extern void           DRM(sg_cleanup)(drm_sg_mem_t *entry);
+#endif
+
+#ifdef __linux__
+/* Stub support (drm_stub.h) */
+extern int	DRM(stub_register)(const char *name,
+				 struct file_operations *fops,
+				 drm_device_t *dev);
+extern int	DRM(stub_unregister)(int minor);
+#endif
+
+#ifdef __FreeBSD__
+extern int	DRM(sysctl_init)(drm_device_t *dev);
+extern int	DRM(sysctl_cleanup)(drm_device_t *dev);
 #endif
 
                                /* ATI PCIGART support (ati_pcigart.h) */

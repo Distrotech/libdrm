@@ -96,7 +96,12 @@ static int tdfx_probe(device_t dev)
 #include "drm_memory.h"
 #include "drm_proc.h"
 #include "drm_vm.h"
+#ifdef __linux__
 #include "drm_stub.h"
+#endif
+#ifdef __FreeBSD__
+#include "drm_sysctl.h"
+#endif
 
 #ifdef __FreeBSD__
 DRIVER_MODULE(tdfx, pci, tdfx_driver, tdfx_devclass, 0, 0);

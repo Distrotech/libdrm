@@ -191,6 +191,7 @@ extern d_close_t	DRM(close);
 extern d_read_t		DRM(read);
 extern d_write_t	DRM(write);
 extern d_poll_t		DRM(poll);
+extern d_mmap_t		DRM(mmap);
 
 /* Misc. IOCTL support (drm_ioctl.h) */
 extern d_ioctl_t	DRM(irq_busid);
