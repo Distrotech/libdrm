@@ -66,54 +66,55 @@ static struct miscdevice      mga_misc = {
 };
 
 static drm_ioctl_desc_t	      mga_ioctls[] = {
-	[DRM_IOCTL_NR(DRM_IOCTL_VERSION)]     = { mga_version,	  0, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_GET_UNIQUE)]  = { drm_getunique,  0, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_GET_MAGIC)]   = { drm_getmagic,	  0, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_IRQ_BUSID)]   = { drm_irq_busid,  0, 1 },
+	[DRM_IOCTL_NR(DRM_IOCTL_VERSION)]     = { mga_version,	  0, 0, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_GET_UNIQUE)]  = { drm_getunique,  0, 0, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_GET_MAGIC)]   = { drm_getmagic,	  0, 0, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_IRQ_BUSID)]   = { drm_irq_busid,  0, 1, 0 },
 
-	[DRM_IOCTL_NR(DRM_IOCTL_SET_UNIQUE)]  = { drm_setunique,  1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_BLOCK)]	      = { drm_block,	  1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_UNBLOCK)]     = { drm_unblock,	  1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_CONTROL)]     = { mga_control,	  1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AUTH_MAGIC)]  = { drm_authmagic,  1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_ADD_MAP)]     = { drm_addmap,	  1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_ADD_BUFS)]    = { mga_addbufs,	  1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_MARK_BUFS)]   = { mga_markbufs,	  1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_INFO_BUFS)]   = { mga_infobufs,	  1, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_MAP_BUFS)]    = { mga_mapbufs,	  1, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_FREE_BUFS)]   = { mga_freebufs,	  1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_SET_UNIQUE)]  = { drm_setunique,  1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_BLOCK)]	      = { drm_block,	  1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_UNBLOCK)]     = { drm_unblock,	  1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_CONTROL)]     = { mga_control,	  1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_AUTH_MAGIC)]  = { drm_authmagic,  1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_ADD_MAP)]     = { drm_addmap,	  1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_ADD_BUFS)]    = { mga_addbufs,	  1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_MARK_BUFS)]   = { mga_markbufs,	  1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_INFO_BUFS)]   = { mga_infobufs,	  1, 0, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_MAP_BUFS)]    = { mga_mapbufs,	  1, 0, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_FREE_BUFS)]   = { mga_freebufs,	  1, 0, 0 },
 
-	[DRM_IOCTL_NR(DRM_IOCTL_ADD_CTX)]     = { mga_addctx,	  1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_RM_CTX)]      = { mga_rmctx,	  1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_MOD_CTX)]     = { mga_modctx,	  1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_GET_CTX)]     = { mga_getctx,	  1, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_SWITCH_CTX)]  = { mga_switchctx,  1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_NEW_CTX)]     = { mga_newctx,	  1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_RES_CTX)]     = { mga_resctx,	  1, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_ADD_DRAW)]    = { drm_adddraw,	  1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_RM_DRAW)]     = { drm_rmdraw,	  1, 1 },
+	[DRM_IOCTL_NR(DRM_IOCTL_ADD_CTX)]     = { mga_addctx,	  1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_RM_CTX)]      = { mga_rmctx,	  1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_MOD_CTX)]     = { mga_modctx,	  1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_GET_CTX)]     = { mga_getctx,	  1, 0, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_SWITCH_CTX)]  = { mga_switchctx,  1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_NEW_CTX)]     = { mga_newctx,	  1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_RES_CTX)]     = { mga_resctx,	  1, 0, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_ADD_DRAW)]    = { drm_adddraw,	  1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_RM_DRAW)]     = { drm_rmdraw,	  1, 1, 0 },
 
-	[DRM_IOCTL_NR(DRM_IOCTL_DMA)]	      = { mga_dma,	  1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_DMA)]	      = { mga_dma,	  1, 0, 1 },
 
-	[DRM_IOCTL_NR(DRM_IOCTL_LOCK)]	      = { mga_lock,	  1, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_UNLOCK)]      = { mga_unlock,	  1, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_FINISH)]      = { drm_finish,	  1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_LOCK)]	      = { mga_lock,	  1, 0, 1 },
+	[DRM_IOCTL_NR(DRM_IOCTL_UNLOCK)]      = { mga_unlock,	  1, 0, 1 },
+	[DRM_IOCTL_NR(DRM_IOCTL_FINISH)]      = { drm_finish,	  1, 0, 0 },
 
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ACQUIRE)] = { drm_agp_acquire, 1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_RELEASE)] = { drm_agp_release, 1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ENABLE)]  = { drm_agp_enable,  1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_INFO)]    = { drm_agp_info,    1, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ALLOC)]   = { drm_agp_alloc,   1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_FREE)]    = { drm_agp_free,    1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_BIND)]    = { drm_agp_bind,    1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_UNBIND)]  = { drm_agp_unbind,  1, 1 },
-   	[DRM_IOCTL_NR(DRM_IOCTL_MGA_INIT)]    = { mga_dma_init,    1, 1 },
-   	[DRM_IOCTL_NR(DRM_IOCTL_MGA_SWAP)]    = { mga_swap_bufs,   1, 0 },
-   	[DRM_IOCTL_NR(DRM_IOCTL_MGA_CLEAR)]   = { mga_clear_bufs,  1, 0 },
-   	[DRM_IOCTL_NR(DRM_IOCTL_MGA_ILOAD)]   = { mga_iload,       1, 0 },
-   	[DRM_IOCTL_NR(DRM_IOCTL_MGA_VERTEX)]  = { mga_vertex,      1, 0 },
-   	[DRM_IOCTL_NR(DRM_IOCTL_MGA_FLUSH)]   = { mga_flush_ioctl, 1, 0 },
-   	[DRM_IOCTL_NR(DRM_IOCTL_MGA_INDICES)] = { mga_indices,     1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ACQUIRE)] = { drm_agp_acquire, 1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_AGP_RELEASE)] = { drm_agp_release, 1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ENABLE)]  = { drm_agp_enable,  1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_AGP_INFO)]    = { drm_agp_info,    1, 0, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ALLOC)]   = { drm_agp_alloc,   1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_AGP_FREE)]    = { drm_agp_free,    1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_AGP_BIND)]    = { drm_agp_bind,    1, 1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_AGP_UNBIND)]  = { drm_agp_unbind,  1, 1, 0 },
+
+   	[DRM_IOCTL_NR(DRM_IOCTL_MGA_INIT)]    = { mga_dma_init,    1, 1, 0 },
+   	[DRM_IOCTL_NR(DRM_IOCTL_MGA_SWAP)]    = { mga_swap_bufs,   1, 0, 1 },
+   	[DRM_IOCTL_NR(DRM_IOCTL_MGA_CLEAR)]   = { mga_clear_bufs,  1, 0, 1 },
+   	[DRM_IOCTL_NR(DRM_IOCTL_MGA_ILOAD)]   = { mga_iload,       1, 0, 1 },
+   	[DRM_IOCTL_NR(DRM_IOCTL_MGA_VERTEX)]  = { mga_vertex,      1, 0, 1 },
+   	[DRM_IOCTL_NR(DRM_IOCTL_MGA_FLUSH)]   = { mga_flush_ioctl, 1, 0, 1 },
+   	[DRM_IOCTL_NR(DRM_IOCTL_MGA_INDICES)] = { mga_indices,     1, 0, 1 },
 };
 
 #define MGA_IOCTL_COUNT DRM_ARRAY_SIZE(mga_ioctls)
@@ -182,6 +183,9 @@ static int mga_setup(drm_device_t *dev)
 	dev->last_context   = 0;
 	dev->last_switch    = 0;
 	dev->last_checked   = 0;
+	dev->irq_lock_depth = -1;
+	dev->bh_lock_depth  = -1;
+
 	init_timer(&dev->timer);
 	init_waitqueue_head(&dev->context_wait);
 
@@ -192,6 +196,7 @@ static int mga_setup(drm_device_t *dev)
 	dev->buf_wp	  = dev->buf;
 	dev->buf_end	  = dev->buf + DRM_BSZ;
 	dev->buf_async	  = NULL;
+
 	init_waitqueue_head(&dev->buf_readers);
 	init_waitqueue_head(&dev->buf_writers);
 
@@ -539,7 +544,7 @@ int mga_release(struct inode *inode, struct file *filp)
 				/* Contention */
 			atomic_inc(&dev->total_sleeps);
 			current->state = TASK_INTERRUPTIBLE;
-			schedule();
+			drm_schedule(dev);
 			if (signal_pending(current)) {
 				retcode = -ERESTARTSYS;
 				break;
@@ -619,7 +624,11 @@ int mga_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 			    || (ioctl->auth_needed && !priv->authenticated)) {
 			retcode = -EACCES;
 		} else {
+			if(ioctl->needs_hvy_lock == 1)
+				drm_big_fscking_lock_filp(dev, priv);
 			retcode = (func)(inode, filp, cmd, arg);
+			if(ioctl->needs_hvy_lock == 1)
+				drm_big_fscking_unlock_filp(dev, priv);
 		}
 	}
 

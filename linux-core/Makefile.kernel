@@ -27,6 +27,7 @@ export-objs     := $(patsubst %.o,%_drv.o,$(module-list))
 #
 lib-objs   := init.o memory.o proc.o auth.o context.o drawable.o bufs.o
 lib-objs   += lists.o lock.o ioctl.o fops.o vm.o dma.o ctxbitmap.o
+lib-objs   += drm_heavy_kern_lock.o
 
 ifeq ($(CONFIG_AGP),y)
  lib-objs  += agpsupport.o

@@ -230,7 +230,7 @@ drm_buf_t *mga_freelist_get(drm_device_t *dev)
 				     &dev_priv->dispatch_status))
 				break;
 		   	atomic_inc(&dev->total_sleeps);
-		   	schedule();
+		   	drm_schedule(dev);
 		   	if (signal_pending(current)) {
 				clear_bit(MGA_IN_GETBUF,
 					  &dev_priv->dispatch_status);
@@ -417,6 +417,7 @@ void mga_fire_primary(drm_device_t *dev, drm_mga_prim_buf_t *prim)
 	}
 
    	mga_flush_write_combine();
+
     	atomic_inc(&dev_priv->pending_bufs);
        	MGA_WRITE(MGAREG_PRIMADDRESS, phys_head | TT_GENERAL);
  	MGA_WRITE(MGAREG_PRIMEND, (phys_head + num_dwords * 4) | use_agp);
@@ -472,7 +473,7 @@ int mga_advance_primary(drm_device_t *dev)
 				break;
 		   	atomic_inc(&dev->total_sleeps);
 		   	atomic_inc(&dma->total_missed_sched);
-		   	schedule();
+		   	drm_schedule(dev);
 		   	if (signal_pending(current)) {
 			   	ret = -ERESTARTSYS;
 			   	break;
@@ -563,6 +564,8 @@ int mga_dma_schedule(drm_device_t *dev, int locked)
       	drm_device_dma_t  *dma	    = dev->dma;
 	int retval = 0;
 
+	drm_big_fscking_lock(dev);
+
    	if (test_and_set_bit(0, &dev->dma_flag)) {
 		atomic_inc(&dma->total_missed_dma);
 		retval = -EBUSY;
@@ -633,6 +636,7 @@ sch_out_wakeup:
 	}
 
    	clear_bit(0, &dev->dma_flag);
+	drm_big_fscking_unlock(dev);
 	return retval;
 }
 
@@ -645,6 +649,7 @@ static void mga_dma_service(int irq, void *device, struct pt_regs *regs)
 	DRM_DEBUG("%s\n", __FUNCTION__);
     	atomic_inc(&dev->total_irq);
 	if((MGA_READ(MGAREG_STATUS) & 0x00000001) != 0x00000001) return;
+	drm_big_fscking_lock(dev);
       	MGA_WRITE(MGAREG_ICLEAR, 0x00000001);
    	last_prim_buffer = dev_priv->last_prim;
     	last_prim_buffer->num_dwords = 0;
@@ -658,6 +663,7 @@ static void mga_dma_service(int irq, void *device, struct pt_regs *regs)
       	atomic_dec(&dev_priv->pending_bufs);
    	queue_task(&dev->tq, &tq_immediate);
    	mark_bh(IMMEDIATE_BH);
+	drm_big_fscking_unlock(dev);
 }
 
 static void mga_dma_task_queue(void *device)
@@ -813,8 +819,9 @@ static int mga_dma_initialize(drm_device_t *dev, drm_mga_init_t *init) {
 		/* Poll for the first buffer to insure that
 		 * the status register will be correct
 		 */
-
+	   
 		mga_flush_write_combine();
+
 	   	MGA_WRITE(MGAREG_PRIMADDRESS, phys_head | TT_GENERAL);
 
 		MGA_WRITE(MGAREG_PRIMEND, ((phys_head + num_dwords * 4) |
@@ -960,7 +967,7 @@ static int mga_flush_queue(drm_device_t *dev)
 				      &dev_priv->dispatch_status))
 				break;
 		   	atomic_inc(&dev->total_sleeps);
-	      		schedule();
+	      		drm_schedule(dev);
 	      		if (signal_pending(current)) {
 		   		ret = -EINTR; /* Can't restart */
 				clear_bit(MGA_IN_FLUSH,
@@ -1050,7 +1057,7 @@ int mga_lock(struct inode *inode, struct file *filp, unsigned int cmd,
 				/* Contention */
 			atomic_inc(&dev->total_sleeps);
 			current->state = TASK_INTERRUPTIBLE;
-			schedule();
+			drm_schedule(dev);
 			if (signal_pending(current)) {
 				ret = -ERESTARTSYS;
 				break;

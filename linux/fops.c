@@ -55,6 +55,7 @@ int drm_open_helper(struct inode *inode, struct file *filp, drm_device_t *dev)
 	priv->dev	    = dev;
 	priv->ioctl_count   = 0;
 	priv->authenticated = capable(CAP_SYS_ADMIN);
+	priv->lock_depth    = -1;
 
 	down(&dev->struct_sem);
 	if (!dev->file_last) {

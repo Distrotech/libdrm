@@ -300,6 +300,7 @@ typedef struct drm_ioctl_desc {
 	drm_ioctl_t	     *func;
 	int		     auth_needed;
 	int		     root_only;
+	int		     needs_hvy_lock;
 } drm_ioctl_desc_t;
 
 typedef struct drm_devstate {
@@ -430,8 +431,9 @@ typedef struct drm_file {
 	struct drm_file	  *next;
 	struct drm_file	  *prev;
 	struct drm_device *dev;
+	volatile int	  lock_depth;
+	unsigned long	  irq_flags;
 } drm_file_t;
-
 
 typedef struct drm_queue {
 	atomic_t	  use_count;	/* Outstanding uses (+1)	    */
@@ -615,6 +617,12 @@ typedef struct drm_device {
 	void		  *dev_private;
 	drm_sigdata_t     sigdata; /* For block_all_signals */
 	sigset_t          sigmask;
+
+	spinlock_t	  big_fscking_lock;
+	volatile int	  irq_lock_depth;
+	unsigned long	  irq_flags;
+	volatile int	  bh_lock_depth;
+	unsigned long	  bh_flags;
 } drm_device_t;
 
 
@@ -816,6 +824,16 @@ extern int	     drm_ctxbitmap_init(drm_device_t *dev);
 extern void	     drm_ctxbitmap_cleanup(drm_device_t *dev);
 extern int	     drm_ctxbitmap_next(drm_device_t *dev);
 extern void	     drm_ctxbitmap_free(drm_device_t *dev, int ctx_handle);
+
+				/* BIG Fscking lock (drm_heavy_kern_lock.c) */
+extern void drm_schedule(drm_device_t *dev);
+extern void drm_schedule_timeout(drm_device_t *dev, unsigned long timeout);
+extern void drm_big_fscking_lock(drm_device_t *dev);
+extern void drm_big_fscking_unlock(drm_device_t *dev);
+extern void __inline drm_big_fscking_lock_filp(drm_device_t *dev, 
+					       drm_file_t *filp);
+extern void __inline drm_big_fscking_unlock_filp(drm_device_t *dev, 
+						 drm_file_t *filp);
 
 #if defined(CONFIG_AGP) || defined(CONFIG_AGP_MODULE)
 				/* AGP/GART support (agpsupport.c) */

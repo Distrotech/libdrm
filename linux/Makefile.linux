@@ -53,7 +53,8 @@ LIBS=           libdrm.a
 PROGS=		drmstat
 
 DRMOBJS=	init.o memory.o proc.o auth.o context.o drawable.o bufs.o \
-		lists.o lock.o ioctl.o fops.o vm.o dma.o ctxbitmap.o
+		lists.o lock.o ioctl.o fops.o vm.o dma.o ctxbitmap.o \
+		drm_heavy_kern_lock.o
 DRMHEADERS=	drm.h drmP.h compat-pre24.h
 
 GAMMAOBJS=      gamma_drv.o gamma_dma.o
