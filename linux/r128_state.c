@@ -1517,9 +1517,8 @@ int r128_cce_indirect( DRM_OS_IOCTL )
 		return -EINVAL;
 	}
 
-	if ( copy_from_user( &indirect, (drm_r128_indirect_t *)arg,
-			     sizeof(indirect) ) )
-		return -EFAULT;
+	DRM_OS_KRNFROMUSR( indirect, (drm_r128_indirect_t *) arg,
+			     sizeof(indirect) );
 
 	DRM_DEBUG( "indirect: idx=%d s=%d e=%d d=%d\n",
 		   indirect.idx, indirect.start,

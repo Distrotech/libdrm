@@ -121,18 +121,19 @@ int DRM(open_helper)(dev_t kdev, int flags, int fmt, DRM_OS_STRUCTPROC *p,
 	} else {
 		priv = (drm_file_t *) DRM(alloc)(sizeof(*priv), DRM_MEM_FILES);
 		bzero(priv, sizeof(*priv));
-#if __FreeBSD_version >= 500021
-		priv->uid		= p->p_ucred->cr_svuid;
+#if __FreeBSD_version >= 500000
+		priv->uid		= p->td_proc->p_ucred->cr_svuid;
+		priv->pid		= p->td_proc->p_pid;
 #else
 		priv->uid		= p->p_cred->p_svuid;
+		priv->pid		= p->p_pid;
 #endif
 
-		priv->pid		= p->p_pid;
 		priv->refs		= 1;
 		priv->minor		= m;
 		priv->devXX		= dev;
 		priv->ioctl_count 	= 0;
-		priv->authenticated	= !suser(p);
+		priv->authenticated	= !DRM_OS_CHECKSUSER;
 		lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, p);
 		TAILQ_INSERT_TAIL(&dev->files, priv, link);
 		lockmgr(&dev->dev_lock, LK_RELEASE, 0, p);

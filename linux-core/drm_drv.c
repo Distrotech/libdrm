@@ -1219,12 +1219,7 @@ int DRM(ioctl)( DRM_OS_IOCTL )
 		if ( !func ) {
 			DRM_DEBUG( "no function\n" );
 			retcode = EINVAL;
-		} else if ( ( ioctl->root_only && 
-#ifdef __linux__
-				!capable( CAP_SYS_ADMIN ) )
-#endif /* __linux__ */
-#ifdef __FreeBSD__
-				suser(p) )
+		} else if ( ( ioctl->root_only && DRM_OS_CHECKSUSER ) 
 #endif /* __FreeBSD__ */
 			 || ( ioctl->auth_needed && !priv->authenticated ) ) {
 			retcode = EACCES;
@@ -1421,7 +1416,11 @@ SYSUNINIT(DRM( unregister), SI_SUB_KLD, SI_ORDER_MIDDLE, linux_ioctl_unregister_
 static int
 DRM(linux_ioctl)(DRM_OS_STRUCTPROC *p, struct linux_ioctl_args* args)
 {
+#ifdef __FreeBSD_version >= 500000
+    struct file		*fp = p->td_proc->p_fd->fd_ofiles[args->fd];
+#else
     struct file		*fp = p->p_fd->fd_ofiles[args->fd];
+#endif
     u_long		cmd = args->cmd;
     caddr_t             data = (caddr_t) args->arg;
     /*

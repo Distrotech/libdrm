@@ -56,6 +56,7 @@
 #define DRM_OS_STRUCTPROC	struct thread
 #define DRM_OS_CURRENTPID       curthread->td_proc->p_pid
 #define DRM_OS_IOCTL 		dev_t kdev, u_long cmd, caddr_t data, int flags, struct thread *p
+#define DRM_OS_CHECKSUSER	suser(p->td_proc)
 #else
 #define DRM_OS_CURPROC		curproc
 #define DRM_OS_STRUCTPROC	struct proc
@@ -67,6 +68,7 @@
 #define DRM_OS_LOCK	lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, curproc)
 #define DRM_OS_UNLOCK 	lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc)
 #define DRM_OS_CURRENTPID       curproc->p_pid
+#define DRM_OS_CHECKSUSER	suser(p)
 #endif
 
 #define DRM_OS_TASKQUEUE_ARGS	void *dev, int pending

@@ -270,6 +270,7 @@ do {									\
 #define DRM_OS_DELAY(d)		udelay(d)
 #define DRM_OS_RETURN(v)	return -v;
 #define DRM_OS_CURRENTPID	current->pid
+#define DRM_OS_CHECKSUSER	!capable( CAP_SYS_ADMIN )
 #define DRM_OS_KRNTOUSR(arg1, arg2, arg3) \
 	if ( copy_to_user(arg1, &arg2, arg3) ) \
 		return -EFAULT
