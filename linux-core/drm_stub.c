@@ -1,13 +1,15 @@
 /**
  * \file drm_stub.h
- * Stub support
+ * Stub support.
  *
+ * The functions in this file provide the support for the attribution of 
+ * minor device numbers in the presence of multiple (distinct) DRM modules.
+ * It also registers the proc filesystem for each minor.
+ * 
  * \author Rickard E. (Rik) Faith <faith@valinux.com>
  */
 
 /*
- * Created: Fri Jan 19 10:48:35 2001 by faith@acm.org
- *
  * Copyright 2001 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
  *
@@ -36,16 +38,25 @@
 
 #define DRM_STUB_MAXCARDS 16	/* Enough for one machine */
 
-/** Stub list. One for each minor. */
+/** 
+ * Stub list. 
+ *
+ * One for each minor. 
+ */
 static struct drm_stub_list {
-	const char             *name;
-	struct file_operations *fops;	/**< file operations */
+	const char             *name;		/**< driver name */
+	struct file_operations *fops;		/**< file operations */
 	struct proc_dir_entry  *dev_root;	/**< proc directory entry */
 } *DRM(stub_list);
 
 static struct proc_dir_entry *DRM(stub_root);
 
-/** Stub information */
+/** 
+ * Stub information. 
+ *
+ * This structure holds the callbacks for stub (un)registration is made
+ * available for other DRM modules as a registered symbol named "drm".
+ */
 static struct drm_stub_info {
 	int (*info_register)(const char *name, struct file_operations *fops,
 			     drm_device_t *dev);
