@@ -793,9 +793,9 @@ do {									\
 		DRM_INFO( "ADVANCE_RING() wr=0x%06x tail=0x%06x\n",	\
 			  _ring_write, _ring_tail );			\
 	}								\
-	DRM_READMEMORYBARRIER();					\
+	DRM_READMEMORYBARRIER(dev_priv->mmio);				\
 	mach64_clear_dma_eol( &_ring[(_ring_tail - 2) & _ring_mask] );	\
-	DRM_READMEMORYBARRIER();					\
+	DRM_READMEMORYBARRIER(dev_priv->mmio);				\
 	dev_priv->ring.tail = _ring_write;				\
 	mach64_ring_tick( dev_priv, &(dev_priv)->ring );		\
 } while (0)
@@ -817,7 +817,7 @@ do {									\
 
 #define GETBUFADDR( __buf )				\
 ((dev_priv->is_pci) ? 					\
-	((u32)virt_to_bus((void *)(__buf)->address)) : 	\
+	((u32)DRM_VTOPHYS((void *)(__buf)->address)) : 	\
 	((u32)(__buf)->bus_address))
 
 #define GETRINGOFFSET() (_entry->ring_ofs)
