@@ -488,7 +488,7 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 
 						data = *p;
 
-						MACH64_WRITE( reg, data );
+						MACH64_WRITE( reg++, data );
 
 						p++;
 						used--;
