@@ -2,6 +2,7 @@
  * Created: Fri Nov 24 22:07:58 2000 by gareth@valinux.com
  *
  * Copyright 2000 Gareth Hughes
+ * Copyright 2002 Frank C. Earl
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -24,13 +25,26 @@
  *
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
+ *    Frank C. Earl <fearl@airmail.net>
  */
 
 #ifndef __MACH64_DRV_H__
 #define __MACH64_DRV_H__
 
-typedef struct drm_mach64_private {
+#include <linux/list.h>
+
+
+/* Doesn't need much- the interrupt handler will manage "aging", etc. */
+typedef struct drm_mach64_freelist 
+{
+	struct list_head  list;			/* Linux LIST structure... */
+	struct drm_buf	  *buf;       		/* DMA buffer  */
+} drm_mach64_freelist_t;
+
+typedef struct drm_mach64_private 
+{
 	drm_mach64_sarea_t *sarea_priv;
+	int is_pci;
 
 	unsigned int fb_bpp;
 	unsigned int front_offset, front_pitch;
@@ -43,17 +57,27 @@ typedef struct drm_mach64_private {
 	u32 back_offset_pitch;
 	u32 depth_offset_pitch;
 
-	int usec_timeout;
+	u32 usec_timeout;		/* Number of microseconds to wait for a timeout on the idle functions */
+	atomic_t dma_timeout;		/* Number of interrupt dispatches since last DMA dispatch... */
+	atomic_t do_gui;		/* Flag for the bottom half to know what to do... */
+	atomic_t do_blit;		/* Flag for the bottom half to know what to do... */
+	
+	struct pci_pool *pool;		
+	dma_addr_t table_handle;
+	u32 table_addr;
+	u32 *table;
+	void *cpu_addr_table;
+	
+	struct list_head	  free_list;     /* Free-list head  */
+	struct list_head	  empty_list;    /* Free-list placeholder list  */
+	struct list_head	  pending;    	 /* Pending submission placeholder  */
+	struct list_head	  dma_queue;     /* Submission queue head  */
 
 	drm_map_t *sarea;
 	drm_map_t *fb;
 	drm_map_t *mmio;
 	drm_map_t *buffers;
 } drm_mach64_private_t;
-
-typedef struct drm_mach64_buf_priv {
-	int age;
-} drm_mach64_buf_priv_t;
 
 
 				/* mach64_drv.c */
@@ -397,6 +421,9 @@ do {									\
 /* ================================================================
  * DMA macros
  */
+
+#define MACH64_DMA_TIMEOUT	10		/* 10 vertical retraces should be enough */
+#define MACH64_DMA_SIZE		8		/* 1 MB should be enough to make things happy */
 
 #define DMA_FRAME_BUF_OFFSET	0
 #define DMA_SYS_MEM_ADDR	1

@@ -37,7 +37,7 @@
 /* General customization:
  */
 #define __HAVE_AGP		1
-#define __MUST_HAVE_AGP		1
+#define __MUST_HAVE_AGP		0
 #define __HAVE_MTRR		1
 #define __HAVE_CTX_BITMAP	1
 #define __HAVE_SG		1
@@ -46,6 +46,9 @@
 /* DMA customization:
  */
 #define __HAVE_DMA		1
+#define __HAVE_DMA_IRQ		1
+#define __HAVE_DMA_IRQ_BH	1
+#define __HAVE_SHARED_IRQ       1
 
 /* Buffer customization:
  */

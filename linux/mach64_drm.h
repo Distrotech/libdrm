@@ -2,6 +2,7 @@
  * Created: Thu Nov 30 20:04:32 2000 by gareth@valinux.com
  *
  * Copyright 2000 Gareth Hughes
+ * Copyright 2002 Frank C. Earl
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -24,6 +25,7 @@
  *
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
+ *    Frank C. Earl <fearl@airmail.net>
  */
 
 #ifndef __MACH64_DRM_H__
@@ -148,6 +150,7 @@ typedef struct drm_mach64_init {
 	} func;
 
 	unsigned int sarea_priv_offset;
+	int is_pci;
 
 	unsigned int fb_bpp;
 	unsigned int front_offset, front_pitch;
