@@ -641,14 +641,6 @@ extern int            DRM(proc_cleanup)(int minor,
 					struct proc_dir_entry *root,
 					struct proc_dir_entry *dev_root);
 
-                               /* ATI PCIGART support (ati_pcigart.h) */
-extern int            DRM(ati_pcigart_init)(drm_device_t *dev,
-					    unsigned long *addr,
-					    dma_addr_t *bus_addr);
-extern int            DRM(ati_pcigart_cleanup)(drm_device_t *dev,
-					       unsigned long addr,
-					       dma_addr_t bus_addr);
-
 /*@}*/
 
 #endif /* __KERNEL__ */

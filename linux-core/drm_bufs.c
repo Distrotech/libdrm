@@ -1,23 +1,10 @@
 /**
  * \file drm_bufs.h 
- * Buffer management.
+ * DMA buffers management.
  * 
  * \author Rickard E. (Rik) Faith <faith@valinux.com>
  * \author Gareth Hughes <gareth@valinux.com>
  * \author José Fonseca <jrfonseca@tungstengraphics.com>
- *
- * \todo The current buffer management system assumes too much and is severily
- * limited:
- * - It expects to all buffers to be used by clients, and has little provisions
- *   for private buffers (such as ring buffers, primary DMA buffers, etc.) This
- *   is currently overcomed by allocating these buffers directly in AGP memory
- *   when available, or by allocating a pool with a single buffer and with a
- *   size different of the regular client buffers.
- * - It doesn't allow to be two different pools with the same log2 of the
- *   buffers size making impossible, e.g., to have to pools of buffers: one
- *   private and one public.
- * - The high/low water mark is hardly used and the freelist should be
- *   redesigned to be more useful for all drivers.
  */
 
 /*
@@ -59,7 +46,7 @@ typedef struct drm_pool drm_pool_t;
 /**
  * A buffer of the DMA buffer pool.
  *
- * \sa drm_pool.
+ * This structure holds individual buffer information. See also drm_pool.
  */
 struct drm_pool_buffer {
 	void *			cpuaddr;	/**< kernel virtual address */
@@ -69,7 +56,14 @@ struct drm_pool_buffer {
 /**
  * DMA buffer pool.
  *
- * \sa drm_pool_buffer.
+ * This structure stores information about an homogeneous pool of buffers. See
+ * also drm_pool_buffer.
+ * 
+ * It only provides the basic information. This structure can be extended by 
+ * composition. See drm_pool_pci, drm_pool_agp, and drm_pool_sg for examples.
+ *
+ * See drm_freelist2 for a convinient and extensible way to manage a buffer
+ * pool.
  */
 struct drm_pool {
 	size_t			count;		/**< number of buffers */
@@ -86,11 +80,11 @@ struct drm_pool {
 /** \name Free-list management */
 /*@{*/
 
-typedef struct drm_freelist2_entrys drm_freelist2_entrys_t;
+typedef struct drm_freelist2_entry drm_freelist2_entry_t;
 typedef struct drm_freelist2 drm_freelist2_t;
 
 /**
- * An entrys in a freelist.
+ * An entryin a freelist.
  *
  * This structure can be extended by passing to drm_freelist2_init a stride
  * value greater than the size of this structure.
@@ -100,7 +94,7 @@ typedef struct drm_freelist2 drm_freelist2_t;
  * \author Based on Leif Delgass's original freelist code for the Mach64
  * driver.
  */
-struct drm_freelist2_entrys {
+struct drm_freelist2_entry {
 	struct list_head	list;		/**< Linux list */
 	drm_pool_buffer_t *	buffer;		/**< referred DMA buffer */
 	
@@ -154,7 +148,7 @@ struct drm_freelist2 {
 	/**
 	 * Stamp of the last processed buffer.
 	 *
-	 * \sa drm_free_list2_entrys::stamp.
+	 * \sa drm_free_list2_entry::stamp.
 	 */
 	unsigned long		last_stamp;
 	
@@ -168,6 +162,7 @@ struct drm_freelist2 {
 /*@}*/
 
 
+#if 0
 /** \name Deprecated structure */
 /*@{*/
 
@@ -253,6 +248,35 @@ typedef struct drm_buf_entry {
 } drm_buf_entry_t;
 
 /*@}*/
+#endif
+
+/**
+ * Backward compatability buffer pools used by the addbufs_ioctl() and friends.
+ *
+ * There is one of these for each buffer size in log2. Note that there can't be
+ * two different pools with the same log2 of the buffers size.
+ */
+typedef struct drm_buf_entry {
+	drm_pool_t *	pool;		/**< the pool */
+	int		seg_count;
+	int		page_order;
+	unsigned long *	seglist;
+} drm_buf_entry_t;
+
+
+
+/**
+ * Device buffer related data.
+ */
+typedef struct drm_bufs_data_t {
+	/** buffers, grouped  by their size order for backwards compatability */
+	drm_buf_entry_t	bufs[DRM_MAX_ORDER + 1];	
+	enum {
+		_DRM_DMA_USE_AGP = 0x01,
+		_DRM_DMA_USE_SG  = 0x02
+	} flags;
+} ;
+
 
 
 /** \name Prototypes */

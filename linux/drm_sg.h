@@ -54,11 +54,11 @@ typedef struct drm_sg_mem {
 
 /** \name Prototypes */
 /*@{*/
-extern void DRM(sg_free)( drm_sg_mem_t *entry );
-extern drm_sg_mem_t * DRM(sg_alloc)( unsigned long size );
-extern int DRM(sg_alloc_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
-extern int DRM(sg_free_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
-extern void DRM(sg_cleanup)(drm_device_t *dev);
+extern void drm_sg_free( drm_sg_mem_t *entry );
+extern drm_sg_mem_t * drm_sg_alloc( unsigned long size );
+extern int drm_sg_alloc_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
+extern int drm_sg_free_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
+extern void drm_sg_cleanup(drm_device_t *dev);
 /*@}*/
 
 

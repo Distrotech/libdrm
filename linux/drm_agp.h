@@ -63,7 +63,7 @@ typedef struct drm_agp_mem {
 /**
  * AGP data.
  *
- * \sa DRM(agp_init)() and drm_device::agp.
+ * \sa drm_agp_init() and drm_device::agp.
  */
 typedef struct drm_agp_head {
 	agp_kern_info      agp_info;	/**< AGP device information */
@@ -81,25 +81,25 @@ typedef struct drm_agp_head {
 /** \name Prototypes */
 /*@{*/
 
-extern int DRM(agp_acquire)(void);
-extern void DRM(agp_release)(void);
-extern void DRM(agp_enable)(unsigned long mode);
-extern agp_memory *DRM(agp_alloc)(size_t pages, u32 type);
-extern int DRM(agp_free)(agp_memory *handle);
-extern int DRM(agp_bind)(agp_memory *handle, off_t start);
-extern int DRM(agp_unbind)(agp_memory *handle);
+extern int drm_agp_acquire(void);
+extern void drm_agp_release(void);
+extern void drm_agp_enable(unsigned long mode);
+extern agp_memory *drm_agp_alloc(size_t pages, u32 type);
+extern int drm_agp_free(agp_memory *handle);
+extern int drm_agp_bind(agp_memory *handle, off_t start);
+extern int drm_agp_unbind(agp_memory *handle);
 
-extern int DRM(agp_acquire_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
-extern int DRM(agp_release_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
-extern int DRM(agp_enable_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
-extern int DRM(agp_info_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
-extern int DRM(agp_alloc_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
-extern int DRM(agp_free_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
-extern int DRM(agp_bind_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
-extern int DRM(agp_unbind_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
+extern int drm_agp_acquire_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
+extern int drm_agp_release_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
+extern int drm_agp_enable_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
+extern int drm_agp_info_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
+extern int drm_agp_alloc_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
+extern int drm_agp_free_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
+extern int drm_agp_bind_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
+extern int drm_agp_unbind_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
 
-extern void DRM(agp_init)(drm_device_t *dev);
-extern void DRM(agp_cleanup)(drm_device_t *dev);
+extern void drm_agp_init(drm_device_t *dev);
+extern void drm_agp_cleanup(drm_device_t *dev);
 
 /*@}*/
 

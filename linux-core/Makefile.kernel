@@ -7,6 +7,7 @@
 # $XFree86: xc/programs/Xserver/hw/xfree86/os-support/linux/drm/kernel/Makefile.kernel,v 1.17 2003/04/12 17:18:17 dawes Exp $
 #
 
+drm-objs    := drm_pci.o drm_agp.o drm_sg.o drm_mem.o drm_bufs.o
 gamma-objs  := gamma_drv.o gamma_dma.o
 tdfx-objs   := tdfx_drv.o
 r128-objs   := r128_drv.o r128_cce.o r128_state.o r128_irq.o
@@ -51,31 +52,31 @@ include $(TOPDIR)/Rules.make
 endif
 
 ifeq ($(BELOW25),y)
-gamma.o: $(gamma-objs) $(lib)
-	$(LD) -r -o $@ $(gamma-objs) $(lib)
+gamma.o: $(gamma-objs) $(drm-objs) $(lib)
+	$(LD) -r -o $@ $(gamma-objs) $(drm-objs) $(lib)
 
-tdfx.o: $(tdfx-objs) $(lib)
-	$(LD) -r -o $@ $(tdfx-objs) $(lib)
+tdfx.o: $(tdfx-objs) $(drm-objs) $(lib)
+	$(LD) -r -o $@ $(tdfx-objs) $(drm-objs) $(lib)
 
-mga.o: $(mga-objs) $(lib)
-	$(LD) -r -o $@ $(mga-objs) $(lib)
+mga.o: $(mga-objs) $(drm-objs) $(lib)
+	$(LD) -r -o $@ $(mga-objs) $(drm-objs) $(lib)
 
-i810.o: $(i810-objs) $(lib)
-	$(LD) -r -o $@ $(i810-objs) $(lib)
+i810.o: $(i810-objs) $(drm-objs) $(lib)
+	$(LD) -r -o $@ $(i810-objs) $(drm-objs) $(lib)
 
-i830.o: $(i830-objs) $(lib)
-	$(LD) -r -o $@ $(i830-objs) $(lib)
+i830.o: $(i830-objs) $(drm-objs) $(lib)
+	$(LD) -r -o $@ $(i830-objs) $(drm-objs) $(lib)
 
-r128.o: $(r128-objs) $(lib)
-	$(LD) -r -o $@ $(r128-objs) $(lib)
+r128.o: $(r128-objs) $(drm-objs) $(lib)
+	$(LD) -r -o $@ $(r128-objs) $(drm-objs) $(lib)
 
-radeon.o: $(radeon-objs) $(lib)
-	$(LD) -r -o $@ $(radeon-objs) $(lib)
+radeon.o: $(radeon-objs) $(drm-objs) $(lib)
+	$(LD) -r -o $@ $(radeon-objs) $(drm-objs) $(lib)
 
-sis.o: $(sis-objs) $(lib)
-	$(LD) -r -o $@ $(sis-objs) $(lib)
+sis.o: $(sis-objs) $(drm-objs) $(lib)
+	$(LD) -r -o $@ $(sis-objs) $(drm-objs) $(lib)
 
-ffb.o: $(ffb-objs) $(lib)
-	$(LD) -r -o $@ $(ffb-objs) $(lib)
+ffb.o: $(ffb-objs) $(drm-objs) $(lib)
+	$(LD) -r -o $@ $(ffb-objs) $(drm-objs) $(lib)
 endif
 

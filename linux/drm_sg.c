@@ -51,7 +51,7 @@
  *
  * \param entry scatter/gather memory entry to free, as returned by sg_alloc().
  */
-void DRM(sg_free)( drm_sg_mem_t *entry )
+void drm_sg_free( drm_sg_mem_t *entry )
 {
 	struct page *page;
 	int i;
@@ -64,13 +64,13 @@ void DRM(sg_free)( drm_sg_mem_t *entry )
 
 	vfree( entry->virtual );
 
-	DRM(free)( entry->busaddr,
+	drm_free( entry->busaddr,
 		   entry->pages * sizeof(*entry->busaddr),
 		   DRM_MEM_PAGES );
-	DRM(free)( entry->pagelist,
+	drm_free( entry->pagelist,
 		   entry->pages * sizeof(*entry->pagelist),
 		   DRM_MEM_PAGES );
-	DRM(free)( entry,
+	drm_free( entry,
 		   sizeof(*entry),
 		   DRM_MEM_SGLISTS );
 }
@@ -81,14 +81,14 @@ void DRM(sg_free)( drm_sg_mem_t *entry )
  * \param size size of memory to allocate.
  * \return pointer to a drm_sg_mem structure on success or NULL on failure.
  */
-drm_sg_mem_t * DRM(sg_alloc)( unsigned long size )
+drm_sg_mem_t * drm_sg_alloc( unsigned long size )
 {
 	drm_sg_mem_t *entry;
 	unsigned long pages, i, j;
 
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
-	entry = DRM(alloc)( sizeof(*entry), DRM_MEM_SGLISTS );
+	entry = drm_alloc( sizeof(*entry), DRM_MEM_SGLISTS );
 	if ( !entry )
 		return NULL;
 
@@ -98,22 +98,22 @@ drm_sg_mem_t * DRM(sg_alloc)( unsigned long size )
 	DRM_DEBUG( "sg size=%ld pages=%ld\n", size, pages );
 
 	entry->pages = pages;
-	entry->pagelist = DRM(alloc)( pages * sizeof(*entry->pagelist),
+	entry->pagelist = drm_alloc( pages * sizeof(*entry->pagelist),
 				     DRM_MEM_PAGES );
 	if ( !entry->pagelist ) {
-		DRM(free)( entry, sizeof(*entry), DRM_MEM_SGLISTS );
+		drm_free( entry, sizeof(*entry), DRM_MEM_SGLISTS );
 		return NULL;
 	}
 
 	memset(entry->pagelist, 0, pages * sizeof(*entry->pagelist));
 
-	entry->busaddr = DRM(alloc)( pages * sizeof(*entry->busaddr),
+	entry->busaddr = drm_alloc( pages * sizeof(*entry->busaddr),
 				     DRM_MEM_PAGES );
 	if ( !entry->busaddr ) {
-		DRM(free)( entry->pagelist,
+		drm_free( entry->pagelist,
 			   entry->pages * sizeof(*entry->pagelist),
 			   DRM_MEM_PAGES );
-		DRM(free)( entry,
+		drm_free( entry,
 			   sizeof(*entry),
 			   DRM_MEM_SGLISTS );
 		return NULL;
@@ -122,13 +122,13 @@ drm_sg_mem_t * DRM(sg_alloc)( unsigned long size )
 
 	entry->virtual = vmalloc_32( pages << PAGE_SHIFT );
 	if ( !entry->virtual ) {
-		DRM(free)( entry->busaddr,
+		drm_free( entry->busaddr,
 			   entry->pages * sizeof(*entry->busaddr),
 			   DRM_MEM_PAGES );
-		DRM(free)( entry->pagelist,
+		drm_free( entry->pagelist,
 			   entry->pages * sizeof(*entry->pagelist),
 			   DRM_MEM_PAGES );
-		DRM(free)( entry,
+		drm_free( entry,
 			   sizeof(*entry),
 			   DRM_MEM_SGLISTS );
 		return NULL;
@@ -191,7 +191,7 @@ drm_sg_mem_t * DRM(sg_alloc)( unsigned long size )
 	return entry;
 
  failed:
-	DRM(sg_free)( entry );
+	drm_sg_free( entry );
 	return NULL;
 }
 
@@ -220,7 +220,7 @@ drm_sg_mem_t * DRM(sg_alloc)( unsigned long size )
  * \param arg user argument, pointing to a drm_scatter_gather structure.
  * \return zero on success or a negative number on failure.
  */
-int DRM(sg_alloc_ioctl)( struct inode *inode, struct file *filp,
+int drm_sg_alloc_ioctl( struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
@@ -238,7 +238,7 @@ int DRM(sg_alloc_ioctl)( struct inode *inode, struct file *filp,
 			     sizeof(request) ) )
 		return -EFAULT;
 
-	entry = DRM(sg_alloc)( request.size  );
+	entry = drm_sg_alloc( request.size  );
 	if ( !entry )
 		return -ENOMEM;
 
@@ -247,7 +247,7 @@ int DRM(sg_alloc_ioctl)( struct inode *inode, struct file *filp,
 	if ( copy_to_user( (drm_scatter_gather_t *)arg,
 			   &request,
 			   sizeof(request) ) ) {
-		DRM(sg_free)( entry );
+		drm_sg_free( entry );
 		return -EFAULT;
 	}
 
@@ -264,7 +264,7 @@ int DRM(sg_alloc_ioctl)( struct inode *inode, struct file *filp,
  * \param arg user argument, pointing to a drm_scatter_gather structure.
  * \return zero on success or a negative number on failure.
  */
-int DRM(sg_free_ioctl)( struct inode *inode, struct file *filp,
+int drm_sg_free_ioctl( struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
@@ -285,7 +285,7 @@ int DRM(sg_free_ioctl)( struct inode *inode, struct file *filp,
 
 	DRM_DEBUG( "sg free virtual  = %p\n", entry->virtual );
 
-	DRM(sg_free)( entry );
+	drm_sg_free( entry );
 
 	return 0;
 }
@@ -297,10 +297,10 @@ int DRM(sg_free_ioctl)( struct inode *inode, struct file *filp,
  * Called by takedown() to free the scatter/gather memory resources associated
  * with a given device, i.e., to free drm_device_t::sg.
  */
-void DRM(sg_cleanup)(drm_device_t *dev)
+void drm_sg_cleanup(drm_device_t *dev)
 {
 	if ( dev->sg ) {
-		DRM(sg_free)( dev->sg );
+		drm_sg_free( dev->sg );
 		dev->sg = NULL;
 	}
 }

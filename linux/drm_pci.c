@@ -1,11 +1,9 @@
 /**
  * \file drm_pci_tmp.h
- * ioctl's to manage PCI memory
+ * PCI consistent memory allocation.
  * 
  * \warning These interfaces aren't stable yet.
  * 
- * \todo Implement the remaining ioctl's for the PCI pools.
- * \todo Add support to map these buffers.
  * \todo The wrappers here are so thin that they would be better off inlined..
  *
  * \author José Fonseca <jrfonseca@tungstengraphics.com>
@@ -47,7 +45,7 @@
 /**
  * Allocate a PCI consistent memory block, for DMA.
  */
-void * DRM(pci_alloc)( drm_device_t *dev, size_t size, 
+void * drm_pci_alloc( drm_device_t *dev, size_t size, 
 		       dma_addr_t *busaddr )
 {
 	return pci_alloc_consistent( dev->pdev, size, busaddr );
@@ -56,7 +54,7 @@ void * DRM(pci_alloc)( drm_device_t *dev, size_t size,
 /**
  * Free a PCI consistent memory block.
  */
-void DRM(pci_free)( drm_device_t *dev, size_t size, void *cpuaddr, 
+void drm_pci_free( drm_device_t *dev, size_t size, void *cpuaddr, 
 		    dma_addr_t busaddr )
 {
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
@@ -68,7 +66,13 @@ void DRM(pci_free)( drm_device_t *dev, size_t size, void *cpuaddr,
 
 
 /**********************************************************************/
-/** \name PCI memory pool */
+/** 
+ * \name PCI memory pool 
+ *
+ * These are low level abstractions of the OS primitives.  Don't call these
+ * directly from the drivers.  Use drm_pool_pci_alloc() and drm_pool_free()
+ * instead.
+ */
 /*@{*/
 
 /**
@@ -80,20 +84,16 @@ void DRM(pci_free)( drm_device_t *dev, size_t size, void *cpuaddr,
  * function to ease porting to other OS's. More functionality can be exposed
  * later if actually required by the drivers.
  */
-void *DRM(pci_pool_create)( drm_device_t *dev, size_t size, size_t align )
+void *drm_pci_pool_create( drm_device_t *dev, size_t size, size_t align )
 {
-	DRM_DEBUG( "%s\n", __FUNCTION__ );
-
 	return pci_pool_create( "DRM", dev->pdev, size, align, 0, 0);
 }
 
 /**
  * Destroy a pool of PCI consistent memory blocks.
  */
-void DRM(pci_pool_destroy)( drm_device_t *dev, void *entry )
+void drm_pci_pool_destroy( drm_device_t *dev, void *entry )
 {
-	DRM_DEBUG( "%s\n", __FUNCTION__ );
-
 	pci_pool_destroy( (struct pci_pool *)entry );
 }
 
@@ -102,20 +102,16 @@ void DRM(pci_pool_destroy)( drm_device_t *dev, void *entry )
  *
  * \return the virtual address of a block on success, or NULL on failure. 
  */
-void *DRM(pci_pool_alloc)( void *entry, dma_addr_t *busaddr )
+void *drm_pci_pool_alloc( void *entry, dma_addr_t *busaddr )
 {
-	DRM_DEBUG( "%s\n", __FUNCTION__ );
-
 	return pci_pool_alloc( (struct pci_pool *)entry, 0, busaddr );
 }
 
 /**
  * Free a block back into a PCI consistent memory block pool.
  */
-void DRM(pci_pool_free)( void *entry, void *cpuaddr, dma_addr_t busaddr )
+void drm_pci_pool_free( void *entry, void *cpuaddr, dma_addr_t busaddr )
 {
-	DRM_DEBUG( "%s\n", __FUNCTION__ );
-
 	pci_pool_free( (struct pci_pool *)entry, cpuaddr, busaddr );
 }
 
@@ -128,7 +124,7 @@ void DRM(pci_pool_free)( void *entry, void *cpuaddr, dma_addr_t busaddr )
 /** \name Ioctl's */
 /*@{*/
 
-int DRM(pci_alloc_ioctl)( struct inode *inode, struct file *filp,
+int drm_pci_alloc_ioctl( struct inode *inode, struct file *filp,
 			  unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
@@ -143,17 +139,17 @@ int DRM(pci_alloc_ioctl)( struct inode *inode, struct file *filp,
 			     sizeof(request) ) )
 		return -EFAULT;
 
-	entry = DRM(alloc)( sizeof(*entry), DRM_MEM_DRIVER );
+	entry = drm_alloc( sizeof(*entry), DRM_MEM_DRIVER );
 	if ( !entry )
 		return -ENOMEM;
 
    	memset( entry, 0, sizeof(*entry) );
 
-	entry->cpuaddr = DRM(pci_alloc)( dev, request.size, 
+	entry->cpuaddr = drm_pci_alloc( dev, request.size, 
 					 &entry->busaddr );
 	
 	if ( !entry->cpuaddr ) {
-		DRM(free)( entry, sizeof(*entry), DRM_MEM_DRIVER );
+		drm_free( entry );
 		return -ENOMEM;
 	}
 
@@ -163,9 +159,9 @@ int DRM(pci_alloc_ioctl)( struct inode *inode, struct file *filp,
 	if ( copy_to_user( (drm_pci_mem_ioctl_t *)arg,
 			   &request,
 			   sizeof(request) ) ) {
-		DRM(pci_free)( dev, entry->size, entry->cpuaddr, 
+		drm_pci_free( dev, entry->size, entry->cpuaddr, 
 			       entry->busaddr );
-		DRM(free)( entry, sizeof(*entry), DRM_MEM_DRIVER );
+		drm_free( entry );
 		return -EFAULT;
 	}
 
@@ -174,7 +170,7 @@ int DRM(pci_alloc_ioctl)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
-int DRM(pci_free_ioctl)( struct inode *inode, struct file *filp,
+int drm_pci_free_ioctl( struct inode *inode, struct file *filp,
 			  unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
@@ -195,9 +191,9 @@ int DRM(pci_free_ioctl)( struct inode *inode, struct file *filp,
 		entry = list_entry(ptr, drm_pci_mem_t, list);
 		if( entry->busaddr == request.busaddr ) {
 			list_del(ptr);
-			DRM(pci_free)( dev, entry->size, entry->cpuaddr, 
+			drm_pci_free( dev, entry->size, entry->cpuaddr, 
 				       entry->busaddr );
-			DRM(free)( entry, sizeof(*entry), DRM_MEM_DRIVER );
+			drm_free( entry );
 			return 0;
 		}
 	}
@@ -214,7 +210,7 @@ int DRM(pci_free_ioctl)( struct inode *inode, struct file *filp,
 /** 
  * Called on driver exit to free the PCI memory allocated by userspace.
  */
-void DRM(pci_cleanup)( drm_device_t *dev )
+void drm_pci_cleanup( drm_device_t *dev )
 {
 	struct list_head *ptr, *tmp;
 	drm_pci_mem_t *entry;
@@ -225,9 +221,9 @@ void DRM(pci_cleanup)( drm_device_t *dev )
 	{
 		entry = list_entry(ptr, drm_pci_mem_t, list);
 		list_del(ptr);
-		DRM(pci_free)( dev, entry->size, entry->cpuaddr, 
+		drm_pci_free( dev, entry->size, entry->cpuaddr, 
 			       entry->busaddr );
-		DRM(free)( entry, sizeof(*entry), DRM_MEM_DRIVER );
+		drm_free( entry );
 	}
 }
 

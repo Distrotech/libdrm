@@ -57,10 +57,11 @@ typedef struct drm_queue {
  * DMA data.
  */
 typedef struct drm_device_dma {
-
+#if 0
 	drm_buf_entry_t	  bufs[DRM_MAX_ORDER+1];	/**< buffers, grouped by their size order */
 	int		  buf_count;	/**< total number of buffers */
 	drm_buf_t	  **buflist;	/**< Vector of pointers into drm_device_dma::bufs */
+#endif
 	int		  seg_count;
 	int		  page_count;	/**< number of pages */
 	unsigned long	  *pagelist;	/**< page list */

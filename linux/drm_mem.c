@@ -35,6 +35,106 @@
 #include <linux/config.h>
 #include "drmP.h"
 
+
+/** \name Regular memory allocation */
+/*@{*/
+
+/** Wrapper around kmalloc() */
+void *drm_alloc(size_t size)
+{
+	return kmalloc(size, GFP_KERNEL);
+}
+
+/** Wrapper around kmalloc() and kfree() */
+void *drm_realloc(void *ptrt, size_t oldsize, size_t size)
+{
+	void *pt;
+
+	if (!(pt = kmalloc(size, GFP_KERNEL))) return NULL;
+	if (oldpt && oldsize) {
+		memcpy(pt, oldpt, oldsize);
+		kfree(oldpt);
+	}
+	return pt;
+}
+
+/** Wrapper around kfree() */
+void drm_free(void *ptr)
+{
+	kfree(pt);
+}
+
+/*@}*/
+
+
+/** \name Page allocation */
+/*@{*/
+
+/**
+ * Allocate pages.
+ *
+ * \param order size order.
+ * \return page address on success, or zero on failure.
+ *
+ * Allocate and reserve free pages.
+ */
+unsigned long drm_alloc_pages(int order)
+{
+	unsigned long address;
+	unsigned long bytes	  = PAGE_SIZE << order;
+	unsigned long addr;
+	unsigned int  sz;
+
+	address = __get_free_pages(GFP_KERNEL, order);
+	if (!address) 
+		return 0;
+
+	/* Zero */
+	memset((void *)address, 0, bytes);
+
+	/* Reserve */
+	for (addr = address, sz = bytes;
+	     sz > 0;
+	     addr += PAGE_SIZE, sz -= PAGE_SIZE) {
+		SetPageReserved(virt_to_page(addr));
+	}
+
+	return address;
+}
+
+/**
+ * Free pages.
+ * 
+ * \param address address of the pages to free.
+ * \param order size order.
+ *
+ * Unreserve and free pages allocated by alloc_pages().
+ */
+void drm_free_pages(unsigned long address, int order)
+{
+	unsigned long bytes = PAGE_SIZE << order;
+	unsigned long addr;
+	unsigned int  sz;
+
+	if (!address) 
+		return;
+
+	/* Unreserve */
+	for (addr = address, sz = bytes;
+	     sz > 0;
+	     addr += PAGE_SIZE, sz -= PAGE_SIZE) {
+		ClearPageReserved(virt_to_page(addr));
+	}
+
+	free_pages(address, order);
+}
+
+/*@}*/
+
+
+/** \name Memory mapping */
+/*@{*/
+
 /* Need the 4-argument version of vmap().  */
 #if __REALLY_HAVE_AGP && defined(VMAP_4_ARGS)
 
@@ -59,8 +159,10 @@
 # define flush_tlb_kernel_range(s,e)		flush_tlb_all()
 #endif
 
-/*
- * Find the drm_map that covers the range [offset, offset+size).
+
+
+/**
+ * Find the drm_map that covers the range [offset, offset+size].
  */
 static inline drm_map_t *
 drm_lookup_map (unsigned long offset, unsigned long size, drm_device_t *dev)
@@ -189,106 +291,4 @@ static inline void drm_ioremapfree(void *pt, unsigned long size, drm_device_t *d
 	iounmap(pt);
 }
 
-/** Wrapper around kmalloc() */
-void *DRM(alloc)(size_t size, int area)
-{
-	return kmalloc(size, GFP_KERNEL);
-}
-
-/** Wrapper around kmalloc() and kfree() */
-void *DRM(realloc)(void *oldpt, size_t oldsize, size_t size, int area)
-{
-	void *pt;
-
-	if (!(pt = kmalloc(size, GFP_KERNEL))) return NULL;
-	if (oldpt && oldsize) {
-		memcpy(pt, oldpt, oldsize);
-		kfree(oldpt);
-	}
-	return pt;
-}
-
-/** Wrapper around kfree() */
-void DRM(free)(void *pt, size_t size, int area)
-{
-	kfree(pt);
-}
-
-/**
- * Allocate pages.
- *
- * \param order size order.
- * \param area memory area. (Not used.)
- * \return page address on success, or zero on failure.
- *
- * Allocate and reserve free pages.
- */
-unsigned long DRM(alloc_pages)(int order, int area)
-{
-	unsigned long address;
-	unsigned long bytes	  = PAGE_SIZE << order;
-	unsigned long addr;
-	unsigned int  sz;
-
-	address = __get_free_pages(GFP_KERNEL, order);
-	if (!address) 
-		return 0;
-
-				/* Zero */
-	memset((void *)address, 0, bytes);
-
-				/* Reserve */
-	for (addr = address, sz = bytes;
-	     sz > 0;
-	     addr += PAGE_SIZE, sz -= PAGE_SIZE) {
-		SetPageReserved(virt_to_page(addr));
-	}
-
-	return address;
-}
-
-/**
- * Free pages.
- * 
- * \param address address of the pages to free.
- * \param order size order.
- * \param area memory area. (Not used.)
- *
- * Unreserve and free pages allocated by alloc_pages().
- */
-void DRM(free_pages)(unsigned long address, int order, int area)
-{
-	unsigned long bytes = PAGE_SIZE << order;
-	unsigned long addr;
-	unsigned int  sz;
-
-	if (!address) 
-		return;
-
-	/* Unreserve */
-	for (addr = address, sz = bytes;
-	     sz > 0;
-	     addr += PAGE_SIZE, sz -= PAGE_SIZE) {
-		ClearPageReserved(virt_to_page(addr));
-	}
-
-	free_pages(address, order);
-}
-
-/** Wrapper around drm_ioremap() */
-void *DRM(ioremap)(unsigned long offset, unsigned long size, drm_device_t *dev)
-{
-	return drm_ioremap(offset, size, dev);
-}
-
-/** Wrapper around drm_ioremap_nocache() */
-void *DRM(ioremap_nocache)(unsigned long offset, unsigned long size, drm_device_t *dev)
-{
-	return drm_ioremap_nocache(offset, size, dev);
-}
-
-/** Wrapper around drm_iounmap() */
-void DRM(ioremapfree)(void *pt, unsigned long size, drm_device_t *dev)
-{
-	drm_ioremapfree(pt, size, dev);
-}
+/*@}*/
