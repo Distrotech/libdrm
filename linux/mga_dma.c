@@ -638,8 +638,9 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 
 	dev_priv->prim.high_mark = 256 * DMA_BLOCK_SIZE;
 
-	/* FIXME: This lock is unused */
-	/* spin_lock_init( &dev_priv->prim.list_lock ); */
+#ifdef __linux__
+	spin_lock_init( &dev_priv->prim.list_lock );
+#endif
 
 	dev_priv->prim.status[0] = dev_priv->primary->offset;
 	dev_priv->prim.status[1] = 0;

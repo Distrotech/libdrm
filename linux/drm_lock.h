@@ -167,9 +167,9 @@ static int DRM(flush_queue)(drm_device_t *dev, int context)
 	atomic_inc(&q->use_count);
 	if (atomic_read(&q->use_count) > 1) {
 		atomic_inc(&q->block_write);
-		atomic_inc(&q->block_count);
 #ifdef __linux__
 		add_wait_queue(&q->flush_queue, &entry);
+		atomic_inc(&q->block_count);
 		for (;;) {
 			current->state = TASK_INTERRUPTIBLE;
 			if (!DRM_BUFCOUNT(&q->waitlist)) break;
@@ -181,6 +181,7 @@ static int DRM(flush_queue)(drm_device_t *dev, int context)
 		}
 #endif
 #ifdef __FreeBSD__
+		atomic_inc(&q->block_count);
 		error = tsleep(&q->flush_queue, PZERO|PCATCH, "drmfq", 0);
 		if (error)
 			return error;

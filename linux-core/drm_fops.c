@@ -30,10 +30,10 @@
  *    Gareth Hughes <gareth@valinux.com>
  */
 
+#define __NO_VERSION__
 #include "drmP.h"
 
 #ifdef __linux__
-#define __NO_VERSION__
 #include <linux/poll.h>
 #endif
 
