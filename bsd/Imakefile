@@ -2,9 +2,8 @@ XCOMM $XFree86: xc/programs/Xserver/hw/xfree86/os-support/bsd/drm/kernel/Imakefi
 
 #include <Server.tmpl>
 
-XCOMM We need to use Linux headers to avoid skew, OS dependencies will be
-XCOMM held in a drm_os.h file (eventually/hopefully). Currently these
-XCOMM dependencies are stuck in drmP.h
+XCOMM We need to use Linux headers to avoid skew, OS dependencies are held in
+XCOMM a drm_os_<OS>.h file. 
 
 includes:: tdfxinc mgainc gammainc r128inc radeoninc sisinc i810inc
 
