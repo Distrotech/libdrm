@@ -39,4 +39,8 @@
 #define __HAVE_MTRR		1
 #define __HAVE_CTX_BITMAP	1
 
+#define DRIVER_IOCTLS							     \
+ [DRM_IOCTL_NR(DRM_IOCTL_DMA)]               = { savage_bci_buffers,  1, 0 }, \
+ [DRM_IOCTL_NR(DRM_IOCTL_SAVAGE_BCI_INIT)]    = { savage_bci_init,     1, 1 }, 
+
 #endif

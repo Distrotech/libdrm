@@ -34,7 +34,7 @@ tdfx.o: $(tdfx-objs) $(lib)
 	$(LD) -r -o $@ $(tdfx-objs) $(lib)
 
 savage.o: $(savage-objs) $(lib)
-       $(LD) -r -o $@ $(savage-objs) $(lib)
+	$(LD) -r -o $@ $(savage-objs) $(lib)
 
 mga.o: $(mga-objs) $(lib)
 	$(LD) -r -o $@ $(mga-objs) $(lib)

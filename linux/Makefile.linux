@@ -52,8 +52,8 @@ GAMMAHEADERS =	gamma_drv.h $(DRMHEADERS) $(DRMTEMPLATES)
 TDFXOBJS =	tdfx_drv.o
 TDFXHEADERS =	tdfx.h $(DRMHEADERS) $(DRMTEMPLATES)
 
-SAVAGEOBJS =    savage_drv.o
-SAVAGEHEADERS = savage.h $(DRMHEADERS) $(DRMTEMPLATES)
+SAVAGEOBJS =	savage_drv.o savage_bci.o
+SAVAGEHEADERS =	savage.h savage_drv.h savage_drm.h $(DRMHEADERS) $(DRMTEMPLATES)
 
 R128OBJS =	r128_drv.o r128_cce.o r128_state.o
 R128HEADERS =	r128.h r128_drv.h r128_drm.h $(DRMHEADERS) $(DRMTEMPLATES)
@@ -228,9 +228,9 @@ tdfx.o: $(TDFXOBJS) $(LIBS)
 	$(LD) -r $^ -o $@
 
 savage_drv.o: savage_drv.c
-       $(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
+	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
 savage.o: $(SAVAGEOBJS) $(LIBS)
-       $(LD) -r $^ -o $@
+	$(LD) -r $^ -o $@
 
 sis.o: $(SISOBJS) $(LIBS)
 	$(LD) -r $^ -o $@

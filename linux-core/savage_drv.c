@@ -39,7 +39,7 @@
 #define DRIVER_AUTHOR		"bootstraped by Andreas Karrenbauer"
 
 #define DRIVER_NAME		"savage"
-#define DRIVER_DESC		"alpha savage dr"
+#define DRIVER_DESC		"savage driver alpha"
 #define DRIVER_DATE		"20030226"
 
 #define DRIVER_MAJOR		1
@@ -60,7 +60,8 @@ static drm_pci_list_t DRM(idlist)[] = {
 
 #define DRIVER_CARD_LIST DRM(idlist)
 
-
+#include "savage_drm.h"
+#include "savage_drv.h"
 #include "drm_auth.h"
 #include "drm_bufs.h"
 #include "drm_context.h"
