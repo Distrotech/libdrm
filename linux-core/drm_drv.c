@@ -43,7 +43,6 @@
  * #define DRIVER_MINOR		0
  * #define DRIVER_PATCHLEVEL	2
  *
- * #define DRIVER_IOCTL_COUNT	DRM_ARRAY_SIZE( mga_ioctls )
  *
  * #define DRM(x)		mga_##x
  */
@@ -109,9 +108,20 @@
 #ifndef DRIVER_POSTSETUP
 #define DRIVER_POSTSETUP()
 #endif
-#ifndef DRIVER_IOCTLS
-#define DRIVER_IOCTLS
+
+/*
+ * The default number of instances (minor numbers) to initialize.
+ */
+#ifndef DRIVER_NUM_CARDS
+#define DRIVER_NUM_CARDS 1
 #endif
+
+/* 
+ * defining file operations is the responsibility of the driver writer
+ * if there are multiple versions.
+ */
+
+#ifndef DRIVER_VERSION_TABLE
 #ifndef DRIVER_FOPS
 #define DRIVER_FOPS				\
 static struct file_operations	DRM(fops) = {	\
@@ -127,91 +137,20 @@ static struct file_operations	DRM(fops) = {	\
 }
 #endif
 
-
-/*
- * The default number of instances (minor numbers) to initialize.
- */
-#ifndef DRIVER_NUM_CARDS
-#define DRIVER_NUM_CARDS 1
-#endif
-
-static drm_device_t	*DRM(device);
-static int		*DRM(minor);
-static int		DRM(numdevs) = 0;
-
 DRIVER_FOPS;
 
-static drm_ioctl_desc_t		  DRM(ioctls)[] = {
-	[DRM_IOCTL_NR(DRM_IOCTL_VERSION)]       = { DRM(version),     0, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_GET_UNIQUE)]    = { DRM(getunique),   0, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_GET_MAGIC)]     = { DRM(getmagic),    0, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_IRQ_BUSID)]     = { DRM(irq_busid),   0, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_GET_MAP)]       = { DRM(getmap),      0, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_GET_CLIENT)]    = { DRM(getclient),   0, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_GET_STATS)]     = { DRM(getstats),    0, 0 },
+#define DRIVER_VERSION_TABLE						\
+static drm_version_table_t	DRM(version_table)[] =			\
+{									\
+	{ DRIVER_MAJOR, DRIVER_MINOR, DRIVER_PATCHLEVEL, &DRM(fops) },	\
+	{ 0, 0, 0, NULL }						\
+}
+#endif /* DRIVER_VERSION_TABLE */
 
-	[DRM_IOCTL_NR(DRM_IOCTL_SET_UNIQUE)]    = { DRM(setunique),   1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_BLOCK)]         = { DRM(block),       1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_UNBLOCK)]       = { DRM(unblock),     1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AUTH_MAGIC)]    = { DRM(authmagic),   1, 1 },
-
-	[DRM_IOCTL_NR(DRM_IOCTL_ADD_MAP)]       = { DRM(addmap),      1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_RM_MAP)]        = { DRM(rmmap),       1, 0 },
-
-#if __HAVE_CTX_BITMAP
-	[DRM_IOCTL_NR(DRM_IOCTL_SET_SAREA_CTX)] = { DRM(setsareactx), 1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_GET_SAREA_CTX)] = { DRM(getsareactx), 1, 0 },
-#endif
-
-	[DRM_IOCTL_NR(DRM_IOCTL_ADD_CTX)]       = { DRM(addctx),      1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_RM_CTX)]        = { DRM(rmctx),       1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_MOD_CTX)]       = { DRM(modctx),      1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_GET_CTX)]       = { DRM(getctx),      1, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_SWITCH_CTX)]    = { DRM(switchctx),   1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_NEW_CTX)]       = { DRM(newctx),      1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_RES_CTX)]       = { DRM(resctx),      1, 0 },
-
-	[DRM_IOCTL_NR(DRM_IOCTL_ADD_DRAW)]      = { DRM(adddraw),     1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_RM_DRAW)]       = { DRM(rmdraw),      1, 1 },
-
-	[DRM_IOCTL_NR(DRM_IOCTL_LOCK)]	        = { DRM(lock),        1, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_UNLOCK)]        = { DRM(unlock),      1, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_FINISH)]        = { DRM(finish),      1, 0 },
-
-#if __HAVE_DMA
-	[DRM_IOCTL_NR(DRM_IOCTL_ADD_BUFS)]      = { DRM(addbufs),     1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_MARK_BUFS)]     = { DRM(markbufs),    1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_INFO_BUFS)]     = { DRM(infobufs),    1, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_MAP_BUFS)]      = { DRM(mapbufs),     1, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_FREE_BUFS)]     = { DRM(freebufs),    1, 0 },
-
-	/* The DRM_IOCTL_DMA ioctl should be defined by the driver.
-	 */
-#if __HAVE_DMA_IRQ
-	[DRM_IOCTL_NR(DRM_IOCTL_CONTROL)]       = { DRM(control),     1, 1 },
-#endif
-#endif
-
-#if __REALLY_HAVE_AGP
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ACQUIRE)]   = { DRM(agp_acquire), 1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_RELEASE)]   = { DRM(agp_release), 1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ENABLE)]    = { DRM(agp_enable),  1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_INFO)]      = { DRM(agp_info),    1, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ALLOC)]     = { DRM(agp_alloc),   1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_FREE)]      = { DRM(agp_free),    1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_BIND)]      = { DRM(agp_bind),    1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_UNBIND)]    = { DRM(agp_unbind),  1, 1 },
-#endif
-
-#if __HAVE_SG
-	[DRM_IOCTL_NR(DRM_IOCTL_SG_ALLOC)]      = { DRM(sg_alloc),    1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_SG_FREE)]       = { DRM(sg_free),     1, 1 },
-#endif
-
-	DRIVER_IOCTLS
-};
-
-#define DRIVER_IOCTL_COUNT	DRM_ARRAY_SIZE( DRM(ioctls) )
+static drm_device_t		*DRM(device);
+static int			*DRM(minor);
+static int			DRM(numdevs) = 0;
+DRIVER_VERSION_TABLE;
 
 #ifdef MODULE
 static char *drm_opts = NULL;
@@ -480,6 +419,16 @@ static int DRM(takedown)( drm_device_t *dev )
 		dev->lock.pid = 0;
 		wake_up_interruptible( &dev->lock.lock_queue );
 	}
+
+	/* Always default to the first file operations on recycle. */
+	memcpy(dev->file_ops,
+	       DRM(version_table)[0].file_ops,
+	       sizeof(*dev->file_ops));
+
+	dev->major_version = DRM(version_table)[0].major_version;
+	dev->minor_version = DRM(version_table)[0].minor_version;
+	dev->patch_version = DRM(version_table)[0].patch_version;
+
 	up( &dev->struct_sem );
 
 	return 0;
@@ -559,11 +508,27 @@ static int __init drm_init( void )
 	for (i = 0; i < DRM(numdevs); i++) {
 		dev = &(DRM(device)[i]);
 		memset( (void *)dev, 0, sizeof(*dev) );
+		dev->file_ops = kmalloc(sizeof(*dev->file_ops), GFP_KERNEL);
+		if (!dev->file_ops) return -ENOMEM;
+
+		/* Always default to the first file operations */
+		memcpy(dev->file_ops,
+		       DRM(version_table)[0].file_ops,
+		       sizeof(*dev->file_ops));
+
+		dev->major_version = DRM(version_table)[0].major_version;
+		dev->minor_version = DRM(version_table)[0].minor_version;
+		dev->patch_version = DRM(version_table)[0].patch_version;
+
 		dev->count_lock = SPIN_LOCK_UNLOCKED;
 		sema_init( &dev->struct_sem, 1 );
 
-		if ((DRM(minor)[i] = DRM(stub_register)(DRIVER_NAME, &DRM(fops),dev)) < 0)
+		if ((DRM(minor)[i] = DRM(stub_register)(DRIVER_NAME, 
+							dev->file_ops,
+							dev)) < 0) {
+			DRM(takedown)( dev );
 			return -EPERM;
+		}
 		dev->device = MKDEV(DRM_MAJOR, DRM(minor)[i] );
 		dev->name   = DRIVER_NAME;
 
@@ -651,6 +616,7 @@ static void __exit drm_cleanup( void )
 			dev->agp = NULL;
 		}
 #endif
+		if(dev->file_ops) kfree(dev->file_ops);
 	}
 	DRIVER_POSTCLEANUP();
 	kfree(DRM(minor));
@@ -662,17 +628,6 @@ module_init( drm_init );
 module_exit( drm_cleanup );
 
 
-int DRM(version)( struct inode *inode, struct file *filp,
-		  unsigned int cmd, unsigned long arg )
-{
-	drm_version_t version;
-	int len;
-
-	if ( copy_from_user( &version,
-			     (drm_version_t *)arg,
-			     sizeof(version) ) )
-		return -EFAULT;
-
 #define DRM_COPY( name, value )						\
 	len = strlen( value );						\
 	if ( len > name##_len ) len = name##_len;			\
@@ -682,9 +637,24 @@ int DRM(version)( struct inode *inode, struct file *filp,
 			return -EFAULT;					\
 	}
 
-	version.version_major = DRIVER_MAJOR;
-	version.version_minor = DRIVER_MINOR;
-	version.version_patchlevel = DRIVER_PATCHLEVEL;
+int DRM(version)( struct inode *inode, struct file *filp,
+		  unsigned int cmd, unsigned long arg )
+{
+	drm_file_t *priv = filp->private_data;
+	drm_device_t *dev = priv->dev;
+	drm_version_t version;
+	int len;
+
+	if ( copy_from_user( &version,
+			     (drm_version_t *)arg,
+			     sizeof(version) ) )
+		return -EFAULT;
+
+	down( &dev->struct_sem );
+	version.version_major = dev->major_version;
+	version.version_minor = dev->minor_version;
+	version.version_patchlevel = dev->patch_version;
+	up( &dev->struct_sem );
 
 	DRM_COPY( version.name, DRIVER_NAME );
 	DRM_COPY( version.date, DRIVER_DATE );
@@ -694,6 +664,43 @@ int DRM(version)( struct inode *inode, struct file *filp,
 			   &version,
 			   sizeof(version) ) )
 		return -EFAULT;
+	return 0;
+}
+
+int DRM(set_version)( struct inode *inode, struct file *filp,
+		      unsigned int cmd, unsigned long arg )
+{
+	drm_file_t *priv = filp->private_data;
+	drm_device_t *dev = priv->dev;
+	drm_version_t version;
+	drm_version_table_t *table;
+	struct file_operations *file_ops = NULL;
+	int i;
+
+	if ( copy_from_user( &version,
+			     (drm_version_t *)arg,
+			     sizeof(version) ) )
+		return -EFAULT;
+
+	i = 0;
+	do {
+		table = &DRM(version_table)[i];
+		if (table->major_version == version.version_major &&
+		    table->minor_version >= version.version_minor) {
+			file_ops = table->file_ops;
+			break;
+		}
+		i++;
+	} while (table->file_ops != NULL);
+	if (!file_ops) return -EINVAL;
+
+	down( &dev->struct_sem );
+	dev->major_version = table->major_version;
+	dev->minor_version = table->minor_version;
+	dev->patch_version = table->patch_version;
+	memcpy(dev->file_ops, file_ops, sizeof(*file_ops));
+	up( &dev->struct_sem );
+
 	return 0;
 }
 
@@ -853,46 +860,6 @@ int DRM(release)( struct inode *inode, struct file *filp )
 	spin_unlock( &dev->count_lock );
 
 	unlock_kernel();
-	return retcode;
-}
-
-/* DRM(ioctl) is called whenever a process performs an ioctl on /dev/drm.
- */
-int DRM(ioctl)( struct inode *inode, struct file *filp,
-		unsigned int cmd, unsigned long arg )
-{
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
-	drm_ioctl_desc_t *ioctl;
-	drm_ioctl_t *func;
-	int nr = DRM_IOCTL_NR(cmd);
-	int retcode = 0;
-
-	atomic_inc( &dev->ioctl_count );
-	atomic_inc( &dev->counts[_DRM_STAT_IOCTLS] );
-	++priv->ioctl_count;
-
-	DRM_DEBUG( "pid=%d, cmd=0x%02x, nr=0x%02x, dev 0x%x, auth=%d\n",
-		   current->pid, cmd, nr, dev->device, priv->authenticated );
-
-	if ( nr >= DRIVER_IOCTL_COUNT ) {
-		retcode = -EINVAL;
-	} else {
-		ioctl = &DRM(ioctls)[nr];
-		func = ioctl->func;
-
-		if ( !func ) {
-			DRM_DEBUG( "no function\n" );
-			retcode = -EINVAL;
-		} else if ( ( ioctl->root_only && !capable( CAP_SYS_ADMIN ) )||
-			    ( ioctl->auth_needed && !priv->authenticated ) ) {
-			retcode = -EACCES;
-		} else {
-			retcode = func( inode, filp, cmd, arg );
-		}
-	}
-
-	atomic_dec( &dev->ioctl_count );
 	return retcode;
 }
 

@@ -59,6 +59,8 @@
  [DRM_IOCTL_NR(DRM_IOCTL_RADEON_STIPPLE)]    = { radeon_cp_stipple,  1, 0 }, \
  [DRM_IOCTL_NR(DRM_IOCTL_RADEON_INDIRECT)]   = { radeon_cp_indirect, 1, 1 },
 
+#define IOCTL_TABLE_NAME	DRM(ioctls)
+#define IOCTL_FUNC_NAME 	DRM(ioctl)
 
 #if 0
 /* GH: Count data sent to card via ring or vertex/indirect buffers.
@@ -76,6 +78,7 @@
 #include "drm_context.h"
 #include "drm_dma.h"
 #include "drm_drawable.h"
+#include "drm_ioctl_table.h"
 #include "drm_drv.h"
 
 #ifndef MODULE

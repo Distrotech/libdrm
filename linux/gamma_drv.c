@@ -49,6 +49,8 @@
 	[DRM_IOCTL_NR(DRM_IOCTL_GAMMA_INIT)] = { gamma_dma_init,  1, 1 }, \
 	[DRM_IOCTL_NR(DRM_IOCTL_GAMMA_COPY)] = { gamma_dma_copy,  1, 1 }
 
+#define IOCTL_TABLE_NAME	DRM(ioctls)
+#define IOCTL_FUNC_NAME 	DRM(ioctl)
 
 #define __HAVE_COUNTERS		5
 #define __HAVE_COUNTER6		_DRM_STAT_IRQ
@@ -64,6 +66,7 @@
 #include "drm_context.h"
 #include "drm_dma.h"
 #include "drm_drawable.h"
+#include "drm_ioctl_table.h"
 #include "drm_drv.h"
 
 #ifndef MODULE

@@ -54,6 +54,9 @@
         [DRM_IOCTL_NR(SIS_IOCTL_FLIP_FINAL)] = { sis_flip_final,  1, 1 }
 #endif
 
+#define IOCTL_TABLE_NAME	DRM(ioctls)
+#define IOCTL_FUNC_NAME 	DRM(ioctl)
+
 #define __HAVE_COUNTERS		5
 
 #include "drm_auth.h"
@@ -62,6 +65,7 @@
 #include "drm_context.h"
 #include "drm_dma.h"
 #include "drm_drawable.h"
+#include "drm_ioctl_table.h"
 #include "drm_drv.h"
 #include "drm_fops.h"
 #include "drm_init.h"

@@ -433,6 +433,18 @@ drmVersionPtr drmGetVersion(int fd)
     return retval;
 }
 
+int drmSetVersion(int fd, int major, int minor, int patch)
+{
+    drm_version_t version;
+
+    memset(&version, 0, sizeof(version));
+    version.version_major = major;
+    version.version_minor = minor;
+    version.version_patchlevel = patch;
+    if (ioctl(fd, DRM_IOCTL_SET_VERSION, &version)) return -errno;
+    return 0;
+}
+
 void drmFreeBusid(const char *busid)
 {
     drmFree((void *)busid);

@@ -55,6 +55,8 @@
    	[DRM_IOCTL_NR(DRM_IOCTL_I810_SWAP)]   = { i810_swap_bufs,   1, 0 }, \
    	[DRM_IOCTL_NR(DRM_IOCTL_I810_DOCOPY)] = { i810_docopy,      1, 0 },
 
+#define IOCTL_TABLE_NAME	DRM(ioctls)
+#define IOCTL_FUNC_NAME 	DRM(ioctl)
 
 #define __HAVE_COUNTERS         4
 #define __HAVE_COUNTER6         _DRM_STAT_IRQ
@@ -69,6 +71,7 @@
 #include "drm_context.h"
 #include "drm_dma.h"
 #include "drm_drawable.h"
+#include "drm_ioctl_table.h"
 #include "drm_drv.h"
 
 #ifndef MODULE

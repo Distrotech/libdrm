@@ -385,6 +385,7 @@ typedef struct drm_scatter_gather {
 #define DRM_IOCTL_GET_MAP               DRM_IOWR(0x04, drm_map_t)
 #define DRM_IOCTL_GET_CLIENT            DRM_IOWR(0x05, drm_client_t)
 #define DRM_IOCTL_GET_STATS             DRM_IOR( 0x06, drm_stats_t)
+#define DRM_IOCTL_SET_VERSION		DRM_IOW( 0x07, drm_version_t)
 
 #define DRM_IOCTL_SET_UNIQUE		DRM_IOW( 0x10, drm_unique_t)
 #define DRM_IOCTL_AUTH_MAGIC		DRM_IOW( 0x11, drm_auth_t)

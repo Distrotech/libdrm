@@ -74,12 +74,15 @@ static drm_pci_list_t DRM(idlist)[] = {
 
 #define DRIVER_CARD_LIST DRM(idlist)
 
+#define IOCTL_TABLE_NAME	DRM(ioctls)
+#define IOCTL_FUNC_NAME 	DRM(ioctl)
 
 #include "drm_auth.h"
 #include "drm_bufs.h"
 #include "drm_context.h"
 #include "drm_dma.h"
 #include "drm_drawable.h"
+#include "drm_ioctl_table.h"
 #include "drm_drv.h"
 
 #ifndef MODULE

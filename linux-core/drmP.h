@@ -725,8 +725,20 @@ typedef struct drm_device {
 	void		  *dev_private;
 	drm_sigdata_t     sigdata; /* For block_all_signals */
 	sigset_t          sigmask;
+
+	/* Support for version setting */
+	int		  	major_version;
+	int		  	minor_version;
+	int		  	patch_version;
+	struct file_operations	*file_ops;
 } drm_device_t;
 
+typedef struct drm_version_table {
+	int		  	major_version;
+	int		  	minor_version;
+	int		  	patch_version;
+	struct file_operations	*file_ops;
+} drm_version_table_t;
 
 /* ================================================================
  * Internal function definitions
@@ -740,6 +752,8 @@ extern int           DRM(cpu_valid)( void );
 				/* Driver support (drm_drv.h) */
 extern int           DRM(version)(struct inode *inode, struct file *filp,
 				  unsigned int cmd, unsigned long arg);
+extern int	     DRM(set_version)(struct inode *inode, struct file *filp,
+				      unsigned int cmd, unsigned long arg);
 extern int           DRM(open)(struct inode *inode, struct file *filp);
 extern int           DRM(release)(struct inode *inode, struct file *filp);
 extern int           DRM(ioctl)(struct inode *inode, struct file *filp,
