@@ -150,37 +150,99 @@ static struct file_operations i810_buffer_fops = {
       	poll:	 drm_poll,
 };
 
+/* These handle currently mapped */
+void drm_i810_vm_open(struct vm_area_struct *vma)
+{
+	drm_file_t	*priv	= vma->vm_file->private_data;
+	drm_device_t	*dev	= priv->dev;
+	drm_buf_t *buf = vma->vm_private_data;
+	drm_i810_buf_priv_t *buf_priv;
+
+	if(!buf) goto out_vm_open;
+	buf_priv = buf->dev_private;
+	if(!buf_priv) goto out_vm_open;
+	buf_priv->map_count++;
+	if(buf_priv->map_count == 1) {
+		buf_priv->currently_mapped = I810_BUF_MAPPED;
+	}
+
+out_vm_open:
+	atomic_inc(&dev->vma_count);
+	MOD_INC_USE_COUNT;
+}
+
+void drm_i810_vm_close(struct vm_area_struct *vma)
+{
+	drm_file_t	*priv	= vma->vm_file->private_data;
+	drm_device_t	*dev	= priv->dev;
+	drm_buf_t *buf = vma->vm_private_data;
+	drm_i810_buf_priv_t *buf_priv;
+
+	if(!buf) goto out_vm_close;
+	buf_priv = buf->dev_private;
+	if(!buf_priv) goto out_vm_close;
+	buf_priv->map_count--;
+	if(buf_priv->map_count == 0) {
+		buf_priv->currently_mapped = I810_BUF_UNMAPPED;
+		buf_priv->virtual = 0;
+	}
+
+out_vm_close:
+	MOD_DEC_USE_COUNT;
+	atomic_dec(&dev->vma_count);
+}
+
+struct vm_operations_struct   drm_i810_vm_ops = {
+	nopage:	 drm_vm_nopage,
+	open:	 drm_i810_vm_open,
+	close:	 drm_i810_vm_close,
+};
+
 int i810_mmap_buffers(struct file *filp, struct vm_area_struct *vma)
 {
-	vma->vm_flags |= VM_IO;
+	drm_file_t	  *priv	  = filp->private_data;
+	drm_device_t	  *dev	  = priv->dev;
+	drm_i810_private_t *dev_priv = dev->dev_private;
+	drm_buf_t *buf = dev_priv->mmap_buffer;
+
+	vma->vm_flags |= (VM_IO | VM_DONTCOPY);
+	vma->vm_ops = &drm_i810_vm_ops;
+	vma->vm_private_data = buf;
+	vma->vm_file = filp;
+
 	if (remap_page_range(vma->vm_start,
 			     VM_OFFSET(vma),
 			     vma->vm_end - vma->vm_start,
 			     vma->vm_page_prot)) return -EAGAIN;
+	vma->vm_ops->open(vma);
 	return 0;
 }
 
 static int i810_map_buffer(drm_buf_t *buf, struct file *filp)
 {
+	drm_file_t	  *priv	  = filp->private_data;
+	drm_device_t	  *dev	  = priv->dev;
 	drm_i810_buf_priv_t *buf_priv = buf->dev_private;
-	int retcode = 0;
+      	drm_i810_private_t *dev_priv = dev->dev_private;
    	struct file_operations *old_fops;
+	int retcode = 0;
 
 	if(buf_priv->currently_mapped == I810_BUF_MAPPED) return -EINVAL;
 	down(&current->mm->mmap_sem);
    	old_fops = filp->f_op;
 	filp->f_op = &i810_buffer_fops;
+	dev_priv->mmap_buffer = buf;
 	buf_priv->virtual = (void *)do_mmap(filp, 0, buf->total, 
 					    PROT_READ|PROT_WRITE,
 					    MAP_SHARED, 
 					    buf->bus_address);
+	dev_priv->mmap_buffer = NULL;
    	filp->f_op = old_fops;
 	if ((unsigned long)buf_priv->virtual > -1024UL) {
 		/* Real error */
 		DRM_DEBUG("mmap error\n");
 		retcode = (signed int)buf_priv->virtual;
-	} else {
-		buf_priv->currently_mapped = I810_BUF_MAPPED;
+		buf_priv->virtual = 0;
 	}
    	up(&current->mm->mmap_sem);
 	return retcode;
@@ -195,8 +257,6 @@ static int i810_unmap_buffer(drm_buf_t *buf)
 	down(&current->mm->mmap_sem);
         retcode = do_munmap((unsigned long)buf_priv->virtual, 
 			    (size_t) buf->total);
-	buf_priv->currently_mapped = I810_BUF_UNMAPPED;
-	buf_priv->virtual = 0;
    	up(&current->mm->mmap_sem);
 
 	return retcode;
@@ -205,6 +265,7 @@ static int i810_unmap_buffer(drm_buf_t *buf)
 static int i810_dma_get_buffer(drm_device_t *dev, drm_i810_dma_t *d, 
 			       struct file *filp)
 {
+	drm_file_t	  *priv	  = filp->private_data;
 	drm_buf_t	  *buf;
 	drm_i810_buf_priv_t *buf_priv;
 	int retcode = 0;
@@ -223,7 +284,7 @@ static int i810_dma_get_buffer(drm_device_t *dev, drm_i810_dma_t *d,
 			  __FUNCTION__, retcode);
 	   	goto out_get_buf;
 	}
-	buf->pid     = current->pid;
+	buf->pid     = priv->pid;
 	buf_priv = buf->dev_private;	
 	d->granted = 1;
    	d->request_idx = buf->idx;
@@ -1102,8 +1163,6 @@ void i810_reclaim_buffers(drm_device_t *dev, pid_t pid)
 
 			if (used == I810_BUF_CLIENT)
 				DRM_DEBUG("reclaimed from client\n");
-
-			buf_priv->currently_mapped = I810_BUF_UNMAPPED;
 		}
 	}
 }

@@ -32,6 +32,15 @@
 #ifndef _I810_DRV_H_
 #define _I810_DRV_H_
 
+typedef struct drm_i810_buf_priv {
+   	u32 *in_use;
+   	int my_use_idx;
+	int currently_mapped;
+	void *virtual;
+	void *kernel_virtual;
+	int map_count;
+} drm_i810_buf_priv_t;
+
 typedef struct _drm_i810_ring_buffer{
 	int tail_mask;
 	unsigned long Start;
@@ -55,7 +64,7 @@ typedef struct drm_i810_private {
 
    	atomic_t flush_done;
    	wait_queue_head_t flush_queue;	/* Processes waiting until flush    */
-
+	drm_buf_t *mmap_buffer;
 
 	
 	u32 front_di1, back_di1, zi1;
@@ -128,18 +137,6 @@ extern int  i810_rmctx(struct inode *inode, struct file *filp,
 
 extern int  i810_context_switch(drm_device_t *dev, int old, int new);
 extern int  i810_context_switch_complete(drm_device_t *dev, int new);
-
-
-
-
-typedef struct drm_i810_buf_priv {
-   	u32 *in_use;
-   	int my_use_idx;
-	int currently_mapped;
-	void *virtual;
-	void *kernel_virtual;
-} drm_i810_buf_priv_t;
-
 
 #define I810_VERBOSE 0
 
