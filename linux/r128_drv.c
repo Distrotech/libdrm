@@ -29,11 +29,23 @@
  *    Gareth Hughes <gareth@valinux.com>
  */
 
+#ifdef __linux__
 #include <linux/config.h>
+#endif
+
+#ifdef __FreeBSD__
+#include <sys/types.h>
+#include <sys/bus.h>
+#include <pci/pcivar.h>
+#include <opt_drm_linux.h>
+#endif
+
 #include "r128.h"
 #include "drmP.h"
 #include "r128_drv.h"
+#if __REALLY_HAVE_SG
 #include "ati_pcigart.h"
+#endif
 
 #define DRIVER_AUTHOR		"Gareth Hughes, VA Linux Systems Inc."
 
@@ -44,6 +56,35 @@
 #define DRIVER_MAJOR		2
 #define DRIVER_MINOR		1
 #define DRIVER_PATCHLEVEL	6
+
+#ifdef __FreeBSD__
+static int r128_probe(device_t dev)
+{
+	const char *s = 0;
+
+	switch (pci_get_devid(dev)) {
+	case 0x52451002:
+		s = "ATI Rage 128-RE";
+		break;
+	case 0x52461002:
+		s = "ATI Rage 128-RF";
+		break;
+	case 0x524b1002:
+		s = "ATI Rage 128-RK";
+		break;
+	case 0x524c1002:
+		s = "ATI Rage 128-RL";
+		break;
+	}
+
+	if (s) {
+		device_set_desc(dev, s);
+		return 0;
+	}
+
+	return ENXIO;
+}
+#endif
 
 #define DRIVER_IOCTLS							    \
    [DRM_IOCTL_NR(DRM_IOCTL_DMA)]             = { r128_cce_buffers,  1, 0 }, \
@@ -86,7 +127,18 @@
 #include "drm_ioctl.h"
 #include "drm_lock.h"
 #include "drm_memory.h"
+#ifdef __linux__
 #include "drm_proc.h"
-#include "drm_vm.h"
 #include "drm_stub.h"
+#endif
+#ifdef __FreeBSD__
+#include "drm_sysctl.h"
+#endif
+#include "drm_vm.h"
+#if __REALLY_HAVE_SG
 #include "drm_scatter.h"
+#endif
+
+#ifdef __FreeBSD__
+DRIVER_MODULE(r128, pci, r128_driver, r128_devclass, 0, 0);
+#endif

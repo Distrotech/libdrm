@@ -61,7 +61,7 @@
 #define __HAVE_DMA_HISTOGRAM	0
 #endif
 
-#define DRM_DEBUG_CODE 0	  /* Include debugging code (if > 1, then
+#define DRM_DEBUG_CODE 1	  /* Include debugging code (if > 1, then
 				     also include looping detection. */
 
 /* There's undoubtably more of this file to go into these OS dependent ones. */

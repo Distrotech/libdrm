@@ -23,10 +23,18 @@ int DRM(mmap)(dev_t kdev, vm_offset_t offset, int prot)
 	drm_device_t	*dev	= kdev->si_drv1;
 	drm_map_t	*map	= NULL;
 	drm_map_list_entry_t *listentry=NULL;
-	
+	/*drm_file_t *priv;*/
+
 /*	DRM_DEBUG("offset = 0x%x\n", offset);*/
 
-	if (!priv->authenticated) DRM_OS_RETURN(EACCES);
+	/*XXX Fixme */
+	/*priv = DRM(find_file_by_proc)(dev, p);
+	if (!priv) {
+		DRM_DEBUG("can't find authenticator\n");
+		return EINVAL;
+	}
+
+	if (!priv->authenticated) DRM_OS_RETURN(EACCES);*/
 
 	if (dev->dma
 	    && offset >= 0
@@ -62,7 +70,6 @@ int DRM(mmap)(dev_t kdev, vm_offset_t offset, int prot)
 	case _DRM_AGP:
 		return atop(offset);
 	case _DRM_SHM:
-		DRM_DEBUG("In DRM_SHM\n");
 		return atop(vtophys(offset));
 	default:
 		return -1;	/* This should never happen. */
@@ -71,7 +78,4 @@ int DRM(mmap)(dev_t kdev, vm_offset_t offset, int prot)
 	
 	return -1;
 }
-
-
-
 

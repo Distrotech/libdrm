@@ -40,6 +40,7 @@
 
 #define R128_FIFO_DEBUG		0
 
+int r128_do_wait_for_idle( drm_r128_private_t *dev_priv );
 
 /* CCE microcode (from ATI) */
 static u32 r128_cce_microcode[] = {
@@ -134,7 +135,7 @@ static int r128_do_pixcache_flush( drm_r128_private_t *dev_priv )
 	}
 
 	DRM_ERROR( "%s failed!\n", __FUNCTION__ );
-	return -EBUSY;
+	DRM_OS_RETURN( EBUSY );
 }
 
 static int r128_do_wait_for_fifo( drm_r128_private_t *dev_priv, int entries )
@@ -148,7 +149,7 @@ static int r128_do_wait_for_fifo( drm_r128_private_t *dev_priv, int entries )
 	}
 
 	DRM_ERROR( "%s failed!\n", __FUNCTION__ );
-	return -EBUSY;
+	DRM_OS_RETURN( EBUSY );
 }
 
 int r128_do_wait_for_idle( drm_r128_private_t *dev_priv )
@@ -167,7 +168,7 @@ int r128_do_wait_for_idle( drm_r128_private_t *dev_priv )
 	}
 
 	DRM_ERROR( "%s failed!\n", __FUNCTION__ );
-	return -EBUSY;
+	DRM_OS_RETURN( EBUSY );
 }
 
 
@@ -228,7 +229,7 @@ int r128_do_cce_idle( drm_r128_private_t *dev_priv )
 	DRM_ERROR( "failed!\n" );
 	r128_status( dev_priv );
 #endif
-	return -EBUSY;
+	DRM_OS_RETURN( EBUSY );
 }
 
 /* Start the Concurrent Command Engine.
@@ -336,9 +337,15 @@ static void r128_cce_init_ring_buffer( drm_device_t *dev )
 	/* DL_RPTR_ADDR is a physical address in AGP space. */
 	SET_RING_HEAD( &dev_priv->ring, 0 );
 
+#if __REALLY_HAVE_SG
+#define DRM_OS_VTOPHYS(x) vtophys(x)
+#define DRM_OS_VTOPHYS(x) virt_to_bus(x)
+
 	if ( !dev_priv->is_pci ) {
+#endif
 		R128_WRITE( R128_PM4_BUFFER_DL_RPTR_ADDR,
 			    dev_priv->ring_rptr->offset );
+#if __REALLY_HAVE_SG
 	} else {
 		drm_sg_mem_t *entry = dev->sg;
 		unsigned long tmp_ofs, page_ofs;
@@ -347,12 +354,13 @@ static void r128_cce_init_ring_buffer( drm_device_t *dev )
 		page_ofs = tmp_ofs >> PAGE_SHIFT;
 
 		R128_WRITE( R128_PM4_BUFFER_DL_RPTR_ADDR,
-			    virt_to_bus(entry->pagelist[page_ofs]->virtual));
+			    DRM_OS_VTOPHYS( entry->pagelist[page_ofs]->virtual ) );
 
 		DRM_DEBUG( "ring rptr: offset=0x%08lx handle=0x%08lx\n",
 			   virt_to_bus(entry->pagelist[page_ofs]->virtual),
 			   entry->handle + tmp_ofs );
 	}
+#endif
 
 	/* Set watermark control */
 	R128_WRITE( R128_PM4_BUFFER_WM_CNTL,
@@ -372,13 +380,18 @@ static void r128_cce_init_ring_buffer( drm_device_t *dev )
 static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 {
 	drm_r128_private_t *dev_priv;
+#ifdef __linux__
 	struct list_head *list;
+#endif
+#if defined( __FreeBSD__ )
+	drm_map_list_entry_t *listentry;
+#endif
 
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
 	dev_priv = DRM(alloc)( sizeof(drm_r128_private_t), DRM_MEM_DRIVER );
 	if ( dev_priv == NULL )
-		return -ENOMEM;
+		DRM_OS_RETURN( ENOMEM );
 	dev->dev_private = (void *)dev_priv;
 
 	memset( dev_priv, 0, sizeof(drm_r128_private_t) );
@@ -390,7 +403,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 		DRM_ERROR( "PCI GART memory not allocated!\n" );
 		DRM(free)( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
 		dev->dev_private = NULL;
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	dev_priv->usec_timeout = init->usec_timeout;
@@ -399,7 +412,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 		DRM_DEBUG( "TIMEOUT problem!\n" );
 		DRM(free)( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
 		dev->dev_private = NULL;
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	dev_priv->cce_mode = init->cce_mode;
@@ -419,7 +432,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 		DRM_DEBUG( "Bad cce_mode!\n" );
 		DRM(free)( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
 		dev->dev_private = NULL;
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	switch ( init->cce_mode ) {
@@ -481,6 +494,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 	dev_priv->span_pitch_offset_c = (((dev_priv->depth_pitch/8) << 21) |
 					 (dev_priv->span_offset >> 5));
 
+#ifdef __linux__
 	list_for_each(list, &dev->maplist->head) {
 		drm_map_list_t *r_list = (drm_map_list_t *)list;
 		if( r_list->map &&
@@ -490,6 +504,17 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
  			break;
  		}
  	}
+#endif
+#if defined( __FreeBSD__ )
+	TAILQ_FOREACH(listentry, dev->maplist, link) {
+		drm_map_t *map = listentry->map;
+		if (map->type == _DRM_SHM &&
+			map->flags & _DRM_CONTAINS_LOCK) {
+			dev_priv->sarea = map;
+			break;
+		}
+	}
+#endif
 
 	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
 	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
@@ -546,6 +571,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 	R128_WRITE( R128_LAST_DISPATCH_REG,
 		    dev_priv->sarea_priv->last_dispatch );
 
+#if __REALLY_HAVE_SG
 	if ( dev_priv->is_pci ) {
 		dev_priv->phys_pci_gart = DRM(ati_pcigart_init)( dev );
 		if ( !dev_priv->phys_pci_gart ) {
@@ -554,11 +580,12 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 			DRM(free)( dev_priv, sizeof(*dev_priv),
 				   DRM_MEM_DRIVER );
 			dev->dev_private = NULL;
-			return -EINVAL;
+			DRM_OS_RETURN( EINVAL );
 		}
 		R128_WRITE( R128_PCI_GART_PAGE,
 			    virt_to_bus( (void *)dev_priv->phys_pci_gart ) );
 	}
+#endif
 
 	r128_cce_init_ring_buffer( dev );
 	r128_cce_load_microcode( dev_priv );
@@ -586,17 +613,14 @@ int r128_do_cleanup_cce( drm_device_t *dev )
 	return 0;
 }
 
-int r128_cce_init( struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg )
+int r128_cce_init( DRM_OS_IOCTL )
 {
-        drm_file_t *priv = filp->private_data;
-        drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_r128_init_t init;
 
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
-	if ( copy_from_user( &init, (drm_r128_init_t *)arg, sizeof(init) ) )
-		return -EFAULT;
+	DRM_OS_KRNFROMUSR( init, (drm_r128_init_t *)data, sizeof(init) );
 
 	switch ( init.func ) {
 	case R128_INIT_CCE:
@@ -605,14 +629,12 @@ int r128_cce_init( struct inode *inode, struct file *filp,
 		return r128_do_cleanup_cce( dev );
 	}
 
-	return -EINVAL;
+	DRM_OS_RETURN( EINVAL );
 }
 
-int r128_cce_start( struct inode *inode, struct file *filp,
-		    unsigned int cmd, unsigned long arg )
+int r128_cce_start( DRM_OS_IOCTL )
 {
-        drm_file_t *priv = filp->private_data;
-        drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_r128_private_t *dev_priv = dev->dev_private;
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
@@ -631,11 +653,9 @@ int r128_cce_start( struct inode *inode, struct file *filp,
 /* Stop the CCE.  The engine must have been idled before calling this
  * routine.
  */
-int r128_cce_stop( struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg )
+int r128_cce_stop( DRM_OS_IOCTL )
 {
-        drm_file_t *priv = filp->private_data;
-        drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_r128_private_t *dev_priv = dev->dev_private;
 	drm_r128_cce_stop_t stop;
 	int ret;
@@ -643,8 +663,7 @@ int r128_cce_stop( struct inode *inode, struct file *filp,
 
 	LOCK_TEST_WITH_RETURN( dev );
 
-	if ( copy_from_user( &stop, (drm_r128_init_t *)arg, sizeof(stop) ) )
-		return -EFAULT;
+	DRM_OS_KRNFROMUSR(stop, (drm_r128_cce_stop_t *)data, sizeof(stop) );
 
 	/* Flush any pending CCE commands.  This ensures any outstanding
 	 * commands are exectuted by the engine before we turn it off.
@@ -675,11 +694,9 @@ int r128_cce_stop( struct inode *inode, struct file *filp,
 
 /* Just reset the CCE ring.  Called as part of an X Server engine reset.
  */
-int r128_cce_reset( struct inode *inode, struct file *filp,
-		    unsigned int cmd, unsigned long arg )
+int r128_cce_reset( DRM_OS_IOCTL )
 {
-        drm_file_t *priv = filp->private_data;
-        drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_r128_private_t *dev_priv = dev->dev_private;
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
@@ -687,7 +704,7 @@ int r128_cce_reset( struct inode *inode, struct file *filp,
 
 	if ( !dev_priv ) {
 		DRM_DEBUG( "%s called before init done\n", __FUNCTION__ );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	r128_do_cce_reset( dev_priv );
@@ -698,11 +715,9 @@ int r128_cce_reset( struct inode *inode, struct file *filp,
 	return 0;
 }
 
-int r128_cce_idle( struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg )
+int r128_cce_idle( DRM_OS_IOCTL )
 {
-        drm_file_t *priv = filp->private_data;
-        drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_r128_private_t *dev_priv = dev->dev_private;
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
@@ -715,11 +730,9 @@ int r128_cce_idle( struct inode *inode, struct file *filp,
 	return r128_do_cce_idle( dev_priv );
 }
 
-int r128_engine_reset( struct inode *inode, struct file *filp,
-		       unsigned int cmd, unsigned long arg )
+int r128_engine_reset( DRM_OS_IOCTL )
 {
-        drm_file_t *priv = filp->private_data;
-        drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
 	LOCK_TEST_WITH_RETURN( dev );
@@ -764,17 +777,14 @@ int r128_do_cleanup_pageflip( drm_device_t *dev )
 	return 0;
 }
 
-int r128_fullscreen( struct inode *inode, struct file *filp,
-		     unsigned int cmd, unsigned long arg )
+int r128_fullscreen( DRM_OS_IOCTL )
 {
-        drm_file_t *priv = filp->private_data;
-        drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_r128_fullscreen_t fs;
 
 	LOCK_TEST_WITH_RETURN( dev );
 
-	if ( copy_from_user( &fs, (drm_r128_fullscreen_t *)arg, sizeof(fs) ) )
-		return -EFAULT;
+	DRM_OS_KRNFROMUSR( fs, (drm_r128_fullscreen_t *)data, sizeof(fs) );
 
 	switch ( fs.func ) {
 	case R128_INIT_FULLSCREEN:
@@ -783,7 +793,7 @@ int r128_fullscreen( struct inode *inode, struct file *filp,
 		return r128_do_cleanup_pageflip( dev );
 	}
 
-	return -EINVAL;
+	DRM_OS_RETURN( EINVAL );
 }
 
 
@@ -806,7 +816,7 @@ static int r128_freelist_init( drm_device_t *dev )
 	dev_priv->head = DRM(alloc)( sizeof(drm_r128_freelist_t),
 				     DRM_MEM_DRIVER );
 	if ( dev_priv->head == NULL )
-		return -ENOMEM;
+		DRM_OS_RETURN( ENOMEM );
 
 	memset( dev_priv->head, 0, sizeof(drm_r128_freelist_t) );
 	dev_priv->head->age = R128_BUFFER_USED;
@@ -817,7 +827,7 @@ static int r128_freelist_init( drm_device_t *dev )
 
 		entry = DRM(alloc)( sizeof(drm_r128_freelist_t),
 				    DRM_MEM_DRIVER );
-		if ( !entry ) return -ENOMEM;
+		if ( !entry ) DRM_OS_RETURN( ENOMEM );
 
 		entry->age = R128_BUFFER_FREE;
 		entry->buf = buf;
@@ -910,70 +920,65 @@ int r128_wait_ring( drm_r128_private_t *dev_priv, int n )
 
 	/* FIXME: This is being ignored... */
 	DRM_ERROR( "failed!\n" );
-	return -EBUSY;
+	DRM_OS_RETURN( EBUSY );
 }
 
-static int r128_cce_get_buffers( drm_device_t *dev, drm_dma_t *d )
+static int r128_cce_get_buffers( drm_device_t *dev, drm_dma_t *d,  int pid)
 {
 	int i;
 	drm_buf_t *buf;
 
 	for ( i = d->granted_count ; i < d->request_count ; i++ ) {
 		buf = r128_freelist_get( dev );
-		if ( !buf ) return -EAGAIN;
+		if ( !buf ) DRM_OS_RETURN( EAGAIN );
 
-		buf->pid = current->pid;
+		buf->pid = pid;
 
-		if ( copy_to_user( &d->request_indices[i], &buf->idx,
+		 if ( DRM_OS_COPYTOUSR( &d->request_indices[i], &buf->idx,
 				   sizeof(buf->idx) ) )
-			return -EFAULT;
-		if ( copy_to_user( &d->request_sizes[i], &buf->total,
+			DRM_OS_RETURN( EFAULT );
+		 if ( DRM_OS_COPYTOUSR( &d->request_sizes[i], &buf->total,
 				   sizeof(buf->total) ) )
-			return -EFAULT;
-
+			DRM_OS_RETURN( EFAULT );
 		d->granted_count++;
 	}
 	return 0;
 }
 
-int r128_cce_buffers( struct inode *inode, struct file *filp,
-		      unsigned int cmd, unsigned long arg )
+int r128_cce_buffers( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_device_dma_t *dma = dev->dma;
 	int ret = 0;
 	drm_dma_t d;
 
 	LOCK_TEST_WITH_RETURN( dev );
 
-	if ( copy_from_user( &d, (drm_dma_t *) arg, sizeof(d) ) )
-		return -EFAULT;
+	DRM_OS_KRNFROMUSR( d, (drm_dma_t *) data, sizeof(d) );
 
 	/* Please don't send us buffers.
 	 */
 	if ( d.send_count != 0 ) {
 		DRM_ERROR( "Process %d trying to send %d buffers via drmDMA\n",
-			   current->pid, d.send_count );
-		return -EINVAL;
+			   DRM_OS_CURRENTPID, d.send_count );
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	/* We'll send you buffers.
 	 */
 	if ( d.request_count < 0 || d.request_count > dma->buf_count ) {
 		DRM_ERROR( "Process %d trying to get %d buffers (of %d max)\n",
-			   current->pid, d.request_count, dma->buf_count );
-		return -EINVAL;
+			  DRM_OS_CURRENTPID, d.request_count, dma->buf_count );
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	d.granted_count = 0;
 
 	if ( d.request_count ) {
-		ret = r128_cce_get_buffers( dev, &d );
+		ret = r128_cce_get_buffers( dev, &d, DRM_OS_CURRENTPID );
 	}
 
-	if ( copy_to_user( (drm_dma_t *) arg, &d, sizeof(d) ) )
-		return -EFAULT;
+	DRM_OS_KRNTOUSR((drm_dma_t *) data, d, sizeof(d) );
 
 	return ret;
 }

@@ -13,6 +13,9 @@
 #include <sys/filio.h>
 #include <sys/sysctl.h>
 #include <sys/select.h>
+#include <vm/vm.h>
+#include <vm/pmap.h>
+#include <machine/pmap.h>
 #if __FreeBSD_version >= 500000
 #include <sys/selinfo.h>
 #endif
@@ -55,6 +58,8 @@
 #endif
 #define DRM_OS_IOCTL	dev_t kdev, u_long cmd, caddr_t data, int flags, struct proc *p
 #define DRM_OS_DEVICE	drm_device_t	*dev	= kdev->si_drv1
+#define DRM_OS_MALLOC(size) malloc( size, DRM(M_DRM), M_NOWAIT )
+#define DRM_OS_FREE(pt) free( pt, DRM(M_DRM) )
 
 #define DRM_OS_PRIV					\
 	drm_file_t	*priv	= (drm_file_t *) DRM(find_file_by_proc)(dev, p); \
@@ -93,6 +98,11 @@ do {								\
 #define DRM_OS_WRITEMEMORYBARRIER DRM_OS_READMEMORYBARRIER
 
 #define PAGE_ALIGN(addr) (((addr)+PAGE_SIZE-1)&PAGE_MASK)
+
+#define malloctype DRM(M_DRM)
+/* The macros confliced in the MALLOC_DEFINE */
+MALLOC_DECLARE(malloctype);
+#undef malloctype
 
 typedef unsigned long atomic_t;
 typedef u_int32_t cycles_t;

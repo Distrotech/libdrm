@@ -143,8 +143,8 @@ int DRM(addmap)( DRM_OS_IOCTL )
 			|| ((entry->offset < map->offset)
 			    && (entry->offset + entry->size) >= (map->offset + map->size) ) )
 			DRM_DEBUG("map collission: add(0x%x-0x%x), current(0x%x-0x%x)\n", 
-				entry->offset, entry->offset + entry->size - 1,
-				map->offset,        map->offset        + map->size - 1);
+				(int)entry->offset, (int)entry->offset + (int)entry->size - 1,
+				(int)map->offset,        (int)map->offset        + (int)map->size - 1);
 	}
 #endif
 
@@ -403,7 +403,7 @@ int DRM(addbufs_agp)( DRM_OS_IOCTL )
 	DRM_DEBUG( "count:      %d\n",  count );
 	DRM_DEBUG( "order:      %d\n",  order );
 	DRM_DEBUG( "size:       %d\n",  size );
-	DRM_DEBUG( "agp_offset: %ld\n", agp_offset );
+	DRM_DEBUG( "agp_offset: 0x%x\n", (int)agp_offset );
 	DRM_DEBUG( "alignment:  %d\n",  alignment );
 	DRM_DEBUG( "page_order: %d\n",  page_order );
 	DRM_DEBUG( "total:      %d\n",  total );
@@ -475,8 +475,6 @@ int DRM(addbufs_agp)( DRM_OS_IOCTL )
 		buf->time_completed = 0;
 		buf->time_freed = 0;
 #endif
-		DRM_DEBUG( "buffer %d @ %p\n",
-			   entry->buf_count, buf->address );
 
 		offset += alignment;
 		entry->buf_count++;
@@ -735,7 +733,7 @@ int DRM(addbufs_sg)( DRM_OS_IOCTL )
        DRM_DEBUG( "count:      %d\n",  count );
        DRM_DEBUG( "order:      %d\n",  order );
        DRM_DEBUG( "size:       %d\n",  size );
-       DRM_DEBUG( "agp_offset: %ld\n", agp_offset );
+       DRM_DEBUG( "agp_offset: 0x%x\n", (int)agp_offset );
        DRM_DEBUG( "alignment:  %d\n",  alignment );
        DRM_DEBUG( "page_order: %d\n",  page_order );
        DRM_DEBUG( "total:      %d\n",  total );
@@ -1161,3 +1159,4 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 }
 
 #endif /* __HAVE_DMA */
+

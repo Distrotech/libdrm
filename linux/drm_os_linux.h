@@ -280,6 +280,8 @@ do {									\
 	copy_to_user(arg1, arg2, arg3)
 #define DRM_OS_COPYFROMUSR(arg1, arg2, arg3) \
 	copy_from_user(arg1, arg2, arg3)
+#define DRM_OS_MALLOC(x) kmalloc(x, 0)
+#define DRM_OS_FREE(x) kfree(x)
 
 #define DRM_OS_READMEMORYBARRIER mb()
 #define DRM_OS_WRITEMEMORYBARRIER wmb()

@@ -31,6 +31,17 @@
  *    Michel Dänzer <daenzerm@student.ethz.ch>
  */
 
+#ifdef __FreeBSD__
+#include <machine/endian.h>
+#if BYTE_ORDER==LITTLE_ENDIAN
+#define le32_to_cpu(x) x
+#define cpu_to_le32(x) x
+#else
+#define le32_to_cpu(x) ntohl(x)
+#define cpu_to_le32(x) htonl(x)
+#endif
+#endif
+
 #ifndef __R128_DRV_H__
 #define __R128_DRV_H__
 
@@ -372,12 +383,12 @@ extern int r128_cce_indirect( DRM_OS_IOCTL );
 #define R128_READ(reg)		(_R128_READ((u32 *)R128_ADDR(reg)))
 static inline u32 _R128_READ(u32 *addr)
 {
-	mb();
+	DRM_OS_READMEMORYBARRIER;
 	return *(volatile u32 *)addr;
 }
 #define R128_WRITE(reg,val)						\
 do {									\
-	wmb();								\
+	DRM_OS_WRITEMEMORYBARRIER;								\
 	R128_DEREF(reg) = val;						\
 } while (0)
 #else
@@ -393,12 +404,12 @@ do {									\
 #define R128_READ8(reg)		_R128_READ8((u8 *)R128_ADDR(reg))
 static inline u8 _R128_READ8(u8 *addr)
 {
-	mb();
+	DRM_OS_READMEMORYBARRIER;
 	return *(volatile u8 *)addr;
 }
 #define R128_WRITE8(reg,val)						\
 do {									\
-	wmb();								\
+	DRM_OS_WRITEMEMORYBARRIER;								\
 	R128_DEREF8(reg) = val;						\
 } while (0)
 #else
@@ -432,10 +443,10 @@ extern int R128_READ_PLL(drm_device_t *dev, int addr);
 #define LOCK_TEST_WITH_RETURN( dev )					\
 do {									\
 	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||		\
-	     dev->lock.pid != current->pid ) {				\
+	     dev->lock.pid != DRM_OS_CURRENTPID ) {				\
 		DRM_ERROR( "%s called without lock held\n",		\
 			   __FUNCTION__ );				\
-		return -EINVAL;						\
+		DRM_OS_RETURN( EINVAL );						\
 	}								\
 } while (0)
 
@@ -447,10 +458,10 @@ do {									\
 			r128_update_ring_snapshot( ring );		\
 			if ( ring->space >= ring->high_mark )		\
 				goto __ring_space_done;			\
-			udelay( 1 );					\
+			DRM_OS_DELAY( 1 );					\
 		}							\
 		DRM_ERROR( "ring space check failed!\n" );		\
-		return -EBUSY;						\
+		DRM_OS_RETURN( EBUSY );				\
 	}								\
  __ring_space_done:							\
 } while (0)
@@ -476,7 +487,7 @@ do {									\
  * Ring control
  */
 
-#define r128_flush_write_combine()	mb()
+#define r128_flush_write_combine() DRM_OS_READMEMORYBARRIER
 
 
 #define R128_VERBOSE	0

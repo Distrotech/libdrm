@@ -501,12 +501,7 @@ static int DRM(takedown)( drm_device_t *dev )
 		}
 		dev->agp->memory = NULL;
 
-#ifdef __linux__
 		if ( dev->agp->acquired ) DRM(agp_do_release)();
-#endif
-#ifdef __FreeBSD__
-		if ( dev->agp->acquired ) agp_release(dev->agp->agpdev);
-#endif
 
 		dev->agp->acquired = 0;
 		dev->agp->enabled  = 0;
@@ -906,7 +901,7 @@ int DRM( close)(dev_t kdev, int flags, int fmt, struct proc *p)
 	 */
 
 	DRM_DEBUG( "pid = %d, device = 0x%x, open_count = %d\n",
-		   DRM_OS_CURRENTPID, dev->device, dev->open_count );
+		   DRM_OS_CURRENTPID, (int)dev->device, dev->open_count );
 
 	if (dev->lock.hw_lock && _DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)
 	    && dev->lock.pid == DRM_OS_CURRENTPID) {
@@ -1088,7 +1083,7 @@ int DRM(ioctl)( DRM_OS_IOCTL )
 	++priv->ioctl_count;
 
 	DRM_DEBUG( "pid=%d, cmd=0x%02x, nr=0x%02x, dev 0x%x, auth=%d\n",
-		 DRM_OS_CURRENTPID, cmd, nr, dev->device, priv->authenticated );
+		 DRM_OS_CURRENTPID, (int)cmd, nr, (int)dev->device, priv->authenticated );
 
 #ifdef __FreeBSD__
 	switch (cmd) {
