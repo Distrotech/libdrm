@@ -44,10 +44,10 @@ void DRM(ctxbitmap_free)( drm_device_t *dev, int ctx_handle )
 	if ( !dev->ctx_bitmap ) goto failed;
 
 	if ( ctx_handle < DRM_MAX_CTXBITMAP ) {
-		down(&dev->struct_sem);
+		DRM_OS_LOCK;
 		clear_bit( ctx_handle, dev->ctx_bitmap );
 		dev->context_sareas[ctx_handle] = NULL;
-		up(&dev->struct_sem);
+		DRM_OS_UNLOCK;
 		return;
 	}
 failed:
@@ -62,7 +62,7 @@ int DRM(ctxbitmap_next)( drm_device_t *dev )
 
 	if(!dev->ctx_bitmap) return -1;
 
-	down(&dev->struct_sem);
+	DRM_OS_LOCK;
 	bit = find_first_zero_bit( dev->ctx_bitmap, DRM_MAX_CTXBITMAP );
 	if ( bit < DRM_MAX_CTXBITMAP ) {
 		set_bit( bit, dev->ctx_bitmap );
@@ -87,10 +87,10 @@ int DRM(ctxbitmap_next)( drm_device_t *dev )
 				dev->context_sareas[bit] = NULL;
 			}
 		}
-		up(&dev->struct_sem);
+		DRM_OS_UNLOCK;
 		return bit;
 	}
-	up(&dev->struct_sem);
+	DRM_OS_UNLOCK;
 	return -1;
 }
 
@@ -99,17 +99,17 @@ int DRM(ctxbitmap_init)( drm_device_t *dev )
 	int i;
    	int temp;
 
-	down(&dev->struct_sem);
+	DRM_OS_LOCK;
 	dev->ctx_bitmap = (unsigned long *) DRM(alloc)( PAGE_SIZE,
 							DRM_MEM_CTXBITMAP );
 	if ( dev->ctx_bitmap == NULL ) {
-		up(&dev->struct_sem);
-		return -ENOMEM;
+		DRM_OS_UNLOCK;
+		DRM_OS_RETURN(ENOMEM);
 	}
 	memset( (void *)dev->ctx_bitmap, 0, PAGE_SIZE );
 	dev->context_sareas = NULL;
 	dev->max_context = -1;
-	up(&dev->struct_sem);
+	DRM_OS_UNLOCK;
 
 	for ( i = 0 ; i < DRM_RESERVED_CONTEXTS ; i++ ) {
 		temp = DRM(ctxbitmap_next)( dev );
@@ -121,84 +121,97 @@ int DRM(ctxbitmap_init)( drm_device_t *dev )
 
 void DRM(ctxbitmap_cleanup)( drm_device_t *dev )
 {
-	down(&dev->struct_sem);
+	DRM_OS_LOCK;
 	if( dev->context_sareas ) DRM(free)( dev->context_sareas,
 					     sizeof(*dev->context_sareas) * 
 					     dev->max_context,
 					     DRM_MEM_MAPS );
 	DRM(free)( (void *)dev->ctx_bitmap, PAGE_SIZE, DRM_MEM_CTXBITMAP );
-	up(&dev->struct_sem);
+	DRM_OS_UNLOCK;
 }
 
 /* ================================================================
  * Per Context SAREA Support
  */
 
-int DRM(getsareactx)(struct inode *inode, struct file *filp,
-		     unsigned int cmd, unsigned long arg)
+int DRM(getsareactx)( DRM_OS_IOCTL )
 {
-	drm_file_t	*priv	= filp->private_data;
-	drm_device_t	*dev	= priv->dev;
+	DRM_OS_DEVICE;
 	drm_ctx_priv_map_t request;
 	drm_map_t *map;
 
 	if (copy_from_user(&request,
 			   (drm_ctx_priv_map_t *)arg,
 			   sizeof(request)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 
-	down(&dev->struct_sem);
+	DRM_OS_LOCK;
 	if ((int)request.ctx_id >= dev->max_context) {
-		up(&dev->struct_sem);
-		return -EINVAL;
+		DRM_OS_UNLOCK;
+		DRM_OS_RETURN(EINVAL);
 	}
 
 	map = dev->context_sareas[request.ctx_id];
-	up(&dev->struct_sem);
+	DRM_OS_UNLOCK;
 
 	request.handle = map->handle;
 	if (copy_to_user((drm_ctx_priv_map_t *)arg, &request, sizeof(request)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	return 0;
 }
 
-int DRM(setsareactx)(struct inode *inode, struct file *filp,
-		     unsigned int cmd, unsigned long arg)
+int DRM(setsareactx)( DRM_OS_IOCTL )
 {
-	drm_file_t	*priv	= filp->private_data;
-	drm_device_t	*dev	= priv->dev;
+	DRM_OS_DEVICE;
 	drm_ctx_priv_map_t request;
 	drm_map_t *map = NULL;
+#ifdef __linux__
 	drm_map_list_t *r_list;
 	struct list_head *list;
+#endif
+#ifdef __FreeBSD__
+	drm_map_list_entry_t *list;
+#endif
 
 	if (copy_from_user(&request,
 			   (drm_ctx_priv_map_t *)arg,
 			   sizeof(request)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 
-	down(&dev->struct_sem);
+	DRM_OS_LOCK;
+#ifdef __linux__
 	list_for_each(list, &dev->maplist->head) {
 		r_list = (drm_map_list_t *)list;
 		if(r_list->map &&
 		   r_list->map->handle == request.handle) break;
 	}
 	if (list == &(dev->maplist->head)) {
-		up(&dev->struct_sem);
-		return -EINVAL;
+		DRM_OS_UNLOCK;
+		DRM_OS_RETURN(EINVAL);
 	}
 	map = r_list->map;
-	up(&dev->struct_sem);
+#endif
+#ifdef __FreeBSD__
+	TAILQ_FOREACH(list, dev->maplist, link) {
+		map=list->map;
+		if(map->handle == request.handle) break;
+	}
+	if (!list) {
+		lockmgr( &dev->dev_lock, LK_RELEASE, 0, curproc );
+		return EINVAL;
+	}
+#endif
+	DRM_OS_UNLOCK;
 
-	if (!map) return -EINVAL;
+	if (!map) DRM_OS_RETURN(EINVAL);
 
-	down(&dev->struct_sem);
+	DRM_OS_LOCK;
 	if ((int)request.ctx_id >= dev->max_context) {
-		up(&dev->struct_sem);
-		return -EINVAL;
+		DRM_OS_UNLOCK;
+		DRM_OS_RETURN(EINVAL);
 	}
 	dev->context_sareas[request.ctx_id] = map;
-	up(&dev->struct_sem);
+	DRM_OS_UNLOCK;
 	return 0;
 }
 
@@ -212,7 +225,7 @@ int DRM(context_switch)( drm_device_t *dev, int old, int new )
 
         if ( test_and_set_bit( 0, &dev->context_flag ) ) {
                 DRM_ERROR( "Reentering -- FIXME\n" );
-                return -EBUSY;
+                DRM_OS_RETURN(EBUSY);
         }
 
 #if __HAVE_DMA_HISTOGRAM
@@ -259,15 +272,14 @@ int DRM(context_switch_complete)( drm_device_t *dev, int new )
         return 0;
 }
 
-int DRM(resctx)( struct inode *inode, struct file *filp,
-		 unsigned int cmd, unsigned long arg )
+int DRM(resctx)( DRM_OS_IOCTL )
 {
 	drm_ctx_res_t res;
 	drm_ctx_t ctx;
 	int i;
 
 	if ( copy_from_user( &res, (drm_ctx_res_t *)arg, sizeof(res) ) )
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 
 	if ( res.count >= DRM_RESERVED_CONTEXTS ) {
 		memset( &ctx, 0, sizeof(ctx) );
@@ -275,25 +287,23 @@ int DRM(resctx)( struct inode *inode, struct file *filp,
 			ctx.handle = i;
 			if ( copy_to_user( &res.contexts[i],
 					   &i, sizeof(i) ) )
-				return -EFAULT;
+				DRM_OS_RETURN(EFAULT);
 		}
 	}
 	res.count = DRM_RESERVED_CONTEXTS;
 
 	if ( copy_to_user( (drm_ctx_res_t *)arg, &res, sizeof(res) ) )
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	return 0;
 }
 
-int DRM(addctx)( struct inode *inode, struct file *filp,
-		 unsigned int cmd, unsigned long arg )
+int DRM(addctx)( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_ctx_t ctx;
 
 	if ( copy_from_user( &ctx, (drm_ctx_t *)arg, sizeof(ctx) ) )
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 
 	ctx.handle = DRM(ctxbitmap_next)( dev );
 	if ( ctx.handle == DRM_KERNEL_CONTEXT ) {
@@ -304,60 +314,54 @@ int DRM(addctx)( struct inode *inode, struct file *filp,
 	if ( ctx.handle == -1 ) {
 		DRM_DEBUG( "Not enough free contexts.\n" );
 				/* Should this return -EBUSY instead? */
-		return -ENOMEM;
+		DRM_OS_RETURN(ENOMEM);
 	}
 
 	if ( copy_to_user( (drm_ctx_t *)arg, &ctx, sizeof(ctx) ) )
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	return 0;
 }
 
-int DRM(modctx)( struct inode *inode, struct file *filp,
-		 unsigned int cmd, unsigned long arg )
+int DRM(modctx)( DRM_OS_IOCTL )
 {
 	/* This does nothing */
 	return 0;
 }
 
-int DRM(getctx)( struct inode *inode, struct file *filp,
-		 unsigned int cmd, unsigned long arg )
+int DRM(getctx)( DRM_OS_IOCTL )
 {
 	drm_ctx_t ctx;
 
 	if ( copy_from_user( &ctx, (drm_ctx_t*)arg, sizeof(ctx) ) )
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 
 	/* This is 0, because we don't handle any context flags */
 	ctx.flags = 0;
 
 	if ( copy_to_user( (drm_ctx_t*)arg, &ctx, sizeof(ctx) ) )
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	return 0;
 }
 
-int DRM(switchctx)( struct inode *inode, struct file *filp,
-		    unsigned int cmd, unsigned long arg )
+int DRM(switchctx)( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_ctx_t ctx;
 
 	if ( copy_from_user( &ctx, (drm_ctx_t *)arg, sizeof(ctx) ) )
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 
 	DRM_DEBUG( "%d\n", ctx.handle );
 	return DRM(context_switch)( dev, dev->last_context, ctx.handle );
 }
 
-int DRM(newctx)( struct inode *inode, struct file *filp,
-		 unsigned int cmd, unsigned long arg )
+int DRM(newctx)( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_ctx_t ctx;
 
 	if ( copy_from_user( &ctx, (drm_ctx_t *)arg, sizeof(ctx) ) )
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 
 	DRM_DEBUG( "%d\n", ctx.handle );
 	DRM(context_switch_complete)( dev, ctx.handle );
@@ -365,15 +369,13 @@ int DRM(newctx)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
-int DRM(rmctx)( struct inode *inode, struct file *filp,
-		unsigned int cmd, unsigned long arg )
+int DRM(rmctx)( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_ctx_t ctx;
 
 	if ( copy_from_user( &ctx, (drm_ctx_t *)arg, sizeof(ctx) ) )
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 
 	DRM_DEBUG( "%d\n", ctx.handle );
 	if ( ctx.handle == DRM_KERNEL_CONTEXT + 1 ) {
@@ -405,7 +407,7 @@ int DRM(context_switch)(drm_device_t *dev, int old, int new)
 
 	if (test_and_set_bit(0, &dev->context_flag)) {
 		DRM_ERROR("Reentering -- FIXME\n");
-		return -EBUSY;
+		DRM_OS_RETURN(EBUSY);
 	}
 
 #if __HAVE_DMA_HISTOGRAM
@@ -416,7 +418,7 @@ int DRM(context_switch)(drm_device_t *dev, int old, int new)
 
 	if (new >= dev->queue_count) {
 		clear_bit(0, &dev->context_flag);
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 	}
 
 	if (new == dev->last_context) {
@@ -429,7 +431,7 @@ int DRM(context_switch)(drm_device_t *dev, int old, int new)
 	if (atomic_read(&q->use_count) == 1) {
 		atomic_dec(&q->use_count);
 		clear_bit(0, &dev->context_flag);
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 	}
 
 	if (DRM(flags) & DRM_FLAG_NOCTX) {
@@ -532,7 +534,7 @@ static int DRM(alloc_queue)(drm_device_t *dev)
 		atomic_dec(&dev->queuelist[i]->use_count);
 	}
 				/* Allocate a new queue */
-	down(&dev->struct_sem);
+	DRM_OS_LOCK;
 
 	queue = gamma_alloc(sizeof(*queue), DRM_MEM_QUEUES);
 	memset(queue, 0, sizeof(*queue));
@@ -550,20 +552,19 @@ static int DRM(alloc_queue)(drm_device_t *dev)
 					      newslots,
 					      DRM_MEM_QUEUES);
 		if (!dev->queuelist) {
-			up(&dev->struct_sem);
+			DRM_OS_UNLOCK;
 			DRM_DEBUG("out of memory\n");
-			return -ENOMEM;
+			DRM_OS_RETURN(ENOMEM);
 		}
 	}
 	dev->queuelist[dev->queue_count-1] = queue;
 
-	up(&dev->struct_sem);
+	DRM_OS_UNLOCK;
 	DRM_DEBUG("%d (new)\n", dev->queue_count - 1);
 	return dev->queue_count - 1;
 }
 
-int DRM(resctx)(struct inode *inode, struct file *filp,
-		unsigned int cmd, unsigned long arg)
+int DRM(resctx)( DRM_OS_IOCTL )
 {
 	drm_ctx_res_t	res;
 	drm_ctx_t	ctx;
@@ -571,7 +572,7 @@ int DRM(resctx)(struct inode *inode, struct file *filp,
 
 	DRM_DEBUG("%d\n", DRM_RESERVED_CONTEXTS);
 	if (copy_from_user(&res, (drm_ctx_res_t *)arg, sizeof(res)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	if (res.count >= DRM_RESERVED_CONTEXTS) {
 		memset(&ctx, 0, sizeof(ctx));
 		for (i = 0; i < DRM_RESERVED_CONTEXTS; i++) {
@@ -579,24 +580,22 @@ int DRM(resctx)(struct inode *inode, struct file *filp,
 			if (copy_to_user(&res.contexts[i],
 					 &i,
 					 sizeof(i)))
-				return -EFAULT;
+				DRM_OS_RETURN(EFAULT);
 		}
 	}
 	res.count = DRM_RESERVED_CONTEXTS;
 	if (copy_to_user((drm_ctx_res_t *)arg, &res, sizeof(res)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	return 0;
 }
 
-int DRM(addctx)(struct inode *inode, struct file *filp,
-		unsigned int cmd, unsigned long arg)
+int DRM(addctx)( DRM_OS_IOCTL )
 {
-	drm_file_t	*priv	= filp->private_data;
-	drm_device_t	*dev	= priv->dev;
+	DRM_OS_DEVICE;
 	drm_ctx_t	ctx;
 
 	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	if ((ctx.handle = DRM(alloc_queue)(dev)) == DRM_KERNEL_CONTEXT) {
 				/* Init kernel's context and get a new one. */
 		DRM(init_queue)(dev, dev->queuelist[ctx.handle], &ctx);
@@ -605,36 +604,35 @@ int DRM(addctx)(struct inode *inode, struct file *filp,
 	DRM(init_queue)(dev, dev->queuelist[ctx.handle], &ctx);
 	DRM_DEBUG("%d\n", ctx.handle);
 	if (copy_to_user((drm_ctx_t *)arg, &ctx, sizeof(ctx)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	return 0;
 }
 
-int DRM(modctx)(struct inode *inode, struct file *filp,
-		unsigned int cmd, unsigned long arg)
+int DRM(modctx)( DRM_OS_IOCTL )
 {
-	drm_file_t	*priv	= filp->private_data;
-	drm_device_t	*dev	= priv->dev;
+	DRM_OS_DEVICE;
 	drm_ctx_t	ctx;
 	drm_queue_t	*q;
 
 	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 
 	DRM_DEBUG("%d\n", ctx.handle);
 
-	if (ctx.handle < 0 || ctx.handle >= dev->queue_count) return -EINVAL;
+	if (ctx.handle < 0 || ctx.handle >= dev->queue_count) 
+		DRM_OS_RETURN(EINVAL);
 	q = dev->queuelist[ctx.handle];
 
 	atomic_inc(&q->use_count);
 	if (atomic_read(&q->use_count) == 1) {
 				/* No longer in use */
 		atomic_dec(&q->use_count);
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 	}
 
 	if (DRM_BUFCOUNT(&q->waitlist)) {
 		atomic_dec(&q->use_count);
-		return -EBUSY;
+		DRM_OS_RETURN(EBUSY);
 	}
 
 	q->flags = ctx.flags;
@@ -643,87 +641,80 @@ int DRM(modctx)(struct inode *inode, struct file *filp,
 	return 0;
 }
 
-int DRM(getctx)(struct inode *inode, struct file *filp,
-		unsigned int cmd, unsigned long arg)
+int DRM(getctx)( DRM_OS_IOCTL )
 {
-	drm_file_t	*priv	= filp->private_data;
-	drm_device_t	*dev	= priv->dev;
+	DRM_OS_DEVICE;
 	drm_ctx_t	ctx;
 	drm_queue_t	*q;
 
 	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 
 	DRM_DEBUG("%d\n", ctx.handle);
 
-	if (ctx.handle >= dev->queue_count) return -EINVAL;
+	if (ctx.handle >= dev->queue_count) 
+		DRM_OS_RETURN(EINVAL);
 	q = dev->queuelist[ctx.handle];
 
 	atomic_inc(&q->use_count);
 	if (atomic_read(&q->use_count) == 1) {
 				/* No longer in use */
 		atomic_dec(&q->use_count);
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 	}
 
 	ctx.flags = q->flags;
 	atomic_dec(&q->use_count);
 
 	if (copy_to_user((drm_ctx_t *)arg, &ctx, sizeof(ctx)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 
 	return 0;
 }
 
-int DRM(switchctx)(struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg)
+int DRM(switchctx)( DRM_OS_IOCTL )
 {
-	drm_file_t	*priv	= filp->private_data;
-	drm_device_t	*dev	= priv->dev;
+	DRM_OS_DEVICE;
 	drm_ctx_t	ctx;
 
 	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	DRM_DEBUG("%d\n", ctx.handle);
 	return DRM(context_switch)(dev, dev->last_context, ctx.handle);
 }
 
-int DRM(newctx)(struct inode *inode, struct file *filp,
-		unsigned int cmd, unsigned long arg)
+int DRM(newctx)( DRM_OS_IOCTL )
 {
-	drm_file_t	*priv	= filp->private_data;
-	drm_device_t	*dev	= priv->dev;
+	DRM_OS_DEVICE;
 	drm_ctx_t	ctx;
 
 	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	DRM_DEBUG("%d\n", ctx.handle);
 	DRM(context_switch_complete)(dev, ctx.handle);
 
 	return 0;
 }
 
-int DRM(rmctx)(struct inode *inode, struct file *filp,
-	       unsigned int cmd, unsigned long arg)
+int DRM(rmctx)( DRM_OS_IOCTL )
 {
-	drm_file_t	*priv	= filp->private_data;
-	drm_device_t	*dev	= priv->dev;
+	DRM_OS_DEVICE;
 	drm_ctx_t	ctx;
 	drm_queue_t	*q;
 	drm_buf_t	*buf;
 
 	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	DRM_DEBUG("%d\n", ctx.handle);
 
-	if (ctx.handle >= dev->queue_count) return -EINVAL;
+	if (ctx.handle >= dev->queue_count) DRM_OS_RETURN(EINVAL);
 	q = dev->queuelist[ctx.handle];
 
 	atomic_inc(&q->use_count);
 	if (atomic_read(&q->use_count) == 1) {
 				/* No longer in use */
 		atomic_dec(&q->use_count);
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 	}
 
 	atomic_inc(&q->finalization); /* Mark queue in finalization state */
@@ -734,7 +725,7 @@ int DRM(rmctx)(struct inode *inode, struct file *filp,
 		schedule();
 		if (signal_pending(current)) {
 			clear_bit(0, &dev->interrupt_flag);
-			return -EINTR;
+			DRM_OS_RETURN(EINTR);
 		}
 	}
 				/* Remove queued buffers */

@@ -51,7 +51,7 @@ int DRM(dma_setup)( drm_device_t *dev )
 
 	dev->dma = DRM(alloc)( sizeof(*dev->dma), DRM_MEM_DRIVER );
 	if ( !dev->dma )
-		return -ENOMEM;
+		DRM_OS_RETURN(ENOMEM);
 
 	memset( dev->dma, 0, sizeof(*dev->dma) );
 
@@ -330,7 +330,7 @@ int DRM(dma_enqueue)(drm_device_t *dev, drm_dma_t *d)
 		if (!_DRM_LOCK_IS_HELD(context)) {
 			DRM_ERROR("No lock held during \"while locked\""
 				  " request\n");
-			return -EINVAL;
+			DRM_OS_RETURN(EINVAL);
 		}
 		if (d->context != _DRM_LOCKING_CONTEXT(context)
 		    && _DRM_LOCKING_CONTEXT(context) != DRM_KERNEL_CONTEXT) {
@@ -338,7 +338,7 @@ int DRM(dma_enqueue)(drm_device_t *dev, drm_dma_t *d)
 				  " \"while locked\" request\n",
 				  _DRM_LOCKING_CONTEXT(context),
 				  d->context);
-			return -EINVAL;
+			DRM_OS_RETURN(EINVAL);
 		}
 		q = dev->queuelist[DRM_KERNEL_CONTEXT];
 		while_locked = 1;
@@ -358,7 +358,7 @@ int DRM(dma_enqueue)(drm_device_t *dev, drm_dma_t *d)
 			if (signal_pending(current)) {
 				atomic_dec(&q->use_count);
 				remove_wait_queue(&q->write_queue, &entry);
-				return -EINTR;
+				DRM_OS_RETURN(EINTR);
 			}
 		}
 		atomic_dec(&q->block_count);
@@ -372,14 +372,14 @@ int DRM(dma_enqueue)(drm_device_t *dev, drm_dma_t *d)
 			atomic_dec(&q->use_count);
 			DRM_ERROR("Index %d (of %d max)\n",
 				  d->send_indices[i], dma->buf_count - 1);
-			return -EINVAL;
+			DRM_OS_RETURN(EINVAL);
 		}
 		buf = dma->buflist[ idx ];
 		if (buf->pid != current->pid) {
 			atomic_dec(&q->use_count);
 			DRM_ERROR("Process %d using buffer owned by %d\n",
 				  current->pid, buf->pid);
-			return -EINVAL;
+			DRM_OS_RETURN(EINVAL);
 		}
 		if (buf->list != DRM_LIST_NONE) {
 			atomic_dec(&q->use_count);
@@ -397,14 +397,14 @@ int DRM(dma_enqueue)(drm_device_t *dev, drm_dma_t *d)
 			DRM_ERROR("Queueing pending buffer:"
 				  " buffer %d, offset %d\n",
 				  d->send_indices[i], i);
-			return -EINVAL;
+			DRM_OS_RETURN(EINVAL);
 		}
 		if (buf->waiting) {
 			atomic_dec(&q->use_count);
 			DRM_ERROR("Queueing waiting buffer:"
 				  " buffer %d, offset %d\n",
 				  d->send_indices[i], i);
-			return -EINVAL;
+			DRM_OS_RETURN(EINVAL);
 		}
 		buf->waiting = 1;
 		if (atomic_read(&q->use_count) == 1
@@ -442,12 +442,12 @@ static int DRM(dma_get_buffers_of_order)(drm_device_t *dev, drm_dma_t *d,
 		if (copy_to_user(&d->request_indices[i],
 				 &buf->idx,
 				 sizeof(buf->idx)))
-			return -EFAULT;
+			DRM_OS_RETURN(EFAULT);
 
 		if (copy_to_user(&d->request_sizes[i],
 				 &buf->total,
 				 sizeof(buf->total)))
-			return -EFAULT;
+			DRM_OS_RETURN(EFAULT);
 
 		++d->granted_count;
 	}
@@ -504,12 +504,12 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 	int ret;
 
 	if ( !irq )
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 
 	down( &dev->struct_sem );
 	if ( dev->irq ) {
 		up( &dev->struct_sem );
-		return -EBUSY;
+		DRM_OS_RETURN(EBUSY);
 	}
 	dev->irq = irq;
 	up( &dev->struct_sem );
@@ -560,7 +560,7 @@ int DRM(irq_uninstall)( drm_device_t *dev )
 	up( &dev->struct_sem );
 
 	if ( !irq )
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 
 	DRM_DEBUG( "%s: irq=%d\n", __FUNCTION__, irq );
 
@@ -579,7 +579,7 @@ int DRM(control)( struct inode *inode, struct file *filp,
 	drm_control_t ctl;
 
 	if ( copy_from_user( &ctl, (drm_control_t *)arg, sizeof(ctl) ) )
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 
 	switch ( ctl.func ) {
 	case DRM_INST_HANDLER:
@@ -587,7 +587,7 @@ int DRM(control)( struct inode *inode, struct file *filp,
 	case DRM_UNINST_HANDLER:
 		return DRM(irq_uninstall)( dev );
 	default:
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 	}
 }
 

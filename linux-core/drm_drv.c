@@ -584,8 +584,7 @@ module_init( drm_init );
 module_exit( drm_cleanup );
 
 
-int DRM(version)( struct inode *inode, struct file *filp,
-		  unsigned int cmd, unsigned long arg )
+int DRM(version)( DRM_OS_IOCTL )
 {
 	drm_version_t version;
 	int len;
@@ -645,8 +644,7 @@ int DRM(open)( struct inode *inode, struct file *filp )
 
 int DRM(release)( struct inode *inode, struct file *filp )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev;
+	DRM_OS_DEVICE;
 	int retcode = 0;
 
 	lock_kernel();
@@ -775,11 +773,9 @@ int DRM(release)( struct inode *inode, struct file *filp )
 
 /* DRM(ioctl) is called whenever a process performs an ioctl on /dev/drm.
  */
-int DRM(ioctl)( struct inode *inode, struct file *filp,
-		unsigned int cmd, unsigned long arg )
+int DRM(ioctl)( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_ioctl_desc_t *ioctl;
 	drm_ioctl_t *func;
 	int nr = DRM_IOCTL_NR(cmd);
@@ -813,11 +809,9 @@ int DRM(ioctl)( struct inode *inode, struct file *filp,
 	return retcode;
 }
 
-int DRM(lock)( struct inode *inode, struct file *filp,
-	       unsigned int cmd, unsigned long arg )
+int DRM(lock)( DRM_OS_IOCTL )
 {
-        drm_file_t *priv = filp->private_data;
-        drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
         DECLARE_WAITQUEUE( entry, current );
         drm_lock_t lock;
         int ret = 0;
@@ -919,11 +913,9 @@ int DRM(lock)( struct inode *inode, struct file *filp,
 }
 
 
-int DRM(unlock)( struct inode *inode, struct file *filp,
-		 unsigned int cmd, unsigned long arg )
+int DRM(unlock)( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_lock_t lock;
 
 	if ( copy_from_user( &lock, (drm_lock_t *)arg, sizeof(lock) ) )

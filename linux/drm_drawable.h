@@ -32,8 +32,7 @@
 #define __NO_VERSION__
 #include "drmP.h"
 
-int DRM(adddraw)(struct inode *inode, struct file *filp,
-		 unsigned int cmd, unsigned long arg)
+int DRM(adddraw)( DRM_OS_IOCTL )
 {
 	drm_draw_t draw;
 
@@ -44,8 +43,7 @@ int DRM(adddraw)(struct inode *inode, struct file *filp,
 	return 0;
 }
 
-int DRM(rmdraw)(struct inode *inode, struct file *filp,
-		unsigned int cmd, unsigned long arg)
+int DRM(rmdraw)( DRM_OS_IOCTL )
 {
 	return 0;		/* NOOP */
 }

@@ -172,5 +172,5 @@ int DRM(authmagic)(DRM_OS_IOCTL)
 		DRM(remove_magic)(dev, auth.magic);
 		return 0;
 	}
-	return -EINVAL;
+	DRM_OS_RETURN(EINVAL);
 }

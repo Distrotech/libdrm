@@ -45,43 +45,43 @@ typedef u_int32_t cycles_t;
 typedef u_int32_t spinlock_t;
 #define atomic_set(p, v)	(*(p) = (v))
 #define atomic_read(p)		(*(p))
-#define atomic_inc(p)		atomic_add_int(p, 1)
-#define atomic_dec(p)		atomic_subtract_int(p, 1)
-#define atomic_add(n, p)	atomic_add_int(p, n)
-#define atomic_sub(n, p)	atomic_subtract_int(p, n)
+#define atomic_inc(p)		atomic_add_long(p, 1)
+#define atomic_dec(p)		atomic_subtract_long(p, 1)
+#define atomic_add(n, p)	atomic_add_long(p, n)
+#define atomic_sub(n, p)	atomic_subtract_long(p, n)
 
 /* Fake this */
-static __inline u_int32_t
-test_and_set_bit(int b, volatile u_int32_t *p)
+static __inline unsigned long
+test_and_set_bit(int b, volatile unsigned long *p)
 {
 	int s = splhigh();
-	u_int32_t m = 1<<b;
-	u_int32_t r = *p & m;
+	unsigned long m = 1<<b;
+	unsigned long r = *p & m;
 	*p |= m;
 	splx(s);
 	return r;
 }
 
 static __inline void
-clear_bit(int b, volatile u_int32_t *p)
+clear_bit(int b, volatile unsigned long *p)
 {
-    atomic_clear_int(p + (b >> 5), 1 << (b & 0x1f));
+    atomic_clear_long(p + (b >> 5), 1 << (b & 0x1f));
 }
 
 static __inline void
-set_bit(int b, volatile u_int32_t *p)
+set_bit(int b, volatile unsigned long *p)
 {
-    atomic_set_int(p + (b >> 5), 1 << (b & 0x1f));
+    atomic_set_long(p + (b >> 5), 1 << (b & 0x1f));
 }
 
 static __inline int
-test_bit(int b, volatile u_int32_t *p)
+test_bit(int b, volatile unsigned long *p)
 {
     return p[b >> 5] & (1 << (b & 0x1f));
 }
 
 static __inline int
-find_first_zero_bit(volatile u_int32_t *p, int max)
+find_first_zero_bit(volatile unsigned long *p, int max)
 {
     int b;
 
@@ -128,8 +128,6 @@ find_first_zero_bit(volatile u_int32_t *p, int max)
 
 /* Redefinitions to make templating easy */
 #define wait_queue_head_t	int
-#define cycles_t		struct timespec
-
 
 				/* Macros to make printf easier */
 #define DRM_ERROR(fmt, arg...) \
