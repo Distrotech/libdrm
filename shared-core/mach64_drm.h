@@ -153,15 +153,26 @@ typedef struct drm_mach64_sarea {
 /* Mach64 specific ioctls 
  * The device specific ioctl range is 0x40 to 0x79.
  */
-#define DRM_IOCTL_MACH64_INIT           DRM_IOW( 0x40, drm_mach64_init_t)
-#define DRM_IOCTL_MACH64_IDLE           DRM_IO(  0x41)
-#define DRM_IOCTL_MACH64_RESET          DRM_IO(  0x42)
-#define DRM_IOCTL_MACH64_SWAP           DRM_IO(  0x43)
-#define DRM_IOCTL_MACH64_CLEAR          DRM_IOW( 0x44, drm_mach64_clear_t)
-#define DRM_IOCTL_MACH64_VERTEX         DRM_IOW( 0x45, drm_mach64_vertex_t)
-#define DRM_IOCTL_MACH64_BLIT           DRM_IOW( 0x46, drm_mach64_blit_t)
-#define DRM_IOCTL_MACH64_FLUSH          DRM_IO(  0x47)
-#define DRM_IOCTL_MACH64_GETPARAM       DRM_IOWR(0x48, drm_mach64_getparam_t)
+
+#define DRM_MACH64_INIT           0x00
+#define DRM_MACH64_IDLE           0x01
+#define DRM_MACH64_RESET          0x02
+#define DRM_MACH64_SWAP           0x03
+#define DRM_MACH64_CLEAR          0x04
+#define DRM_MACH64_VERTEX         0x05
+#define DRM_MACH64_BLIT           0x06
+#define DRM_MACH64_FLUSH          0x07
+#define DRM_MACH64_GETPARAM       0x08
+
+#define DRM_IOCTL_MACH64_INIT           DRM_IOW( DRM_COMMAND_BASE + DRM_MACH64_INIT, drm_mach64_init_t)
+#define DRM_IOCTL_MACH64_IDLE           DRM_IO(  DRM_COMMAND_BASE + DRM_MACH64_IDLE )
+#define DRM_IOCTL_MACH64_RESET          DRM_IO(  DRM_COMMAND_BASE + DRM_MACH64_RESET )
+#define DRM_IOCTL_MACH64_SWAP           DRM_IO(  DRM_COMMAND_BASE + DRM_MACH64_SWAP )
+#define DRM_IOCTL_MACH64_CLEAR          DRM_IOW( DRM_COMMAND_BASE + DRM_MACH64_CLEAR, drm_mach64_clear_t)
+#define DRM_IOCTL_MACH64_VERTEX         DRM_IOW( DRM_COMMAND_BASE + DRM_MACH64_VERTEX, drm_mach64_vertex_t)
+#define DRM_IOCTL_MACH64_BLIT           DRM_IOW( DRM_COMMAND_BASE + DRM_MACH64_BLIT, drm_mach64_blit_t)
+#define DRM_IOCTL_MACH64_FLUSH          DRM_IO(  DRM_COMMAND_BASE + DRM_MACH64_FLUSH )
+#define DRM_IOCTL_MACH64_GETPARAM       DRM_IOWR( DRM_COMMAND_BASE + DRM_MACH64_GETPARAM, drm_mach64_getparam_t)
 
 /* Buffer flags for clears
  */
@@ -241,7 +252,7 @@ typedef struct drm_mach64_getparam {
 		MACH64_PARAM_FRAMES_QUEUED = 0x01,
 		MACH64_PARAM_IRQ_NR = 0x02
 	} param;
-	int *value;
+	void *value;
 } drm_mach64_getparam_t;
 
 #endif
