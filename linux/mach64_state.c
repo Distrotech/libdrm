@@ -322,6 +322,9 @@ static int mach64_dma_dispatch_swap( drm_device_t *dev )
 		break;
 	}
 
+	if ( !nbox ) 
+		return 0;
+
 	DMAGETPTR( dev_priv, 13 + nbox * 4 ); /* returns on failure to get buffer */
 
 	DMAOUTREG( MACH64_Z_CNTL, 0 );
