@@ -261,6 +261,10 @@ extern int mach64_dma_swap( struct inode *inode, struct file *filp,
 #define MACH64_GUI_CMDFIFO_DEBUG		0x0170
 #define MACH64_GUI_CMDFIFO_DATA			0x0174
 #define MACH64_GUI_CNTL				0x0178
+#       define MACH64_CMDFIFO_SIZE_MASK                 0x00000003ul
+#       define MACH64_CMDFIFO_SIZE_192                  0x00000000ul
+#       define MACH64_CMDFIFO_SIZE_128                  0x00000001ul
+#       define MACH64_CMDFIFO_SIZE_64                   0x00000002ul
 #define MACH64_GUI_STAT				0x0738
 #	define MACH64_GUI_ACTIVE			(1 << 0)
 #define MACH64_GUI_TRAJ_CNTL			0x0730

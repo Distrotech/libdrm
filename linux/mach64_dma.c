@@ -161,7 +161,6 @@ static void dump_engine_info( drm_mach64_private_t *dev_priv )
 	DRM_INFO( "\n" );
 	DRM_INFO( "             Z_CNTL = 0x%08x\n", MACH64_READ( MACH64_Z_CNTL ) );
 	DRM_INFO( "        Z_OFF_PITCH = 0x%08x\n", MACH64_READ( MACH64_Z_OFF_PITCH ) );
-	DRM_INFO( "        MACH64_PAT_REG0 = 0x%08x\n", MACH64_READ( MACH64_PAT_REG0 ) );
 	DRM_INFO( "\n" );
 }
 
@@ -169,45 +168,47 @@ static void dump_engine_info( drm_mach64_private_t *dev_priv )
 static void bm_dma_test(drm_mach64_private_t *dev_priv)
 {
 	struct pci_pool *pool;
+	dma_addr_t table_handle, data_handle;
 	u32 table_addr, data_addr;
 	u32 *table, *data;
 
 	void *cpu_addr_table, *cpu_addr_data;
 	int i;
-	u32 bus_cntl, src_cntl, gui_cntl, tmp;
 
 	DRM_INFO( "Creating pool ... \n");
 	pool = pci_pool_create( "mach64", NULL, 0x4000,
 				0x4000, 0x4000, SLAB_ATOMIC );
 
+	if (!pool) {
+		DRM_INFO( "pci_pool_create failed!\n" );
+		return;
+	}
+
 	DRM_INFO( "Allocating table memory ...\n" );
-	cpu_addr_table = pci_pool_alloc( pool, SLAB_ATOMIC, &table_addr );
-	if (!cpu_addr_table) {
+	cpu_addr_table = pci_pool_alloc( pool, SLAB_ATOMIC, &table_handle );
+	if (!cpu_addr_table || !table_handle) {
 		DRM_INFO( "table-memory allocation failed!\n" );
 		return;
 	} else {
 		table = (u32 *) cpu_addr_table;
+		table_addr = (u32) table_handle;
 		memset( cpu_addr_table, 0x0, 0x4000 );
 	}
 
 	DRM_INFO( "Allocating data memory ...\n" );
-	cpu_addr_data = pci_pool_alloc( pool, SLAB_ATOMIC, &data_addr );
-	if (!cpu_addr_data) {
+	cpu_addr_data = pci_pool_alloc( pool, SLAB_ATOMIC, &data_handle );
+	if (!cpu_addr_data || !data_handle) {
 		DRM_INFO( "data-memory allocation failed!\n" );
 		return;
 	} else {
 		data = (u32 *) cpu_addr_data;
+		data_addr = (u32) data_handle;
 	}
 
 	MACH64_WRITE( MACH64_SRC_CNTL, 0x00000000 );
 	MACH64_WRITE( MACH64_PAT_REG0, 0x11111111 );
-	
-	gui_cntl = MACH64_READ( MACH64_GUI_CNTL );
-	gui_cntl= ( gui_cntl | 0x00000001 );
-	MACH64_WRITE( MACH64_GUI_CNTL, gui_cntl );
-	tmp = MACH64_READ( MACH64_GUI_STAT );
 
-	DRM_INFO( "(Before DMA Transfer) PATH_REG0 = 0x%08x\n",
+	DRM_INFO( "(Before DMA Transfer) PAT_REG0 = 0x%08x\n",
 		  MACH64_READ( MACH64_PAT_REG0 ) );
 
 	data[0] = 0x000000a0;
@@ -240,8 +241,8 @@ static void bm_dma_test(drm_mach64_private_t *dev_priv)
 	mach64_do_wait_for_idle( dev_priv );
 	DRM_INFO( "waiting for idle... done.\n" );
 
-	DRM_INFO( "BUS_CNTL = 0x%08x\n", bus_cntl );
-	DRM_INFO( "SRC_CNTL = 0x%08x\n", src_cntl );
+	DRM_INFO( "BUS_CNTL = 0x%08x\n", MACH64_READ( MACH64_BUS_CNTL ) );
+	DRM_INFO( "SRC_CNTL = 0x%08x\n", MACH64_READ( MACH64_SRC_CNTL ) );
 	DRM_INFO( "\n" );
 	DRM_INFO( "data  = 0x%08x\n", data_addr );
 	DRM_INFO( "table = 0x%08x\n", table_addr );
@@ -262,16 +263,17 @@ static void bm_dma_test(drm_mach64_private_t *dev_priv)
 
 	DRM_INFO( "waiting for idle [locked_after_dma??]...\n" );
 	if ((i=mach64_do_wait_for_idle( dev_priv ))) {
-		DRM_INFO( "resetting engine ... (result=%d)\n", i );
+		DRM_INFO( "mach64_do_wait_for_idle failed (result=%d)\n", i);
+		DRM_INFO( "resetting engine ...");
 		mach64_do_engine_reset( dev_priv );
 	}
 
-	DRM_INFO( "(Before DMA Transfer) PATH_REG0 = 0x%08x\n",
+	DRM_INFO( "(After DMA Transfer) PAT_REG0 = 0x%08x\n",
 		  MACH64_READ( MACH64_PAT_REG0 ) );
 
 	DRM_INFO( "freeing memory.\n" );
-	pci_pool_free( pool, cpu_addr_table, table_addr );
-	pci_pool_free( pool, cpu_addr_data, data_addr );
+	pci_pool_free( pool, cpu_addr_table, table_handle );
+	pci_pool_free( pool, cpu_addr_data, data_handle );
 	pci_pool_destroy( pool );
 	DRM_INFO( "returning ...\n" );
 }
@@ -363,16 +365,21 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 
 	DRM_INFO( "init->fb = 0x%08x\n", init->fb_offset );
 	DRM_INFO( "init->mmio_offset = 0x%08x\n", init->mmio_offset );
-	DRM_INFO( "mmio->offset=0x%08X mmio->handle=0x%08X\n",
-		  dev_priv->mmio->offset, dev_priv->mmio->handle );
+	DRM_INFO( "mmio->offset=0x%08lx mmio->handle=0x%08lx\n",
+		  dev_priv->mmio->offset, (unsigned long) dev_priv->mmio->handle );
+	DRM_INFO( "buffers->offset=0x%08lx buffers->handle=0x%08lx\n",
+		  dev_priv->buffers->offset, (unsigned long) dev_priv->buffers->handle );
 
 
 	tmp = MACH64_READ( MACH64_BUS_CNTL );
 	tmp = ( tmp | 0x08000000 ) & ~MACH64_BUS_MASTER_DIS;
 	MACH64_WRITE( MACH64_BUS_CNTL, tmp );
-	
-	MACH64_WRITE( MACH64_GUI_CNTL, 0 );
-	tmp = MACH64_READ( MACH64_GUI_STAT );
+
+	tmp = MACH64_READ( MACH64_GUI_CNTL );
+	MACH64_WRITE( MACH64_GUI_CNTL, ( ( tmp & ~MACH64_CMDFIFO_SIZE_MASK ) \
+					 | MACH64_CMDFIFO_SIZE_128 ) );
+	DRM_INFO( "GUI_STAT=0x%08x\n", MACH64_READ( MACH64_GUI_STAT ) );
+	DRM_INFO( "GUI_CNTL=0x%08x\n", MACH64_READ( MACH64_GUI_CNTL ) );
 
 	bm_dma_test( dev_priv );
 	return 0;
