@@ -317,9 +317,9 @@ static int r128_do_engine_reset( drm_device_t *dev )
 	return 0;
 }
 
-static void r128_cce_init_ring_buffer( drm_device_t *dev )
+static void r128_cce_init_ring_buffer( drm_device_t *dev,
+				       drm_r128_private_t *dev_priv )
 {
-	drm_r128_private_t *dev_priv = dev->dev_private;
 	u32 ring_start;
 	u32 tmp;
 
@@ -356,6 +356,13 @@ static void r128_cce_init_ring_buffer( drm_device_t *dev )
 		tmp_ofs = dev_priv->ring_rptr->offset - dev->sg->handle;
 		page_ofs = tmp_ofs >> PAGE_SHIFT;
 
+#if defined(__alpha__) && (LINUX_VERSION_CODE >= 0x020400)
+		R128_WRITE( R128_PM4_BUFFER_DL_RPTR_ADDR,
+     			    entry->busaddr[page_ofs]);
+		DRM_DEBUG( "ring rptr: offset=0x%08x handle=0x%08lx\n",
+			   entry->busaddr[page_ofs],
+     			   entry->handle + tmp_ofs );
+#else
 		R128_WRITE( R128_PM4_BUFFER_DL_RPTR_ADDR,
 			    DRM_OS_VTOPHYS( entry->pagelist[page_ofs]->virtual ) );
 
@@ -395,17 +402,15 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 	dev_priv = DRM(alloc)( sizeof(drm_r128_private_t), DRM_MEM_DRIVER );
 	if ( dev_priv == NULL )
 		DRM_OS_RETURN( ENOMEM );
-	dev->dev_private = (void *)dev_priv;
 
 	memset( dev_priv, 0, sizeof(drm_r128_private_t) );
 
 	dev_priv->is_pci = init->is_pci;
 
 	if ( dev_priv->is_pci && !dev->sg ) {
-		DRM_DEBUG( "PCI GART memory not allocated!\n" );
 		DRM_ERROR( "PCI GART memory not allocated!\n" );
-		DRM(free)( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
-		dev->dev_private = NULL;
+		dev->dev_private = (void *)dev_priv;
+		r128_do_cleanup_cce( dev );
 		DRM_OS_RETURN( EINVAL );
 	}
 
@@ -413,8 +418,8 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 	if ( dev_priv->usec_timeout < 1 ||
 	     dev_priv->usec_timeout > R128_MAX_USEC_TIMEOUT ) {
 		DRM_DEBUG( "TIMEOUT problem!\n" );
-		DRM(free)( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
-		dev->dev_private = NULL;
+		dev->dev_private = (void *)dev_priv;
+		r128_do_cleanup_cce( dev );
 		DRM_OS_RETURN( EINVAL );
 	}
 
@@ -433,8 +438,8 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 	     ( init->cce_mode != R128_PM4_64BM_128INDBM ) &&
 	     ( init->cce_mode != R128_PM4_64BM_64VCBM_64INDBM ) ) {
 		DRM_DEBUG( "Bad cce_mode!\n" );
-		DRM(free)( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
-		dev->dev_private = NULL;
+		dev->dev_private = (void *)dev_priv;
+		r128_do_cleanup_cce( dev );
 		DRM_OS_RETURN( EINVAL );
 	}
 
@@ -519,15 +524,58 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 	}
 #endif
 
+	if(!dev_priv->sarea) {
+		DRM_ERROR("could not find sarea!\n");
+		dev->dev_private = (void *)dev_priv;
+		r128_do_cleanup_cce( dev );
+		DRM_OS_RETURN(EINVAL);
+	}
+
 	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
+	if(!dev_priv->fb) {
+		DRM_ERROR("could not find framebuffer!\n");
+		dev->dev_private = (void *)dev_priv;
+		r128_do_cleanup_cce( dev );
+		DRM_OS_RETURN(EINVAL);
+	}
 	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
+	if(!dev_priv->mmio) {
+		DRM_ERROR("could not find mmio region!\n");
+		dev->dev_private = (void *)dev_priv;
+		r128_do_cleanup_cce( dev );
+		DRM_OS_RETURN(EINVAL);
+	}
 	DRM_FIND_MAP( dev_priv->cce_ring, init->ring_offset );
+	if(!dev_priv->cce_ring) {
+		DRM_ERROR("could not find cce ring region!\n");
+		dev->dev_private = (void *)dev_priv;
+		r128_do_cleanup_cce( dev );
+		DRM_OS_RETURN(EINVAL);
+	}
 	DRM_FIND_MAP( dev_priv->ring_rptr, init->ring_rptr_offset );
+	if(!dev_priv->ring_rptr) {
+		DRM_ERROR("could not find ring read pointer!\n");
+		dev->dev_private = (void *)dev_priv;
+		r128_do_cleanup_cce( dev );
+		DRM_OS_RETURN(EINVAL);
+	}
 	DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
+	if(!dev_priv->buffers) {
+		DRM_ERROR("could not find dma buffer region!\n");
+		dev->dev_private = (void *)dev_priv;
+		r128_do_cleanup_cce( dev );
+		DRM_OS_RETURN(EINVAL);
+	}
 
 	if ( !dev_priv->is_pci ) {
 		DRM_FIND_MAP( dev_priv->agp_textures,
 			      init->agp_textures_offset );
+		if(!dev_priv->agp_textures) {
+			DRM_ERROR("could not find agp texture region!\n");
+			dev->dev_private = (void *)dev_priv;
+			r128_do_cleanup_cce( dev );
+			DRM_OS_RETURN(EINVAL);
+		}
 	}
 
 	dev_priv->sarea_priv =
@@ -538,6 +586,14 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 		DRM_IOREMAP( dev_priv->cce_ring );
 		DRM_IOREMAP( dev_priv->ring_rptr );
 		DRM_IOREMAP( dev_priv->buffers );
+		if(!dev_priv->cce_ring->handle ||
+		   !dev_priv->ring_rptr->handle ||
+		   !dev_priv->buffers->handle) {
+			DRM_ERROR("Could not ioremap agp regions!\n");
+			dev->dev_private = (void *)dev_priv;
+			r128_do_cleanup_cce( dev );
+			DRM_OS_RETURN(ENOMEM);
+		}
 	} else {
 		dev_priv->cce_ring->handle =
 			(void *)dev_priv->cce_ring->offset;
@@ -576,22 +632,22 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 
 #if __REALLY_HAVE_SG
 	if ( dev_priv->is_pci ) {
-		dev_priv->phys_pci_gart = DRM(ati_pcigart_init)( dev );
-		if ( !dev_priv->phys_pci_gart ) {
-			DRM_DEBUG( "failed to init PCI GART!\n" );
+		if (!DRM(ati_pcigart_init)( dev, &dev_priv->phys_pci_gart,
+     					    &dev_priv->bus_pci_gart) ) {
 			DRM_ERROR( "failed to init PCI GART!\n" );
-			DRM(free)( dev_priv, sizeof(*dev_priv),
-				   DRM_MEM_DRIVER );
-			dev->dev_private = NULL;
-			DRM_OS_RETURN( EINVAL );
+			dev->dev_private = (void *)dev_priv;
+			r128_do_cleanup_cce( dev );
+			DRM_OS_RETURN(ENOMEM);
 		}
-		R128_WRITE( R128_PCI_GART_PAGE,
-			    virt_to_bus( (void *)dev_priv->phys_pci_gart ) );
+		R128_WRITE( R128_PCI_GART_PAGE, dev_priv->bus_pci_gart );
 	}
 #endif
 
-	r128_cce_init_ring_buffer( dev );
+	r128_cce_init_ring_buffer( dev, dev_priv );
 	r128_cce_load_microcode( dev_priv );
+
+	dev->dev_private = (void *)dev_priv;
+
 	r128_do_engine_reset( dev );
 
 	return 0;
@@ -606,6 +662,11 @@ int r128_do_cleanup_cce( drm_device_t *dev )
 			DRM_IOREMAPFREE( dev_priv->cce_ring );
 			DRM_IOREMAPFREE( dev_priv->ring_rptr );
 			DRM_IOREMAPFREE( dev_priv->buffers );
+		} else {
+			if (!DRM(ati_pcigart_cleanup)( dev,
+						dev_priv->phys_pci_gart,
+						dev_priv->bus_pci_gart ))
+				DRM_ERROR( "failed to cleanup PCI GART!\n" );
 		}
 
 		DRM(free)( dev->dev_private, sizeof(drm_r128_private_t),

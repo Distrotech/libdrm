@@ -171,7 +171,7 @@ int i810_mmap_buffers(struct file *filp, struct vm_area_struct *vma)
 	if (remap_page_range(vma->vm_start,
 			     VM_OFFSET(vma),
 			     vma->vm_end - vma->vm_start,
-			     vma->vm_page_prot)) return -EAGAIN;
+			     vma->vm_page_prot)) DRM_OS_RETURN(EAGAIN);
 	return 0;
 }
 
@@ -183,7 +183,7 @@ static int i810_map_buffer(drm_buf_t *buf, struct file *filp)
    	struct file_operations *old_fops;
 	int retcode = 0;
 
-	if(buf_priv->currently_mapped == I810_BUF_MAPPED) return -EINVAL;
+	if(buf_priv->currently_mapped == I810_BUF_MAPPED) DRM_OS_RETURN(EINVAL);
 
 	if(VM_DONTCOPY != 0) {
 #if LINUX_VERSION_CODE <= 0x020402
@@ -225,7 +225,7 @@ static int i810_unmap_buffer(drm_buf_t *buf)
 
 	if(VM_DONTCOPY != 0) {
 		if(buf_priv->currently_mapped != I810_BUF_MAPPED)
-			return -EINVAL;
+			DRM_OS_RETURN(EINVAL);
 #if LINUX_VERSION_CODE <= 0x020402
 		down( &current->mm->mmap_sem );
 #else
@@ -263,7 +263,7 @@ static int i810_dma_get_buffer(drm_device_t *dev, drm_i810_dma_t *d,
 	if (!buf) {
 		retcode = -ENOMEM;
 	   	DRM_DEBUG("retcode=%d\n", retcode);
-		return retcode;
+		DRM_OS_RETURN(retcode);
 	}
 
 	retcode = i810_map_buffer(buf, filp);
@@ -383,17 +383,16 @@ static void i810_kernel_lost_context(drm_device_t *dev)
      	if (ring->space < 0) ring->space += ring->Size;
 }
 
-static int i810_freelist_init(drm_device_t *dev)
+static int i810_freelist_init(drm_device_t *dev, drm_i810_private_t *dev_priv)
 {
       	drm_device_dma_t *dma = dev->dma;
-   	drm_i810_private_t *dev_priv = (drm_i810_private_t *)dev->dev_private;
    	int my_idx = 24;
    	u32 *hw_status = (u32 *)(dev_priv->hw_status_page + my_idx);
    	int i;
 
    	if(dma->buf_count > 1019) {
 	   	/* Not enough space in the status page for the freelist */
-	   	return -EINVAL;
+	   	DRM_OS_RETURN(EINVAL);
 	}
 
    	for (i = 0; i < dma->buf_count; i++) {
@@ -423,7 +422,6 @@ static int i810_dma_initialize(drm_device_t *dev,
 	drm_map_list_entry_t *listentry;
 #endif
 
-   	dev->dev_private = (void *) dev_priv;
    	memset(dev_priv, 0, sizeof(drm_i810_private_t));
 
 #ifdef __linux__
@@ -448,8 +446,27 @@ static int i810_dma_initialize(drm_device_t *dev,
 	}
 #endif
 	
+	if(!dev_priv->sarea_map) {
+		dev->dev_private = (void *)dev_priv;
+	   	i810_dma_cleanup(dev);
+	   	DRM_ERROR("can not find sarea!\n");
+	   	DRM_OS_RETURN(EINVAL);
+	}
+
 	DRM_FIND_MAP( dev_priv->mmio_map, init->mmio_offset );
+	if(!dev_priv->mmio_map) {
+		dev->dev_private = (void *)dev_priv;
+	   	i810_dma_cleanup(dev);
+	   	DRM_ERROR("can not find mmio map!\n");
+	   	DRM_OS_RETURN(EINVAL);
+	}
 	DRM_FIND_MAP( dev_priv->buffer_map, init->buffers_offset );
+	if(!dev_priv->buffer_map) {
+		dev->dev_private = (void *)dev_priv;
+	   	i810_dma_cleanup(dev);
+	   	DRM_ERROR("can not find dma buffer map!\n");
+	   	DRM_OS_RETURN(EINVAL);
+	}
 
 	dev_priv->sarea_priv = (drm_i810_sarea_t *)
 		((u8 *)dev_priv->sarea_map->handle +
@@ -466,14 +483,15 @@ static int i810_dma_initialize(drm_device_t *dev,
 						    init->ring_start,
 						    init->ring_size);
 
-   	dev_priv->ring.tail_mask = dev_priv->ring.Size - 1;
-
    	if (dev_priv->ring.virtual_start == NULL) {
+		dev->dev_private = (void *) dev_priv;
 	   	i810_dma_cleanup(dev);
 	   	DRM_ERROR("can not ioremap virtual address for"
 			  " ring buffer\n");
-	   	return -ENOMEM;
+	   	DRM_OS_RETURN(ENOMEM);
 	}
+
+   	dev_priv->ring.tail_mask = dev_priv->ring.Size - 1;
 
 	dev_priv->w = init->w;
 	dev_priv->h = init->h;
@@ -485,27 +503,30 @@ static int i810_dma_initialize(drm_device_t *dev,
 	dev_priv->back_di1 = init->back_offset | init->pitch_bits;
 	dev_priv->zi1 = init->depth_offset | init->pitch_bits;
 
-
    	/* Program Hardware Status Page */
    	dev_priv->hw_status_page = i810_alloc_page(dev);
-   	memset((void *) dev_priv->hw_status_page, 0, PAGE_SIZE);
    	if(dev_priv->hw_status_page == 0UL) {
+		dev->dev_private = (void *)dev_priv;
 		i810_dma_cleanup(dev);
 		DRM_ERROR("Can not allocate hardware status page\n");
-		return -ENOMEM;
+		DRM_OS_RETURN(ENOMEM);
 	}
+   	memset((void *) dev_priv->hw_status_page, 0, PAGE_SIZE);
    	DRM_DEBUG("hw status page @ %lx\n", dev_priv->hw_status_page);
 
    	I810_WRITE(0x02080, virt_to_bus((void *)dev_priv->hw_status_page));
    	DRM_DEBUG("Enabled hardware status page\n");
 
    	/* Now we need to init our freelist */
-   	if(i810_freelist_init(dev) != 0) {
+   	if(i810_freelist_init(dev, dev_priv) != 0) {
+		dev->dev_private = (void *)dev_priv;
 	   	i810_dma_cleanup(dev);
 	   	DRM_ERROR("Not enough space in the status page for"
 			  " the freelist\n");
-	   	return -ENOMEM;
+	   	DRM_OS_RETURN(ENOMEM);
 	}
+	dev->dev_private = (void *)dev_priv;
+
    	return 0;
 }
 
@@ -522,7 +543,7 @@ int i810_dma_init( DRM_OS_IOCTL )
 	 	case I810_INIT_DMA:
 	   		dev_priv = DRM(alloc)(sizeof(drm_i810_private_t),
 					     DRM_MEM_DRIVER);
-	   		if(dev_priv == NULL) return -ENOMEM;
+	   		if(dev_priv == NULL) DRM_OS_RETURN(ENOMEM);
 	   		retcode = i810_dma_initialize(dev, dev_priv, &init);
 	   	break;
 	 	case I810_CLEANUP_DMA:
@@ -533,7 +554,7 @@ int i810_dma_init( DRM_OS_IOCTL )
 	   	break;
 	}
 
-   	return retcode;
+   	DRM_OS_RETURN(retcode);
 }
 
 
@@ -1107,7 +1128,7 @@ int i810_dma_vertex( DRM_OS_IOCTL )
 	DRM_DEBUG("i810 dma vertex, idx %d used %d discard %d\n",
 		  vertex.idx, vertex.used, vertex.discard);
 
-	if(vertex.idx < 0 || vertex.idx > dma->buf_count) return -EINVAL;
+	if(vertex.idx < 0 || vertex.idx > dma->buf_count) DRM_OS_RETURN(EINVAL);
 
 	i810_dma_dispatch_vertex( dev,
 				  dma->buflist[ vertex.idx ],
@@ -1137,7 +1158,7 @@ int i810_clear_bufs( DRM_OS_IOCTL )
 
  	/* GH: Someone's doing nasty things... */
  	if (!dev->dev_private) {
- 		return -EINVAL;
+ 		DRM_OS_RETURN(EINVAL);
  	}
 
 	i810_dma_dispatch_clear( dev, clear.flags,
@@ -1201,7 +1222,7 @@ int i810_getbuf( DRM_OS_IOCTL )
 	DRM_OS_KRNTOUSR( (drm_dma_t *) data, d, sizeof(d) );
    	sarea_priv->last_dispatch = (int) hw_status[5];
 
-	return retcode;
+	DRM_OS_RETURN(retcode);
 }
 
 int i810_copybuf( DRM_OS_IOCTL )
@@ -1226,7 +1247,7 @@ int i810_copybuf( DRM_OS_IOCTL )
         if(d.idx < 0 || d.idx > dma->buf_count) DRM_OS_RETURN(EINVAL);
 	buf = dma->buflist[ d.idx ];
    	buf_priv = buf->dev_private;
-	if (buf_priv->currently_mapped != I810_BUF_MAPPED) return -EPERM;
+	if (buf_priv->currently_mapped != I810_BUF_MAPPED) DRM_OS_RETURN(EPERM);
 	if(d.used < 0 || d.used > buf->total) DRM_OS_RETURN(EINVAL);
 
    	if (DRM_OS_COPYFROMUSR(buf_priv->virtual, d.address, d.used))
