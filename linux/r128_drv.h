@@ -40,7 +40,7 @@
 #define le32_to_cpu(x) ntohl(x)
 #define cpu_to_le32(x) htonl(x)
 #endif
-#endif
+#endif /* __FreeBSD__ */
 
 #ifndef __R128_DRV_H__
 #define __R128_DRV_H__
