@@ -34,10 +34,17 @@
 
 #define DRM_OS_LOCK	lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, curproc)
 #define DRM_OS_UNLOCK 	lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc)
+#define DRM_OS_SPINLOCK(l)	simple_lock(l)
+#define DRM_OS_SPINUNLOCK(u)	simple_unlock(u);
 #define DRM_OS_IOCTL	dev_t kdev, u_long cmd, caddr_t data, int flags, struct proc *p
 #define DRM_OS_DEVICE	drm_file_t	*priv; \
 			drm_device_t	*dev	= kdev->si_drv1
 #define DRM_OS_RETURN(v)	return v;
+#define DRM_OS_CURRENTPID	p->p_pid
+#define DRM_OS_KRNTOUSR(arg1, arg2, arg3) \
+	*arg1 = arg2
+#define DRM_OS_KRNFROMUSR(arg1, arg2, arg3) \
+	arg1 = *arg2
 
 typedef u_int32_t atomic_t;
 typedef u_int32_t cycles_t;

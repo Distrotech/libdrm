@@ -93,10 +93,15 @@ int DRM(addmap)( DRM_OS_IOCTL )
 	if ( !map )
 		DRM_OS_RETURN(ENOMEM);
 
+#ifdef __linux__
 	if ( copy_from_user( &map, (drm_map_t *)data, sizeof(map) ) ) {
 		DRM(free)( map, sizeof(*map), DRM_MEM_MAPS );
 		DRM_OS_RETURN(EFAULT);
 	}
+#endif
+#ifdef __FreeBSD__
+	*map = *(drm_map_t *)data;
+#endif
 
 	/* Only allow shared memory to be removable since we only keep enough
 	 * book keeping information about shared memory to allow for removal
@@ -193,14 +198,24 @@ int DRM(addmap)( DRM_OS_IOCTL )
 #endif
 	DRM_OS_UNLOCK;
 
+#ifdef __linux__
 	if ( copy_to_user( (drm_map_t *)data, &map, sizeof(map) ) )
 		DRM_OS_RETURN(EFAULT);
+#endif
+#ifdef __FreeBSD__
+	*(drm_map_t *)data = *map;
+#endif
 
 	if ( map->type != _DRM_SHM ) {
-		if ( copy_to_user( &((drm_map_t *)arg)->handle,
+#ifdef __linux__
+		if ( copy_to_user( &((drm_map_t *)data)->handle,
 				   &map->offset,
 				   sizeof(map->offset) ) )
 			DRM_OS_RETURN(EFAULT);
+#endif
+#ifdef __FreeBSD__
+		((drm_map_t *)data)->handle = (void *)map;
+#endif
 	}
 	return 0;
 }
@@ -225,10 +240,7 @@ int DRM(rmmap)( DRM_OS_IOCTL )
 	drm_map_t request;
 	int found_maps = 0;
 
-	if (copy_from_user(&request, (drm_map_t *)arg,
-			   sizeof(request))) {
-		DRM_OS_RETURN(EFAULT);
-	}
+	DRM_OS_KRNFROMUSR( request, (drm_map_t *)data, sizeof(request) );
 
 	DRM_OS_LOCK;
 #ifdef __linux__
@@ -269,6 +281,7 @@ int DRM(rmmap)( DRM_OS_IOCTL )
 #endif
 	DRM(free)(list, sizeof(*list), DRM_MEM_MAPS);
 
+#ifdef __linux__
 	for (pt = dev->vmalist, prev = NULL; pt; prev = pt, pt = pt->next) {
 #if LINUX_VERSION_CODE >= 0x020300
 		if (pt->vma->vm_private_data == map) found_maps++;
@@ -276,6 +289,7 @@ int DRM(rmmap)( DRM_OS_IOCTL )
 		if (pt->vma->vm_pte == map) found_maps++;
 #endif
 	}
+#endif
 
 	if(!found_maps) {
 		switch (map->type) {
@@ -328,7 +342,7 @@ int DRM(addbufs_agp)( DRM_OS_IOCTL )
 
 	if ( !dma ) DRM_OS_RETURN(EINVAL);
 
-	if ( copy_from_user( &request, (drm_buf_desc_t *)arg,
+	if ( copy_from_user( &request, (drm_buf_desc_t *)data,
 			     sizeof(request) ) )
 		DRM_OS_RETURN(EFAULT);
 
@@ -450,8 +464,7 @@ int DRM(addbufs_agp)( DRM_OS_IOCTL )
 	request.count = entry->buf_count;
 	request.size = size;
 
-	if ( copy_to_user( (drm_buf_desc_t *)arg, &request, sizeof(request) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNTOUSR( (drm_buf_desc_t *)data, request, sizeof(request) );
 
 	dma->flags = _DRM_DMA_USE_AGP;
 
@@ -482,9 +495,7 @@ int DRM(addbufs_pci)( DRM_OS_IOCTL )
 
 	if ( !dma ) DRM_OS_RETURN(EINVAL);
 
-	if ( copy_from_user( &request, (drm_buf_desc_t *)arg,
-			     sizeof(request) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( request, (drm_buf_desc_t *)data, sizeof(request) );
 
 	count = request.count;
 	order = DRM(order)( request.size );
@@ -617,8 +628,7 @@ int DRM(addbufs_pci)( DRM_OS_IOCTL )
 	request.count = entry->buf_count;
 	request.size = size;
 
-	if ( copy_to_user( (drm_buf_desc_t *)arg, &request, sizeof(request) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNTOUSR( (drm_buf_desc_t *)data, request, sizeof(request) );
 
 	atomic_dec( &dev->buf_alloc );
 	return 0;
@@ -646,9 +656,7 @@ int DRM(addbufs_sg)( DRM_OS_IOCTL )
 
        if ( !dma ) DRM_OS_RETURN(EINVAL);
 
-       if ( copy_from_user( &request, (drm_buf_desc_t *)arg,
-                            sizeof(request) ) )
-               DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( request, (drm_buf_desc_t *)data, sizeof(request) );
 
        count = request.count;
        order = DRM(order)( request.size );
@@ -768,8 +776,7 @@ int DRM(addbufs_sg)( DRM_OS_IOCTL )
        request.count = entry->buf_count;
        request.size = size;
 
-       if ( copy_to_user( (drm_buf_desc_t *)arg, &request, sizeof(request) ) )
-               DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNTOUSR( (drm_buf_desc_t *)data, request, sizeof(request) );
 
        dma->flags = _DRM_DMA_USE_SG;
 
@@ -782,22 +789,20 @@ int DRM(addbufs)( DRM_OS_IOCTL )
 {
 	drm_buf_desc_t request;
 
-	if ( copy_from_user( &request, (drm_buf_desc_t *)arg,
-			     sizeof(request) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( request, (drm_buf_desc_t *)data, sizeof(request) );
 
 #if __REALLY_HAVE_AGP
 	if ( request.flags & _DRM_AGP_BUFFER )
-		return DRM(addbufs_agp)( inode, filp, cmd, arg );
+		return DRM(addbufs_agp)( inode, filp, cmd, data );
 	else
 #endif
 #if __HAVE_SG
 	if ( request.flags & _DRM_SG_BUFFER )
-		return DRM(addbufs_sg)( inode, filp, cmd, arg );
+		return DRM(addbufs_sg)( inode, filp, cmd, data );
 	else
 #endif
 #if __HAVE_PCI_DMA
-		return DRM(addbufs_pci)( inode, filp, cmd, arg );
+		return DRM(addbufs_pci)( inode, filp, cmd, data );
 #else
 		DRM_OS_RETURN(EINVAL);
 #endif
@@ -821,10 +826,7 @@ int DRM(infobufs)( DRM_OS_IOCTL )
 	++dev->buf_use;		/* Can't allocate more after this call */
 	spin_unlock( &dev->count_lock );
 
-	if ( copy_from_user( &request,
-			     (drm_buf_info_t *)arg,
-			     sizeof(request) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( request, (drm_buf_info_t *)data, sizeof(request) );
 
 	for ( i = 0, count = 0 ; i < DRM_MAX_ORDER + 1 ; i++ ) {
 		if ( dma->bufs[i].buf_count ) ++count;
@@ -864,10 +866,7 @@ int DRM(infobufs)( DRM_OS_IOCTL )
 	}
 	request.count = count;
 
-	if ( copy_to_user( (drm_buf_info_t *)arg,
-			   &request,
-			   sizeof(request) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNTOUSR( (drm_buf_info_t *)data, request, sizeof(request) );
 
 	return 0;
 }
@@ -882,10 +881,7 @@ int DRM(markbufs)( DRM_OS_IOCTL )
 
 	if ( !dma ) DRM_OS_RETURN(EINVAL);
 
-	if ( copy_from_user( &request,
-			     (drm_buf_desc_t *)arg,
-			     sizeof(request) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( request, (drm_buf_desc_t *)data, sizeof(request) );
 
 	DRM_DEBUG( "%d, %d, %d\n",
 		   request.size, request.low_mark, request.high_mark );
@@ -916,10 +912,7 @@ int DRM(freebufs)( DRM_OS_IOCTL )
 
 	if ( !dma ) DRM_OS_RETURN(EINVAL);
 
-	if ( copy_from_user( &request,
-			     (drm_buf_free_t *)arg,
-			     sizeof(request) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( request, (drm_buf_free_t *)data, sizeof(request) );
 
 	DRM_DEBUG( "%d\n", request.count );
 	for ( i = 0 ; i < request.count ; i++ ) {
@@ -965,9 +958,7 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 	dev->buf_use++;		/* Can't allocate more after this call */
 	spin_unlock( &dev->count_lock );
 
-	if ( copy_from_user( &request, (drm_buf_map_t *)arg,
-			     sizeof(request) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( request, (drm_buf_map_t *)data, sizeof(request) );
 
 	if ( request.count >= dma->buf_count ) {
 		if ( (__HAVE_AGP && (dma->flags & _DRM_DMA_USE_AGP)) ||
@@ -1057,8 +1048,7 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 	request.count = dma->buf_count;
 	DRM_DEBUG( "%d buffers, retcode = %d\n", request.count, retcode );
 
-	if ( copy_to_user( (drm_buf_map_t *)arg, &request, sizeof(request) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNTOUSR( (drm_buf_map_t *)data, request, sizeof(request) );
 
 	return retcode;
 }

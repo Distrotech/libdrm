@@ -140,10 +140,8 @@ int DRM(getsareactx)( DRM_OS_IOCTL )
 	drm_ctx_priv_map_t request;
 	drm_map_t *map;
 
-	if (copy_from_user(&request,
-			   (drm_ctx_priv_map_t *)arg,
-			   sizeof(request)))
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( request, (drm_ctx_priv_map_t *)data, 
+			   sizeof(request) );
 
 	DRM_OS_LOCK;
 	if ((int)request.ctx_id >= dev->max_context) {
@@ -155,8 +153,9 @@ int DRM(getsareactx)( DRM_OS_IOCTL )
 	DRM_OS_UNLOCK;
 
 	request.handle = map->handle;
-	if (copy_to_user((drm_ctx_priv_map_t *)arg, &request, sizeof(request)))
-		DRM_OS_RETURN(EFAULT);
+
+	DRM_OS_KRNTOUSR( (drm_ctx_priv_map_t *)data, request, sizeof(request) );
+
 	return 0;
 }
 
@@ -173,10 +172,8 @@ int DRM(setsareactx)( DRM_OS_IOCTL )
 	drm_map_list_entry_t *list;
 #endif
 
-	if (copy_from_user(&request,
-			   (drm_ctx_priv_map_t *)arg,
-			   sizeof(request)))
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( request, (drm_ctx_priv_map_t *)data,
+			   sizeof(request) );
 
 	DRM_OS_LOCK;
 #ifdef __linux__
@@ -283,8 +280,7 @@ int DRM(resctx)( DRM_OS_IOCTL )
 	drm_ctx_t ctx;
 	int i;
 
-	if ( copy_from_user( &res, (drm_ctx_res_t *)arg, sizeof(res) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( res, (drm_ctx_res_t *)data, sizeof(res) );
 
 	if ( res.count >= DRM_RESERVED_CONTEXTS ) {
 		memset( &ctx, 0, sizeof(ctx) );
@@ -297,8 +293,8 @@ int DRM(resctx)( DRM_OS_IOCTL )
 	}
 	res.count = DRM_RESERVED_CONTEXTS;
 
-	if ( copy_to_user( (drm_ctx_res_t *)arg, &res, sizeof(res) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNTOUSR( (drm_ctx_res_t *)data, res, sizeof(res) );
+
 	return 0;
 }
 
@@ -307,8 +303,7 @@ int DRM(addctx)( DRM_OS_IOCTL )
 	DRM_OS_DEVICE;
 	drm_ctx_t ctx;
 
-	if ( copy_from_user( &ctx, (drm_ctx_t *)arg, sizeof(ctx) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( ctx, (drm_ctx_t *)data, sizeof(ctx) );
 
 	ctx.handle = DRM(ctxbitmap_next)( dev );
 	if ( ctx.handle == DRM_KERNEL_CONTEXT ) {
@@ -322,8 +317,8 @@ int DRM(addctx)( DRM_OS_IOCTL )
 		DRM_OS_RETURN(ENOMEM);
 	}
 
-	if ( copy_to_user( (drm_ctx_t *)arg, &ctx, sizeof(ctx) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNTOUSR( (drm_ctx_t *)data, ctx, sizeof(ctx) );
+
 	return 0;
 }
 
@@ -337,14 +332,13 @@ int DRM(getctx)( DRM_OS_IOCTL )
 {
 	drm_ctx_t ctx;
 
-	if ( copy_from_user( &ctx, (drm_ctx_t*)arg, sizeof(ctx) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( ctx, (drm_ctx_t *)data, sizeof(ctx) );
 
 	/* This is 0, because we don't handle any context flags */
 	ctx.flags = 0;
 
-	if ( copy_to_user( (drm_ctx_t*)arg, &ctx, sizeof(ctx) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNTOUSR( (drm_ctx_t *)data, ctx, sizeof(ctx) );
+
 	return 0;
 }
 
@@ -353,8 +347,7 @@ int DRM(switchctx)( DRM_OS_IOCTL )
 	DRM_OS_DEVICE;
 	drm_ctx_t ctx;
 
-	if ( copy_from_user( &ctx, (drm_ctx_t *)arg, sizeof(ctx) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( ctx, (drm_ctx_t *)data, sizeof(ctx) );
 
 	DRM_DEBUG( "%d\n", ctx.handle );
 	return DRM(context_switch)( dev, dev->last_context, ctx.handle );
@@ -365,8 +358,7 @@ int DRM(newctx)( DRM_OS_IOCTL )
 	DRM_OS_DEVICE;
 	drm_ctx_t ctx;
 
-	if ( copy_from_user( &ctx, (drm_ctx_t *)arg, sizeof(ctx) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( ctx, (drm_ctx_t *)data, sizeof(ctx) );
 
 	DRM_DEBUG( "%d\n", ctx.handle );
 	DRM(context_switch_complete)( dev, ctx.handle );
@@ -379,13 +371,14 @@ int DRM(rmctx)( DRM_OS_IOCTL )
 	DRM_OS_DEVICE;
 	drm_ctx_t ctx;
 
-	if ( copy_from_user( &ctx, (drm_ctx_t *)arg, sizeof(ctx) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( ctx, (drm_ctx_t *)data, sizeof(ctx) );
 
 	DRM_DEBUG( "%d\n", ctx.handle );
+#ifdef __linux__
 	if ( ctx.handle == DRM_KERNEL_CONTEXT + 1 ) {
 		priv->remove_auth_on_close = 1;
 	}
+#endif
 	if ( ctx.handle != DRM_KERNEL_CONTEXT ) {
 		DRM(ctxbitmap_free)( dev, ctx.handle );
 	}
@@ -576,8 +569,9 @@ int DRM(resctx)( DRM_OS_IOCTL )
 	int		i;
 
 	DRM_DEBUG("%d\n", DRM_RESERVED_CONTEXTS);
-	if (copy_from_user(&res, (drm_ctx_res_t *)arg, sizeof(res)))
-		DRM_OS_RETURN(EFAULT);
+	
+	DRM_OS_KRNFROMUSR( res, (drm_ctx_res_t *)data, sizeof(res) );
+
 	if (res.count >= DRM_RESERVED_CONTEXTS) {
 		memset(&ctx, 0, sizeof(ctx));
 		for (i = 0; i < DRM_RESERVED_CONTEXTS; i++) {
@@ -589,8 +583,9 @@ int DRM(resctx)( DRM_OS_IOCTL )
 		}
 	}
 	res.count = DRM_RESERVED_CONTEXTS;
-	if (copy_to_user((drm_ctx_res_t *)arg, &res, sizeof(res)))
-		DRM_OS_RETURN(EFAULT);
+
+	DRM_OS_KRNTOUSR( (drm_ctx_res_t *)data, res, sizeof(res) );
+
 	return 0;
 }
 

@@ -38,8 +38,9 @@ int DRM(adddraw)( DRM_OS_IOCTL )
 
 	draw.handle = 0;	/* NOOP */
 	DRM_DEBUG("%d\n", draw.handle);
-	if (copy_to_user((drm_draw_t *)arg, &draw, sizeof(draw)))
-		return -EFAULT;
+	
+	DRM_OS_KRNTOUSR( (drm_draw_t *)data, draw, sizeof(draw) );
+
 	return 0;
 }
 

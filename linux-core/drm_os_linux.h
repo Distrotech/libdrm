@@ -259,10 +259,19 @@ do {									\
 
 #define DRM_OS_LOCK 	up(&dev->struct_sem)
 #define DRM_OS_UNLOCK 	down(&dev->struct_sem)
-#define DRM_OS_IOCTL	struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg
+#define DRM_OS_SPINLOCK(l)	spin_lock(l)
+#define DRM_OS_SPINUNLOCK(u)	spin_unlock(u)
+#define DRM_OS_IOCTL	struct inode *inode, struct file *filp, unsigned int cmd, unsigned long data
 #define DRM_OS_DEVICE	drm_file_t	*priv	= filp->private_data; \
 			drm_device_t	*dev	= priv->dev
 #define DRM_OS_RETURN(v)	return -v;
+#define DRM_OS_CURRENTPID	current->pid
+#define DRM_OS_KRNTOUSR(arg1, arg2, arg3) \
+	if ( copy_to_user(arg1, &arg2, arg3) ) \
+		return -EFAULT
+#define DRM_OS_KRNFROMUSR(arg1, arg2, arg3) \
+	if ( copy_from_user(&arg1, arg2, arg3) ) \
+		return -EFAULT
 
 /* Internal functions */
 

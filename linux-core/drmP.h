@@ -526,7 +526,13 @@ typedef struct drm_device {
 	char		  *buf_rp;	/* Read pointer			   */
 	char		  *buf_wp;	/* Write pointer		   */
 	char		  *buf_end;	/* End pointer			   */
+#ifdef __linux
 	struct fasync_struct *buf_async;/* Processes waiting for SIGIO	   */
+#endif
+#ifdef __FreeBSD__
+	struct sigio      *buf_sigio;	/* Processes waiting for SIGIO     */
+	struct selinfo    buf_sel;	/* Workspace for select/poll       */
+#endif
 	wait_queue_head_t buf_readers;	/* Processes waiting to read	   */
 	wait_queue_head_t buf_writers;	/* Processes waiting to ctx switch */
 

@@ -37,15 +37,16 @@ int DRM(irq_busid)( DRM_OS_IOCTL )
 	drm_irq_busid_t p;
 	struct pci_dev	*dev;
 
-	if (copy_from_user(&p, (drm_irq_busid_t *)arg, sizeof(p)))
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( p, (drm_irq_busid_t *)data, sizeof(p) );
+
 	dev = pci_find_slot(p.busnum, PCI_DEVFN(p.devnum, p.funcnum));
 	if (dev) p.irq = dev->irq;
 	else	 p.irq = 0;
 	DRM_DEBUG("%d:%d:%d => IRQ %d\n",
 		  p.busnum, p.devnum, p.funcnum, p.irq);
-	if (copy_to_user((drm_irq_busid_t *)arg, &p, sizeof(p)))
-		DRM_OS_RETURN(EFAULT);
+	
+	DRM_OS_KRNTOUSR( (drm_irq_busid_t *)data, p, sizeof(p) );
+
 	return 0;
 }
 
@@ -54,15 +55,16 @@ int DRM(getunique)( DRM_OS_IOCTL )
 	DRM_OS_DEVICE;
 	drm_unique_t	 u;
 
-	if (copy_from_user(&u, (drm_unique_t *)arg, sizeof(u)))
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( u, (drm_unique_t *)data, sizeof(u) );
+
 	if (u.unique_len >= dev->unique_len) {
 		if (copy_to_user(u.unique, dev->unique, dev->unique_len))
 			DRM_OS_RETURN(EFAULT);
 	}
 	u.unique_len = dev->unique_len;
-	if (copy_to_user((drm_unique_t *)arg, &u, sizeof(u)))
-		DRM_OS_RETURN(EFAULT);
+
+	DRM_OS_KRNTOUSR( (drm_unique_t *)data, u, sizeof(u) );
+
 	return 0;
 }
 
@@ -74,8 +76,7 @@ int DRM(setunique)( DRM_OS_IOCTL )
 	if (dev->unique_len || dev->unique)
 		DRM_OS_RETURN(EBUSY);
 
-	if (copy_from_user(&u, (drm_unique_t *)arg, sizeof(u)))
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( u, (drm_unique_t *)data, sizeof(u) );
 
 	if (!u.unique_len)
 		DRM_OS_RETURN(EINVAL);
@@ -124,8 +125,8 @@ int DRM(getmap)( DRM_OS_IOCTL )
 	int          idx;
 	int	     i;
 
-	if (copy_from_user(&map, (drm_map_t *)arg, sizeof(map)))
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( map, (drm_map_t *)data, sizeof(map) );
+
 	idx = map.offset;
 
 	DRM_OS_LOCK;
@@ -155,8 +156,8 @@ int DRM(getmap)( DRM_OS_IOCTL )
 	map.mtrr   = r_list->map->mtrr;
 	DRM_OS_UNLOCK;
 
-	if (copy_to_user((drm_map_t *)arg, &map, sizeof(map))) 
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNTOUSR( (drm_map_t *)data, map, sizeof(map) );
+
 	return 0;
 }
 
@@ -168,8 +169,8 @@ int DRM(getclient)( DRM_OS_IOCTL )
 	int          idx;
 	int          i;
 
-	if (copy_from_user(&client, (drm_client_t *)arg, sizeof(client)))
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( client, (drm_client_t *)data, sizeof(client) );
+
 	idx = client.idx;
 	DRM_OS_LOCK;
 	for (i = 0, pt = dev->file_first; i < idx && pt; i++, pt = pt->next)
@@ -186,8 +187,8 @@ int DRM(getclient)( DRM_OS_IOCTL )
 	client.iocs  = pt->ioctl_count;
 	DRM_OS_UNLOCK;
 
-	if (copy_to_user((drm_client_t *)arg, &client, sizeof(client)))
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNTOUSR( (drm_client_t *)data, client, sizeof(client) );
+
 	return 0;
 }
 
@@ -215,7 +216,7 @@ int DRM(getstats)( DRM_OS_IOCTL )
 
 	DRM_OS_UNLOCK;
 
-	if (copy_to_user((drm_stats_t *)arg, &stats, sizeof(stats)))
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNTOUSR( (drm_stats_t *)data, stats, sizeof(stats) );
+
 	return 0;
 }

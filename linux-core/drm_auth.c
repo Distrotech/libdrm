@@ -134,33 +134,19 @@ int DRM(getmagic)(DRM_OS_IOCTL)
 		auth.magic = priv->magic;
 	} else {
 		do {
-#ifdef __linux__
-			spin_lock(&lock);
-#endif
-#ifdef __FreeBSD__
-			simple_lock(&lock);
-#endif
+			DRM_OS_SPINLOCK(&lock);
 			if (!sequence) ++sequence; /* reserve 0 */
 			auth.magic = sequence++;
-#ifdef __linux__
-			spin_unlock(&lock);
-#endif
-#ifdef __FreeBSD__
-			simple_unlock(&lock);
-#endif
+			DRM_OS_SPINUNLOCK(&lock);
 		} while (DRM(find_file)(dev, auth.magic));
 		priv->magic = auth.magic;
 		DRM(add_magic)(dev, priv, auth.magic);
 	}
 
 	DRM_DEBUG("%u\n", auth.magic);
-#ifdef __linux__
-	if (copy_to_user((drm_auth_t *)arg, &auth, sizeof(auth)))
-		return -EFAULT;
-#endif
-#ifdef __FreeBSD__
-	*(drm_auth_t *) data = auth;
-#endif
+
+	DRM_OS_KRNTOUSR((drm_auth_t *)data, auth, sizeof(auth));
+
 	return 0;
 }
 
@@ -170,13 +156,7 @@ int DRM(authmagic)(DRM_OS_IOCTL)
 	drm_file_t	   *file;
 	DRM_OS_DEVICE;
 
-#ifdef __linux__
-	if (copy_from_user(&auth, (drm_auth_t *)arg, sizeof(auth)))
-		return -EFAULT;
-#endif
-#ifdef __FreeBSD__
-	auth = *(drm_auth_t *) data;
-#endif
+	DRM_OS_KRNFROMUSR(auth, (drm_auth_t *)data, sizeof(auth));
 
 	DRM_DEBUG("%u\n", auth.magic);
 	if ((file = DRM(find_file)(dev, auth.magic))) {
