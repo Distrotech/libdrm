@@ -102,7 +102,7 @@ int DRM(addmap)( DRM_OS_IOCTL )
 		DRM_OS_RETURN(ENOMEM);
 
 #ifdef __linux__
-	if ( copy_from_user( &map, (drm_map_t *)data, sizeof(map) ) ) {
+	if ( copy_from_user( map, (drm_map_t *)data, sizeof(*map) ) ) {
 		DRM(free)( map, sizeof(*map), DRM_MEM_MAPS );
 		DRM_OS_RETURN(EFAULT);
 	}
@@ -233,7 +233,7 @@ int DRM(addmap)( DRM_OS_IOCTL )
 	DRM_OS_UNLOCK;
 
 #ifdef __linux__
-	if ( copy_to_user( (drm_map_t *)data, &map, sizeof(map) ) )
+	if ( copy_to_user( (drm_map_t *)data, map, sizeof(*map) ) )
 		DRM_OS_RETURN(EFAULT);
 #endif
 #ifdef __FreeBSD__
