@@ -1,6 +1,6 @@
 /**
  * \file drm_pci.h
- * \brief ioctl's to manage PCI memory
+ * ioctl's to manage PCI memory
  * 
  * \warning These interfaces aren't stable yet.
  * 
@@ -41,22 +41,22 @@
 
 
 /**
- * \brief PCI consistent memory block, for DMA.
+ * PCI consistent memory block, for DMA.
  */
 typedef struct drm_pci_mem {
-	struct list_head	list;		/**< \brief Linux list */
-	size_t			size;		/**< \brief size */
-	void			*cpuaddr;	/**< \brief kernel virtual address */
-	dma_addr_t		busaddr;	/**< \brief associated bus address */
+	struct list_head	list;		/**< Linux list */
+	size_t			size;		/**< size */
+	void			*cpuaddr;	/**< kernel virtual address */
+	dma_addr_t		busaddr;	/**< associated bus address */
 } drm_pci_mem_t;
 
 
 #if 0
 /**
- * \brief PCI data
+ * PCI data
  */
 typedef struct drm_pci_data {
-	struct list_head  pci_mem;	/**< \brief PCI consistent memory */
+	struct list_head  pci_mem;	/**< PCI consistent memory */
 } drm_pci_data_t;
 #endif
 
