@@ -25,7 +25,7 @@
 #endif
 
 #if __FreeBSD_version >= 400006
-#define __REALLY_HAVE_AGP	1
+#define __REALLY_HAVE_AGP	__HAVE_AGP
 #endif
 
 #define __REALLY_HAVE_MTRR	0
