@@ -27,6 +27,7 @@
  *    Gareth Hughes <gareth@valinux.com>
  *    Frank C. Earl <fearl@airmail.net>
  *    Leif Delgass <ldelgass@retinalburn.net>
+ *    José Fonseca <j_r_fonseca@yahoo.co.uk>
  */
 
 #ifndef __MACH64_DRV_H__
@@ -718,6 +719,21 @@ static __inline__ void mach64_clear_dma_eol( volatile u32 * addr )
 	: "=&r" (old), "=m" (*addr)
 	: "r" (mask), "r" (addr), "m" (*addr)
 	: "cc");
+#elif defined(__alpha__)
+	u32 temp;
+	u32 mask = ~DMA_EOL;
+
+	/* Taken from the include/asm-alpha/bitops.h linux header */
+	__asm__ __volatile__(
+	"1:	ldl_l %0,%3\n"
+	"	and %0,%2,%0\n"
+	"	stl_c %0,%1\n"
+	"	beq %0,2f\n"
+	".subsection 2\n"
+	"2:	br 1b\n"
+	".previous"
+	:"=&r" (temp), "=m" (*addr)
+	:"Ir" (mask), "m" (*addr));
 #else
 	u32 mask = cpu_to_le32( ~DMA_EOL );
 
