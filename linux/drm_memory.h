@@ -7,8 +7,6 @@
  */
 
 /* 
- * Created: Thu Feb  4 14:00:34 1999 by faith@valinux.com
- *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
@@ -33,328 +31,33 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#define __NO_VERSION__
-#include <linux/config.h>
-#include "drmP.h"
 
-/**
- * Cut down version of drm_memory_debug.h, which used to be called
- * drm_memory.h.  If you want the debug functionality, change 0 to 1
- * below.
- */
-#define DEBUG_MEMORY 0
+#ifndef _DRM_MEMORY_H_
+#define _DRM_MEMORY_H_
 
-/* Need the 4-argument version of vmap().  */
-#if __REALLY_HAVE_AGP && defined(VMAP_4_ARGS)
 
-#include <linux/vmalloc.h>
+/** \name Prototypes */
+/*@{*/
 
-#ifdef HAVE_PAGE_AGP
-#include <asm/agp.h>
-#else
-# ifdef __powerpc__
-#  define PAGE_AGP	__pgprot(_PAGE_KERNEL | _PAGE_NO_CACHE)
-# else
-#  define PAGE_AGP	PAGE_KERNEL
-# endif
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-# include <asm/tlbflush.h>
-#else
-# define pte_offset_kernel(dir, address)	pte_offset(dir, address)
-# define pte_pfn(pte)				(pte_page(pte) - mem_map)
-# define pfn_to_page(pfn)			(mem_map + (pfn))
-# define flush_tlb_kernel_range(s,e)		flush_tlb_all()
-#endif
-
-/*
- * Find the drm_map that covers the range [offset, offset+size).
- */
-static inline drm_map_t *
-drm_lookup_map (unsigned long offset, unsigned long size, drm_device_t *dev)
-{
-	struct list_head *list;
-	drm_map_list_t *r_list;
-	drm_map_t *map;
-
-	list_for_each(list, &dev->maplist->head) {
-		r_list = (drm_map_list_t *) list;
-		map = r_list->map;
-		if (!map)
-			continue;
-		if (map->offset <= offset && (offset + size) <= (map->offset + map->size))
-			return map;
-	}
-	return NULL;
-}
-
-static inline void *
-agp_remap (unsigned long offset, unsigned long size, drm_device_t *dev)
-{
-	unsigned long *phys_addr_map, i, num_pages = PAGE_ALIGN(size) / PAGE_SIZE;
-	struct drm_agp_mem *agpmem;
-	struct page **page_map;
-	void *addr;
-
-	size = PAGE_ALIGN(size);
-
-#ifdef __alpha__
-	offset -= dev->hose->mem_space->start;
-#endif
-
-	for (agpmem = dev->agp->memory; agpmem; agpmem = agpmem->next)
-		if (agpmem->bound <= offset
-		    && (agpmem->bound + (agpmem->pages << PAGE_SHIFT)) >= (offset + size))
-			break;
-	if (!agpmem)
-		return NULL;
-
-	/*
-	 * OK, we're mapping AGP space on a chipset/platform on which memory accesses by
-	 * the CPU do not get remapped by the GART.  We fix this by using the kernel's
-	 * page-table instead (that's probably faster anyhow...).
-	 */
-	/* note: use vmalloc() because num_pages could be large... */
-	page_map = vmalloc(num_pages * sizeof(struct page *));
-	if (!page_map)
-		return NULL;
-
-	phys_addr_map = agpmem->memory->memory + (offset - agpmem->bound) / PAGE_SIZE;
-	for (i = 0; i < num_pages; ++i)
-		page_map[i] = pfn_to_page(phys_addr_map[i] >> PAGE_SHIFT);
-	addr = vmap(page_map, num_pages, VM_IOREMAP, PAGE_AGP);
-	vfree(page_map);
-	if (!addr)
-		return NULL;
-
-	flush_tlb_kernel_range((unsigned long) addr, (unsigned long) addr + size);
-	return addr;
-}
-
-static inline unsigned long
-drm_follow_page (void *vaddr)
-{
-	pgd_t *pgd = pgd_offset_k((unsigned long) vaddr);
-	pmd_t *pmd = pmd_offset(pgd, (unsigned long) vaddr);
-	pte_t *ptep = pte_offset_kernel(pmd, (unsigned long) vaddr);
-	return pte_pfn(*ptep) << PAGE_SHIFT;
-}
-
-#endif /* __REALLY_HAVE_AGP && defined(VMAP_4_ARGS) */
-
-static inline void *drm_ioremap(unsigned long offset, unsigned long size, drm_device_t *dev)
-{
-#if __REALLY_HAVE_AGP && defined(VMAP_4_ARGS)
-	if (dev->agp && dev->agp->cant_use_aperture) {
-		drm_map_t *map = drm_lookup_map(offset, size, dev);
-
-		if (map && map->type == _DRM_AGP)
-			return agp_remap(offset, size, dev);
-	}
-#endif
-
-	return ioremap(offset, size);
-}
-
-static inline void *drm_ioremap_nocache(unsigned long offset, unsigned long size,
-					drm_device_t *dev)
-{
-#if __REALLY_HAVE_AGP && defined(VMAP_4_ARGS)
-	if (dev->agp && dev->agp->cant_use_aperture) {
-		drm_map_t *map = drm_lookup_map(offset, size, dev);
-
-		if (map && map->type == _DRM_AGP)
-			return agp_remap(offset, size, dev);
-	}
-#endif
-
-	return ioremap_nocache(offset, size);
-}
-
-static inline void drm_ioremapfree(void *pt, unsigned long size, drm_device_t *dev)
-{
-#if __REALLY_HAVE_AGP && defined(VMAP_4_ARGS)
-	/*
-	 * This is a bit ugly.  It would be much cleaner if the DRM API would use separate
-	 * routines for handling mappings in the AGP space.  Hopefully this can be done in
-	 * a future revision of the interface...
-	 */
-	if (dev->agp && dev->agp->cant_use_aperture
-	    && ((unsigned long) pt >= VMALLOC_START && (unsigned long) pt < VMALLOC_END))
-	{
-		unsigned long offset;
-		drm_map_t *map;
-
-		offset = drm_follow_page(pt) | ((unsigned long) pt & ~PAGE_MASK);
-		map = drm_lookup_map(offset, size, dev);
-		if (map && map->type == _DRM_AGP) {
-			vunmap(pt);
-			return;
-		}
-	}
-#endif
-
-	iounmap(pt);
-}
-
-#if DEBUG_MEMORY
-#include "drm_memory_debug.h"
-#else
-
-/** No-op. */
-void DRM(mem_init)(void)
-{
-}
-
-/**
- * Called when "/proc/dri/%dev%/mem" is read.
- * 
- * \param buf output buffer.
- * \param start start of output data.
- * \param offset requested start offset.
- * \param len requested number of bytes.
- * \param eof whether there is no more data to return.
- * \param data private data.
- * \return number of written bytes.
- *
- * No-op. 
- */
-int DRM(mem_info)(char *buf, char **start, off_t offset,
-		  int len, int *eof, void *data)
-{
-	return 0;
-}
-
-/** Wrapper around kmalloc() */
-void *DRM(alloc)(size_t size, int area)
-{
-	return kmalloc(size, GFP_KERNEL);
-}
-
-/** Wrapper around kmalloc() and kfree() */
-void *DRM(realloc)(void *oldpt, size_t oldsize, size_t size, int area)
-{
-	void *pt;
-
-	if (!(pt = kmalloc(size, GFP_KERNEL))) return NULL;
-	if (oldpt && oldsize) {
-		memcpy(pt, oldpt, oldsize);
-		kfree(oldpt);
-	}
-	return pt;
-}
-
-/** Wrapper around kfree() */
-void DRM(free)(void *pt, size_t size, int area)
-{
-	kfree(pt);
-}
-
-/**
- * Allocate pages.
- *
- * \param order size order.
- * \param area memory area. (Not used.)
- * \return page address on success, or zero on failure.
- *
- * Allocate and reserve free pages.
- */
-unsigned long DRM(alloc_pages)(int order, int area)
-{
-	unsigned long address;
-	unsigned long bytes	  = PAGE_SIZE << order;
-	unsigned long addr;
-	unsigned int  sz;
-
-	address = __get_free_pages(GFP_KERNEL, order);
-	if (!address) 
-		return 0;
-
-				/* Zero */
-	memset((void *)address, 0, bytes);
-
-				/* Reserve */
-	for (addr = address, sz = bytes;
-	     sz > 0;
-	     addr += PAGE_SIZE, sz -= PAGE_SIZE) {
-		SetPageReserved(virt_to_page(addr));
-	}
-
-	return address;
-}
-
-/**
- * Free pages.
- * 
- * \param address address of the pages to free.
- * \param order size order.
- * \param area memory area. (Not used.)
- *
- * Unreserve and free pages allocated by alloc_pages().
- */
-void DRM(free_pages)(unsigned long address, int order, int area)
-{
-	unsigned long bytes = PAGE_SIZE << order;
-	unsigned long addr;
-	unsigned int  sz;
-
-	if (!address) 
-		return;
-
-	/* Unreserve */
-	for (addr = address, sz = bytes;
-	     sz > 0;
-	     addr += PAGE_SIZE, sz -= PAGE_SIZE) {
-		ClearPageReserved(virt_to_page(addr));
-	}
-
-	free_pages(address, order);
-}
-
-/** Wrapper around drm_ioremap() */
-void *DRM(ioremap)(unsigned long offset, unsigned long size, drm_device_t *dev)
-{
-	return drm_ioremap(offset, size, dev);
-}
-
-/** Wrapper around drm_ioremap_nocache() */
-void *DRM(ioremap_nocache)(unsigned long offset, unsigned long size, drm_device_t *dev)
-{
-	return drm_ioremap_nocache(offset, size, dev);
-}
-
-/** Wrapper around drm_iounmap() */
-void DRM(ioremapfree)(void *pt, unsigned long size, drm_device_t *dev)
-{
-	drm_ioremapfree(pt, size, dev);
-}
+extern void	     DRM(mem_init)(void);
+extern int	     DRM(mem_info)(char *buf, char **start, off_t offset, int request, int *eof, void *data);
+extern void	     *DRM(alloc)(size_t size, int area);
+extern void	     *DRM(realloc)(void *oldpt, size_t oldsize, size_t size, int area);
+extern void	     DRM(free)(void *pt, size_t size, int area);
+extern unsigned long DRM(alloc_pages)(int order, int area);
+extern void	     DRM(free_pages)(unsigned long address, int order, int area);
+extern void	     *DRM(ioremap)(unsigned long offset, unsigned long size, drm_device_t *dev);
+extern void	     *DRM(ioremap_nocache)(unsigned long offset, unsigned long size, drm_device_t *dev);
+extern void	     DRM(ioremapfree)(void *pt, unsigned long size, drm_device_t *dev);
 
 #if __REALLY_HAVE_AGP
-/** Wrapper around agp_allocate_memory() */
-agp_memory *DRM(agp_alloc)(int pages, u32 type)
-{
-	return DRM(agp_allocate_memory)(pages, type);
-}
+extern agp_memory    *DRM(agp_alloc)(int pages, u32 type);
+extern int           DRM(agp_free)(agp_memory *handle, int pages);
+extern int           DRM(agp_bind)(agp_memory *handle, unsigned int start);
+extern int           DRM(agp_unbind)(agp_memory *handle);
+#endif
 
-/** Wrapper around agp_free_memory() */
-int DRM(agp_free)(agp_memory *handle, int pages)
-{
-	return DRM(agp_free_memory)(handle) ? 0 : -EINVAL;
-}
-
-/** Wrapper around agp_bind_memory() */
-int DRM(agp_bind)(agp_memory *handle, unsigned int start)
-{
-	return DRM(agp_bind_memory)(handle, start);
-}
-
-/** Wrapper around agp_unbind_memory() */
-int DRM(agp_unbind)(agp_memory *handle)
-{
-	return DRM(agp_unbind_memory)(handle);
-}
-#endif /* __REALLY_HAVE_AGP */
+/*@}*/
 
 
-#endif /* debug_memory */
+#endif /* !_DRM_MEMORY_H_ */

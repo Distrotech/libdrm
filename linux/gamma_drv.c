@@ -51,7 +51,7 @@
 #include "gamma_lists.h"        /* NOTE */
 #include "drm_lock_tmp.h"
 #include "gamma_lock.h"		/* NOTE */
-#include "drm_memory.h"
+#include "drm_memory_tmp.h"
 #include "drm_proc.h"
 #include "drm_vm_tmp.h"
 #include "drm_stub.h"
