@@ -104,6 +104,7 @@ typedef struct drm_tex_region {
 #include "i810_drm.h"
 #include "r128_drm.h"
 #include "radeon_drm.h"
+#include "mach64_drm.h"
 #include "sis_drm.h"
 #include "i830_drm.h"
 #include "gamma_drm.h"
@@ -515,5 +516,10 @@ typedef struct drm_scatter_gather {
 #define DRM_IOCTL_I830_SWAP		DRM_IO ( 0x46)
 #define DRM_IOCTL_I830_COPY		DRM_IOW( 0x47, drm_i830_copy_t)
 #define DRM_IOCTL_I830_DOCOPY		DRM_IO ( 0x48)
+/* Mach64 specific ioctls */
+#define DRM_IOCTL_MACH64_INIT	DRM_IOW( 0x40, drm_mach64_init_t)
+#define DRM_IOCTL_MACH64_CLEAR	DRM_IOW( 0x41, drm_mach64_clear_t)
+#define DRM_IOCTL_MACH64_SWAP	DRM_IO(  0x42)
+#define DRM_IOCTL_MACH64_IDLE	DRM_IO(  0x43)
 
 #endif
