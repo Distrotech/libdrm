@@ -924,7 +924,7 @@ int DRM( close)(dev_t kdev, int flags, int fmt, struct proc *p)
 #endif
 			if ( !dev->lock.hw_lock ) {
 				/* Device has been unregistered */
-				retcode = -EINTR;
+				retcode = EINTR;
 				break;
 			}
 			if ( DRM(lock_take)( &dev->lock.hw_lock->lock,
@@ -947,7 +947,7 @@ int DRM( close)(dev_t kdev, int flags, int fmt, struct proc *p)
 #ifdef __linux__
 			schedule();
 			if ( signal_pending( current ) ) {
-				retcode = -ERESTARTSYS;
+				retcode = ERESTARTSYS;
 				break;
 			}
 #endif
@@ -1028,7 +1028,7 @@ int DRM( close)(dev_t kdev, int flags, int fmt, struct proc *p)
 	if ( !--dev->open_count ) {
 		if ( atomic_read( &dev->ioctl_count ) || dev->blocked ) {
 			DRM_ERROR( "Device busy: %ld %d\n",
-				   atomic_read( &dev->ioctl_count ),
+				(unsigned long)atomic_read( &dev->ioctl_count ),
 				   dev->blocked );
 			DRM_OS_SPINUNLOCK( &dev->count_lock );
 #ifdef __linux__
@@ -1107,14 +1107,14 @@ int DRM(ioctl)( DRM_OS_IOCTL )
 #endif
 
 	if ( nr >= DRIVER_IOCTL_COUNT ) {
-		retcode = -EINVAL;
+		retcode = EINVAL;
 	} else {
 		ioctl = &DRM(ioctls)[nr];
 		func = ioctl->func;
 
 		if ( !func ) {
 			DRM_DEBUG( "no function\n" );
-			retcode = -EINVAL;
+			retcode = EINVAL;
 		} else if ( ( ioctl->root_only && 
 #ifdef __linux__
 				!capable( CAP_SYS_ADMIN ) )
@@ -1123,7 +1123,7 @@ int DRM(ioctl)( DRM_OS_IOCTL )
 				suser(p) )
 #endif
 			 || ( ioctl->auth_needed && !priv->authenticated ) ) {
-			retcode = -EACCES;
+			retcode = EACCES;
 		} else {
 #ifdef __linux__
 			retcode = func( inode, filp, cmd, data );
@@ -1135,7 +1135,7 @@ int DRM(ioctl)( DRM_OS_IOCTL )
 	}
 
 	atomic_dec( &dev->ioctl_count );
-	return retcode;
+	DRM_OS_RETURN(retcode);
 }
 
 int DRM(lock)( DRM_OS_IOCTL )
@@ -1189,7 +1189,7 @@ int DRM(lock)( DRM_OS_IOCTL )
 #endif
                         if ( !dev->lock.hw_lock ) {
                                 /* Device has been unregistered */
-                                ret = -EINTR;
+                                ret = EINTR;
                                 break;
                         }
                         if ( DRM(lock_take)( &dev->lock.hw_lock->lock,
@@ -1209,7 +1209,7 @@ int DRM(lock)( DRM_OS_IOCTL )
 #ifdef __linux__
                         schedule();
                         if ( signal_pending( current ) ) {
-                                ret = -ERESTARTSYS;
+                                ret = ERESTARTSYS;
                                 break;
                         }
 #endif

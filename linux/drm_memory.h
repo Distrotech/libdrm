@@ -580,9 +580,11 @@ int DRM(unbind_agp)(agp_memory *handle)
 		return retcode;
 	}
 
+#ifdef __FreeBSD__
 	agp_memory_info(dev, handle, &info);
 	if ((retcode = agp_unbind_memory(dev, handle)))
 		return retcode;
+#endif
 
 	if ((retcode = DRM(agp_unbind_memory)(handle))) return retcode;
 	DRM_OS_SPINLOCK(&DRM(mem_lock));

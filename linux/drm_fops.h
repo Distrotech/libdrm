@@ -188,7 +188,9 @@ ssize_t DRM(read)(dev_t kdev, struct uio *uio, int ioflag)
 	int	      avail;
 	int	      send;
 	int	      cur;
+#ifdef __FreeBSD__
 	int           error = 0;
+#endif
 
 	DRM_DEBUG("%p, %p\n", dev->buf_rp, dev->buf_wp);
 
