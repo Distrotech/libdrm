@@ -92,11 +92,11 @@ typedef struct drm_mach64_private {
 	u32 back_offset_pitch;
 	u32 depth_offset_pitch;
 
-	drm_map_t *sarea;
-	drm_map_t *fb;
-	drm_map_t *mmio;
-	drm_map_t *buffers;
-	drm_map_t *agp_textures;
+	drm_local_map_t *sarea;
+	drm_local_map_t *fb;
+	drm_local_map_t *mmio;
+	drm_local_map_t *buffers;
+	drm_local_map_t *agp_textures;
 } drm_mach64_private_t;
 
 				/* mach64_dma.c */
@@ -445,12 +445,8 @@ extern int mach64_get_param( DRM_IOCTL_ARGS );
 #define MACH64_DATATYPE_RGB8				9
 #define MACH64_DATATYPE_ARGB4444			15
 
-#define MACH64_BASE(reg)	((unsigned long)(dev_priv->mmio->handle))
-
-#define MACH64_ADDR(reg)	(MACH64_BASE(reg) + reg)
-
-#define MACH64_READ(reg)	readl( (volatile u32 *) MACH64_ADDR(reg) )
-#define MACH64_WRITE(reg,val)	writel( (val), (volatile u32 *) MACH64_ADDR(reg) )
+#define MACH64_READ(reg)	DRM_READ32(dev_priv->mmio, (reg) )
+#define MACH64_WRITE(reg,val)	DRM_WRITE32(dev_priv->mmio, (reg), (val) )
 
 
 #define DWMREG0		0x0400
