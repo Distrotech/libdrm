@@ -489,12 +489,16 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 		data_addr = (u32) data_handle;
 	}
 
+	mach64_do_wait_for_fifo( dev_priv, 4 );
+			
 	MACH64_WRITE( MACH64_SRC_CNTL, 0 );
 
 	MACH64_WRITE( MACH64_VERTEX_1_S, 0x00000000 );
 	MACH64_WRITE( MACH64_VERTEX_1_T, 0x00000000 );
 	MACH64_WRITE( MACH64_VERTEX_1_W, 0x00000000 );
 
+	mach64_do_wait_for_idle( dev_priv );
+	
 	for (i=0; i < 3; i++) {
 		DRM_DEBUG( "(Before DMA Transfer) reg %d = 0x%08x\n", i, 
 			   MACH64_READ( (MACH64_VERTEX_1_S + i*4) ) );

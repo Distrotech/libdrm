@@ -476,12 +476,6 @@ static inline void mach64_ring_start( drm_mach64_private_t *dev_priv )
 		      ( MACH64_READ(MACH64_BUS_CNTL) & 	~MACH64_BUS_MASTER_DIS ) 
 		      | MACH64_BUS_EXT_REG_EN );
 
-	/* enable GUI bus mastering, and sync the bus master to the GUI */
-	MACH64_WRITE( MACH64_SRC_CNTL, 
-		      MACH64_SRC_BM_ENABLE | MACH64_SRC_BM_SYNC |
-		      MACH64_SRC_BM_OP_SYSTEM_TO_REG );
-
-	/* FIXME: See mach64_ring_resume */
 	mach64_do_wait_for_idle( dev_priv );
 	
 	dev_priv->ring_running = 1;
@@ -493,25 +487,11 @@ static inline void mach64_ring_resume( drm_mach64_private_t *dev_priv, drm_mach6
 		__FUNCTION__, 
 		ring->head_addr, ring->head, ring->tail, ring->space);
 
-#if 0
-	/* FIXME: at this moment this is always called on idle but we could gain something by just 
-	 * wait for FIFO when resuming the BM and in that case we will have to check for the apropriate
-	 * number of free entries here
-	 */
-	mach64_do_wait_for_fifo( dev_priv, 2 );
-#endif
-
 #if MACH64_EXTRA_CHECKING
-	if ( !(MACH64_READ(MACH64_SRC_CNTL) & MACH64_SRC_BM_ENABLE) ) {
-		DRM_ERROR("Call of %s without BM enabled!!!\n", __FUNCTION__ );
-		mach64_dump_ring_info( dev_priv );
-		return;
-	}
-
 	if ( MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE ) {
 		DRM_ERROR("Call of %s with GUI ACTIVE!!!\n", __FUNCTION__ );
 		mach64_dump_ring_info( dev_priv );
-		return;
+		mach64_do_wait_for_idle( dev_priv );
 	}
 
 	if( ring->head_addr < ring->start_addr || ring->head_addr >= ring->start_addr + ring->size ) {
@@ -524,6 +504,11 @@ static inline void mach64_ring_resume( drm_mach64_private_t *dev_priv, drm_mach6
 	/* reset descriptor table ring head */
 	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, ring->head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB );
 	
+	/* enable GUI bus mastering, and sync the bus master to the GUI */
+	MACH64_WRITE( MACH64_SRC_CNTL, 
+		      MACH64_SRC_BM_ENABLE | MACH64_SRC_BM_SYNC |
+		      MACH64_SRC_BM_OP_SYSTEM_TO_REG );
+
 	/* kick off the transfer */
 	MACH64_WRITE( MACH64_DST_HEIGHT_WIDTH, 0 );
 }
@@ -538,11 +523,9 @@ static inline void mach64_ring_stop( drm_mach64_private_t *dev_priv )
 	mach64_do_wait_for_fifo( dev_priv, 1 );
 	MACH64_WRITE( MACH64_SRC_CNTL, 0 );
 
-#if 1
-	/* FIXME: This probably can be safely removed from here. */ 
+	/* disable busmastering but keep the block 1 registers enabled */ 
 	mach64_do_wait_for_idle( dev_priv );
 	MACH64_WRITE( MACH64_BUS_CNTL, MACH64_READ( MACH64_BUS_CNTL ) | MACH64_BUS_MASTER_DIS | MACH64_BUS_EXT_REG_EN );
-#endif
 		
 	dev_priv->ring_running = 0;
 }
@@ -556,7 +539,6 @@ do {													\
 		mach64_ring_start( dev_priv );								\
 	}												\
 	/* GUI_ACTIVE must be read before BM_GUI_TABLE to correctly determine the ring head */		\
-	/* FIXME: See mach64_ring_resume */								\
 	gui_active = MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE;					\
 	(ring)->head_addr = MACH64_READ(MACH64_BM_GUI_TABLE) & 0xfffffff0;				\
 	if ( gui_active ) {										\
@@ -662,7 +644,7 @@ do {									\
  * DMA descriptor ring macros
  */
 
-#define RING_LOCALS	int tail, write; unsigned int mask; volatile u32 *ring;
+#define RING_LOCALS	int tail, write; unsigned int mask; volatile u32 *ring
 
 #define RING_WRITE_OFS write
 
@@ -699,6 +681,49 @@ do {								\
 	write &= mask;						\
 } while (0)
 
+
+#if defined(__i386__)
+
+/* Taken from include/asm-i386/bitops.h linux header */
+static __inline__ void mach64_clear_bit(int nr, volatile void * addr)
+{
+        __asm__ __volatile__( "lock;"
+                "btrl %1,%0"
+                :"=m" (*(volatile long *) addr)
+                :"Ir" (nr));
+}
+
+#elif defined(__powerpc__)
+
+/* Taken from the include/asm-ppc/bitops.h linux header */
+static __inline__ void mach64_clear_bit(int nr, volatile void *addr)
+{
+	unsigned long old;
+	unsigned long mask = 1 << (nr & 0x1f);
+	unsigned long *p = ((unsigned long *)addr) + (nr >> 5);
+
+	__asm__ __volatile__("\n\
+1:	lwarx	%0,0,%3 \n\
+	andc	%0,%0,%2 \n\
+	stwcx.	%0,0,%3 \n\
+	bne-	1b"
+	: "=&r" (old), "=m" (*p)
+	: "r" (mask), "r" (p), "m" (*p)
+	: "cc");
+}
+
+#else
+
+static __inline__ void mach64_clear_bit(int nr, volatile void *addr)
+{
+	unsigned long mask = 1 << (nr & 0x1f);
+	volatile unsigned long *p = ((unsigned long *)addr) + (nr >> 5);
+
+	*p &= ~mask;
+}
+
+#endif
+
 #define ADVANCE_RING() 							\
 do {									\
 	if ( MACH64_VERBOSE ) {						\
@@ -706,7 +731,8 @@ do {									\
 			  write, tail );				\
 	}								\
 	mach64_flush_write_combine();					\
-	ring[(tail - 2) & mask] &= cpu_to_le32( ~DMA_EOL );		\
+	/* Clear DMA_EOL */						\
+	mach64_clear_bit(31, &ring[(tail - 2) & mask]);			\
 	mach64_flush_write_combine();					\
 	dev_priv->ring.tail = write;					\
 	UPDATE_RING_HEAD( dev_priv, &(dev_priv)->ring );		\
