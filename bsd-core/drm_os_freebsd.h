@@ -44,20 +44,31 @@
 #define DRM_DEV_UID	0
 #define DRM_DEV_GID	0
 
-#define DRM_OS_LOCK	lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, curproc)
-#define DRM_OS_UNLOCK 	lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc)
+
 #if __FreeBSD_version >= 500000
 #define DRM_OS_SPINTYPE		struct mtx
 #define DRM_OS_SPININIT(l,name)	mtx_init(&l, name, MTX_DEF)
 #define DRM_OS_SPINLOCK(l)	mtx_lock(l)
 #define DRM_OS_SPINUNLOCK(u)	mtx_unlock(u);
+#define DRM_OS_LOCK	lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, curthread)
+#define DRM_OS_UNLOCK 	lockmgr(&dev->dev_lock, LK_RELEASE, 0, curthread)
+#define DRM_OS_CURPROC		curthread
+#define DRM_OS_STRUCTPROC	struct thread
+#define DRM_OS_CURRENTPID       curthread->td_proc->p_pid
+#define DRM_OS_IOCTL 		dev_t kdev, u_long cmd, caddr_t data, int flags, struct thread *p
 #else
+#define DRM_OS_CURPROC		curproc
+#define DRM_OS_STRUCTPROC	struct proc
 #define DRM_OS_SPINTYPE		struct simplelock
 #define DRM_OS_SPININIT(l,name)	simple_lock_init(&l)
 #define DRM_OS_SPINLOCK(l)	simple_lock(l)
 #define DRM_OS_SPINUNLOCK(u)	simple_unlock(u);
+#define DRM_OS_IOCTL		dev_t kdev, u_long cmd, caddr_t data, int flags, struct proc *p
+#define DRM_OS_LOCK	lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, curproc)
+#define DRM_OS_UNLOCK 	lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc)
+#define DRM_OS_CURRENTPID       curproc->p_pid
 #endif
-#define DRM_OS_IOCTL	dev_t kdev, u_long cmd, caddr_t data, int flags, struct proc *p
+
 #define DRM_OS_TASKQUEUE_ARGS	void *dev, int pending
 #define DRM_OS_IRQ_ARGS	void *device
 #define DRM_OS_DEVICE	drm_device_t	*dev	= kdev->si_drv1
@@ -79,7 +90,8 @@ do {								\
 } while (0)
 
 #define DRM_OS_RETURN(v)	return v;
-#define DRM_OS_CURRENTPID	curproc->p_pid
+
+
 #define DRM_OS_KRNTOUSR(arg1, arg2, arg3) \
 	*arg1 = arg2
 #define DRM_OS_KRNFROMUSR(arg1, arg2, arg3) \
@@ -276,9 +288,9 @@ extern d_write_t	DRM(write);
 extern d_poll_t		DRM(poll);
 extern d_mmap_t		DRM(mmap);
 extern int		DRM(open_helper)(dev_t kdev, int flags, int fmt, 
-					struct proc *p, drm_device_t *dev);
+					 DRM_OS_STRUCTPROC *p, drm_device_t *dev);
 extern drm_file_t	*DRM(find_file_by_proc)(drm_device_t *dev, 
-					struct proc *p);
+					 DRM_OS_STRUCTPROC *p);
 
 /* Misc. IOCTL support (drm_ioctl.h) */
 extern d_ioctl_t	DRM(irq_busid);
