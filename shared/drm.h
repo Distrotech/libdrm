@@ -307,9 +307,17 @@ typedef struct drm_irq_busid {
 	int funcnum;
 } drm_irq_busid_t;
 
+/* This one here for backwards compatibility, use drm_agp_setup instead */
 typedef struct drm_agp_mode {
-	unsigned long mode;
+	unsigned int agp_mode;
 } drm_agp_mode_t;
+
+typedef struct drm_agp_setup {
+	unsigned int agp_mode;
+	unsigned int bus;
+	unsigned int slot;
+	unsigned int func;
+} drm_agp_setup_t;
 
 				/* For drm_agp_alloc -- allocated a buffer */
 typedef struct drm_agp_buffer {
@@ -382,12 +390,13 @@ typedef struct drm_agp_info {
 
 #define DRM_IOCTL_AGP_ACQUIRE		DRM_IO(  0x30)
 #define DRM_IOCTL_AGP_RELEASE		DRM_IO(  0x31)
-#define DRM_IOCTL_AGP_ENABLE		DRM_IOW( 0x32, drm_agp_mode_t)
+#define DRM_IOCTL_AGP_ENABLE_OLD	DRM_IOW( 0x32, drm_agp_mode_t)
 #define DRM_IOCTL_AGP_INFO		DRM_IOR( 0x33, drm_agp_info_t)
 #define DRM_IOCTL_AGP_ALLOC		DRM_IOWR(0x34, drm_agp_buffer_t)
 #define DRM_IOCTL_AGP_FREE		DRM_IOW( 0x35, drm_agp_buffer_t)
 #define DRM_IOCTL_AGP_BIND		DRM_IOW( 0x36, drm_agp_binding_t)
 #define DRM_IOCTL_AGP_UNBIND		DRM_IOW( 0x37, drm_agp_binding_t)
+#define DRM_IOCTL_AGP_ENABLE		DRM_IOW( 0x38, drm_agp_setup_t)
 
 /* MGA specific ioctls */
 #define DRM_IOCTL_MGA_INIT		DRM_IOW( 0x40, drm_mga_init_t)

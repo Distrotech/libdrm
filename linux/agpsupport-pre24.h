@@ -34,7 +34,7 @@ typedef struct {
 	agp_memory *(*allocate_memory)(size_t, u32);
 	int        (*bind_memory)(agp_memory *, off_t);
 	int        (*unbind_memory)(agp_memory *);
-	void       (*enable)(u32);
+	void       (*enable)(agp_setup *);
 	int        (*acquire)(void);
 	void       (*release)(void);
 	void       (*copy_info)(agp_kern_info *);
@@ -52,7 +52,7 @@ typedef union {
 	agp_memory    *(*allocate_memory)(size_t, u32);
 	int           (*bind_memory)(agp_memory *, off_t);
 	int           (*unbind_memory)(agp_memory *);
-	void          (*enable)(u32);
+	void          (*enable)(agp_setup *);
 	int           (*acquire)(void);
 	void          (*release)(void);
 	void          (*copy_info)(agp_kern_info *);

@@ -166,12 +166,13 @@ static drm_ioctl_desc_t		DRM(ioctls)[] = {
 #if __REALLY_HAVE_AGP
 	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ACQUIRE)] = { DRM(agp_acquire), 1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_AGP_RELEASE)] = { DRM(agp_release), 1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ENABLE)]  = { DRM(agp_enable),  1, 1 },
+	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ENABLE_OLD)]  = { DRM(agp_enable_old),1,1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_AGP_INFO)]    = { DRM(agp_info),    1, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ALLOC)]   = { DRM(agp_alloc),   1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_AGP_FREE)]    = { DRM(agp_free),    1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_AGP_BIND)]    = { DRM(agp_bind),    1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_AGP_UNBIND)]  = { DRM(agp_unbind),  1, 1 },
+	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ENABLE)]  = { DRM(agp_enable),  1, 1 },
 #endif
 
 	DRIVER_IOCTLS

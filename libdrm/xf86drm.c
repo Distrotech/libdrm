@@ -882,11 +882,16 @@ int drmAgpRelease(int fd)
     return 0;
 }
 
-int drmAgpEnable(int fd, unsigned long mode)
+int drmAgpEnable(int fd, unsigned int mode, unsigned int bus, unsigned int slot,
+		 unsigned int func)
 {
-    drm_agp_mode_t m;
+    drm_agp_setup_t m;
 
-    m.mode = mode;
+    m.agp_mode = mode;
+    m.bus = bus;
+    m.slot = slot;
+    m.func = func;
+
     if (ioctl(fd, DRM_IOCTL_AGP_ENABLE, &m)) return -errno;
     return 0;
 }

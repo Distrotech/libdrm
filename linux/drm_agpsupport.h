@@ -101,20 +101,28 @@ void DRM(agp_do_release)(void)
 	if (drm_agp->release) drm_agp->release();
 }
 
+int DRM(agp_enable_old)(struct inode *inode, struct file *filp,
+		    unsigned int cmd, unsigned long arg)
+{
+	DRM_ERROR("Called deprecated agp_enable ioctl, not enabling AGP.\n");
+
+	return -ENOSYS;
+}
+
 int DRM(agp_enable)(struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long arg)
 {
 	drm_file_t	 *priv	 = filp->private_data;
 	drm_device_t	 *dev	 = priv->dev;
-	drm_agp_mode_t   mode;
+	agp_setup        setup;
 
 	if (!dev->agp->acquired || !drm_agp->enable) return -EINVAL;
 
-	if (copy_from_user(&mode, (drm_agp_mode_t *)arg, sizeof(mode)))
+	if (copy_from_user(&setup, (drm_agp_setup_t *)arg, sizeof(setup)))
 		return -EFAULT;
 
-	dev->agp->mode    = mode.mode;
-	drm_agp->enable(mode.mode);
+	dev->agp->mode    = setup.agp_mode;
+	drm_agp->enable(&setup);
 	dev->agp->base    = dev->agp->agp_info.aper_base;
 	dev->agp->enabled = 1;
 	return 0;

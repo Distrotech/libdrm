@@ -639,72 +639,55 @@ static int gamma_do_init_dma( drm_device_t *dev, drm_gamma_init_t *init )
 
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
-if (init->pcimode) {
-	printk("INITING PCI DMA MODE\n");
-	for (i = 0; i < 21; i++) {
-	buf = dma->buflist[i];
-	printk("0x%x 0x%x\n",buf->address,virt_to_phys((void*)buf->address));
-	}
+	if (init->pcimode) {
+		buf = dma->buflist[GLINT_DRI_BUF_COUNT];
+		pgt = buf->address;
 
-	buf = dma->buflist[GLINT_DRI_BUF_COUNT];
-	pgt = buf->address;
-	printk("pgt = 0x%x\n",pgt);
+ 		for (i = 0; i < GLINT_DRI_BUF_COUNT; i++) {
+			buf = dma->buflist[i];
+			*pgt = virt_to_phys((void*)buf->address) | 0x07;
+			pgt++;
+		}
 
-	printk("0x%x\n",virt_to_phys((void*)buf->address) >> 12);
- 	for (i = 0; i < GLINT_DRI_BUF_COUNT; i++) {
-		buf = dma->buflist[i];
-		*pgt = virt_to_phys((void*)buf->address) | 0x07;
-		printk("0x%x ",*pgt);
-		pgt++;
-	}
+		buf = dma->buflist[GLINT_DRI_BUF_COUNT];
+	} else {
+		/* some of this currently isn't used */
+		dev_priv = DRM(alloc)( sizeof(drm_gamma_private_t), 
+							DRM_MEM_DRIVER );
+		if ( !dev_priv )
+			return -ENOMEM;
+		dev->dev_private = (void *)dev_priv;
 
-	buf = dma->buflist[GLINT_DRI_BUF_COUNT];
-	GAMMA_WRITE( GAMMA_PAGETABLEADDR, virt_to_phys((void*)buf->address) );
-	GAMMA_WRITE( GAMMA_PAGETABLELENGTH, 2 );
-} else {
-	printk("INITING AGP DMA MODE\n");
-	dev_priv = DRM(alloc)( sizeof(drm_gamma_private_t), DRM_MEM_DRIVER );
-	if ( !dev_priv )
-		return -ENOMEM;
-	dev->dev_private = (void *)dev_priv;
+		memset( dev_priv, 0, sizeof(drm_gamma_private_t) );
 
-	memset( dev_priv, 0, sizeof(drm_gamma_private_t) );
+		dev_priv->sarea = dev->maplist[0];
 
-	dev_priv->sarea = dev->maplist[0];
+		DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
 
-	DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
-
-	dev_priv->sarea_priv =
-		(drm_gamma_sarea_t *)((u8 *)dev_priv->sarea->handle +
+		dev_priv->sarea_priv =
+			(drm_gamma_sarea_t *)((u8 *)dev_priv->sarea->handle +
 				    init->sarea_priv_offset);
 
-	DRM_IOREMAP( dev_priv->buffers );
+		DRM_IOREMAP( dev_priv->buffers );
 
-printk("0x%x 0x%x 0x%x\n",dev_priv->buffers->handle,dev_priv->buffers->size,dev_priv->buffers->offset);
-	for (i = 0; i < 21; i++) {
-	buf = dma->buflist[i];
-	printk("0x%x\n",buf->address);
+		buf = dma->buflist[GLINT_DRI_BUF_COUNT];
+		pgt = buf->address;
+
+ 		for (i = 0; i < GLINT_DRI_BUF_COUNT; i++) {
+			buf = dma->buflist[i];
+			*pgt = (unsigned int)buf->address + 0x07;
+			pgt++;
+		}
+
+		buf = dma->buflist[GLINT_DRI_BUF_COUNT];
+
+		while (GAMMA_READ(GAMMA_INFIFOSPACE) < 1);
+		GAMMA_WRITE( GAMMA_GDMACONTROL, 0xe);
 	}
-
-	buf = dma->buflist[GLINT_DRI_BUF_COUNT];
-	pgt = buf->address;
-	printk("pgt = 0x%x\n",pgt);
-
-	printk("0x%x\n",virt_to_phys((void*)buf->address) >> 12);
- 	for (i = 0; i < GLINT_DRI_BUF_COUNT; i++) {
-		buf = dma->buflist[i];
-		*pgt = (unsigned int)buf->address + 0x07;
-		printk("0x%x ",*pgt);
-		pgt++;
-	}
-
-	buf = dma->buflist[GLINT_DRI_BUF_COUNT];
-
-	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 3);
-	GAMMA_WRITE( GAMMA_GDMACONTROL, 0x6e);
+	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 2);
 	GAMMA_WRITE( GAMMA_PAGETABLEADDR, virt_to_phys((void*)buf->address) );
 	GAMMA_WRITE( GAMMA_PAGETABLELENGTH, 2 );
-}
+
 	return 0;
 }
 

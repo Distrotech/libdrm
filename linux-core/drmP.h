@@ -897,6 +897,8 @@ extern int            DRM(agp_acquire)(struct inode *inode, struct file *filp,
 extern void           DRM(agp_do_release)(void);
 extern int            DRM(agp_release)(struct inode *inode, struct file *filp,
 				       unsigned int cmd, unsigned long arg);
+extern int            DRM(agp_enable_old)(struct inode *inode,struct file *filp,
+				      unsigned int cmd, unsigned long arg);
 extern int            DRM(agp_enable)(struct inode *inode, struct file *filp,
 				      unsigned int cmd, unsigned long arg);
 extern int            DRM(agp_info)(struct inode *inode, struct file *filp,
