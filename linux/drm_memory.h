@@ -307,11 +307,17 @@ void DRM(free)(void *pt, size_t size, int area)
 
 unsigned long DRM(alloc_pages)(int order, int area)
 {
+#ifdef __linux__
 	unsigned long address;
+#endif
+#ifdef __FreeBSD_
+	vm_offset_t address;
+#endif
 	unsigned long bytes	  = PAGE_SIZE << order;
 	unsigned long addr;
 	unsigned int  sz;
 
+#ifdef __linux__
 	DRM_OS_SPINLOCK(&DRM(mem_lock));
 	if ((DRM(ram_used) >> PAGE_SHIFT)
 	    > (DRM_RAM_PERCENT * DRM(ram_available)) / 100) {
@@ -319,6 +325,7 @@ unsigned long DRM(alloc_pages)(int order, int area)
 		return 0;
 	}
 	DRM_OS_SPINUNLOCK(&DRM(mem_lock));
+#endif
 
 #ifdef __linux__
 	address = __get_free_pages(GFP_KERNEL, order);
@@ -497,13 +504,13 @@ int DRM(free_agp)(agp_memory *handle, int pages)
 	device_t dev = agp_find_device();
 
 	if (!dev)
-		return NULL;
+		return EINVAL;
 #endif
 
 	if (!handle) {
 		DRM_MEM_ERROR(DRM_MEM_TOTALAGP,
 			      "Attempt to free NULL AGP handle\n");
-		return retval;;
+		return retval;
 	}
 
 	if (DRM(agp_free_memory)(handle)) {
