@@ -355,4 +355,14 @@ int DRM(poll)(dev_t kdev, int events, struct proc *p)
 
 	return revents;
 }
+
+int DRM(write)(dev_t kdev, struct uio *uio, int ioflag)
+{
+        struct proc   *p      = curproc;
+        drm_device_t  *dev    = kdev->si_drv1;
+
+        DRM_DEBUG("pid = %d, device = %p, open_count = %d\n",
+                  p->p_pid, dev->device, dev->open_count);
+        return 0;
+}
 #endif
