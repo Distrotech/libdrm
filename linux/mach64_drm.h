@@ -34,10 +34,10 @@
 
 
 /* WARNING: If you change any of these defines, make sure to change the
- * defines in the Xserver file (xf86drmMach64.h)
+ * defines in the Xserver file (mach64_sarea.h)
  */
-#ifndef __MACH64_DEFINES__
-#define __MACH64_DEFINES__
+#ifndef __MACH64_SAREA_DEFINES__
+#define __MACH64_SAREA_DEFINES__
 
 /* What needs to be changed for the current vertex buffer?
  * GH: We're going to be pedantic about this.  We want the card to do as
@@ -63,11 +63,6 @@
 #define MACH64_FRONT			0x1
 #define MACH64_BACK			0x2
 #define MACH64_DEPTH			0x4
-
-
-/* WARNING: If you change any of these defines, make sure to change the
- * defines in the Xserver file (mach64_sarea.h)
- */
 
 /* DMA buffer size
  */
@@ -157,11 +152,27 @@ typedef struct drm_mach64_sarea {
 } drm_mach64_sarea_t;
 
 
+/* WARNING: If you change any of these defines, make sure to change the
+ * defines in the Xserver file (mach64_common.h)
+ */
+
+/* Mach64 specific ioctls 
+ * The device specific ioctl range is 0x40 to 0x79.
+ */
+#define DRM_IOCTL_MACH64_INIT           DRM_IOW( 0x40, drm_mach64_init_t)
+#define DRM_IOCTL_MACH64_IDLE           DRM_IO(  0x41)
+#define DRM_IOCTL_MACH64_RESET          DRM_IO(  0x42)
+#define DRM_IOCTL_MACH64_SWAP           DRM_IO(  0x43)
+#define DRM_IOCTL_MACH64_CLEAR          DRM_IOW( 0x44, drm_mach64_clear_t)
+#define DRM_IOCTL_MACH64_VERTEX         DRM_IOW( 0x45, drm_mach64_vertex_t)
+#define DRM_IOCTL_MACH64_BLIT           DRM_IOW( 0x46, drm_mach64_blit_t)
+#define DRM_IOCTL_MACH64_FLUSH          DRM_IO(  0x47)
+
 
 typedef struct drm_mach64_init {
 	enum {
-		MACH64_INIT_DMA = 0x01,
-		MACH64_CLEANUP_DMA = 0x02
+		DRM_MACH64_INIT_DMA = 0x01,
+		DRM_MACH64_CLEANUP_DMA = 0x02
 	} func;
 
 	unsigned int sarea_priv_offset;
@@ -174,7 +185,6 @@ typedef struct drm_mach64_init {
 
 	unsigned int depth_bpp;
 	unsigned int depth_offset, depth_pitch;
-	unsigned int span_offset;
 
 	unsigned int fb_offset;
 	unsigned int mmio_offset;

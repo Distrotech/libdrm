@@ -29,6 +29,8 @@
 #include <linux/config.h>
 #include "mach64.h"
 #include "drmP.h"
+#include "drm.h"
+#include "mach64_drm.h"
 #include "mach64_drv.h"
 #include "ati_pcigart.h"
 

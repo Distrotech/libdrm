@@ -32,6 +32,8 @@
 
 #include "mach64.h"
 #include "drmP.h"
+#include "drm.h"
+#include "mach64_drm.h"
 #include "mach64_drv.h"
 
 #include <linux/interrupt.h>	/* For task queue support */
@@ -1256,9 +1258,9 @@ int mach64_dma_init( struct inode *inode, struct file *filp,
 		return -EFAULT;
 
 	switch ( init.func ) {
-	case MACH64_INIT_DMA:
+	case DRM_MACH64_INIT_DMA:
 		return mach64_do_dma_init( dev, &init );
-	case MACH64_CLEANUP_DMA:
+	case DRM_MACH64_CLEANUP_DMA:
 		return mach64_do_cleanup_dma( dev );
 	}
 		
