@@ -80,7 +80,7 @@ int DRM(ctxbitmap_next)( drm_device_t *dev )
 						DRM_MEM_MAPS);
 				if(!ctx_sareas) {
 					clear_bit(bit, dev->ctx_bitmap);
-					up(&dev->struct_sem);
+					DRM_OS_UNLOCK;
 					return -1;
 				}
 				dev->context_sareas = ctx_sareas;
@@ -93,7 +93,7 @@ int DRM(ctxbitmap_next)( drm_device_t *dev )
 						DRM_MEM_MAPS);
 				if(!dev->context_sareas) {
 					clear_bit(bit, dev->ctx_bitmap);
-					up(&dev->struct_sem);
+					DRM_OS_UNLOCK;
 					return -1;
 				}
 				dev->context_sareas[bit] = NULL;

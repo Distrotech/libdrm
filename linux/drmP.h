@@ -729,6 +729,7 @@ extern int	DRM(sysctl_init)(drm_device_t *dev);
 extern int	DRM(sysctl_cleanup)(drm_device_t *dev);
 #endif
 
+#if defined(__linux__) && (LINUX_VERSION_CODE >= 0x020400)
                                /* ATI PCIGART support (ati_pcigart.h) */
 extern int            DRM(ati_pcigart_init)(drm_device_t *dev,
 					    unsigned long *addr,
@@ -736,6 +737,7 @@ extern int            DRM(ati_pcigart_init)(drm_device_t *dev,
 extern int            DRM(ati_pcigart_cleanup)(drm_device_t *dev,
 					       unsigned long addr,
 					       dma_addr_t bus_addr);
+#endif
 
 #endif /* __KERNEL__ */
 #endif

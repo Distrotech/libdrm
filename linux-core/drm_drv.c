@@ -87,6 +87,9 @@
 #ifndef __HAVE_KERNEL_CTX_SWITCH
 #define __HAVE_KERNEL_CTX_SWITCH	0
 #endif
+#ifndef PCI_ANY_ID
+#define PCI_ANY_ID	~0
+#endif
 
 #ifndef DRIVER_PREINIT
 #define DRIVER_PREINIT()
@@ -734,14 +737,14 @@ static int DRM(init)( device_t nbdev )
 	if (DRM(numdevs) <= 0)
 		DRM(numdevs) = 1;
 
-	DRM(device) = kmalloc(sizeof(*DRM(device)) * DRM(numdevs), GFP_KERNEL);
+	DRM(device) = DRM_OS_MALLOC(sizeof(*DRM(device)) * DRM(numdevs));
 	if (!DRM(device)) {
-		return -ENOMEM;
+		DRM_OS_RETURN(ENOMEM);
 	}
-	DRM(minor) = kmalloc(sizeof(*DRM(minor)) * DRM(numdevs), GFP_KERNEL);
+	DRM(minor) = DRM_OS_MALLOC(*(DRM(minor)) * DRM(numdevs));
 	if (!DRM(minor)) {
-		kfree(DRM(device));
-		return -ENOMEM;
+		DRM_OS_FREE(DRM(device));
+		DRM_OS_RETURN(ENOMEM);
 	}
 
 	DRIVER_PREINIT();
@@ -796,7 +799,7 @@ static int DRM(init)( device_t nbdev )
 			destroy_dev(dev->devnode);
 #endif
 			DRM(takedown)( dev );
-			return -ENOMEM;
+			DRM_OS_RETURN(ENOMEM);
 		}
 #endif
 #if __REALLY_HAVE_MTRR
@@ -943,16 +946,16 @@ int DRM( open)(dev_t kdev, int flags, int fmt, struct proc *p)
 	int i;
 
 	for (i = 0; i < DRM(numdevs); i++) {
-		if (MINOR(inode->i_rdev) == DRM(minor)[i]) {
 #ifdef __linux__
+		if (MINOR(inode->i_rdev) == DRM(minor)[i]) {
 			dev = &(DRM(device)[i]);
-#endif
-#ifdef __FreeBSD__
-			/* FIXME ??? - multihead */
-			dev    = DRIVER_SOFTC(minor(kdev));
-#endif
 			break;
 		}
+#endif
+#ifdef __FreeBSD__
+		/* FIXME ??? - multihead */
+		dev    = DRIVER_SOFTC(minor(kdev));
+#endif
 	}
 	if (!dev) {
 		DRM_OS_RETURN(ENODEV);
