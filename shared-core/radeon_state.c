@@ -717,16 +717,7 @@ static void radeon_cp_dispatch_swap( drm_device_t *dev )
 	drm_clip_rect_t *pbox = sarea_priv->boxes;
 	int i;
 	RING_LOCALS;
-	printk( "%s\n", __FUNCTION__ );
-
-
-	BEGIN_RING( 2 );
-	RADEON_WAIT_UNTIL_IDLE();
-	ADVANCE_RING();
-	
-	radeon_emit_irq( dev );
-/* 	return; */
-
+	DRM_DEBUG( "\n" );
 
 	/* Do some trivial performance monitoring...
 	 */

@@ -60,15 +60,13 @@ void DRM(dma_service)(int irq, void *device, struct pt_regs *regs)
 	/* Need to wait for fifo to drain?
 	 */
        	temp = RADEON_READ(RADEON_GEN_INT_STATUS);  
-	printk("%s %x\n", __FUNCTION__, temp);
-
      	temp = temp & RADEON_SW_INT_TEST_ACK;  
      	if(temp == 0) return;  
   	RADEON_WRITE(RADEON_GEN_INT_STATUS, temp);  
 
    	atomic_inc(&dev_priv->irq_received);
-/*     	queue_task(&dev->tq, &tq_immediate);  */
-/*     	mark_bh(IMMEDIATE_BH);  */
+     	queue_task(&dev->tq, &tq_immediate);  
+     	mark_bh(IMMEDIATE_BH);  
 }
 
 void DRM(dma_immediate_bh)(void *device)
@@ -77,7 +75,7 @@ void DRM(dma_immediate_bh)(void *device)
       	drm_radeon_private_t *dev_priv = 
 	   (drm_radeon_private_t *)dev->dev_private;
 
-   	wake_up_interruptible(&dev_priv->irq_queue);
+    	wake_up_interruptible(&dev_priv->irq_queue); 
 }
 
 
@@ -88,13 +86,9 @@ int radeon_emit_irq(drm_device_t *dev)
 
    	atomic_inc(&dev_priv->irq_emitted);
 
-	printk("Emitting irq\n");
-
-    	BEGIN_RING(4); 
+    	BEGIN_RING(2); 
 	OUT_RING( CP_PACKET0( RADEON_GEN_INT_STATUS, 0 ) );
 	OUT_RING( RADEON_SW_INT_FIRE );
-	OUT_RING( CP_PACKET0( RADEON_GEN_INT_STATUS, 0 ) );
-	OUT_RING( 0 );
       	ADVANCE_RING(); 
  	COMMIT_RING();
 
@@ -108,9 +102,12 @@ int radeon_wait_irq(drm_device_t *dev, int irq_nr)
   	drm_radeon_private_t *dev_priv = 
 	   (drm_radeon_private_t *)dev->dev_private;
 	unsigned long end = jiffies + HZ*3;
+	int ret = 0;
 
-	if (atomic_read(&dev_priv->irq_received) >= irq_nr) 
-		return 0;
+/* 	if (atomic_read(&dev_priv->irq_received) >= irq_nr)  */
+/* 		return 0; */
+
+	dev_priv->stats.boxes |= RADEON_BOX_WAIT_IDLE;
 
    	add_wait_queue(&dev_priv->irq_queue, &entry);
    
@@ -119,17 +116,19 @@ int radeon_wait_irq(drm_device_t *dev, int irq_nr)
 	   	if (atomic_read(&dev_priv->irq_received) >= irq_nr) 
 		   break;
 		if((signed)(end - jiffies) <= 0) {
-		   	DRM_ERROR("lockup or missed irq\n");
-		   	return -EBUSY;	/* ? */
+		   	ret = -EBUSY;	/* ? */
+			break;
 		}	   
 	      	schedule_timeout(HZ*3);
-	      	if (signal_pending(current)) 
-		   	return -EINTR;
+	      	if (signal_pending(current)) {
+		   	ret = -EINTR;
+			break;
+		}
 	}
    
    	current->state = TASK_RUNNING;
    	remove_wait_queue(&dev_priv->irq_queue, &entry);
-	return 0;
+	return ret;
 }
 
 
@@ -139,12 +138,16 @@ int radeon_emit_and_wait_irq(drm_device_t *dev)
 }
 
 
+/* Needs the lock as it touches the ring.
+ */
 int radeon_irq_emit( DRM_IOCTL_ARGS )
 {
 	DRM_DEVICE;
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	drm_radeon_irq_emit_t emit;
 	int result;
+
+	LOCK_TEST_WITH_RETURN( dev );
 
 	if ( !dev_priv ) {
 		DRM_ERROR( "%s called with no initialization\n", __func__ );
@@ -165,6 +168,8 @@ int radeon_irq_emit( DRM_IOCTL_ARGS )
 }
 
 
+/* Doesn't need the hardware lock.
+ */
 int radeon_irq_wait( DRM_IOCTL_ARGS )
 {
 	DRM_DEVICE;

@@ -132,14 +132,9 @@
 
 
 #define __HAVE_DMA_IRQ		1
-/* #define __HAVE_DMA_IRQ_BH	1 */
+#define __HAVE_DMA_IRQ_BH	1 
 #define __HAVE_SHARED_IRQ       1
 
-#if 0
-#define DRIVER_PREINSTALL()
-#define DRIVER_POSTINSTALL()
-#define DRIVER_UNINSTALL() 
-#else
 #define DRIVER_PREINSTALL() do {				\
 	drm_radeon_private_t *dev_priv =			\
 		(drm_radeon_private_t *)dev->dev_private;	\
@@ -158,11 +153,13 @@
 	drm_radeon_private_t *dev_priv =			\
 		(drm_radeon_private_t *)dev->dev_private;	\
 								\
+   	atomic_set(&dev_priv->irq_received, 0);			\
+   	atomic_set(&dev_priv->irq_emitted, 0);			\
+	init_waitqueue_head(&dev_priv->irq_queue);		\
+								\
 	/* Turn on SW_INT only */				\
-   	RADEON_WRITE( RADEON_GEN_INT_CNTL, 			\
+   	RADEON_WRITE( RADEON_GEN_INT_CNTL,			\
 		      RADEON_SW_INT_ENABLE );			\
-	/* practise fire */				\
-   	RADEON_WRITE( RADEON_GEN_INT_STATUS, RADEON_SW_INT_FIRE );		\
 } while (0)
 
 #define DRIVER_UNINSTALL() do {					\
@@ -173,7 +170,6 @@
 		RADEON_WRITE( RADEON_GEN_INT_CNTL, 0 );		\
 	}							\
 } while (0)
-#endif
 
 /* Buffer customization:
  */
