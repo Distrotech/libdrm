@@ -806,7 +806,7 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 		/* check DMA addressing limitations */
 		DRM_INFO( "Setting 32-bit pci dma mask\n" );
 		if ((ret=pci_set_dma_mask( dev->pdev, 0xffffffff ))) {
-			DRM_INFO( "Setting 32-bit pci dma mask failed\n" );
+			DRM_ERROR( "Setting 32-bit pci dma mask failed\n" );
 			mach64_do_cleanup_dma( dev );
 			return ret;
 		}
