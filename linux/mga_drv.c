@@ -351,7 +351,6 @@ static int mga_init(void)
 #ifdef MODULE
 	drm_parse_options(mga);
 #endif
-	DRM_DEBUG("doing misc_register\n");
 	if ((retcode = misc_register(&mga_misc))) {
 		DRM_ERROR("Cannot register \"%s\"\n", MGA_NAME);
 		return retcode;
@@ -359,11 +358,8 @@ static int mga_init(void)
 	dev->device = MKDEV(MISC_MAJOR, mga_misc.minor);
 	dev->name   = MGA_NAME;
 
-   	DRM_DEBUG("doing mem init\n");
 	drm_mem_init();
-	DRM_DEBUG("doing proc init\n");
 	drm_proc_init(dev);
-	DRM_DEBUG("doing agp init\n");
 	dev->agp    = drm_agp_init();
       	if(dev->agp == NULL) {
 	   	DRM_INFO("The mga drm module requires the agpgart module"
@@ -380,7 +376,6 @@ static int mga_init(void)
 				      MTRR_TYPE_WRCOMB,
 				      1);
 #endif
-	DRM_DEBUG("doing ctxbitmap init\n");
 	if((retcode = drm_ctxbitmap_init(dev))) {
 		DRM_ERROR("Cannot allocate memory for context bitmap.\n");
 		drm_proc_cleanup();
@@ -508,9 +503,18 @@ int mga_release(struct inode *inode, struct file *filp)
 	if (dev->lock.hw_lock && _DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)
 	    && dev->lock.pid == current->pid) {
 	      	mga_reclaim_buffers(dev, priv->pid);
-		DRM_ERROR("Process %d dead, freeing lock for context %d\n",
-			  current->pid,
-			  _DRM_LOCKING_CONTEXT(dev->lock.hw_lock->lock));
+		DRM_INFO("Process %d dead (ctx %d, d_s = 0x%02x)\n",
+			 current->pid,
+			 _DRM_LOCKING_CONTEXT(dev->lock.hw_lock->lock),
+			 dev->dev_private ?
+			 ((drm_mga_private_t *)dev->dev_private)
+			 ->dispatch_status
+			 : 0);
+
+		if (dev->dev_private)
+			((drm_mga_private_t *)dev->dev_private)
+				->dispatch_status &= MGA_IN_DISPATCH;
+		
 		drm_lock_free(dev,
 			      &dev->lock.hw_lock->lock,
 			      _DRM_LOCKING_CONTEXT(dev->lock.hw_lock->lock));
@@ -545,10 +549,12 @@ int mga_release(struct inode *inode, struct file *filp)
 				break;
 			}
 		}
-		current->state = TASK_RUNNING;
 		remove_wait_queue(&dev->lock.lock_queue, &entry);
 	   	if(!retcode) {
 		   	mga_reclaim_buffers(dev, priv->pid);
+			if (dev->dev_private)
+				((drm_mga_private_t *)dev->dev_private)
+					->dispatch_status &= MGA_IN_DISPATCH;
 		   	drm_lock_free(dev, &dev->lock.hw_lock->lock,
 				      DRM_KERNEL_CONTEXT);
 		}
@@ -653,9 +659,7 @@ int mga_unlock(struct inode *inode, struct file *filp, unsigned int cmd,
 	mga_dma_schedule(dev, 1);
 
 	if (drm_lock_free(dev, &dev->lock.hw_lock->lock,
-			  DRM_KERNEL_CONTEXT)) {
-	   DRM_ERROR("\n");
-	}
+			  DRM_KERNEL_CONTEXT)) DRM_ERROR("\n");
 
 	unblock_all_signals();
 	return 0;

@@ -35,9 +35,7 @@
 
 static int mga_alloc_queue(drm_device_t *dev)
 {
-   	int temp = drm_ctxbitmap_next(dev);
-   	DRM_DEBUG("mga_alloc_queue: %d\n", temp);
-	return temp;
+   	return drm_ctxbitmap_next(dev);
 }
 
 int mga_context_switch(drm_device_t *dev, int old, int new)
@@ -102,7 +100,6 @@ int mga_resctx(struct inode *inode, struct file *filp, unsigned int cmd,
 	drm_ctx_t	ctx;
 	int		i;
 
-	DRM_DEBUG("%d\n", DRM_RESERVED_CONTEXTS);
 	if (copy_from_user(&res, (drm_ctx_res_t *)arg, sizeof(res)))
 		return -EFAULT;
 	if (res.count >= DRM_RESERVED_CONTEXTS) {
@@ -135,8 +132,6 @@ int mga_addctx(struct inode *inode, struct file *filp, unsigned int cmd,
 		ctx.handle = mga_alloc_queue(dev);
 	}
         if (ctx.handle == -1) {
-		DRM_DEBUG("Not enough free contexts.\n");
-				/* Should this return -EBUSY instead? */
 		return -ENOMEM;
 	}
 	DRM_DEBUG("%d\n", ctx.handle);

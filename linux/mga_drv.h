@@ -50,7 +50,7 @@ typedef struct {
 } drm_mga_prim_buf_t;
 
 typedef struct _drm_mga_freelist {
-   	unsigned int age;
+   	__volatile__ unsigned int age;
    	drm_buf_t *buf;
    	struct _drm_mga_freelist *next;
    	struct _drm_mga_freelist *prev;

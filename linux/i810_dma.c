@@ -252,16 +252,15 @@ static int i810_dma_get_buffer(drm_device_t *dev, drm_i810_dma_t *d,
 	buf = i810_freelist_get(dev);
 	if (!buf) {
 		retcode = -ENOMEM;
-	   	DRM_DEBUG("%s retcode %d\n", __FUNCTION__, retcode);
-		goto out_get_buf;
+	   	DRM_DEBUG("retcode=%d\n", retcode);
+		return retcode;
 	}
    
 	retcode = i810_map_buffer(buf, filp);
 	if(retcode) {
 		i810_freelist_put(dev, buf);
-	   	DRM_DEBUG("mapbuf failed in %s retcode %d\n", 
-			  __FUNCTION__, retcode);
-	   	goto out_get_buf;
+	   	DRM_DEBUG("mapbuf failed, retcode %d\n", retcode);
+		return retcode;
 	}
 	buf->pid     = priv->pid;
 	buf_priv = buf->dev_private;	
@@ -270,7 +269,6 @@ static int i810_dma_get_buffer(drm_device_t *dev, drm_i810_dma_t *d,
    	d->request_size = buf->total;
    	d->virtual = buf_priv->virtual;
 
-out_get_buf:
 	return retcode;
 }
 
