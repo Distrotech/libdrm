@@ -623,10 +623,10 @@ extern int RADEON_READ_PLL( drm_device_t *dev, int addr );
 #define LOCK_TEST_WITH_RETURN( dev )					\
 do {									\
 	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||		\
-	     dev->lock.pid != current->pid ) {				\
+	     dev->lock.pid != DRM_OS_CURRENTPID ) {				\
 		DRM_ERROR( "%s called without lock held\n",		\
 			   __FUNCTION__ );				\
-		return -EINVAL;						\
+		DRM_OS_RETURN( EINVAL );						\
 	}								\
 } while (0)
 
@@ -638,10 +638,10 @@ do {									\
 			radeon_update_ring_snapshot( ring );		\
 			if ( ring->space >= ring->high_mark )		\
 				goto __ring_space_done;			\
-			udelay( 1 );					\
+			DRM_OS_DELAY( 1 );					\
 		}							\
 		DRM_ERROR( "ring space check failed!\n" );		\
-		return -EBUSY;						\
+		DRM_OS_RETURN( EBUSY );						\
 	}								\
  __ring_space_done:							\
 } while (0)

@@ -38,6 +38,7 @@
 #include <pci/agpvar.h>
 #endif
 
+#define DRM_WEIRD_MAPBUFS_BUG	1
 #define DRM_TIME_SLICE	      (hz/20)  /* Time slice for GLXContexts	  */
 
 #define DRM_DEV_MODE	(S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)

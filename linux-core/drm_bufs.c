@@ -1075,7 +1075,7 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 #ifdef __FreeBSD__
 			retcode = vm_mmap(&p->p_vmspace->vm_map,
 					  &virtual,
-					  round_page(dma->byte_count),
+					  round_page(map->size),
 					  PROT_READ|PROT_WRITE, VM_PROT_ALL,
 					  MAP_SHARED,
 					  SLIST_FIRST(&kdev->si_hlist),

@@ -109,6 +109,7 @@ static int mga_probe(device_t dev)
 #include "drm_ioctl.h"
 #include "drm_lock.h"
 #include "drm_memory.h"
+#include "drm_vm.h"
 #ifdef __linux__
 #include "drm_proc.h"
 #include "drm_stub.h"
@@ -116,7 +117,6 @@ static int mga_probe(device_t dev)
 #ifdef __FreeBSD__
 #include "drm_sysctl.h"
 #endif
-#include "drm_vm.h"
 
 #ifdef __FreeBSD__
 DRIVER_MODULE(mga, pci, mga_driver, mga_devclass, 0, 0);

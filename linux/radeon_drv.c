@@ -27,11 +27,24 @@
  *    Gareth Hughes <gareth@valinux.com>
  */
 
+
+#ifdef __linux__
 #include <linux/config.h>
+#endif
+
+#ifdef __FreeBSD__
+#include <sys/types.h>
+#include <sys/bus.h>
+#include <pci/pcivar.h>
+#include <opt_drm_linux.h>
+#endif
+
 #include "radeon.h"
 #include "drmP.h"
 #include "radeon_drv.h"
+#if __REALLY_HAVE_SG
 #include "ati_pcigart.h"
+#endif
 
 #define DRIVER_AUTHOR		"Gareth Hughes, VA Linux Systems Inc."
 
@@ -42,6 +55,31 @@
 #define DRIVER_MAJOR		1
 #define DRIVER_MINOR		1
 #define DRIVER_PATCHLEVEL	1
+
+#ifdef __FreeBSD__
+static int radeon_probe(device_t dev)
+{
+	const char *s = 0;
+
+	switch (pci_get_devid(dev)) {
+	/* FIXME: Add radeon detection*/
+		/*case 0x0525102b:
+		s = "Matrox MGA G400 AGP graphics accelerator";
+		break;
+
+	case 0x0521102b:
+		s = "Matrox MGA G200 AGP graphics accelerator";
+		break; */
+	}
+
+	if (s) {
+		device_set_desc(dev, s);
+		return 0;
+	}
+
+	return ENXIO;
+}
+#endif
 
 #define DRIVER_IOCTLS							     \
  [DRM_IOCTL_NR(DRM_IOCTL_DMA)]               = { radeon_cp_buffers,  1, 0 }, \
@@ -83,7 +121,18 @@
 #include "drm_ioctl.h"
 #include "drm_lock.h"
 #include "drm_memory.h"
-#include "drm_proc.h"
 #include "drm_vm.h"
+#ifdef __linux__
+#include "drm_proc.h"
 #include "drm_stub.h"
+#endif
+#ifdef __FreeBSD__
+#include "drm_sysctl.h"
+#endif
+#if __REALLY_HAVE_SG
 #include "drm_scatter.h"
+#endif
+
+#ifdef __FreeBSD__
+DRIVER_MODULE(radeon, pci, radeon_driver, radeon_devclass, 0, 0);
+#endif

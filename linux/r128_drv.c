@@ -75,6 +75,9 @@ static int r128_probe(device_t dev)
 	case 0x524c1002:
 		s = "ATI Rage 128-RL";
 		break;
+	case 0x50461002:
+		s = "ATI Rage 128 Pro PF";
+		break;
 	}
 
 	if (s) {

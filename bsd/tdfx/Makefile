@@ -2,7 +2,7 @@
 
 KMOD=	tdfx
 NOMAN=	YES
-SRCS=		tdfx_drv.c
+SRCS=	tdfx_drv.c
 SRCS+=	device_if.h bus_if.h pci_if.h opt_drm_linux.h
 CFLAGS+=	${DEBUG_FLAGS} -I. -I.. 
 
