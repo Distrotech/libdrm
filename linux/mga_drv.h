@@ -44,6 +44,7 @@ typedef struct {
    	int swap_pending;
    	u32 in_use;
    	atomic_t force_fire;
+   	atomic_t needs_overflow;
 } drm_mga_prim_buf_t;
 
 typedef struct _drm_mga_freelist {

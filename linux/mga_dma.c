@@ -467,48 +467,49 @@ out_prim_wait:
 
 int mga_advance_primary(drm_device_t *dev)
 {
-      	DECLARE_WAITQUEUE(entry, current);
-   	drm_mga_private_t *dev_priv = dev->dev_private;
-	drm_mga_prim_buf_t *prim_buffer;
-   	drm_device_dma_t  *dma	    = dev->dma;
-   	int next_prim_idx;
-   	int ret = 0;
+           DECLARE_WAITQUEUE(entry, current);
+           drm_mga_private_t *dev_priv = dev->dev_private;
+           drm_mga_prim_buf_t *prim_buffer;
+           drm_device_dma_t  *dma      = dev->dma;
+           int next_prim_idx;
+           int ret = 0;
    
-   	/* This needs to reset the primary buffer if available,
-    	* we should collect stats on how many times it bites
-    	* it's tail */
-   	next_prim_idx = dev_priv->current_prim_idx + 1;
-   	if(next_prim_idx >= MGA_NUM_PRIM_BUFS) 
-     		next_prim_idx = 0;
-   	prim_buffer = dev_priv->prim_bufs[next_prim_idx];
-   	/* In use is cleared in interrupt handler */
-	atomic_set(&dev_priv->in_wait, 1);
-   	if(test_and_set_bit(0, &prim_buffer->in_use)) {
-	   	add_wait_queue(&dev_priv->wait_queue, &entry);
-		for (;;) {
-		   	current->state = TASK_INTERRUPTIBLE;
-		   	mga_dma_schedule(dev, 0);
-		   	if(!test_and_set_bit(0, &prim_buffer->in_use)) break;
-		   	atomic_inc(&dev->total_sleeps);
-		   	atomic_inc(&dma->total_missed_sched);
-		   	schedule_timeout(HZ/60);
-			if (signal_pending(current)) {
-				ret = -ERESTARTSYS;
-				break;
-			}
-		}
-		current->state = TASK_RUNNING;
-		remove_wait_queue(&dev_priv->wait_queue, &entry);
-	   	if(ret) return ret;
-	}
-   	atomic_set(&dev_priv->in_wait, 0);
-   	/* This primary buffer is now free to use */
-   	prim_buffer->current_dma_ptr = prim_buffer->head;
-   	prim_buffer->num_dwords = 0;
-   	prim_buffer->sec_used = 0;
-      	dev_priv->current_prim = prim_buffer;
-   	dev_priv->current_prim_idx = next_prim_idx;
-   	return 0;
+           /* This needs to reset the primary buffer if available,
+	    * we should collect stats on how many times it bites
+	    * it's tail */
+           next_prim_idx = dev_priv->current_prim_idx + 1;
+           if(next_prim_idx >= MGA_NUM_PRIM_BUFS)
+                     next_prim_idx = 0;
+           prim_buffer = dev_priv->prim_bufs[next_prim_idx];
+           /* In use is cleared in interrupt handler */
+           atomic_set(&dev_priv->in_wait, 1);
+           if(test_and_set_bit(0, &prim_buffer->in_use)) {
+	      add_wait_queue(&dev_priv->wait_queue, &entry);
+	      for (;;) {
+		 current->state = TASK_INTERRUPTIBLE;
+		 mga_dma_schedule(dev, 0);
+		 if(!test_and_set_bit(0, &prim_buffer->in_use)) break;
+		 atomic_inc(&dev->total_sleeps);
+		 atomic_inc(&dma->total_missed_sched);
+		 schedule_timeout(HZ/60);
+		 if (signal_pending(current)) {
+		    ret = -ERESTARTSYS;
+		    break;
+		 }
+	      }
+	      current->state = TASK_RUNNING;
+	      remove_wait_queue(&dev_priv->wait_queue, &entry);
+	      if(ret) return ret;
+	   }
+           atomic_set(&dev_priv->in_wait, 0);
+           /* This primary buffer is now free to use */
+           prim_buffer->current_dma_ptr = prim_buffer->head;
+           prim_buffer->num_dwords = 0;
+           prim_buffer->sec_used = 0;
+   	   atomic_set(&prim_buffer->needs_overflow, 0);
+           dev_priv->current_prim = prim_buffer;
+           dev_priv->current_prim_idx = next_prim_idx;
+           return 0;
 }
 
 /* More dynamic performance decisions */
@@ -558,12 +559,15 @@ int mga_dma_schedule(drm_device_t *dev, int locked)
 	   	/* Fire dma buffer */
 	   	if(mga_decide_to_fire(dev)) {
 		   	DRM_DEBUG("mga_fire_primary\n");
-		   	atomic_set(&dev_priv->next_prim->force_fire, 0);
-		   	if(dev_priv->current_prim == dev_priv->next_prim) {
-			   	mga_advance_primary(dev);
-			}
-	     		mga_fire_primary(dev, 
+		   	mga_fire_primary(dev, 
 					 dev_priv->next_prim);
+		   	if(dev_priv->current_prim == dev_priv->next_prim) {
+			   /* Schedule overflow for a later time */
+			   atomic_set(&dev_priv->current_prim->needs_overflow, 
+				      1);
+			}
+		   	atomic_set(&dev_priv->next_prim->force_fire, 0);
+
 		   	DRM_DEBUG("idx :%d\n", dev_priv->next_prim->idx);
 		} else {
 		   clear_bit(0, &dev_priv->dispatch_lock);
