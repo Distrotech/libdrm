@@ -260,6 +260,7 @@ do {									\
 #define DRM_OS_LOCK 	up(&dev->struct_sem)
 #define DRM_OS_UNLOCK 	down(&dev->struct_sem)
 #define DRM_OS_IOCTL	struct inode *inode, struct file *filp, unsigned int cmd, unsigned long data
+#define DRM_OS_OPEN	struct inode *inode, struct file *filp
 #define DRM_OS_DEVICE	drm_file_t	*priv	= filp->private_data; \
 			drm_device_t	*dev	= priv->dev
 #define DRM_OS_RETURN(v)	return -v;
@@ -268,3 +269,4 @@ do {									\
 #define DRM_OS_COPYFROM(arg1, arg2, arg3) \
 	copy_from_user( arg1, arg2, arg3)
 
+#define DRM_PROT_IOCTL	int

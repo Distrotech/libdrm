@@ -28,9 +28,14 @@
 #include <pci/agpvar.h>
 #endif
 
+#define DRM_DEV_MODE	(S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)
+#define DRM_DEV_UID	0
+#define DRM_DEV_GID	0
+
 #define DRM_OS_LOCK	lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, curproc)
 #define DRM_OS_UNLOCK 	lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc)
 #define DRM_OS_IOCTL	dev_t kdev, u_long cmd, caddr_t data, int flags, struct proc *p
+#define DRM_OS_OPEN	/*dev_t kdev, int flags, int fmt, struct proc *p*/
 #define DRM_OS_DEVICE	drm_file_t	*priv; \
 			drm_device_t	*dev	= kdev->si_drv1
 #define DRM_OS_RETURN(v)	return v;
@@ -40,9 +45,12 @@
 #define DRM_OS_COPYFROM(arg1, arg2, arg3) \
 	copyin( arg2, arg1, arg3 )
 
+#define DRM_PROT_IOCTL	d_ioctl_t
+
 typedef u_int32_t atomic_t;
 typedef u_int32_t cycles_t;
 typedef u_int32_t spinlock_t;
+typedef u_int32_t u32;
 #define atomic_set(p, v)	(*(p) = (v))
 #define atomic_read(p)		(*(p))
 #define atomic_inc(p)		atomic_add_long(p, 1)
@@ -105,8 +113,8 @@ find_first_zero_bit(volatile unsigned long *p, int max)
  * Fake out the module macros for versions of FreeBSD where they don't
  * exist.
  */
-#if __FreeBSD_version < 400002
-
+#if (__FreeBSD_version < 500002 && __FreeBSD_version > 500000) || __FreeBSD_version < 420000
+/* FIXME: again, what's the exact date? */
 #define MODULE_VERSION(a,b)		struct __hack
 #define MODULE_DEPEND(a,b,c,d,e)	struct __hack
 
