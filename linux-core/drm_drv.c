@@ -931,12 +931,11 @@ int DRM( close)(dev_t kdev, int flags, int fmt, struct proc *p)
 					     DRM_KERNEL_CONTEXT ) ) {
 #ifdef __linux__
 				dev->lock.pid	    = priv->pid;
-				dev->lock.lock_time = jiffies;
 #endif
 #ifdef __FreeBSD__
 				dev->lock.pid       = p->p_pid;
-				dev->lock.lock_time = ticks;
 #endif
+				dev->lock.lock_time = jiffies;
                                 atomic_inc( &dev->counts[_DRM_STAT_LOCKS] );
 				break;	/* Got lock */
 			}
@@ -1195,12 +1194,7 @@ int DRM(lock)( DRM_OS_IOCTL )
                         if ( DRM(lock_take)( &dev->lock.hw_lock->lock,
 					     lock.context ) ) {
                                 dev->lock.pid       = DRM_OS_CURRENTPID;
-#ifdef __linux__
                                 dev->lock.lock_time = jiffies;
-#endif
-#ifdef __FreeBSD__
-				dev->lock.lock_time = ticks;
-#endif
                                 atomic_inc( &dev->counts[_DRM_STAT_LOCKS] );
                                 break;  /* Got lock */
                         }

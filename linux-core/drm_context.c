@@ -249,12 +249,7 @@ int DRM(context_switch)( drm_device_t *dev, int old, int new )
 int DRM(context_switch_complete)( drm_device_t *dev, int new )
 {
         dev->last_context = new;  /* PRE/POST: This is the _only_ writer. */
-#ifdef __linux__
         dev->last_switch  = jiffies;
-#endif
-#ifdef __FreeBSD__
-        dev->last_switch  = ticks;
-#endif
 
         if ( !_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock) ) {
                 DRM_ERROR( "Lock isn't held after context switch\n" );

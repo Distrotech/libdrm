@@ -340,6 +340,41 @@ extern int	DRM(freebufs)( DRM_OS_IOCTL );
 extern int	DRM(mapbufs)( DRM_OS_IOCTL );
 #endif
 
+/* Mapping support (drm_vm.h) */
+#if LINUX_VERSION_CODE < 0x020317
+extern unsigned long DRM(vm_nopage)(struct vm_area_struct *vma,
+				    unsigned long address,
+				    int write_access);
+extern unsigned long DRM(vm_shm_nopage)(struct vm_area_struct *vma,
+					unsigned long address,
+					int write_access);
+extern unsigned long DRM(vm_dma_nopage)(struct vm_area_struct *vma,
+					unsigned long address,
+					int write_access);
+extern unsigned long DRM(vm_sg_nopage)(struct vm_area_struct *vma,
+				       unsigned long address,
+				       int write_access);
+#else
+				/* Return type changed in 2.3.23 */
+extern struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
+				   unsigned long address,
+				   int write_access);
+extern struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
+				       unsigned long address,
+				       int write_access);
+extern struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
+				       unsigned long address,
+				       int write_access);
+extern struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
+				      unsigned long address,
+				      int write_access);
+#endif
+extern void	     DRM(vm_open)(struct vm_area_struct *vma);
+extern void	     DRM(vm_close)(struct vm_area_struct *vma);
+extern void	     DRM(vm_shm_close)(struct vm_area_struct *vma);
+extern int	     DRM(mmap_dma)(struct file *filp,
+				   struct vm_area_struct *vma);
+
 /* DMA support (drm_dma.h) */
 #if __HAVE_DMA_IRQ
 extern int	DRM(control)( DRM_OS_IOCTL );

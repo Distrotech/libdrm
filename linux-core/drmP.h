@@ -582,41 +582,6 @@ extern int           DRM(open_helper)(dev_t kdev, int flags, int fmt,
 extern drm_file_t    *DRM(find_file_by_proc)(drm_device_t *dev, struct proc *p);
 #endif
 
-				/* Mapping support (drm_vm.h) */
-#if LINUX_VERSION_CODE < 0x020317
-extern unsigned long DRM(vm_nopage)(struct vm_area_struct *vma,
-				    unsigned long address,
-				    int write_access);
-extern unsigned long DRM(vm_shm_nopage)(struct vm_area_struct *vma,
-					unsigned long address,
-					int write_access);
-extern unsigned long DRM(vm_dma_nopage)(struct vm_area_struct *vma,
-					unsigned long address,
-					int write_access);
-extern unsigned long DRM(vm_sg_nopage)(struct vm_area_struct *vma,
-				       unsigned long address,
-				       int write_access);
-#else
-				/* Return type changed in 2.3.23 */
-extern struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
-				   unsigned long address,
-				   int write_access);
-extern struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
-				       unsigned long address,
-				       int write_access);
-extern struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
-				       unsigned long address,
-				       int write_access);
-extern struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
-				      unsigned long address,
-				      int write_access);
-#endif
-extern void	     DRM(vm_open)(struct vm_area_struct *vma);
-extern void	     DRM(vm_close)(struct vm_area_struct *vma);
-extern void	     DRM(vm_shm_close)(struct vm_area_struct *vma);
-extern int	     DRM(mmap_dma)(struct file *filp,
-				   struct vm_area_struct *vma);
-
 				/* Memory management support (drm_memory.h) */
 extern void	     DRM(mem_init)(void);
 extern void	     *DRM(alloc)(size_t size, int area);
