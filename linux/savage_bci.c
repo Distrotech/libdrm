@@ -142,6 +142,7 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 		return DRM_ERR(EINVAL);
 	}
 
+	DRM_INFO( "looking for dma buffer region ...\n" );
 	DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
 	if(!dev_priv->buffers) {
 		DRM_ERROR("could not find dma buffer region!\n");

@@ -48,4 +48,13 @@
  [DRM_IOCTL_NR(DRM_IOCTL_SAVAGE_BCI_INIT)] = { savage_bci_init,	1, 1 },	\
  [DRM_IOCTL_NR(DRM_IOCTL_SAVAGE_VERTEX)] = { savage_bci_vertex,	1, 0 }, \
 
+/* DMA customization.
+ */
+#define __HAVE_DMA              1
+
+/* Buffer customization:
+ */
+#define DRIVER_AGP_BUFFERS_MAP( dev )				\
+	((drm_savage_private_t *)((dev)->dev_private))->buffers
+
 #endif
