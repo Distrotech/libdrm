@@ -197,13 +197,12 @@ static int mach64_ring_idle( drm_mach64_private_t *dev_priv )
 	i = 0;
 	while ( i < dev_priv->usec_timeout ) {
 		mach64_update_ring_snapshot( dev_priv );
-		if ( ring->head == ring->tail && !(MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE) ) {
-			if ( !(MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE) ) {
-				if (i > 0) {
-					DRM_DEBUG( "mach64_ring_idle: %d usecs\n", i );
-				}
-				return 0;
+		if ( ring->head == ring->tail && 
+		     !(MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE) ) {
+			if (i > 0) {
+				DRM_DEBUG( "mach64_ring_idle: %d usecs\n", i );
 			}
+			return 0;
 		} 
 		if ( ring->head == head ) {
 			++i;
