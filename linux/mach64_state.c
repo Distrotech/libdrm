@@ -438,7 +438,7 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 				u32 *p;
 
 				if (dev_priv->is_pci) {
-					address = (u32) virt_to_phys((void *)buf->address);
+					address = (u32) virt_to_bus((void *)buf->address);
 					p = (u32 *) buf->address;
 				} else {
 					address = (u32) buf->bus_address;
@@ -474,7 +474,7 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 
 				tableDwords += 4;
 #if MACH64_VERBOSE
-				DRM_INFO( "%s: %d bytes, buffer addr: 0x%08x\n", __FUNCTION__, size, address);
+				DRM_INFO( "%d bytes, buffer addr: 0x%08x\n", size, address);
 				table_ptr = (u32 *) dev_priv->cpu_addr_table;
 				for ( i = 0 ; i < tableDwords / 4 ; i++ ) {
 					DRM_INFO( "    entry: %x addr: %p cmd: 0x%x\n", i, 
