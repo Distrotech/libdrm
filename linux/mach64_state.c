@@ -373,12 +373,12 @@ static int mach64_dma_dispatch_swap( drm_device_t *dev )
 #endif
 	DMAADVANCE( dev_priv );
 
-	DMAFLUSH( dev_priv );
+	/*  DMAFLUSH( dev_priv ); */
 	return 0;
 }
 
-static int mach64_dma_dispatch_vertex( drm_device_t *dev,
-					drm_buf_t *buf )
+static int mach64_dma_dispatch_vertex( drm_device_t *dev, drm_buf_t *buf, 
+				       int prim, int discard )
 {
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
@@ -423,9 +423,6 @@ static int mach64_dma_dispatch_blit( drm_device_t *dev,
 {
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_device_dma_t *dma = dev->dma;
-#if 0	
-	drm_mach64_buf_priv_t *buf_priv;
-#endif
 	int dword_shift, dwords;
 	DMALOCALS; /* declares buf=NULL, p, outcount=0 */
 
@@ -466,16 +463,8 @@ static int mach64_dma_dispatch_blit( drm_device_t *dev,
 		DRM_ERROR( "sending pending buffer %d\n", blit->idx );
 		return -EINVAL;
 	}
-#if 0
-	buf_priv = buf->dev_private;
-	buf_priv->discard = 1;
-#endif
-	
-	if (dev_priv->is_pci) {
-		p = (u32 *) buf->address;
-	} else {
-		p = (u32 *)((char *)dev_priv->buffers->handle + buf->offset);
-	}
+
+	p = GETBUFPTR( buf );
 
 	dwords =  (blit->width * blit->height) >> dword_shift;
 	/* Add in a command for every 16 dwords */
@@ -552,7 +541,7 @@ int mach64_dma_clear( struct inode *inode, struct file *filp,
 		return -EFAULT;
 
 	VB_AGE_TEST_WITH_RETURN( dev_priv );
-	QUEUE_SPACE_TEST_WITH_RETURN( dev_priv );
+	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 	
 	if ( sarea_priv->nbox > MACH64_NR_SAREA_CLIPRECTS )
 		sarea_priv->nbox = MACH64_NR_SAREA_CLIPRECTS;
@@ -582,7 +571,7 @@ int mach64_dma_swap( struct inode *inode, struct file *filp,
 	LOCK_TEST_WITH_RETURN( dev );
 
 	VB_AGE_TEST_WITH_RETURN( dev_priv );
-	QUEUE_SPACE_TEST_WITH_RETURN( dev_priv );
+	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 	
 	if ( sarea_priv->nbox > MACH64_NR_SAREA_CLIPRECTS )
 		sarea_priv->nbox = MACH64_NR_SAREA_CLIPRECTS;
@@ -604,9 +593,6 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_t *buf;
-#if 0
-	drm_mach64_buf_priv_t *buf_priv;
-#endif
 	drm_mach64_vertex_t vertex;
 
 	LOCK_TEST_WITH_RETURN( dev );
@@ -637,7 +623,7 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 	}
 #endif
 	VB_AGE_TEST_WITH_RETURN( dev_priv );
-	QUEUE_SPACE_TEST_WITH_RETURN( dev_priv );
+	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 		
 	buf = dma->buflist[vertex.idx];
 	
@@ -652,12 +638,8 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 	}
 
 	buf->used = vertex.count;
-#if 0
-	buf_priv = buf->dev_private;
-	buf_priv->prim = vertex.prim;
-	buf_priv->discard = vertex.discard;
-#endif
-	return mach64_dma_dispatch_vertex( dev, buf );
+
+	return mach64_dma_dispatch_vertex( dev, buf, vertex.prim, vertex.discard );
 }
 
 int mach64_dma_blit( struct inode *inode, struct file *filp,
@@ -685,7 +667,7 @@ int mach64_dma_blit( struct inode *inode, struct file *filp,
 	}
 
 	VB_AGE_TEST_WITH_RETURN( dev_priv );
-	QUEUE_SPACE_TEST_WITH_RETURN( dev_priv );
+	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 
 	return mach64_dma_dispatch_blit( dev, &blit );
 

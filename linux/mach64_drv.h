@@ -45,6 +45,7 @@
 
 #define MACH64_USE_BUFFER_AGING   0
 #define MACH64_USE_FRAME_AGING    0
+#define MACH64_NO_BATCH_DISPATCH  0
 #define MACH64_DEFAULT_MODE       MACH64_MODE_DMA_ASYNC
 
 
@@ -54,9 +55,27 @@ typedef struct drm_mach64_freelist {
 #if MACH64_USE_BUFFER_AGING
 	unsigned int age;
 #else
-	u32 descr_addr;     /* physical address of last descriptor for this buffer */
+	u32 ring_ofs;     /* dword offset in ring of last descriptor for this buffer */
 #endif
 } drm_mach64_freelist_t;
+
+typedef struct drm_mach64_descriptor_ring {
+	dma_addr_t handle;
+	void *start;        /* write pointer (cpu address) to start of descriptor ring */
+	u32 start_addr;     /* bus address of beginning of descriptor ring */
+       	int size;           /* size of ring in bytes */
+
+	u32 head_addr;      /* bus address of descriptor ring head */
+	u32 head;           /* dword offset of descriptor ring head */
+	u32 tail;           /* dword offset of descriptor ring tail */
+	u32 tail_mask;      /* mask used to wrap ring */
+	int space;          /* number of free bytes in ring */
+
+	int last_cmd_ofs;   /* dword offset of DMA_COMMAND in the ring tail descriptor */
+	u32 last_cmd;       /* data in DMA_COMMAND in the ring tail descriptor */
+
+	int high_mark;      /* high water mark in bytes */
+} drm_mach64_descriptor_ring_t;
 
 typedef struct drm_mach64_private {
 	drm_mach64_sarea_t *sarea_priv;
@@ -67,6 +86,21 @@ typedef struct drm_mach64_private {
 		MACH64_MODE_DMA_SYNC,
 		MACH64_MODE_DMA_ASYNC
 	} driver_mode;
+
+	int usec_timeout;      /* Number of microseconds to wait in the idle functions */
+
+	atomic_t dma_timeout;  /* Number of interrupt dispatches since last DMA dispatch */
+	atomic_t do_gui;       /* Flag for the bottom half to know what to do */
+	atomic_t do_blit;      /* Flag for the bottom half to know what to do */
+
+	/* DMA descriptor table (ring buffer) */
+	struct pci_pool *pool;   /* DMA memory pool */
+	drm_mach64_descriptor_ring_t ring;
+	
+	struct list_head free_list;     /* Free-list head  */
+	struct list_head placeholders;    /* Free-list placeholder list  */
+	struct list_head pending;    	/* Pending submission placeholder  */
+	struct list_head dma_queue;     /* Submission queue head  */
 
 	unsigned int fb_bpp;
 	unsigned int front_offset, front_pitch;
@@ -79,40 +113,12 @@ typedef struct drm_mach64_private {
 	u32 back_offset_pitch;
 	u32 depth_offset_pitch;
 
-	int usec_timeout;      /* Number of microseconds to wait for a timeout on the idle functions */
-	atomic_t dma_timeout;  /* Number of interrupt dispatches since last DMA dispatch... */
-	atomic_t do_gui;       /* Flag for the bottom half to know what to do... */
-	atomic_t do_blit;      /* Flag for the bottom half to know what to do... */
-
-	/* DMA descriptor table (ring buffer) */
-	struct pci_pool *pool;   /* DMA memory pool */
-	int table_size;          /* size of table (ring buffer) in bytes */
-	dma_addr_t table_handle; /* handle returned by pci_pool_alloc */
-	void *cpu_addr_table;    /* virtual address of table head */
-	u32 table_addr;          /* physical address of table head */
-	u32 table_start;         /* physical address of start of table ring */
-	u32 table_end;           /* physical address of end of table ring */
-	u32 *table_wptr;         /* write pointer to table (ring tail) */
-
-	struct list_head	  free_list;     /* Free-list head  */
-	struct list_head	  empty_list;    /* Free-list placeholder list  */
-	struct list_head	  pending;    	 /* Pending submission placeholder  */
-	struct list_head	  dma_queue;     /* Submission queue head  */
-
 	drm_map_t *sarea;
 	drm_map_t *fb;
 	drm_map_t *mmio;
 	drm_map_t *buffers;
 	drm_map_t *agp_textures;
 } drm_mach64_private_t;
-
-typedef struct drm_mach64_buf_priv {
-	u32 age;
-	int prim;
-	int discard;
-	int dispatched;
-   	drm_mach64_freelist_t *list_entry;
-} drm_mach64_buf_priv_t;
 
 				/* mach64_dma.c */
 extern int mach64_dma_init( struct inode *inode, struct file *filp,
@@ -125,6 +131,9 @@ extern int mach64_engine_reset( struct inode *inode, struct file *filp,
 				unsigned int cmd, unsigned long arg );
 extern int mach64_dma_buffers( struct inode *inode, struct file *filp,
 			       unsigned int cmd, unsigned long arg );
+
+extern int mach64_init_freelist( drm_device_t *dev );
+extern void mach64_destroy_freelist( drm_device_t *dev );
 #ifdef MACH64_USE_BUFFER_AGING
 extern void mach64_freelist_reset( drm_mach64_private_t *dev_priv );
 #endif
@@ -133,11 +142,14 @@ extern drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv );
 extern int mach64_do_wait_for_fifo( drm_mach64_private_t *dev_priv,
 				    int entries );
 extern int mach64_do_wait_for_idle( drm_mach64_private_t *dev_priv );
+extern int mach64_wait_ring( drm_mach64_private_t *dev_priv, int n );
+extern int mach64_do_release_used_buffers( drm_mach64_private_t *dev_priv );
 extern void mach64_dump_engine_info( drm_mach64_private_t *dev_priv );
 extern int mach64_do_engine_reset( drm_mach64_private_t *dev_priv );
 
 extern int mach64_do_dma_idle( drm_mach64_private_t *dev_priv );
 extern int mach64_do_dma_flush( drm_mach64_private_t *dev_priv );
+extern int mach64_do_cleanup_dma( drm_device_t *dev );
 
 				/* mach64_state.c */
 extern int mach64_dma_clear( struct inode *inode, struct file *filp,
@@ -442,6 +454,32 @@ extern int mach64_dma_blit( struct inode *inode, struct file *filp,
  * Misc helper macros
  */
 
+#define UPDATE_RING_HEAD( dev_priv, ring )						\
+do {											\
+	int idle = 0;									\
+	if (!(MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE)) idle = 1;		\
+	(ring)->head_addr = (MACH64_READ(MACH64_BM_GUI_TABLE) & 0xfffffff0);		\
+	/* If not idle, BM_GUI_TABLE points one descriptor past the current head */	\
+        if ( !idle ) {									\
+        	if ((ring)->head_addr == (ring)->start_addr)				\
+			(ring)->head_addr += ((ring)->size - (sizeof(u32)*4));		\
+		else									\
+			(ring)->head_addr -= (sizeof(u32)*4);				\
+        }										\
+	(ring)->head = ((ring)->head_addr - (ring)->start_addr) / sizeof(u32);		\
+} while (0)
+
+static inline void
+mach64_update_ring_snapshot( drm_mach64_private_t *dev_priv )
+{
+	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring;
+	UPDATE_RING_HEAD( dev_priv, ring );
+	ring->space = (ring->head - ring->tail) * sizeof(u32);
+	if ( ring->space <= 0 ) {
+		ring->space += ring->size;
+	}
+}
+
 #define LOCK_TEST_WITH_RETURN( dev )					\
 do {									\
 	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||		\
@@ -452,9 +490,34 @@ do {									\
 	}								\
 } while (0)
 
+#if MACH64_NO_BATCH_DISPATCH
+
+#define RING_SPACE_TEST_WITH_RETURN( dev_priv )						\
+do {											\
+	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring; int i;			\
+	if ( ring->space < ring->high_mark ) {						\
+		for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {			\
+			mach64_update_ring_snapshot( dev_priv );			\
+			if ( ring->space >= ring->high_mark )				\
+				goto __ring_space_done;					\
+			udelay( 1 );							\
+		}									\
+		DRM_ERROR( "ring space check failed!\n" );				\
+		DRM_INFO( "ring: head addr: 0x%08x head: %d tail: %d space: %d\n", 	\
+			ring->head_addr, ring->head, ring->tail, ring->space );		\
+		DRM_INFO( "last cmd: 0x%08x cmd ofs: %d\n", 	\
+			ring->last_cmd, ring->last_cmd_ofs );		\
+											\
+		return -EBUSY;								\
+	}										\
+ __ring_space_done:									\
+} while (0)
+
+#else
+
 /* Check for high water mark and flush if reached */
 /* FIXME: right now this is needed to ensure free buffers for state emits */
-#define QUEUE_SPACE_TEST_WITH_RETURN( dev_priv )					 \
+#define RING_SPACE_TEST_WITH_RETURN( dev_priv )						 \
 do {											 \
 	struct list_head *ptr;								 \
 	int ret, queued = 0;								 \
@@ -469,6 +532,8 @@ do {											 \
 	}										 \
 __queue_space_done:									 \
 } while (0)
+
+#endif /* MACH64_NO_BATCH_DISPATCH */
 
 #if MACH64_USE_BUFFER_AGING
 
@@ -490,17 +555,19 @@ do {									\
 #endif
 
 /* ================================================================
- * DMA macros
+ * DMA constants
  */
 
 #define DMA_FRAME_BUF_OFFSET	0
 #define DMA_SYS_MEM_ADDR	1
 #define DMA_COMMAND		2
 #define DMA_RESERVED		3
+#define DMA_HOLD_OFFSET         (1<<30)
+#define DMA_EOL                 (1<<31)
 
-#define MACH64_DMA_TIMEOUT      10           /* 10 vertical retraces should be enough */
-#define MACH64_DMA_SIZE         96           /* Queue high water mark (number of buffers) */
-#define DMA_CHUNKSIZE		0x1000       /* 4kB per DMA descriptor */
+#define MACH64_DMA_TIMEOUT      10          /* 10 vertical retraces should be enough */
+#define MACH64_DMA_SIZE         96          /* Queue high water mark (number of buffers) */
+#define DMA_CHUNKSIZE		0x1000      /* 4kB per DMA descriptor */
 #define APERTURE_OFFSET		0x7ff800
 
 
@@ -508,50 +575,90 @@ do {									\
 
 #define mach64_flush_write_combine()	mb()
 
-/* update our snapshot of the hardware's current position */
-#define GET_RING_HEAD( dev_priv )							   \
-do {											   \
-	dev_priv->table_start = (MACH64_READ(MACH64_BM_GUI_TABLE) & 0xfffffff0);	   \
-	/* BM_GUI_TABLE points to the next descriptor to be processed (pre-incremented) */ \
-	if (dev_priv->table_start == dev_priv->table_addr)				   \
-		dev_priv->table_start += (dev_priv->table_size - (sizeof(u32)*4));	   \
-	else										   \
-		dev_priv->table_start -= (sizeof(u32)*4);				   \
+/* ================================================================
+ * DMA descriptor ring macros
+ */
+
+#define RING_LOCALS							\
+	int write; unsigned int tail_mask; u32 *ring;
+
+#define RING_WRITE_OFS write
+
+#define BEGIN_RING( n ) 								\
+do {											\
+	if ( MACH64_VERBOSE ) {								\
+		DRM_INFO( "BEGIN_RING( %d ) in %s\n",					\
+			   (n), __FUNCTION__ );						\
+	}										\
+	if ( dev_priv->ring.space <= (n) * sizeof(u32) ) {				\
+		int ret;								\
+		if ((ret=mach64_wait_ring( dev_priv, (n) * sizeof(u32))) < 0 ) {	\
+			DRM_ERROR( "wait_ring failed, resetting engine\n");		\
+			mach64_dump_engine_info( dev_priv );				\
+			mach64_do_engine_reset( dev_priv );				\
+			return ret;							\
+		}									\
+	}										\
+	dev_priv->ring.space -= (n) * sizeof(u32);					\
+	ring = (u32 *) dev_priv->ring.start;						\
+	write = dev_priv->ring.tail;							\
+	tail_mask = dev_priv->ring.tail_mask;						\
 } while (0)
 
-static inline int mach64_wait_ring( drm_mach64_private_t *dev_priv, u32 addr ) {
-	int t = 0;
-	while (1) {
-		GET_RING_HEAD( dev_priv );
-		if (addr != dev_priv->table_start || t > dev_priv->usec_timeout) {
-			break;
-		} else if (dev_priv->table_start == dev_priv->table_end) {
-			/* If we're waiting for the last descriptor, need to check for idle */
-			if (!(MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE))
-				break;
-		}
-		udelay( 1 );
-		t++;
-	}
-#if MACH64_VERBOSE
-	if (t > 0)
-		DRM_DEBUG("wait ring: %d usec\n", t);
-#endif
-	if (t == dev_priv->usec_timeout)
-		return -EBUSY;
-	else
-		return 0;
-}
+#define OUT_RING( x )						\
+do {								\
+	if ( MACH64_VERBOSE ) {					\
+		DRM_INFO( "   OUT_RING( 0x%08x ) at 0x%x\n",	\
+			   (unsigned int)(x), write );		\
+	}							\
+	ring[write++] = cpu_to_le32( x );			\
+	write &= tail_mask;					\
+} while (0)
+
+#define ADVANCE_RING() 							\
+do {									\
+	if ( MACH64_VERBOSE ) {						\
+		DRM_INFO( "ADVANCE_RING() wr=0x%06x tail=0x%06x\n",	\
+			  write, dev_priv->ring.tail );			\
+	}								\
+	dev_priv->ring.tail = write;					\
+} while (0)
+
+#define COMMIT_RING()							\
+do {									\
+	int last_cmd_ofs; u32 last_cmd;					\
+	UPDATE_RING_HEAD( dev_priv, &dev_priv->ring );			\
+	DRM_DEBUG("COMMIT_RING() head: %d tail: %d last_cmd_ofs: %d\n",	\
+		  dev_priv->ring.head, dev_priv->ring.tail,		\
+		  dev_priv->ring.last_cmd_ofs);				\
+									\
+	last_cmd_ofs = dev_priv->ring.tail - 2;				\
+	if (last_cmd_ofs < 0)						\
+		last_cmd_ofs = dev_priv->ring.tail_mask - 1;		\
+	last_cmd = ring[last_cmd_ofs] & ~DMA_EOL;			\
+	/* set EOL flag */						\
+	ring[last_cmd_ofs] = cpu_to_le32( last_cmd | DMA_EOL );		\
+	wmb();								\
+	/* clear EOL flag from previous ring tail */			\
+	ring[dev_priv->ring.last_cmd_ofs] =				\
+		cpu_to_le32( dev_priv->ring.last_cmd );			\
+	dev_priv->ring.last_cmd_ofs = last_cmd_ofs;			\
+	dev_priv->ring.last_cmd = last_cmd;				\
+	mach64_do_dma_flush( dev_priv );				\
+} while(0)
+
+
+/* ================================================================
+ * DMA macros
+ */
 
 #define DMALOCALS  drm_buf_t *buf = NULL; u32 *p; int outcount = 0
 
-#define GETBUFPTR( dev_priv, _p, _buf )							\
-do {											\
-	if (dev_priv->is_pci)								\
-		(_p) = (u32 *) (_buf)->address;						\
-	else										\
-		(_p) = (u32 *)((char *)dev_priv->buffers->handle + (_buf)->offset);	\
-} while(0)
+#define GETBUFPTR( _buf )							\
+(dev_priv->is_pci) ? ((u32 *)(_buf)->address) : ((u32 *)((char *)dev_priv->buffers->handle + (_buf)->offset))
+
+#define GETBUFADDR( _buf )							\
+(dev_priv->is_pci) ? ((u32)virt_to_bus((void *)(_buf)->address)) : ((u32)(_buf)->bus_address)
 
 /* FIXME: use a private set of smaller buffers for state emits, clears, and swaps? */
 #define DMAGETPTR( dev_priv, n )					\
@@ -569,7 +676,7 @@ do {									\
 	buf->pid = current->pid;					\
 	outcount = 0;							\
 									\
-        GETBUFPTR( dev_priv, p, buf );					\
+        p = GETBUFPTR( buf );						\
 } while (0)
 
 #define DMAOUTREG( reg, val )					\
@@ -583,6 +690,77 @@ do {								\
 	buf->used += 8;						\
 } while (0)
 
+#if MACH64_NO_BATCH_DISPATCH
+
+#define DMAADVANCE( dev_priv )								\
+do {											\
+	struct list_head *ptr;								\
+	drm_mach64_freelist_t *entry;							\
+	RING_LOCALS;									\
+											\
+	if ( MACH64_VERBOSE ) {								\
+		DRM_INFO( "DMAADVANCE() in %s\n", __FUNCTION__ );			\
+	}										\
+											\
+	if (list_empty(&dev_priv->placeholders)) {					\
+		DRM_ERROR( "%s: empty placeholder list in DMAADVANCE()\n",		\
+			   __FUNCTION__ );						\
+		return -EFAULT;								\
+	}										\
+											\
+        ptr = dev_priv->placeholders.next;						\
+	list_del(ptr);									\
+	entry = list_entry(ptr, drm_mach64_freelist_t, list);				\
+	entry->buf = buf;								\
+	entry->buf->pending = 1;							\
+	list_add_tail(ptr, &dev_priv->pending);						\
+											\
+	ADD_BUF_TO_RING( dev_priv, entry );						\
+	COMMIT_RING();									\
+											\
+} while (0)
+
+#define ADD_BUF_TO_RING( dev_priv, entry )						\
+do {											\
+	int bytes, pages, remainder;							\
+	drm_buf_t *buf = entry->buf;							\
+	u32 address, page;								\
+	int i;										\
+											\
+	bytes = buf->used;								\
+	address = GETBUFADDR( buf );							\
+											\
+	pages = (bytes + DMA_CHUNKSIZE - 1) / DMA_CHUNKSIZE;				\
+											\
+	BEGIN_RING( pages * 4 );							\
+											\
+	for ( i = 0 ; i < pages-1 ; i++ ) {						\
+		page = address + i * DMA_CHUNKSIZE;					\
+		OUT_RING( APERTURE_OFFSET + MACH64_BM_ADDR );				\
+		OUT_RING( page );							\
+		OUT_RING( DMA_CHUNKSIZE | DMA_HOLD_OFFSET );				\
+		OUT_RING( 0 );								\
+	}										\
+											\
+	/* generate the final descriptor for any remaining commands in this buffer */	\
+	page = address + i * DMA_CHUNKSIZE;						\
+	remainder = bytes - i * DMA_CHUNKSIZE;						\
+											\
+	/* Save dword offset of last descriptor for this buffer.			\
+	 * This is needed to check for completion of the buffer in freelist_get		\
+	 */										\
+	entry->ring_ofs = RING_WRITE_OFS;						\
+											\
+	OUT_RING( APERTURE_OFFSET + MACH64_BM_ADDR );					\
+	OUT_RING( page );								\
+	OUT_RING( remainder | DMA_HOLD_OFFSET );					\
+	OUT_RING( 0 );									\
+											\
+	ADVANCE_RING();									\
+} while(0)
+
+#else
+
 #define DMAADVANCE( dev_priv )							\
 do {										\
 	struct list_head *ptr;							\
@@ -592,14 +770,14 @@ do {										\
 		DRM_INFO( "DMAADVANCE() in %s\n", __FUNCTION__ );		\
 	}									\
 										\
-	if (list_empty(&dev_priv->empty_list)) {				\
+	if (list_empty(&dev_priv->placeholders)) {				\
 		DRM_ERROR( "%s: empty placeholder list in DMAADVANCE()\n",	\
 			   __FUNCTION__ );					\
 		return -EFAULT;							\
 	}									\
 										\
 	/* Add the buffer to the DMA queue */					\
-	ptr = dev_priv->empty_list.next;					\
+	ptr = dev_priv->placeholders.next;					\
 	list_del(ptr);								\
 	entry = list_entry(ptr, drm_mach64_freelist_t, list);			\
 	entry->buf = buf;							\
@@ -607,6 +785,7 @@ do {										\
 	list_add_tail(ptr, &dev_priv->dma_queue);				\
 										\
 } while (0)
+#endif /* MACH64_NO_BATCH_DISPATCH */
 
 #define DMAFLUSH( dev_priv )					\
 do {								\

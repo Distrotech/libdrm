@@ -129,7 +129,6 @@ do {										\
 
 /* Buffer customization:
  */
-#define DRIVER_BUF_PRIV_T	drm_mach64_buf_priv_t
 
 #define DRIVER_AGP_BUFFERS_MAP( dev )					\
 	((drm_mach64_private_t *)((dev)->dev_private))->buffers
