@@ -189,7 +189,10 @@ static int mach64_dma_dispatch_clear( drm_device_t *dev,
 		return -EINVAL;
 	}
 
-	DMAGETPTR( dev_priv, 100 ); /* returns on failure to get buffer */
+	if ( !nbox ) 
+		return 0;
+
+	DMAGETPTR( dev_priv, nbox * 31 ); /* returns on failure to get buffer */
 
 	for ( i = 0 ; i < nbox ; i++ ) {
 		int x = pbox[i].x1;
