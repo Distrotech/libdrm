@@ -501,8 +501,6 @@ static void i810EmitContextVerified( drm_device_t *dev,
 			OUT_RING( tmp ); 
 			j++;
 		} 
-		else
-		   DRM_DEBUG("bad cmd %x\n", tmp);
 	}
 
 	if (j & 1) 
@@ -510,7 +508,6 @@ static void i810EmitContextVerified( drm_device_t *dev,
 
 	ADVANCE_LP_RING();
 }
-
 
 static void i810EmitTexVerified( drm_device_t *dev, 
 				 volatile unsigned int *code ) 
@@ -536,8 +533,6 @@ static void i810EmitTexVerified( drm_device_t *dev,
 			OUT_RING( tmp ); 
 			j++;
 		}
-		else
-		   DRM_DEBUG("bad cmd %x\n", tmp);
 	} 
 		
 	if (j & 1) 
@@ -545,6 +540,7 @@ static void i810EmitTexVerified( drm_device_t *dev,
 
 	ADVANCE_LP_RING();
 }
+
 
 /* Need to do some additional checking when setting the dest buffer.
  */
@@ -1039,8 +1035,9 @@ static int i810_flush_queue(drm_device_t *dev)
 {
    	DECLARE_WAITQUEUE(entry, current);
   	drm_i810_private_t *dev_priv = (drm_i810_private_t *)dev->dev_private;
+	drm_device_dma_t *dma = dev->dma;
 	unsigned long end;
-   	int ret = 0;      
+   	int i, ret = 0;      
 
    	if(dev_priv == NULL) {
 	   	return 0;
@@ -1065,7 +1062,21 @@ static int i810_flush_queue(drm_device_t *dev)
    
    	current->state = TASK_RUNNING;
    	remove_wait_queue(&dev_priv->flush_queue, &entry);
-   
+
+
+   	for (i = 0; i < dma->buf_count; i++) {
+	   	drm_buf_t *buf = dma->buflist[ i ];
+	   	drm_i810_buf_priv_t *buf_priv = buf->dev_private;
+	   
+		int used = cmpxchg(buf_priv->in_use, I810_BUF_HARDWARE, 
+				   I810_BUF_FREE);
+
+		if (used == I810_BUF_HARDWARE)
+			DRM_DEBUG("reclaimed from HARDWARE\n");
+		if (used == I810_BUF_CLIENT)
+			DRM_DEBUG("still on client HARDWARE\n");
+	}
+
    	return ret;
 }
 
@@ -1086,7 +1097,13 @@ void i810_reclaim_buffers(drm_device_t *dev, pid_t pid)
 	   	drm_i810_buf_priv_t *buf_priv = buf->dev_private;
 	   
 		if (buf->pid == pid && buf_priv) {
-		   *(buf_priv->in_use) = I810_BUF_FREE;
+			int used = cmpxchg(buf_priv->in_use, I810_BUF_CLIENT, 
+					   I810_BUF_FREE);
+
+			if (used == I810_BUF_CLIENT)
+				DRM_DEBUG("reclaimed from client\n");
+
+			buf_priv->currently_mapped = I810_BUF_UNMAPPED;
 		}
 	}
 }
