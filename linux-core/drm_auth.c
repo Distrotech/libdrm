@@ -43,14 +43,14 @@ static drm_file_t *DRM(find_file)(drm_device_t *dev, drm_magic_t magic)
 	drm_magic_entry_t *pt;
 	int		  hash	  = DRM(hash_magic)(magic);
 
-	down(&dev->struct_sem);
+	DRM_OS_LOCK;
 	for (pt = dev->magiclist[hash].head; pt; pt = pt->next) {
 		if (pt->magic == magic) {
 			retval = pt->priv;
 			break;
 		}
 	}
-	up(&dev->struct_sem);
+	DRM_OS_UNLOCK;
 	return retval;
 }
 
@@ -62,13 +62,13 @@ int DRM(add_magic)(drm_device_t *dev, drm_file_t *priv, drm_magic_t magic)
 	DRM_DEBUG("%d\n", magic);
 
 	hash	     = DRM(hash_magic)(magic);
-	entry	     = DRM(alloc)(sizeof(*entry), DRM_MEM_MAGIC);
-	if (!entry) return -ENOMEM;
+	entry	     = (drm_magic_entry_t*) DRM(alloc)(sizeof(*entry), DRM_MEM_MAGIC);
+	if (!entry) DRM_OS_RETURN(ENOMEM);
 	entry->magic = magic;
 	entry->priv  = priv;
 	entry->next  = NULL;
 
-	down(&dev->struct_sem);
+	DRM_OS_LOCK;
 	if (dev->magiclist[hash].tail) {
 		dev->magiclist[hash].tail->next = entry;
 		dev->magiclist[hash].tail	= entry;
@@ -76,7 +76,7 @@ int DRM(add_magic)(drm_device_t *dev, drm_file_t *priv, drm_magic_t magic)
 		dev->magiclist[hash].head	= entry;
 		dev->magiclist[hash].tail	= entry;
 	}
-	up(&dev->struct_sem);
+	DRM_OS_UNLOCK;
 
 	return 0;
 }
@@ -90,7 +90,7 @@ int DRM(remove_magic)(drm_device_t *dev, drm_magic_t magic)
 	DRM_DEBUG("%d\n", magic);
 	hash = DRM(hash_magic)(magic);
 
-	down(&dev->struct_sem);
+	DRM_OS_LOCK;
 	for (pt = dev->magiclist[hash].head; pt; prev = pt, pt = pt->next) {
 		if (pt->magic == magic) {
 			if (dev->magiclist[hash].head == pt) {
@@ -102,56 +102,70 @@ int DRM(remove_magic)(drm_device_t *dev, drm_magic_t magic)
 			if (prev) {
 				prev->next = pt->next;
 			}
-			up(&dev->struct_sem);
+			DRM_OS_UNLOCK;
+#ifdef __FreeBSD__
+			DRM(free)(pt, sizeof(*pt), DRM_MEM_MAGIC);
+#endif
 			return 0;
 		}
 	}
-	up(&dev->struct_sem);
+	DRM_OS_UNLOCK;
 
 	DRM(free)(pt, sizeof(*pt), DRM_MEM_MAGIC);
-
-	return -EINVAL;
+	DRM_OS_RETURN(EINVAL);
 }
 
-int DRM(getmagic)(struct inode *inode, struct file *filp,
-		  unsigned int cmd, unsigned long arg)
+int DRM(getmagic)(DRM_OS_IOCTL)
 {
 	static drm_magic_t sequence = 0;
-	static spinlock_t  lock	    = SPIN_LOCK_UNLOCKED;
-	drm_file_t	   *priv    = filp->private_data;
-	drm_device_t	   *dev	    = priv->dev;
 	drm_auth_t	   auth;
+#ifdef __linux__
+	static spinlock_t  lock	    = SPIN_LOCK_UNLOCKED;
+#endif
+	DRM_OS_DEVICE;
+#ifdef __FreeBSD__
+	static struct simplelock  lock;
+
+	priv = (drm_file_t *) DRM(find_file_by_proc)(dev, p);
+#endif
 
 				/* Find unique magic */
 	if (priv->magic) {
 		auth.magic = priv->magic;
 	} else {
 		do {
+#ifdef __linux__
 			spin_lock(&lock);
+#endif
+#ifdef __FreeBSD__
+			simple_lock(&lock);
+#endif
 			if (!sequence) ++sequence; /* reserve 0 */
 			auth.magic = sequence++;
+#ifdef __linux__
 			spin_unlock(&lock);
+#endif
+#ifdef __FreeBSD__
+			simple_unlock(&lock);
+#endif
 		} while (DRM(find_file)(dev, auth.magic));
 		priv->magic = auth.magic;
 		DRM(add_magic)(dev, priv, auth.magic);
 	}
 
 	DRM_DEBUG("%u\n", auth.magic);
-	if (copy_to_user((drm_auth_t *)arg, &auth, sizeof(auth)))
-		return -EFAULT;
+	DRM_OS_COPYTO((drm_auth_t *)data, &auth, sizeof(auth));
 	return 0;
 }
 
-int DRM(authmagic)(struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg)
+int DRM(authmagic)(DRM_OS_IOCTL)
 {
-	drm_file_t	   *priv    = filp->private_data;
-	drm_device_t	   *dev	    = priv->dev;
 	drm_auth_t	   auth;
 	drm_file_t	   *file;
+	DRM_OS_DEVICE;
 
-	if (copy_from_user(&auth, (drm_auth_t *)arg, sizeof(auth)))
-		return -EFAULT;
+	DRM_OS_COPYFROM(&auth, (drm_auth_t *)data, sizeof(auth));
+
 	DRM_DEBUG("%u\n", auth.magic);
 	if ((file = DRM(find_file)(dev, auth.magic))) {
 		file->authenticated = 1;
