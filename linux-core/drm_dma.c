@@ -585,8 +585,7 @@ int DRM(control)( DRM_OS_IOCTL )
 	drm_device_t *dev = priv->dev;
 	drm_control_t ctl;
 
-	if ( copy_from_user( &ctl, (drm_control_t *)arg, sizeof(ctl) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( ctl, (drm_control_t *) data, sizeof(ctl) );
 
 	switch ( ctl.func ) {
 	case DRM_INST_HANDLER:
