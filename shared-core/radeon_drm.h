@@ -142,6 +142,9 @@
 #define RADEON_CMD_PACKET3     5 /* emit hw packet */
 #define RADEON_CMD_PACKET3_CLIP 6 /* emit hw packet wrapped in cliprects */
 #define RADEON_CMD_SCALARS2     7 /* r200 stopgap */
+#define RADEON_CMD_WAIT         8 /* emit hw wait commands -- note:
+				   *  doesn't make the cpu wait, just
+				   *  the graphics hardware */
 
 
 typedef union {
@@ -367,7 +370,7 @@ typedef struct {
 #define DRM_IOCTL_RADEON_ALLOC      DRM_IOWR( 0x53, drm_radeon_mem_alloc_t)
 #define DRM_IOCTL_RADEON_FREE       DRM_IOW( 0x54, drm_radeon_mem_free_t)
 #define DRM_IOCTL_RADEON_INIT_HEAP  DRM_IOW( 0x55, drm_radeon_mem_init_heap_t)
-#define DRM_IOCTL_RADEON_IRQ_EMIT   DRM_IOR( 0x56, drm_radeon_irq_emit_t)
+#define DRM_IOCTL_RADEON_IRQ_EMIT   DRM_IOWR( 0x56, drm_radeon_irq_emit_t)
 #define DRM_IOCTL_RADEON_IRQ_WAIT   DRM_IOW( 0x57, drm_radeon_irq_wait_t)
 
 typedef struct drm_radeon_init {
