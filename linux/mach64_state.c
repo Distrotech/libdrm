@@ -60,58 +60,96 @@ static inline void mach64_emit_state( drm_mach64_private_t *dev_priv )
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	drm_mach64_context_regs_t *regs = &sarea_priv->context_state;
 	unsigned int dirty = sarea_priv->dirty;
-
 	DMALOCALS;
 
 	DRM_DEBUG( "%s: dirty=0x%08x\n", __FUNCTION__, dirty );
 
 	if ( dirty & MACH64_UPLOAD_MISC ) {
 		DMAGETPTR( dev_priv, 4 );
+		
 		DMAOUTREG( MACH64_DP_MIX, regs->dp_mix );
 		DMAOUTREG( MACH64_DP_SRC, regs->dp_src );
 		DMAOUTREG( MACH64_CLR_CMP_CNTL, regs->clr_cmp_cntl );
 		DMAOUTREG( MACH64_GUI_TRAJ_CNTL, regs->gui_traj_cntl );
+		
 		DMAADVANCE( dev_priv );
+
 		sarea_priv->dirty &= ~MACH64_UPLOAD_MISC;
 	}
 
-	DMAGETPTR( dev_priv, 9 );
-
 	if ( dirty & MACH64_UPLOAD_DST_OFF_PITCH ) {
+		DMAGETPTR( dev_priv, 1 );
+		
 		DMAOUTREG( MACH64_DST_OFF_PITCH, regs->dst_off_pitch );
+
+		DMAADVANCE( dev_priv );
+		
 		sarea_priv->dirty &= ~MACH64_UPLOAD_DST_OFF_PITCH;
 	}
 	if ( dirty & MACH64_UPLOAD_Z_OFF_PITCH ) {
+		DMAGETPTR( dev_priv, 1 );
+		
 		DMAOUTREG( MACH64_Z_OFF_PITCH, regs->z_off_pitch );
+
+		DMAADVANCE( dev_priv );
+		
 		sarea_priv->dirty &= ~MACH64_UPLOAD_Z_OFF_PITCH;
 	}
 	if ( dirty & MACH64_UPLOAD_Z_ALPHA_CNTL ) {
+		DMAGETPTR( dev_priv, 2 );
+		
 		DMAOUTREG( MACH64_Z_CNTL, regs->z_cntl );
 		DMAOUTREG( MACH64_ALPHA_TST_CNTL, regs->alpha_tst_cntl );
+
+		DMAADVANCE( dev_priv );
+		
 		sarea_priv->dirty &= ~MACH64_UPLOAD_Z_ALPHA_CNTL;
 	}
 	if ( dirty & MACH64_UPLOAD_SCALE_3D_CNTL ) {
+		DMAGETPTR( dev_priv, 1 );
+		
 		DMAOUTREG( MACH64_SCALE_3D_CNTL, regs->scale_3d_cntl );
+
+		DMAADVANCE( dev_priv );
+		
 		sarea_priv->dirty &= ~MACH64_UPLOAD_SCALE_3D_CNTL;
 	}
 	if ( dirty & MACH64_UPLOAD_DP_FOG_CLR ) {
+		DMAGETPTR( dev_priv, 1 );
+		
 		DMAOUTREG( MACH64_DP_FOG_CLR, regs->dp_fog_clr );
+
+		DMAADVANCE( dev_priv );
+		
 		sarea_priv->dirty &= ~MACH64_UPLOAD_DP_FOG_CLR;
 	}
 	if ( dirty & MACH64_UPLOAD_DP_WRITE_MASK ) {
+		DMAGETPTR( dev_priv, 1 );
+		
 		DMAOUTREG( MACH64_DP_WRITE_MASK, regs->dp_write_mask );
+
+		DMAADVANCE( dev_priv );
+		
 		sarea_priv->dirty &= ~MACH64_UPLOAD_DP_WRITE_MASK;
 	}
 	if ( dirty & MACH64_UPLOAD_DP_PIX_WIDTH ) {
+		DMAGETPTR( dev_priv, 1 );
+		
 		DMAOUTREG( MACH64_DP_PIX_WIDTH, regs->dp_pix_width );
+
+		DMAADVANCE( dev_priv );
+		
 		sarea_priv->dirty &= ~MACH64_UPLOAD_DP_PIX_WIDTH;
 	}
 	if ( dirty & MACH64_UPLOAD_SETUP_CNTL ) {
+		DMAGETPTR( dev_priv, 1 );
+		
 		DMAOUTREG( MACH64_SETUP_CNTL, regs->setup_cntl );
+
+		DMAADVANCE( dev_priv );
+		
 		sarea_priv->dirty &= ~MACH64_UPLOAD_SETUP_CNTL;
 	}
-
-	DMAADVANCE( dev_priv );
 
 	if ( dirty & MACH64_UPLOAD_TEXTURE ) {
 		mach64_emit_texture( dev_priv );
@@ -120,14 +158,14 @@ static inline void mach64_emit_state( drm_mach64_private_t *dev_priv )
 
 	if ( dirty & MACH64_UPLOAD_CLIPRECTS ) {
 		DMAGETPTR( dev_priv, 2 );
+		
 		DMAOUTREG( MACH64_SC_LEFT_RIGHT, regs->sc_left_right );
 		DMAOUTREG( MACH64_SC_TOP_BOTTOM, regs->sc_top_bottom );
+
 		DMAADVANCE( dev_priv );
+
 		sarea_priv->dirty &= ~MACH64_UPLOAD_CLIPRECTS;
 	}
-
-	/* FIXME: Is this really necessary? */
-	sarea_priv->dirty = 0;
 }
 
 
@@ -138,20 +176,21 @@ static inline void mach64_emit_state( drm_mach64_private_t *dev_priv )
 
 static void mach64_print_dirty( const char *msg, unsigned int flags )
 {
-#if 0
-	DRM_INFO( "%s: (0x%x) %s%s%s%s%s%s%s%s%s\n",
-		  msg,
-		  flags,
-		  (flags & MACH64_UPLOAD_CORE)        ? "core, " : "",
-		  (flags & MACH64_UPLOAD_CONTEXT)     ? "context, " : "",
-		  (flags & MACH64_UPLOAD_SETUP)       ? "setup, " : "",
-		  (flags & MACH64_UPLOAD_TEX0)        ? "tex0, " : "",
-		  (flags & MACH64_UPLOAD_TEX1)        ? "tex1, " : "",
-		  (flags & MACH64_UPLOAD_MASKS)       ? "masks, " : "",
-		  (flags & MACH64_UPLOAD_WINDOW)      ? "window, " : "",
-		  (flags & MACH64_UPLOAD_CLIPRECTS)   ? "cliprects, " : "",
-		  (flags & MACH64_REQUIRE_QUIESCENCE) ? "quiescence, " : "" );
-#endif
+	DRM_INFO( "%s: (0x%x) %s%s%s%s%s%s%s%s%s%s%s%s\n",
+		msg,
+		flags,
+		(flags & MACH64_UPLOAD_DST_OFF_PITCH) ? "dst_off_pitch, " : "",
+		(flags & MACH64_UPLOAD_Z_ALPHA_CNTL)  ? "z_alpha_cntl, " : "",
+		(flags & MACH64_UPLOAD_SCALE_3D_CNTL) ? "scale_3d_cntl, " : "",
+		(flags & MACH64_UPLOAD_DP_FOG_CLR)    ? "dp_fog_clr, " : "",
+		(flags & MACH64_UPLOAD_DP_WRITE_MASK) ? "dp_write_mask, " : "",
+		(flags & MACH64_UPLOAD_DP_PIX_WIDTH)  ? "dp_pix_width, " : "",
+		(flags & MACH64_UPLOAD_SETUP_CNTL)    ? "setup_cntl, " : "",
+		(flags & MACH64_UPLOAD_MISC)          ? "misc, " : "",
+		(flags & MACH64_UPLOAD_TEXTURE)       ? "texture, " : "",
+		(flags & MACH64_UPLOAD_TEX0IMAGE)     ? "tex0 image, " : "",
+		(flags & MACH64_UPLOAD_TEX1IMAGE)     ? "tex1 image, " : "",
+		(flags & MACH64_UPLOAD_CLIPRECTS)     ? "cliprects, " : "" );
 }
 
 static void mach64_dma_dispatch_clear( drm_device_t *dev,
@@ -408,8 +447,6 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 	if ( 0 )
 		mach64_print_dirty( "dispatch_vertex", sarea_priv->dirty );
 
-	/* DRM_INFO( "idx = %u, offset=0x%08x, address=0x%08x, used=%u\n", buf->idx, buf->bus_address, buf->address, buf->used ); */
-	
 	if ( buf->used ) {
 #if 0
 		buf_priv->dispatched = 1;
