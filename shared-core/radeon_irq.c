@@ -53,43 +53,43 @@
 void DRM(dma_service)(int irq, void *device, struct pt_regs *regs)
 {
 	drm_device_t *dev = (drm_device_t *)device;
-      	drm_radeon_private_t *dev_priv = 
+	drm_radeon_private_t *dev_priv = 
 	   (drm_radeon_private_t *)dev->dev_private;
    	u32 temp;
 	
 	/* Need to wait for fifo to drain?
 	 */
-       	temp = RADEON_READ(RADEON_GEN_INT_STATUS);  
-     	temp = temp & RADEON_SW_INT_TEST_ACK;  
-     	if(temp == 0) return;  
-  	RADEON_WRITE(RADEON_GEN_INT_STATUS, temp);  
+	temp = RADEON_READ(RADEON_GEN_INT_STATUS);  
+	temp = temp & RADEON_SW_INT_TEST_ACK;  
+	if (temp == 0) return;  
+	RADEON_WRITE(RADEON_GEN_INT_STATUS, temp);  
 
-   	atomic_inc(&dev_priv->irq_received);
-     	queue_task(&dev->tq, &tq_immediate);  
-     	mark_bh(IMMEDIATE_BH);  
+	atomic_inc(&dev_priv->irq_received);
+	queue_task(&dev->tq, &tq_immediate);  
+	mark_bh(IMMEDIATE_BH);  
 }
 
 void DRM(dma_immediate_bh)(void *device)
 {
 	drm_device_t *dev = (drm_device_t *) device;
-      	drm_radeon_private_t *dev_priv = 
+	drm_radeon_private_t *dev_priv = 
 	   (drm_radeon_private_t *)dev->dev_private;
 
-    	wake_up_interruptible(&dev_priv->irq_queue); 
+	wake_up_interruptible(&dev_priv->irq_queue); 
 }
 
 
 int radeon_emit_irq(drm_device_t *dev)
 {
    	drm_radeon_private_t *dev_priv = dev->dev_private;
-   	RING_LOCALS;
+	RING_LOCALS;
 
-   	atomic_inc(&dev_priv->irq_emitted);
+	atomic_inc(&dev_priv->irq_emitted);
 
-    	BEGIN_RING(2); 
+	BEGIN_RING(2); 
 	OUT_RING( CP_PACKET0( RADEON_GEN_INT_STATUS, 0 ) );
 	OUT_RING( RADEON_SW_INT_FIRE );
-      	ADVANCE_RING(); 
+	ADVANCE_RING(); 
  	COMMIT_RING();
 
 	return atomic_read(&dev_priv->irq_emitted);
@@ -98,7 +98,7 @@ int radeon_emit_irq(drm_device_t *dev)
 
 int radeon_wait_irq(drm_device_t *dev, int irq_nr)
 {
-      	DECLARE_WAITQUEUE(entry, current);
+	DECLARE_WAITQUEUE(entry, current);
   	drm_radeon_private_t *dev_priv = 
 	   (drm_radeon_private_t *)dev->dev_private;
 	unsigned long end = jiffies + HZ*3;
@@ -110,7 +110,7 @@ int radeon_wait_irq(drm_device_t *dev, int irq_nr)
 	dev_priv->stats.boxes |= RADEON_BOX_WAIT_IDLE;
 
    	add_wait_queue(&dev_priv->irq_queue, &entry);
-   
+
    	for (;;) {
 		current->state = TASK_INTERRUPTIBLE;
 	   	if (atomic_read(&dev_priv->irq_received) >= irq_nr) 
@@ -125,9 +125,9 @@ int radeon_wait_irq(drm_device_t *dev, int irq_nr)
 			break;
 		}
 	}
-   
-   	current->state = TASK_RUNNING;
-   	remove_wait_queue(&dev_priv->irq_queue, &entry);
+
+	current->state = TASK_RUNNING;
+	remove_wait_queue(&dev_priv->irq_queue, &entry);
 	return ret;
 }
 
@@ -163,7 +163,7 @@ int radeon_irq_emit( DRM_IOCTL_ARGS )
 		DRM_ERROR( "copy_to_user\n" );
 		return DRM_ERR(EFAULT);
 	}
-	
+
 	return 0;
 }
 
@@ -183,7 +183,7 @@ int radeon_irq_wait( DRM_IOCTL_ARGS )
 
 	DRM_COPY_FROM_USER_IOCTL( irqwait, (drm_radeon_irq_wait_t *)data,
 				  sizeof(irqwait) );
-	
+
 	return radeon_wait_irq( dev, irqwait.irq_seq );
 }
 
