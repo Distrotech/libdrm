@@ -25,9 +25,8 @@
  * DEALINGS IN THE SOFTWARE.
  *
  * Authors:
- *    Kevin E. Martin <martin@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
- *
+ *    Kevin E. Martin <martin@valinux.com>
  */
 
 #ifndef __R128_DRM_H__
@@ -192,8 +191,8 @@ typedef struct drm_r128_init {
 
 	unsigned int fb_offset;
 	unsigned int mmio_offset;
+	unsigned int status_offset;
 	unsigned int ring_offset;
-	unsigned int ring_rptr_offset;
 	unsigned int buffers_offset;
 	unsigned int agp_textures_offset;
 } drm_r128_init_t;

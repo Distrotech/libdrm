@@ -26,7 +26,6 @@
  * Authors:
  *    Kevin E. Martin <martin@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
- *
  */
 
 #ifndef __RADEON_DRM_H__
@@ -228,6 +227,13 @@ typedef struct {
 	int ctx_owner;
 } drm_radeon_sarea_t;
 
+typedef struct {
+	volatile unsigned int head;
+	unsigned int __padding[15];
+	unsigned int tail;
+	int space;
+} drm_radeon_ring_status_t;
+
 
 /* WARNING: If you change any of these defines, make sure to change the
  * defines in the Xserver file (xf86drmRadeon.h)
@@ -252,8 +258,8 @@ typedef struct drm_radeon_init {
 
 	unsigned int fb_offset;
 	unsigned int mmio_offset;
+	unsigned int status_offset;
 	unsigned int ring_offset;
-	unsigned int ring_rptr_offset;
 	unsigned int buffers_offset;
 	unsigned int agp_textures_offset;
 } drm_radeon_init_t;

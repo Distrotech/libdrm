@@ -25,7 +25,7 @@
  * DEALINGS IN THE SOFTWARE.
  *
  * Authors:
- *   Gareth Hughes <gareth@valinux.com>
+ *    Gareth Hughes <gareth@valinux.com>
  */
 
 #define __NO_VERSION__
@@ -131,7 +131,10 @@ static int r128_do_pixcache_flush( drm_r128_private_t *dev_priv )
 		udelay( 1 );
 	}
 
+#if R128_FIFO_DEBUG
 	DRM_ERROR( "%s failed!\n", __FUNCTION__ );
+	r128_status( dev_priv );
+#endif
 	return -EBUSY;
 }
 
@@ -145,7 +148,10 @@ static int r128_do_wait_for_fifo( drm_r128_private_t *dev_priv, int entries )
 		udelay( 1 );
 	}
 
+#if R128_FIFO_DEBUG
 	DRM_ERROR( "%s failed!\n", __FUNCTION__ );
+	r128_status( dev_priv );
+#endif
 	return -EBUSY;
 }
 
@@ -164,7 +170,10 @@ int r128_do_wait_for_idle( drm_r128_private_t *dev_priv )
 		udelay( 1 );
 	}
 
+#if R128_FIFO_DEBUG
 	DRM_ERROR( "%s failed!\n", __FUNCTION__ );
+	r128_status( dev_priv );
+#endif
 	return -EBUSY;
 }
 
@@ -321,10 +330,10 @@ static void r128_cce_init_ring_buffer( drm_device_t *dev )
 	R128_WRITE( R128_PM4_BUFFER_DL_WPTR, 0 );
 	R128_WRITE( R128_PM4_BUFFER_DL_RPTR, 0 );
 
-	/* DL_RPTR_ADDR is a physical address in AGP space. */
+	/* DL_RPTR_ADDR is a physical address in PCI space. */
 	*dev_priv->ring.head = 0;
 	R128_WRITE( R128_PM4_BUFFER_DL_RPTR_ADDR,
-		    dev_priv->ring_rptr->offset );
+		    virt_to_bus((void *)dev_priv->status->offset) );
 
 	/* Set watermark control */
 	R128_WRITE( R128_PM4_BUFFER_WM_CNTL,
@@ -451,20 +460,13 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 	dev_priv->span_pitch_offset_c = (((dev_priv->depth_pitch/8) << 21) |
 					 (dev_priv->span_offset >> 5));
 
-	/* FIXME: We want multiple shared areas, including one shared
-	 * only by the X Server and kernel module.
-	 */
-	for ( i = 0 ; i < dev->map_count ; i++ ) {
-		if ( dev->maplist[i]->type == _DRM_SHM ) {
-			dev_priv->sarea = dev->maplist[i];
-			break;
-		}
-	}
+	dev_priv->sarea = dev->maplist[0];
 
 	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
 	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
+	DRM_FIND_MAP( dev_priv->status, init->status_offset );
+
 	DRM_FIND_MAP( dev_priv->cce_ring, init->ring_offset );
-	DRM_FIND_MAP( dev_priv->ring_rptr, init->ring_rptr_offset );
 	DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
 
 	if ( !dev_priv->is_pci ) {
@@ -477,11 +479,9 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 				     init->sarea_priv_offset);
 
 	DRM_IOREMAP( dev_priv->cce_ring );
-	DRM_IOREMAP( dev_priv->ring_rptr );
 	DRM_IOREMAP( dev_priv->buffers );
 
-	dev_priv->ring.head = ((__volatile__ u32 *)
-			       dev_priv->ring_rptr->handle);
+	dev_priv->ring.head = (volatile u32 *)dev_priv->status->handle;
 
 	dev_priv->ring.start = (u32 *)dev_priv->cce_ring->handle;
 	dev_priv->ring.end = ((u32 *)dev_priv->cce_ring->handle
@@ -514,7 +514,6 @@ int r128_do_cleanup_cce( drm_device_t *dev )
 		drm_r128_private_t *dev_priv = dev->dev_private;
 
 		DRM_IOREMAPFREE( dev_priv->cce_ring );
-		DRM_IOREMAPFREE( dev_priv->ring_rptr );
 		DRM_IOREMAPFREE( dev_priv->buffers );
 
 		DRM(free)( dev->dev_private, sizeof(drm_r128_private_t),

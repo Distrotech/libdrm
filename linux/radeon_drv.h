@@ -24,10 +24,8 @@
  * DEALINGS IN THE SOFTWARE.
  *
  * Authors:
- *   Rickard E. (Rik) Faith <faith@valinux.com>
- *   Kevin E. Martin <martin@valinux.com>
- *   Gareth Hughes <gareth@valinux.com>
- *
+ *    Kevin E. Martin <martin@valinux.com>
+ *    Gareth Hughes <gareth@valinux.com>
  */
 
 #ifndef __RADEON_DRV_H__
@@ -41,16 +39,11 @@ typedef struct drm_radeon_freelist {
 } drm_radeon_freelist_t;
 
 typedef struct drm_radeon_ring_buffer {
+	drm_radeon_ring_status_t *status;
 	u32 *start;
-	u32 *end;
 	int size;
 	int size_l2qw;
-
-	volatile u32 *head;
-	u32 tail;
 	u32 tail_mask;
-	int space;
-
 	int high_mark;
 } drm_radeon_ring_buffer_t;
 
@@ -112,8 +105,8 @@ typedef struct drm_radeon_private {
 	drm_map_t *sarea;
 	drm_map_t *fb;
 	drm_map_t *mmio;
+	drm_map_t *status;
 	drm_map_t *cp_ring;
-	drm_map_t *ring_rptr;
 	drm_map_t *buffers;
 	drm_map_t *agp_textures;
 } drm_radeon_private_t;
@@ -504,25 +497,23 @@ extern int radeon_cp_indirect( struct inode *inode, struct file *filp,
 
 
 #define RADEON_BASE(reg)	((u32)(dev_priv->mmio->handle))
-#define RADEON_ADDR(reg)	(RADEON_BASE(reg) + reg)
+#define RADEON_ADDR(reg)	(RADEON_BASE( reg ) + reg)
 
-#define RADEON_DEREF(reg)	*(volatile u32 *)RADEON_ADDR(reg)
-#define RADEON_READ(reg)	RADEON_DEREF(reg)
-#define RADEON_WRITE(reg,val)	do { RADEON_DEREF(reg) = val; } while (0)
+#define RADEON_DEREF(reg)	*(volatile u32 *)RADEON_ADDR( reg )
+#define RADEON_READ(reg)	RADEON_DEREF( reg )
+#define RADEON_WRITE(reg, val)	do { RADEON_DEREF( reg ) = val; } while (0)
 
-#define RADEON_DEREF8(reg)	*(volatile u8 *)RADEON_ADDR(reg)
-#define RADEON_READ8(reg)	RADEON_DEREF8(reg)
-#define RADEON_WRITE8(reg,val)	do { RADEON_DEREF8(reg) = val; } while (0)
+#define RADEON_DEREF8(reg)	*(volatile u8 *)RADEON_ADDR( reg )
+#define RADEON_READ8(reg)	RADEON_DEREF8( reg )
+#define RADEON_WRITE8(reg, val)	do { RADEON_DEREF8( reg ) = val; } while (0)
 
-#define RADEON_WRITE_PLL(addr,val)                                            \
-do {                                                                          \
-	RADEON_WRITE8(RADEON_CLOCK_CNTL_INDEX,                                \
-		      ((addr) & 0x1f) | RADEON_PLL_WR_EN);                    \
-	RADEON_WRITE(RADEON_CLOCK_CNTL_DATA, (val));                          \
+#define RADEON_WRITE_PLL( addr, val ) do {				\
+	RADEON_WRITE8( RADEON_CLOCK_CNTL_INDEX,				\
+		       ((addr) & 0x1f) | RADEON_PLL_WR_EN );		\
+	RADEON_WRITE( RADEON_CLOCK_CNTL_DATA, (val) );			\
 } while (0)
 
-extern int RADEON_READ_PLL(drm_device_t *dev, int addr);
-
+extern int RADEON_READ_PLL( drm_device_t *dev, int addr );
 
 
 #define CP_PACKET0( reg, n )						\
@@ -541,54 +532,46 @@ extern int RADEON_READ_PLL(drm_device_t *dev, int addr);
  * Engine control helper macros
  */
 
-#define RADEON_WAIT_UNTIL_2D_IDLE()					\
-do {									\
+#define RADEON_WAIT_UNTIL_2D_IDLE() do {				\
 	OUT_RING( CP_PACKET0( RADEON_WAIT_UNTIL, 0 ) );			\
 	OUT_RING( (RADEON_WAIT_2D_IDLECLEAN |				\
 		   RADEON_WAIT_HOST_IDLECLEAN) );			\
 } while (0)
 
-#define RADEON_WAIT_UNTIL_3D_IDLE()					\
-do {									\
+#define RADEON_WAIT_UNTIL_3D_IDLE() do {				\
 	OUT_RING( CP_PACKET0( RADEON_WAIT_UNTIL, 0 ) );			\
 	OUT_RING( (RADEON_WAIT_3D_IDLECLEAN |				\
 		   RADEON_WAIT_HOST_IDLECLEAN) );			\
 } while (0)
 
-#define RADEON_WAIT_UNTIL_IDLE()					\
-do {									\
+#define RADEON_WAIT_UNTIL_IDLE() do {					\
 	OUT_RING( CP_PACKET0( RADEON_WAIT_UNTIL, 0 ) );			\
 	OUT_RING( (RADEON_WAIT_2D_IDLECLEAN |				\
 		   RADEON_WAIT_3D_IDLECLEAN |				\
 		   RADEON_WAIT_HOST_IDLECLEAN) );			\
 } while (0)
 
-#define RADEON_WAIT_UNTIL_PAGE_FLIPPED()				\
-do {									\
+#define RADEON_WAIT_UNTIL_PAGE_FLIPPED() do {				\
 	OUT_RING( CP_PACKET0( RADEON_WAIT_UNTIL, 0 ) );			\
 	OUT_RING( RADEON_WAIT_CRTC_PFLIP );				\
 } while (0)
 
-#define RADEON_FLUSH_CACHE()						\
-do {									\
+#define RADEON_FLUSH_CACHE() do {					\
 	OUT_RING( CP_PACKET0( RADEON_RB2D_DSTCACHE_CTLSTAT, 0 ) );	\
 	OUT_RING( RADEON_RB2D_DC_FLUSH );				\
 } while (0)
 
-#define RADEON_PURGE_CACHE()						\
-do {									\
+#define RADEON_PURGE_CACHE() do {					\
 	OUT_RING( CP_PACKET0( RADEON_RB2D_DSTCACHE_CTLSTAT, 0 ) );	\
 	OUT_RING( RADEON_RB2D_DC_FLUSH_ALL );				\
 } while (0)
 
-#define RADEON_FLUSH_ZCACHE()						\
-do {									\
+#define RADEON_FLUSH_ZCACHE() do {					\
 	OUT_RING( CP_PACKET0( RADEON_RB3D_ZCACHE_CTLSTAT, 0 ) );	\
 	OUT_RING( RADEON_RB3D_ZC_FLUSH );				\
 } while (0)
 
-#define RADEON_PURGE_ZCACHE()						\
-do {									\
+#define RADEON_PURGE_ZCACHE() do {					\
 	OUT_RING( CP_PACKET0( RADEON_RB3D_ZCACHE_CTLSTAT, 0 ) );	\
 	OUT_RING( RADEON_RB3D_ZC_FLUSH_ALL );				\
 } while (0)
@@ -601,12 +584,13 @@ do {									\
 #define RING_SPACE_TEST_WITH_RETURN( dev_priv )				\
 do {									\
 	drm_radeon_ring_buffer_t *ring = &dev_priv->ring; int i;	\
-	if ( ring->space < ring->high_mark ) {				\
+	drm_radeon_ring_status_t *status = ring->status;		\
+	if ( status->space < ring->high_mark ) {			\
 		for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {	\
-			ring->space = *ring->head - ring->tail;		\
-			if ( ring->space <= 0 )				\
-				ring->space += ring->size;		\
-			if ( ring->space >= ring->high_mark )		\
+			status->space = status->head - status->tail;	\
+			if ( status->space <= 0 )			\
+				status->space += ring->size;		\
+			if ( status->space >= ring->high_mark )		\
 				goto __ring_space_done;			\
 			udelay( 1 );					\
 		}							\
@@ -627,20 +611,17 @@ do {									\
 	}								\
 } while (0)
 
-#define RADEON_DISPATCH_AGE( age )					\
-do {									\
+#define RADEON_DISPATCH_AGE( age ) do {					\
 	OUT_RING( CP_PACKET0( RADEON_LAST_DISPATCH_REG, 0 ) );		\
 	OUT_RING( age );						\
 } while (0)
 
-#define RADEON_FRAME_AGE( age )						\
-do {									\
+#define RADEON_FRAME_AGE( age ) do {					\
 	OUT_RING( CP_PACKET0( RADEON_LAST_FRAME_REG, 0 ) );		\
 	OUT_RING( age );						\
 } while (0)
 
-#define RADEON_CLEAR_AGE( age )						\
-do {									\
+#define RADEON_CLEAR_AGE( age ) do {					\
 	OUT_RING( CP_PACKET0( RADEON_LAST_CLEAR_REG, 0 ) );		\
 	OUT_RING( age );						\
 } while (0)
@@ -653,31 +634,38 @@ do {									\
 #define radeon_flush_write_combine()	mb()
 
 
-#define RADEON_VERBOSE	0
+#define RADEON_VERBOSE	1
 
-#define RING_LOCALS	int write; unsigned int mask; volatile u32 *ring;
+#define RING_LOCALS							\
+	int write; unsigned int mask; volatile u32 *ring;		\
+	drm_radeon_ring_status_t *status = dev_priv->ring.status;
 
 #define BEGIN_RING( n ) do {						\
 	if ( RADEON_VERBOSE ) {						\
 		DRM_INFO( "BEGIN_RING( %d ) in %s\n",			\
 			   n, __FUNCTION__ );				\
 	}								\
-	if ( dev_priv->ring.space < (n) * sizeof(u32) ) {		\
+	if ( status->space < (n) * sizeof(u32) ) {			\
 		radeon_wait_ring( dev_priv, (n) * sizeof(u32) );	\
 	}								\
-	dev_priv->ring.space -= (n) * sizeof(u32);			\
+	status->space -= (n) * sizeof(u32);				\
 	ring = dev_priv->ring.start;					\
-	write = dev_priv->ring.tail;					\
+	write = status->tail;						\
 	mask = dev_priv->ring.tail_mask;				\
 } while (0)
 
 #define ADVANCE_RING() do {						\
 	if ( RADEON_VERBOSE ) {						\
 		DRM_INFO( "ADVANCE_RING() tail=0x%06x wr=0x%06x\n",	\
-			  write, dev_priv->ring.tail );			\
+			  write, status->tail );			\
+		DRM_INFO( "               head=0x%06x tl=0x%06x\n",	\
+			  RADEON_READ( RADEON_CP_RB_WPTR ),		\
+			  RADEON_READ( RADEON_CP_RB_RPTR ) );		\
+		DRM_INFO( "               head=0x%06x tl=0x%06x\n",	\
+			  status->head, status->tail );			\
 	}								\
 	radeon_flush_write_combine();					\
-	dev_priv->ring.tail = write;					\
+	status->tail = write;						\
 	RADEON_WRITE( RADEON_CP_RB_WPTR, write );			\
 } while (0)
 

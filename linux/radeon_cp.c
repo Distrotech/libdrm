@@ -24,9 +24,8 @@
  * DEALINGS IN THE SOFTWARE.
  *
  * Authors:
- *   Kevin E. Martin <martin@valinux.com>
- *   Gareth Hughes <gareth@valinux.com>
- *
+ *    Kevin E. Martin <martin@valinux.com>
+ *    Gareth Hughes <gareth@valinux.com>
  */
 
 #define __NO_VERSION__
@@ -476,8 +475,8 @@ static void radeon_do_cp_reset( drm_radeon_private_t *dev_priv )
 
 	cur_read_ptr = RADEON_READ( RADEON_CP_RB_RPTR );
 	RADEON_WRITE( RADEON_CP_RB_WPTR, cur_read_ptr );
-	*dev_priv->ring.head = cur_read_ptr;
-	dev_priv->ring.tail = cur_read_ptr;
+	dev_priv->ring.status->head = cur_read_ptr;
+	dev_priv->ring.status->tail = cur_read_ptr;
 }
 
 /* Stop the Command Processor.  This will not flush any pending
@@ -573,10 +572,13 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev )
 	/* Initialize the ring buffer's read and write pointers */
 	cur_read_ptr = RADEON_READ( RADEON_CP_RB_RPTR );
 	RADEON_WRITE( RADEON_CP_RB_WPTR, cur_read_ptr );
-	*dev_priv->ring.head = cur_read_ptr;
-	dev_priv->ring.tail = cur_read_ptr;
+	dev_priv->ring.status->head = cur_read_ptr;
+	dev_priv->ring.status->tail = cur_read_ptr;
 
-	RADEON_WRITE( RADEON_CP_RB_RPTR_ADDR, dev_priv->ring_rptr->offset );
+	RADEON_WRITE( RADEON_CP_RB_RPTR_ADDR,
+		      virt_to_bus((void *)dev_priv->status->offset) );
+	DRM_INFO( "rptr addr: 0x%08x\n",
+		  RADEON_READ( RADEON_CP_RB_RPTR_ADDR ) );
 
 	/* Set ring buffer size */
 	RADEON_WRITE( RADEON_CP_RB_CNTL, dev_priv->ring.size_l2qw );
@@ -602,7 +604,6 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev )
 static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 {
 	drm_radeon_private_t *dev_priv;
-        int i;
 
 	dev_priv = DRM(alloc)( sizeof(drm_radeon_private_t), DRM_MEM_DRIVER );
 	if ( dev_priv == NULL )
@@ -711,20 +712,13 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 					 RADEON_ROUND_MODE_TRUNC |
 					 RADEON_ROUND_PREC_8TH_PIX);
 
-	/* FIXME: We want multiple shared areas, including one shared
-	 * only by the X Server and kernel module.
-	 */
-	for ( i = 0 ; i < dev->map_count ; i++ ) {
-		if ( dev->maplist[i]->type == _DRM_SHM ) {
-			dev_priv->sarea = dev->maplist[i];
-			break;
-		}
-	}
+	dev_priv->sarea = dev->maplist[0];
 
 	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
 	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
+	DRM_FIND_MAP( dev_priv->status, init->status_offset );
+
 	DRM_FIND_MAP( dev_priv->cp_ring, init->ring_offset );
-	DRM_FIND_MAP( dev_priv->ring_rptr, init->ring_rptr_offset );
 	DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
 
 	if ( !dev_priv->is_pci ) {
@@ -737,7 +731,6 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 				       init->sarea_priv_offset);
 
 	DRM_IOREMAP( dev_priv->cp_ring );
-	DRM_IOREMAP( dev_priv->ring_rptr );
 	DRM_IOREMAP( dev_priv->buffers );
 
 	dev_priv->agp_size = init->agp_size;
@@ -746,12 +739,13 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 					- dev->agp->base
 					+ dev_priv->agp_vm_start);
 
-	dev_priv->ring.head = ((__volatile__ u32 *)
-			       dev_priv->ring_rptr->handle);
+	dev_priv->ring.status = ((drm_radeon_ring_status_t *)
+				 dev_priv->status->handle);
+	dev_priv->ring.status->head = 0;
+	dev_priv->ring.status->tail = 0;
+	dev_priv->ring.status->space = init->ring_size;
 
 	dev_priv->ring.start = (u32 *)dev_priv->cp_ring->handle;
-	dev_priv->ring.end = ((u32 *)dev_priv->cp_ring->handle
-			      + init->ring_size / sizeof(u32));
 	dev_priv->ring.size = init->ring_size;
 	dev_priv->ring.size_l2qw = DRM(order)( init->ring_size / 8 );
 
@@ -770,11 +764,11 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	RADEON_WRITE( RADEON_SCRATCH_ADDR, (dev_priv->ring_rptr->offset +
 					    RADEON_SCRATCH_REG_OFFSET) );
 	RADEON_WRITE( RADEON_SCRATCH_UMSK, 0x7 );
-#endif
 
 	dev_priv->scratch = ((__volatile__ u32 *)
 			     dev_priv->ring_rptr->handle +
 			     (RADEON_SCRATCH_REG_OFFSET / sizeof(u32)));
+#endif
 
 	dev_priv->sarea_priv->last_frame = 0;
 	RADEON_WRITE( RADEON_LAST_FRAME_REG,
@@ -805,7 +799,6 @@ int radeon_do_cleanup_cp( drm_device_t *dev )
 		drm_radeon_private_t *dev_priv = dev->dev_private;
 
 		DRM_IOREMAPFREE( dev_priv->cp_ring );
-		DRM_IOREMAPFREE( dev_priv->ring_rptr );
 		DRM_IOREMAPFREE( dev_priv->buffers );
 
 		DRM(free)( dev->dev_private, sizeof(drm_radeon_private_t),
@@ -1186,14 +1179,15 @@ void radeon_freelist_reset( drm_device_t *dev )
 int radeon_wait_ring( drm_radeon_private_t *dev_priv, int n )
 {
 	drm_radeon_ring_buffer_t *ring = &dev_priv->ring;
+	drm_radeon_ring_status_t *status = ring->status;
 	int i;
 
 	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
-		ring->space = *ring->head - ring->tail;
-		if ( ring->space <= 0 )
-			ring->space += ring->size;
+		status->space = status->head - status->tail;
+		if ( status->space <= 0 )
+			status->space += ring->size;
 
-		if ( ring->space >= n )
+		if ( status->space >= n )
 			return 0;
 
 		udelay( 1 );
@@ -1207,12 +1201,13 @@ int radeon_wait_ring( drm_radeon_private_t *dev_priv, int n )
 void radeon_update_ring_snapshot( drm_radeon_private_t *dev_priv )
 {
 	drm_radeon_ring_buffer_t *ring = &dev_priv->ring;
+	drm_radeon_ring_status_t *status = ring->status;
 
-	ring->space = *ring->head - ring->tail;
-	if ( ring->space == 0 )
+	status->space = status->head - status->tail;
+	if ( status->space == 0 )
 		atomic_inc( &dev_priv->idle_count );
-	if ( ring->space <= 0 )
-		ring->space += ring->size;
+	if ( status->space <= 0 )
+		status->space += ring->size;
 }
 
 static int radeon_cp_get_buffers( drm_device_t *dev, drm_dma_t *d )
