@@ -87,9 +87,11 @@ typedef struct drm_mach64_private {
 
 	int usec_timeout;      /* Number of microseconds to wait in the idle functions */
 
+#if MACH64_INTERRUPTS
 	atomic_t dma_timeout;  /* Number of interrupt dispatches since last DMA dispatch */
 	atomic_t do_gui;       /* Flag for the bottom half to know what to do */
 	atomic_t do_blit;      /* Flag for the bottom half to know what to do */
+#endif
 
 	int ring_running;
 	
@@ -475,19 +477,22 @@ static inline void mach64_ring_start( drm_mach64_private_t *dev_priv )
 	mach64_do_wait_for_idle( dev_priv );
 	
 	/* reset descriptor table ring head */
-	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, ring->head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB );
+	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, 
+		      ring->head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB );
 	
 	dev_priv->ring_running = 1;
 }
 
-static inline void mach64_ring_resume( drm_mach64_private_t *dev_priv, drm_mach64_descriptor_ring_t *ring )
+static inline void mach64_ring_resume( drm_mach64_private_t *dev_priv, 
+				       drm_mach64_descriptor_ring_t *ring )
 {
 	DRM_DEBUG( "%s: head_addr: 0x%08x head: %d tail: %d space: %d\n",
 		   __FUNCTION__, 
 		   ring->head_addr, ring->head, ring->tail, ring->space );
 
 	/* reset descriptor table ring head */
-	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, ring->head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB );
+	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, 
+		      ring->head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB );
 	
 	/* enable GUI bus mastering, and sync the bus master to the GUI */
 	MACH64_WRITE( MACH64_SRC_CNTL, 
@@ -498,7 +503,8 @@ static inline void mach64_ring_resume( drm_mach64_private_t *dev_priv, drm_mach6
 	MACH64_WRITE( MACH64_DST_HEIGHT_WIDTH, 0 );
 }
 
-static inline void mach64_ring_tick( drm_mach64_private_t *dev_priv, drm_mach64_descriptor_ring_t *ring )
+static inline void mach64_ring_tick( drm_mach64_private_t *dev_priv, 
+				     drm_mach64_descriptor_ring_t *ring )
 {
 	DRM_DEBUG( "%s: head_addr: 0x%08x head: %d tail: %d space: %d\n",
 		   __FUNCTION__, 
@@ -511,20 +517,25 @@ static inline void mach64_ring_tick( drm_mach64_private_t *dev_priv, drm_mach64_
 			mach64_ring_resume( dev_priv, ring );
 		}
 	} else {
-		/* GUI_ACTIVE must be read before BM_GUI_TABLE to correctly determine the ring head */
+		/* GUI_ACTIVE must be read before BM_GUI_TABLE to 
+		 * correctly determine the ring head 
+		 */
 		int gui_active = MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE;
 		
 		ring->head_addr = MACH64_READ(MACH64_BM_GUI_TABLE) & 0xfffffff0;
 		
 		if ( gui_active ) {
-			/* If not idle, BM_GUI_TABLE points one descriptor past the current head */
+			/* If not idle, BM_GUI_TABLE points one descriptor 
+			 * past the current head 
+			 */
 			if ( ring->head_addr == ring->start_addr ) {
 				ring->head_addr += ring->size;
 			}
 			ring->head_addr -= 4 * sizeof(u32);
 		}
 
-		if( ring->head_addr < ring->start_addr || ring->head_addr >= ring->start_addr + ring->size ) {
+		if( ring->head_addr < ring->start_addr || 
+		    ring->head_addr >= ring->start_addr + ring->size ) {
 			DRM_ERROR( "bad ring head address: 0x%08x\n", ring->head_addr );
 			mach64_dump_ring_info( dev_priv );
 			mach64_do_engine_reset( dev_priv );
@@ -543,7 +554,8 @@ static inline void mach64_ring_stop( drm_mach64_private_t *dev_priv )
 {
 	DRM_DEBUG( "%s: head_addr: 0x%08x head: %d tail: %d space: %d\n",
 		   __FUNCTION__, 
-		   dev_priv->ring.head_addr, dev_priv->ring.head, dev_priv->ring.tail, dev_priv->ring.space );
+		   dev_priv->ring.head_addr, dev_priv->ring.head, 
+		   dev_priv->ring.tail, dev_priv->ring.space );
 
 	/* restore previous SRC_CNTL to disable busmastering */
 	mach64_do_wait_for_fifo( dev_priv, 1 );
@@ -551,7 +563,8 @@ static inline void mach64_ring_stop( drm_mach64_private_t *dev_priv )
 
 	/* disable busmastering but keep the block 1 registers enabled */ 
 	mach64_do_wait_for_idle( dev_priv );
-	MACH64_WRITE( MACH64_BUS_CNTL, MACH64_READ( MACH64_BUS_CNTL ) | MACH64_BUS_MASTER_DIS | MACH64_BUS_EXT_REG_EN );
+	MACH64_WRITE( MACH64_BUS_CNTL, MACH64_READ( MACH64_BUS_CNTL ) 
+		      | MACH64_BUS_MASTER_DIS | MACH64_BUS_EXT_REG_EN );
 		
 	dev_priv->ring_running = 0;
 }
@@ -733,11 +746,15 @@ do {									\
 
 #define DMALOCALS  drm_buf_t *buf = NULL; u32 *p; int outcount = 0
 
-#define GETBUFPTR( _buf )							\
-((dev_priv->is_pci) ? ((u32 *)(_buf)->address) : ((u32 *)((char *)dev_priv->buffers->handle + (_buf)->offset)))
+#define GETBUFPTR( _buf )						\
+((dev_priv->is_pci) ? 							\
+	((u32 *)(_buf)->address) : 					\
+	((u32 *)((char *)dev_priv->buffers->handle + (_buf)->offset)))
 
-#define GETBUFADDR( _buf )							\
-((dev_priv->is_pci) ? ((u32)virt_to_bus((void *)(_buf)->address)) : ((u32)(_buf)->bus_address))
+#define GETBUFADDR( _buf )				\
+((dev_priv->is_pci) ? 					\
+	((u32)virt_to_bus((void *)(_buf)->address)) : 	\
+	((u32)(_buf)->bus_address))
 
 /* FIXME: use a private set of smaller buffers for state emits, clears, and swaps? */
 #define DMAGETPTR( dev_priv, n )					\
