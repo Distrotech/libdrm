@@ -501,12 +501,12 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 int mach64_do_cleanup_dma( drm_device_t *dev )
 {
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
-	
+
 	if ( dev->dev_private ) {
 		drm_mach64_private_t *dev_priv = dev->dev_private;
-		
+
 		if ( (dev_priv->pool != NULL) && 
-		     (dev_priv->cpu_addr_table != NULL) && !dev_priv->table_handle ) {
+		     (dev_priv->cpu_addr_table != NULL) && dev_priv->table_handle ) {
 			DRM_INFO( "freeing descriptor table from pci pool\n" );
 			pci_pool_free( dev_priv->pool, dev_priv->cpu_addr_table, 
 				       dev_priv->table_handle );
