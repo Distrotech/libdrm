@@ -35,14 +35,6 @@
 #define __NO_VERSION__
 #include "drmP.h"
 
-/** No-op ioctl. */
-int DRM(noop)(struct inode *inode, struct file *filp, unsigned int cmd,
-	       unsigned long arg)
-{
-	DRM_DEBUG("\n");
-	return 0;
-}
-
 /**
  * Take the heavyweight lock.
  *

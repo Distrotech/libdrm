@@ -179,8 +179,8 @@ static drm_ioctl_desc_t		  DRM(ioctls)[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_GET_STATS)]     = { DRM(getstats),    0, 0 },
 
 	[DRM_IOCTL_NR(DRM_IOCTL_SET_UNIQUE)]    = { DRM(setunique),   1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_BLOCK)]         = { DRM(noop),        1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_UNBLOCK)]       = { DRM(noop),        1, 1 },
+	[DRM_IOCTL_NR(DRM_IOCTL_BLOCK)]         = { DRM(noop_ioctl), 1, 1 },
+	[DRM_IOCTL_NR(DRM_IOCTL_UNBLOCK)]       = { DRM(noop_ioctl), 1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_AUTH_MAGIC)]    = { DRM(authmagic),   1, 1 },
 
 	[DRM_IOCTL_NR(DRM_IOCTL_ADD_MAP)]       = { DRM(addmap_ioctl), 1, 1 },
@@ -209,7 +209,7 @@ static drm_ioctl_desc_t		  DRM(ioctls)[] = {
 	/* Gamma only, really */
 	[DRM_IOCTL_NR(DRM_IOCTL_FINISH)]        = { DRM(finish),      1, 0 },
 #else
-	[DRM_IOCTL_NR(DRM_IOCTL_FINISH)]        = { DRM(noop),      1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_FINISH)]        = { DRM(noop_ioctl), 1, 0 },
 #endif
 
 #if __HAVE_DMA
@@ -981,5 +981,13 @@ int DRM(ioctl)( struct inode *inode, struct file *filp,
 
 	atomic_dec( &dev->ioctl_count );
 	return retcode;
+}
+
+/** No-op ioctl. Placeholder for ioctls past. */
+int DRM(noop_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd,
+	       unsigned long arg)
+{
+	DRM_DEBUG("\n");
+	return 0;
 }
 

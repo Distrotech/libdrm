@@ -646,6 +646,9 @@ extern int           DRM(open)(struct inode *inode, struct file *filp);
 extern int           DRM(release)(struct inode *inode, struct file *filp);
 extern int           DRM(ioctl)(struct inode *inode, struct file *filp,
 				unsigned int cmd, unsigned long arg);
+extern int	     DRM(noop_ioctl)(struct inode *inode, struct file *filp,
+				  unsigned int cmd, unsigned long arg);
+
 
 				/* Device support (drm_fops.h) */
 extern int	     DRM(open_helper)(struct inode *inode, struct file *filp,
@@ -756,10 +759,6 @@ extern int	     DRM(getmagic)(struct inode *inode, struct file *filp,
 				   unsigned int cmd, unsigned long arg);
 extern int	     DRM(authmagic)(struct inode *inode, struct file *filp,
 				    unsigned int cmd, unsigned long arg);
-
-                                /* Placeholder for ioctls past */
-extern int	     DRM(noop)(struct inode *inode, struct file *filp,
-				  unsigned int cmd, unsigned long arg);
 
 				/* DMA support (drm_dma.h) */
 #if __HAVE_DMA
