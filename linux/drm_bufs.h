@@ -179,9 +179,8 @@ int DRM(addmap)( DRM_OS_IOCTL )
 		map->handle = vmalloc_32(map->size);
 #endif
 #ifdef __FreeBSD__
-		map->handle = (void *)DRM(alloc_pages)( DRM(order)(map->size)
-						      /* PAGE_SHIFT*/,  /* FIXME: True?  AFAICT, contigmalloc wants bytes, not pages */
-						      DRM_MEM_SAREA );
+		map->handle = (void *)DRM(alloc_pages)
+			(DRM(order)(map->size) - PAGE_SHIFT, DRM_MEM_SAREA);
 #endif
 		DRM_DEBUG( "%ld %d %p\n",
 			   map->size, DRM(order)( map->size ), map->handle );
