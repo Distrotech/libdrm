@@ -44,6 +44,7 @@ typedef struct {
    	u32 *current_dma_ptr;
    	u32 *head;
    	u32 phys_head;
+	unsigned int prim_age;
    	int sec_used;
    	int idx;
 } drm_mga_prim_buf_t;
@@ -58,29 +59,30 @@ typedef struct _drm_mga_freelist {
 #define MGA_IN_DISPATCH   0
 #define MGA_IN_FLUSH      1
 #define MGA_IN_WAIT       2
+#define MGA_IN_GETBUF	  3
 
 typedef struct _drm_mga_private {
    	u32 dispatch_status;
+	unsigned int next_prim_age;
+	__volatile__ unsigned int last_prim_age;
    	int reserved_map_idx;
    	int buffer_map_idx;
    	drm_mga_sarea_t *sarea_priv;
    	int primary_size;
    	int warp_ucode_size;
    	int chipset;
-   	int frontOffset;
-   	int backOffset;
-   	int depthOffset;
-   	int textureOffset;
-   	int textureSize;
+   	unsigned int frontOffset;
+   	unsigned int backOffset;
+   	unsigned int depthOffset;
+   	unsigned int textureOffset;
+   	unsigned int textureSize;
    	int cpp;
-   	int stride;
+   	unsigned int stride;
    	int sgram;
 	int use_agp;
    	drm_mga_warp_index_t WarpIndex[MGA_MAX_G400_PIPES];
 	unsigned int WarpPipe;
    	atomic_t pending_bufs;
-   	unsigned int last_sync_tag;
-   	unsigned int sync_tag;
    	void *status_page;
    	unsigned long real_status_page;
    	u8 *ioremap;
@@ -93,7 +95,7 @@ typedef struct _drm_mga_private {
    	drm_mga_freelist_t *tail;
    	wait_queue_head_t flush_queue;	/* Processes waiting until flush    */
       	wait_queue_head_t wait_queue;	/* Processes waiting until interrupt */
-
+	wait_queue_head_t buf_queue;    /* Processes waiting for a free buf */
 	/* Some validated register values:
 	 */	
 	u32 mAccess;
@@ -128,7 +130,7 @@ extern int mga_dma_init(struct inode *inode, struct file *filp,
 extern int mga_dma_cleanup(drm_device_t *dev);
 extern int mga_flush_ioctl(struct inode *inode, struct file *filp,
 			   unsigned int cmd, unsigned long arg);
-
+extern void mga_flush_write_combine(void);
 extern unsigned int mga_create_sync_tag(drm_device_t *dev);
 extern drm_buf_t *mga_freelist_get(drm_device_t *dev);
 extern int mga_freelist_put(drm_device_t *dev, drm_buf_t *buf);
@@ -190,6 +192,7 @@ typedef enum {
 typedef struct {
    	drm_mga_freelist_t *my_freelist;
 	int discard;
+	int dispatched;
 } drm_mga_buf_priv_t;
 
 #define DWGREG0 	0x1c00
@@ -211,16 +214,16 @@ typedef struct {
 #define PRIM_OVERFLOW(dev, dev_priv, length) do {			\
 	drm_mga_prim_buf_t *tmp_buf =					\
  		dev_priv->prim_bufs[dev_priv->current_prim_idx];	\
- 	if( tmp_buf->max_dwords - tmp_buf->num_dwords < length ||	\
+	if( test_bit(MGA_BUF_NEEDS_OVERFLOW,				\
+		  &tmp_buf->buffer_status)) {				\
+ 		mga_advance_primary(dev);				\
+ 		mga_dma_schedule(dev, 1);				\
+ 	} else if( tmp_buf->max_dwords - tmp_buf->num_dwords < length ||\
  	    tmp_buf->sec_used > MGA_DMA_BUF_NR/2) {			\
 		set_bit(MGA_BUF_FORCE_FIRE, &tmp_buf->buffer_status);	\
  		mga_advance_primary(dev);				\
  		mga_dma_schedule(dev, 1);				\
-	} else if( test_bit(MGA_BUF_NEEDS_OVERFLOW,			\
-		  &tmp_buf->buffer_status)) {				\
- 		mga_advance_primary(dev);				\
- 		mga_dma_schedule(dev, 1);				\
- 	}								\
+	}								\
 } while(0)
 
 #define PRIMGETPTR(dev_priv) do {					\
@@ -270,6 +273,13 @@ drm_mga_prim_buf_t *tmp_buf = 					\
 		dev_priv->prim_bufs[dev_priv->current_prim_idx];	\
 	tmp_buf->sec_used++;						\
 } while (0)
+
+#define AGEBUF(dev_priv, buf_priv)	do {				\
+	drm_mga_prim_buf_t *tmp_buf =					\
+		dev_priv->prim_bufs[dev_priv->current_prim_idx];	\
+	buf_priv->my_freelist->age = tmp_buf->prim_age;			\
+} while (0)
+
 
 #define PRIMOUTREG(reg, val) do {					\
 	tempIndex[outcount]=ADRINDEX(reg);				\
