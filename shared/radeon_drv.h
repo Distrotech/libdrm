@@ -567,6 +567,8 @@ extern int radeon_emit_irq(drm_device_t *dev);
 #define RADEON_TXFORMAT_ARGB4444	5
 #define RADEON_TXFORMAT_ARGB8888	6
 #define RADEON_TXFORMAT_RGBA8888	7
+#define RADEON_TXFORMAT_VYUY422         10
+#define RADEON_TXFORMAT_YVYU422         11
 
 #define R200_PP_TXCBLEND_0                0x2f00
 #define R200_PP_TXCBLEND_1                0x2f10

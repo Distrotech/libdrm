@@ -164,7 +164,13 @@ typedef union {
 	struct { 
 		unsigned char cmd_type, buf_idx, pad0, pad1; 
 	} dma;
+	struct { 
+		unsigned char cmd_type, flags, pad0, pad1; 
+	} wait;
 } drm_radeon_cmd_header_t;
+
+#define RADEON_WAIT_2D  0x1
+#define RADEON_WAIT_3D  0x2
 
 
 #define RADEON_FRONT			0x1

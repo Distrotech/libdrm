@@ -149,13 +149,11 @@
       	RADEON_WRITE( RADEON_GEN_INT_CNTL, 0 );			\
 } while (0)
 
-/* #ifdef __linux__ */
-/* #define IWH(x) init_waitqueue_head(x) */
-/* #else */
-/* #define IWH(x) */
-/* #endif */
-
-#define IWH(x)
+#ifdef __linux__ 
+#define IWH(x) init_waitqueue_head(x) 
+#else 
+#define IWH(x) 
+#endif 
 
 #define DRIVER_POSTINSTALL() do {				\
 	drm_radeon_private_t *dev_priv =			\
