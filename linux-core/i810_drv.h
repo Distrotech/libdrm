@@ -71,8 +71,8 @@ extern int  i810_unlock(struct inode *inode, struct file *filp,
 
 				/* i810_dma.c */
 extern int  i810_dma_schedule(drm_device_t *dev, int locked);
-extern int  i810_dma(struct inode *inode, struct file *filp,
-		      unsigned int cmd, unsigned long arg);
+extern int  i810_getbuf(struct inode *inode, struct file *filp,
+			unsigned int cmd, unsigned long arg);
 extern int  i810_irq_install(drm_device_t *dev, int irq);
 extern int  i810_irq_uninstall(drm_device_t *dev);
 extern int  i810_control(struct inode *inode, struct file *filp,
@@ -97,8 +97,6 @@ extern int  i810_markbufs(struct inode *inode, struct file *filp,
 			 unsigned int cmd, unsigned long arg);
 extern int  i810_freebufs(struct inode *inode, struct file *filp,
 			 unsigned int cmd, unsigned long arg);
-extern int  i810_mapbufs(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
 extern int  i810_addmap(struct inode *inode, struct file *filp,
 		       unsigned int cmd, unsigned long arg);
 
@@ -124,15 +122,12 @@ extern int  i810_context_switch_complete(drm_device_t *dev, int new);
 
 
 
-/* Copy the outstanding cliprects for every I810_DMA_VERTEX buffer.
- * This can be fixed by emitting directly to the ringbuffer in the
- * 'vertex_dma' ioctl.  
-*/
-typedef struct {
+typedef struct drm_i810_buf_priv {
    	u32 *in_use;
    	int my_use_idx;
+	int currently_mapped;
+	void *virtual;
 } drm_i810_buf_priv_t;
-
 
 #define I810_DMA_GENERAL 0
 #define I810_DMA_VERTEX  1

@@ -348,5 +348,5 @@ typedef struct drm_agp_info {
 #define DRM_IOCTL_I810_DMA     DRM_IOW( 0x42, drm_i810_general_t)
 #define DRM_IOCTL_I810_FLUSH   DRM_IO ( 0x43)
 #define DRM_IOCTL_I810_GETAGE  DRM_IO ( 0x44)
-
+#define DRM_IOCTL_I810_GETBUF  DRM_IOW( 0x45, drm_i810_dma_t)
 #endif

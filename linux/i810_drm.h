@@ -90,4 +90,11 @@ typedef struct _drm_i810_vertex {
 	int discard;		/* client is finished with the buffer? */
 } drm_i810_vertex_t;
 
+typedef struct drm_i810_dma {
+	void *virtual;
+	int request_idx;
+	int request_size;
+	int granted;
+} drm_i810_dma_t;
+
 #endif /* _I810_DRM_H_ */

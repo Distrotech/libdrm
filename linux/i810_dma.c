@@ -40,6 +40,9 @@
 #define I810_BUF_FREE		1
 #define I810_BUF_USED		0
 
+#define I810_BUF_UNMAPPED 0
+#define I810_BUF_MAPPED   1
+
 #define I810_REG(reg)		2
 #define I810_BASE(reg)		((unsigned long) \
 				dev->maplist[I810_REG(reg)]->handle)
@@ -135,26 +138,85 @@ static int i810_freelist_put(drm_device_t *dev, drm_buf_t *buf)
    	return 0;
 }
 
-static int i810_dma_get_buffers(drm_device_t *dev, drm_dma_t *d)
+int i810_mmap_buffers(struct file *filp, struct vm_area_struct *vma)
 {
-	int		  i;
-	drm_buf_t	  *buf;
-
-	for (i = d->granted_count; i < d->request_count; i++) {
-		buf = i810_freelist_get(dev);
-		if (!buf) break;
-		buf->pid     = current->pid;
-		copy_to_user_ret(&d->request_indices[i],
-				 &buf->idx,
-				 sizeof(buf->idx),
-				 -EFAULT);
-		copy_to_user_ret(&d->request_sizes[i],
-				 &buf->total,
-				 sizeof(buf->total),
-				 -EFAULT);
-		++d->granted_count;
-	}
+	vma->vm_flags |= VM_IO;
+	if (remap_page_range(vma->vm_start,
+			     VM_OFFSET(vma),
+			     vma->vm_end - vma->vm_start,
+			     vma->vm_page_prot)) return -EAGAIN;
 	return 0;
+}
+
+static int i810_map_buffer(drm_buf_t *buf, struct file *filp)
+{
+	drm_i810_buf_priv_t *buf_priv = buf->dev_private;
+	int retcode = 0;
+
+	if(buf_priv->currently_mapped == I810_BUF_MAPPED) return -EINVAL;
+	down(&current->mm->mmap_sem);
+	filp->f_op->mmap = i810_mmap_buffers;   	
+	buf_priv->virtual = (void *)do_mmap(filp, 0, buf->total, 
+					    PROT_READ|PROT_WRITE,
+					    MAP_SHARED, 
+					    buf->bus_address);
+   	filp->f_op->mmap = drm_mmap;
+	if ((unsigned long)buf_priv->virtual > -1024UL) {
+		/* Real error */
+		DRM_DEBUG("mmap error\n");
+		retcode = (signed int)buf_priv->virtual;
+	} else {
+		buf_priv->currently_mapped = I810_BUF_MAPPED;
+	}
+   	up(&current->mm->mmap_sem);
+	return retcode;
+}
+
+static int i810_unmap_buffer(drm_buf_t *buf)
+{
+	drm_i810_buf_priv_t *buf_priv = buf->dev_private;
+	int retcode = 0;
+
+	if(buf_priv->currently_mapped != I810_BUF_MAPPED) return -EINVAL;
+	down(&current->mm->mmap_sem);
+        retcode = do_munmap((unsigned long)buf_priv->virtual, 
+			    (size_t) buf->total);
+	buf_priv->currently_mapped = I810_BUF_UNMAPPED;
+	buf_priv->virtual = 0;
+   	up(&current->mm->mmap_sem);
+
+	return retcode;
+}
+
+static int i810_dma_get_buffer(drm_device_t *dev, drm_i810_dma_t *d, 
+			       struct file *filp)
+{
+	drm_buf_t	  *buf;
+	drm_i810_buf_priv_t *buf_priv;
+	int retcode = 0;
+
+	buf = i810_freelist_get(dev);
+	if (!buf) {
+		retcode = -ENOMEM;
+	   	DRM_DEBUG("%s retcode %d\n", __FUNCTION__, retcode);
+		goto out_get_buf;
+	}
+   
+	retcode = i810_map_buffer(buf, filp);
+	if(retcode) {
+		i810_freelist_put(dev, buf);
+	   	DRM_DEBUG("mapbuf failed in %s retcode %d\n", __FUNCTION__, retcode);
+	   	goto out_get_buf;
+	}
+	buf->pid     = current->pid;
+	buf_priv = buf->dev_private;	
+	d->granted = 1;
+   	d->request_idx = buf->idx;
+   	d->request_size = buf->total;
+   	d->virtual = buf_priv->virtual;
+
+out_get_buf:
+	return retcode;
 }
 
 static unsigned long i810_alloc_page(drm_device_t *dev)
@@ -395,6 +457,9 @@ static void i810_dma_dispatch_general(drm_device_t *dev, drm_buf_t *buf,
    	OUT_RING( I810_BUF_FREE );   
       	OUT_RING( CMD_REPORT_HEAD );
       	ADVANCE_LP_RING();
+	if(buf_priv->currently_mapped == I810_BUF_MAPPED) {
+		i810_unmap_buffer(buf);
+	}
 }
 
 static void i810_dma_dispatch_vertex(drm_device_t *dev, 
@@ -465,6 +530,9 @@ static void i810_dma_dispatch_vertex(drm_device_t *dev,
       	OUT_RING( CMD_REPORT_HEAD );
 	OUT_RING( 0 );
    	ADVANCE_LP_RING();
+	if(buf_priv->currently_mapped == I810_BUF_MAPPED) {
+		i810_unmap_buffer(buf);
+	}
 }
 
 
@@ -727,6 +795,9 @@ void i810_reclaim_buffers(drm_device_t *dev, pid_t pid)
 		if (buf->pid == pid && buf_priv) {
 		   	cmpxchg(buf_priv->in_use, 
 				I810_BUF_USED, I810_BUF_FREE);
+			if(buf_priv->currently_mapped == I810_BUF_MAPPED) {
+				buf_priv->currently_mapped = I810_BUF_UNMAPPED;
+			}
 		}
 	}
 }
@@ -760,19 +831,6 @@ int i810_lock(struct inode *inode, struct file *filp, unsigned int cmd,
 	 */
 
 	if (!ret) {
-#if 0
-	   	if (_DRM_LOCKING_CONTEXT(dev->lock.hw_lock->lock)
-		    != lock.context) {
-			long j = jiffies - dev->lock.lock_time;
-
-			if (j > 0 && j <= DRM_LOCK_SLICE) {
-				/* Can't take lock if we just had it and
-				   there is contention. */
-				current->state = TASK_INTERRUPTIBLE;
-				schedule_timeout(j);
-			}
-		}
-#endif
 		add_wait_queue(&dev->lock.lock_queue, &entry);
 		for (;;) {
 			if (!dev->lock.hw_lock) {
@@ -929,53 +987,32 @@ int i810_getage(struct inode *inode, struct file *filp, unsigned int cmd,
 	return 0;
 }
 
-int i810_dma(struct inode *inode, struct file *filp, unsigned int cmd,
-	    unsigned long arg)
+int i810_getbuf(struct inode *inode, struct file *filp, unsigned int cmd,
+		unsigned long arg)
 {
 	drm_file_t	  *priv	    = filp->private_data;
 	drm_device_t	  *dev	    = priv->dev;
-	drm_device_dma_t  *dma	    = dev->dma;
 	int		  retcode   = 0;
-	drm_dma_t	  d;
+	drm_i810_dma_t	  d;
    	drm_i810_private_t *dev_priv = (drm_i810_private_t *)dev->dev_private;
    	u32 *hw_status = (u32 *)dev_priv->hw_status_page;
    	drm_i810_sarea_t *sarea_priv = (drm_i810_sarea_t *) 
      					dev_priv->sarea_priv; 
 
-
-   	copy_from_user_ret(&d, (drm_dma_t *)arg, sizeof(d), -EFAULT);
-	DRM_DEBUG("%d %d: %d send, %d req\n",
-		  current->pid, d.context, d.send_count, d.request_count);
+	DRM_DEBUG("getbuf\n");
+   	copy_from_user_ret(&d, (drm_i810_dma_t *)arg, sizeof(d), -EFAULT);
    
 	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
 		DRM_ERROR("i810_dma called without lock held\n");
 		return -EINVAL;
 	}
-
-	/* Please don't send us buffers.
-	 */
-	if (d.send_count != 0) {
-		DRM_ERROR("Process %d trying to send %d buffers via drmDMA\n",
-			  current->pid, d.send_count);
-		return -EINVAL;
-	}
 	
-	/* We'll send you buffers.
-	 */
-	if (d.request_count < 0 || d.request_count > dma->buf_count) {
-		DRM_ERROR("Process %d trying to get %d buffers (of %d max)\n",
-			  current->pid, d.request_count, dma->buf_count);
-		return -EINVAL;
-	}
-	
-	d.granted_count = 0;
+	d.granted = 0;
 
-	if (!retcode && d.request_count) {
-		retcode = i810_dma_get_buffers(dev, &d);
-	}
+	retcode = i810_dma_get_buffer(dev, &d, filp);
 
-	DRM_DEBUG("i810_dma: %d returning, granted = %d\n",
-		  current->pid, d.granted_count);
+	DRM_DEBUG("i810_dma: %d returning %d, granted = %d\n",
+		  current->pid, retcode, d.granted);
 
 	copy_to_user_ret((drm_dma_t *)arg, &d, sizeof(d), -EFAULT);   
    	sarea_priv->last_dispatch = (int) hw_status[5];
