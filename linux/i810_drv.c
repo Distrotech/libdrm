@@ -33,7 +33,6 @@
 #define EXPORT_SYMTAB
 #include "drmP.h"
 #include "i810_drv.h"
-#include "i810_dma.h"
 
 
 EXPORT_SYMBOL(i810_init);

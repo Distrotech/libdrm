@@ -109,24 +109,18 @@ typedef struct {
 typedef struct {
    	int idx;
 	int used;
-   	int age;
 } drm_i810_general_t;
 
 
 /* These may be placeholders if we have more cliprects than
- * I810_NR_SAREA_CLIPRECTS.  In that case, idx != real_idx; idx is the
- * number of a placeholder buffer, real_idx is the real buffer to be
- * rendered multiple times.  
- *
- * This is a hack to work around the fact that the drm considers
- * buffers to be only in a single state (ie on a single queue).
+ * I810_NR_SAREA_CLIPRECTS.  In that case, the client sets discard to
+ * false, indicating that the buffer will be dispatched again with a
+ * new set of cliprects.
  */
 typedef struct {
-   	int idx;		/* buffer to queue and free on completion */
-   	int real_idx;		/* buffer to execute */
-	int real_used;		/* buf->used in for real buffer */
-	int discard;		/* don't execute the commands */
-	int age;
+   	int idx;		/* buffer index */
+	int used;		/* nr bytes in use */
+	int discard;		/* client is finished with the buffer? */
 } drm_i810_vertex_t;
 
 

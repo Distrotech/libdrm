@@ -247,36 +247,25 @@ typedef struct
 /* Device specific ioctls:
  */
 typedef struct {
-   	int idx;
 	int clear_color;
 	int clear_depth;
 	int flags;
 } drm_mga_clear_t;
 
 typedef struct {
-   	int idx;
+   	int dummy;
 } drm_mga_swap_t;
 
 typedef struct {
-	unsigned int destOrg;
 	int idx;
 	int length;
+	unsigned int destOrg;
 } drm_mga_iload_t;
 
-
-/* These may be placeholders if we have more cliprects than
- * MGA_NR_SAREA_CLIPRECTS.  In that case, idx != real_idx; idx is
- * the number of a bogus buffer, real_idx is the real buffer to be
- * rendered multiple times.  
- *
- * This is a hack to work around assumptions built into the drm, and
- * may shortly be removed.
- */
 typedef struct {
-   	int idx;		/* buffer to queue and free on completion */
-   	int real_idx;		/* buffer to execute */
-	int real_used;		/* buf->used in for real buffer */
-	int discard;		/*  */
+   	int idx;		/* buffer to queue */
+	int used;		/* bytes in use */
+	int discard;		/* client finished with buffer?  */
 } drm_mga_vertex_t;
 
 
