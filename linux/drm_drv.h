@@ -81,6 +81,12 @@
 #ifndef __HAVE_COUNTERS
 #define __HAVE_COUNTERS			0
 #endif
+#ifndef __HAVE_SG
+#define __HAVE_SG			0
+#endif
+#ifndef __HAVE_KERNEL_CTX_SWITCH
+#define __HAVE_KERNEL_CTX_SWITCH	0
+#endif
 
 #ifndef DRIVER_PREINIT
 #define DRIVER_PREINIT()
@@ -94,30 +100,47 @@
 #ifndef DRIVER_PRETAKEDOWN
 #define DRIVER_PRETAKEDOWN()
 #endif
+#ifndef DRIVER_POSTCLEANUP
+#define DRIVER_POSTCLEANUP()
+#endif
+#ifndef DRIVER_PRESETUP
+#define DRIVER_PRESETUP()
+#endif
+#ifndef DRIVER_POSTSETUP
+#define DRIVER_POSTSETUP()
+#endif
 #ifndef DRIVER_IOCTLS
 #define DRIVER_IOCTLS
 #endif
-
+#ifndef DRIVER_FOPS
 #ifdef __linux__
-static drm_device_t	DRM(device);
-static int              DRM(minor);
-
-static struct file_operations	DRM(fops) = {
 #if LINUX_VERSION_CODE >= 0x020400
-				/* This started being used during 2.4.0-test */
-	owner:   THIS_MODULE,
+#define DRIVER_FOPS				\
+static struct file_operations	DRM(fops) = {	\
+	owner:   THIS_MODULE,			\
+	open:	 DRM(open),			\
+	flush:	 DRM(flush),			\
+	release: DRM(release),			\
+	ioctl:	 DRM(ioctl),			\
+	mmap:	 DRM(mmap),			\
+	read:	 DRM(read),			\
+	fasync:	 DRM(fasync),			\
+	poll:	 DRM(poll),			\
+}
+#else
+#define DRIVER_FOPS				\
+static struct file_operations	DRM(fops) = {	\
+	open:	 DRM(open),			\
+	flush:	 DRM(flush),			\
+	release: DRM(release),			\
+	ioctl:	 DRM(ioctl),			\
+	mmap:	 DRM(mmap),			\
+	read:	 DRM(read),			\
+	fasync:	 DRM(fasync),			\
+	poll:	 DRM(poll),			\
+}
 #endif
-	open:	 DRM(open),
-	flush:	 DRM(flush),
-	release: DRM(release),
-	ioctl:	 DRM(ioctl),
-	mmap:	 DRM(mmap),
-	read:	 DRM(read),
-	fasync:	 DRM(fasync),
-	poll:	 DRM(poll),
-};
-#endif
-
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 #if DRM_LINUX
 #include <sys/file.h>
@@ -125,8 +148,22 @@ static struct file_operations	DRM(fops) = {
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
 #include "drm_linux.h"
+#endif /* __FreeBSD__ */
 #endif
 
+/*
+ * The default number of instances (minor numbers) to initialize.
+ */
+#ifndef DRIVER_NUM_CARDS
+#define DRIVER_NUM_CARDS 1
+#endif
+
+#ifdef __linux__
+static drm_device_t	DRM(device);
+static int              DRM(minor);
+#endif
+
+#ifdef __FreeBSD__
 static int DRM(init)(device_t nbdev);
 static void DRM(cleanup)(device_t nbdev);
 
@@ -137,11 +174,16 @@ static void DRM(cleanup)(device_t nbdev);
 #if __REALLY_HAVE_AGP
 MODULE_DEPEND(DRIVER_NAME, agp, 1, 1, 1);
 #endif
-
 #if DRM_LINUX
 MODULE_DEPEND(DRIVER_NAME, linux, 1, 1, 1);
 #endif
-#endif
+#endif /* __FreeBSD__
+
+static drm_device_t	*DRM(device);
+static int		*DRM(minor);
+static int		DRM(numdevs) = 0;
+
+DRIVER_FOPS;
 
 static drm_ioctl_desc_t		  DRM(ioctls)[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_VERSION)]       = { DRM(version),     0, 0 },
@@ -224,24 +266,7 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_PARM( drm_opts, "s" );
 
-#ifndef MODULE
-/* DRM(options) is called by the kernel to parse command-line options
- * passed via the boot-loader (e.g., LILO).  It calls the insmod option
- * routine, drm_parse_drm.
- */
-
-static int __init DRM(options)( char *str )
-{
-	DRM(parse_options)( str );
-	return 1;
-}
-
-__setup( DRIVER_NAME "=", DRM(options) );
-#endif
-#endif
-
 #ifdef __FreeBSD__
-
 static int DRM(probe)(device_t dev)
 {
 	const char *s = 0;
@@ -325,6 +350,7 @@ static int DRM(setup)( drm_device_t *dev )
 {
 	int i;
 
+	DRIVER_PRESETUP();
 	atomic_set( &dev->ioctl_count, 0 );
 	atomic_set( &dev->vma_count, 0 );
 	dev->buf_use = 0;
@@ -452,6 +478,7 @@ static int DRM(setup)( drm_device_t *dev )
 	 * drm_select_queue fails between the time the interrupt is
 	 * initialized and the time the queues are initialized.
 	 */
+	DRIVER_POSTSETUP();
 	return 0;
 }
 
@@ -462,7 +489,7 @@ static int DRM(takedown)( drm_device_t *dev )
 	drm_map_t *map;
 #ifdef __linux__
 	drm_map_list_t *r_list;
-	struct list_head *list;
+	struct list_head *list, *list_next;
 #endif
 #ifdef __FreeBSD__
 	drm_map_list_entry_t *list;
@@ -546,7 +573,10 @@ static int DRM(takedown)( drm_device_t *dev )
 
 	if( dev->maplist ) {
 #ifdef __linux__
-		list_for_each(list, &dev->maplist->head) {
+		for(list = dev->maplist->head.next;
+		    list != &dev->maplist->head;
+		    list = list_next) {
+			list_next = list->next;
 			r_list = (drm_map_list_t *)list;
 			map = r_list->map;
 			DRM(free)(r_list, sizeof(*r_list), DRM_MEM_MAPS);
@@ -646,80 +676,136 @@ static int DRM(takedown)( drm_device_t *dev )
 	return 0;
 }
 
+/*
+ * Figure out how many instances to initialize.
+ */
+static int drm_count_cards(void)
+{
+	int num = 0;
+#if defined(DRIVER_CARD_LIST)
+	int i;
+	drm_pci_list_t *l;
+	u16 device, vendor;
+	struct pci_dev *pdev = NULL;
+#endif
+
+	DRM_DEBUG( "\n" );
+
+#if defined(DRIVER_COUNT_CARDS)
+	num = DRIVER_COUNT_CARDS();
+#elif defined(DRIVER_CARD_LIST)
+	for (i = 0, l = DRIVER_CARD_LIST; l[i].vendor != 0; i++) {
+		pdev = NULL;
+		vendor = l[i].vendor;
+		device = l[i].device;
+		if(device == 0xffff) device = PCI_ANY_ID;
+		if(vendor == 0xffff) vendor = PCI_ANY_ID;
+		while ((pdev = pci_find_device(vendor, device, pdev))) {
+			num++;
+		}
+	}
+#else
+	num = DRIVER_NUM_CARDS;
+#endif
+	DRM_DEBUG("numdevs = %d\n", num);
+	return num;
+}
+
 /* drm_init is called via init_module at module load time, or via
  * linux/init/main.c (this is not currently supported).
  */
 #ifdef __linux__
 static int __init drm_init( void )
 {
-	drm_device_t *dev = &DRM(device);
 #endif
 #ifdef __FreeBSD__
 static int DRM(init)( device_t nbdev )
 {
-	drm_device_t *dev = device_get_softc(nbdev);
 #endif
+
+	int i;
 #if __HAVE_CTX_BITMAP
 	int retcode;
 #endif
 	DRM_DEBUG( "\n" );
 
-	memset( (void *)dev, 0, sizeof(*dev) );
-#ifdef __linux__
-	dev->count_lock = SPIN_LOCK_UNLOCKED;
-	sema_init( &dev->struct_sem, 1 );
 #ifdef MODULE
 	DRM(parse_options)( drm_opts );
 #endif
-#endif
-#ifdef __FreeBSD__
-	DRM_OS_SPININIT(&dev->count_lock, "drm device");
-	lockinit(&dev->dev_lock, PZERO, "drmlk", 0, 0);
-#endif
+
+	DRM(numdevs) = drm_count_cards();
+	/* Force at least one instance. */
+	if (DRM(numdevs) <= 0)
+		DRM(numdevs) = 1;
+
+	DRM(device) = kmalloc(sizeof(*DRM(device)) * DRM(numdevs), GFP_KERNEL);
+	if (!DRM(device)) {
+		return -ENOMEM;
+	}
+	DRM(minor) = kmalloc(sizeof(*DRM(minor)) * DRM(numdevs), GFP_KERNEL);
+	if (!DRM(minor)) {
+		kfree(DRM(device));
+		return -ENOMEM;
+	}
 
 	DRIVER_PREINIT();
 
 #ifdef __linux__
 	DRM(mem_init)();
+#endif
 
-	if ((DRM(minor) = DRM(stub_register)(DRIVER_NAME, &DRM(fops),dev)) < 0)
-		DRM_OS_RETURN(EPERM);
-	dev->device = MKDEV(DRM_MAJOR, DRM(minor) );
-	dev->name   = DRIVER_NAME;
+	for (i = 0; i < DRM(numdevs); i++) {
+#ifdef __linux__
+		dev = &(DRM(device)[i]);
 #endif
 #ifdef __FreeBSD__
-	dev->device = nbdev;
-	dev->devnode = make_dev(&DRM( cdevsw),
+		/* FIXME??? - multihead !!! */
+		*dev = device_get_softc(nbdev);
+#endif
+		memset( (void *)dev, 0, sizeof(*dev) );
+#ifdef __linux__
+		dev->count_lock = SPIN_LOCK_UNLOCKED;
+		sema_init( &dev->struct_sem, 1 );
+		if ((DRM(minor)[i] = DRM(stub_register)(DRIVER_NAME, &DRM(fops),dev)) < 0)
+			return -EPERM;
+		dev->device = MKDEV(DRM_MAJOR, DRM(minor)[i] );
+		dev->name   = DRIVER_NAME;
+#endif
+#ifdef __FreeBSD__
+		DRM_OS_SPININIT(&dev->count_lock, "drm device");
+		lockinit(&dev->dev_lock, PZERO, "drmlk", 0, 0);
+		dev->device = nbdev;
+		dev->devnode = make_dev(&DRM( cdevsw),
 				device_get_unit(nbdev),
 				DRM_DEV_UID,
 				DRM_DEV_GID,
 				DRM_DEV_MODE,
-				"dri/card0");
-	dev->name   = DRIVER_NAME;
-	DRM(mem_init)();
-	DRM(sysctl_init)(dev);
-	TAILQ_INIT(&dev->files);
+				"dri/card0"); /* card0 - FIXME !!! */
+		dev->name   = DRIVER_NAME;
+		DRM(mem_init)();
+		DRM(sysctl_init)(dev);
+		TAILQ_INIT(&dev->files);
 #endif
 
 #if __REALLY_HAVE_AGP
-	dev->agp = DRM(agp_init)();
+		dev->agp = DRM(agp_init)();
 #if __MUST_HAVE_AGP
-	if ( dev->agp == NULL ) {
-		DRM_ERROR( "Cannot initialize the agpgart module.\n" );
+		if ( dev->agp == NULL ) {
+			DRM_ERROR( "Cannot initialize the agpgart module.\n" );
 #ifdef __linux__
-		DRM(stub_unregister)(DRM(minor));
+			DRM(stub_unregister)(DRM(minor)[i]);
 #endif
 #ifdef __FreeBSD__
-		DRM(sysctl_cleanup)( dev );
-		destroy_dev(dev->devnode);
+			DRM(sysctl_cleanup)( dev );
+			destroy_dev(dev->devnode);
 #endif
-		DRM(takedown)( dev );
-		DRM_OS_RETURN(ENOMEM);
-	}
+			DRM(takedown)( dev );
+			return -ENOMEM;
+		}
 #endif
 #if __REALLY_HAVE_MTRR
-	if (dev->agp)
-		dev->agp->agp_mtrr = mtrr_add( dev->agp->agp_info.aper_base,
+		if (dev->agp)
+			dev->agp->agp_mtrr = mtrr_add( dev->agp->agp_info.aper_base,
 				       dev->agp->agp_info.aper_size*1024*1024,
 				       MTRR_TYPE_WRCOMB,
 				       1 );
@@ -727,41 +813,30 @@ static int DRM(init)( device_t nbdev )
 #endif
 
 #if __HAVE_CTX_BITMAP
-	retcode = DRM(ctxbitmap_init)( dev );
-	if( retcode ) {
-		DRM_ERROR( "Cannot allocate memory for context bitmap.\n" );
+		retcode = DRM(ctxbitmap_init)( dev );
+		if( retcode ) {
+			DRM_ERROR( "Cannot allocate memory for context bitmap.\n" );
 #ifdef __linux__
-		DRM(stub_unregister)(DRM(minor));
+			DRM(stub_unregister)(DRM(minor)[i]);
 #endif
 #ifdef __FreeBSD__
-		DRM(sysctl_cleanup)( dev );
-		destroy_dev(dev->devnode);
+			DRM(sysctl_cleanup)( dev );
+			destroy_dev(dev->devnode);
 #endif
-		DRM(takedown)( dev );
-		return retcode;
+			DRM(takedown)( dev );
+			return retcode;
+		}
+#endif
+		DRM_INFO( "Initialized %s %d.%d.%d %s on minor %d\n",
+		  	DRIVER_NAME,
+		  	DRIVER_MAJOR,
+		  	DRIVER_MINOR,
+		  	DRIVER_PATCHLEVEL,
+		  	DRIVER_DATE,
+		  	DRM(minor)[i] );
 	}
-#endif
 
 	DRIVER_POSTINIT();
-
-#ifdef __linux__
-	DRM_INFO( "Initialized %s %d.%d.%d %s on minor %d\n",
-		  DRIVER_NAME,
-		  DRIVER_MAJOR,
-		  DRIVER_MINOR,
-		  DRIVER_PATCHLEVEL,
-		  DRIVER_DATE,
-		  DRM(minor) );
-#endif
-#ifdef __FreeBSD__
-	DRM_INFO( "Initialized %s %d.%d.%d %s on minor %d\n",
-		  DRIVER_NAME,
-		  DRIVER_MAJOR,
-		  DRIVER_MINOR,
-		  DRIVER_PATCHLEVEL,
-		  DRIVER_DATE,
-		  device_get_unit(nbdev) );
-#endif
 
 	return 0;
 }
@@ -770,51 +845,60 @@ static int DRM(init)( device_t nbdev )
  */
 #ifdef __linux__
 static void __exit drm_cleanup( void )
-{
-	drm_device_t *dev = &DRM(device);
 #endif
 #ifdef __FreeBSD__
 static void DRM(cleanup)(device_t nbdev)
-{
-	drm_device_t *dev = device_get_softc(nbdev);
 #endif
-	DRM_DEBUG( "\n" );
+{
+	drm_device_t *dev;
+	int i;
 
+	for (i = DRM(numdevs) - 1; i >= 0; i--) {
 #ifdef __linux__
-	if ( DRM(stub_unregister)(DRM(minor)) ) {
-		DRM_ERROR( "Cannot unload module\n" );
-	} else {
-		DRM_INFO( "Module unloaded\n" );
-	}
+		dev = &(DRM(device)[i]);
+		if ( DRM(stub_unregister)(DRM(minor)[i]) ) {
+			DRM_ERROR( "Cannot unload module\n" );
+		} else {
+			DRM_DEBUG("minor %d unregistered\n", DRM(minor)[i]);
+			if (i == 0) {
+				DRM_INFO( "Module unloaded\n" );
+			}
+		}
 #endif
 #ifdef __FreeBSD__
-	DRM(sysctl_cleanup)( dev );
-	destroy_dev(dev->devnode);
+		/* FIXME??? - multihead */
+		dev = device_get_softc(nbdev);
+		DRM(sysctl_cleanup)( dev );
+		destroy_dev(dev->devnode);
 #endif
-
 #if __HAVE_CTX_BITMAP
-	DRM(ctxbitmap_cleanup)( dev );
+		DRM(ctxbitmap_cleanup)( dev );
 #endif
 
 #if __REALLY_HAVE_AGP && __REALLY_HAVE_MTRR
-	if ( dev->agp && dev->agp->agp_mtrr ) {
-		int retval;
-		retval = mtrr_del( dev->agp->agp_mtrr,
+		if ( dev->agp && dev->agp->agp_mtrr >= 0) {
+			int retval;
+			retval = mtrr_del( dev->agp->agp_mtrr,
 				   dev->agp->agp_info.aper_base,
 				   dev->agp->agp_info.aper_size*1024*1024 );
-		DRM_DEBUG( "mtrr_del=%d\n", retval );
-	}
+			DRM_DEBUG( "mtrr_del=%d\n", retval );
+		}
 #endif
 
-	DRM(takedown)( dev );
+		DRM(takedown)( dev );
 
 #if __REALLY_HAVE_AGP
-	if ( dev->agp ) {
-		DRM(agp_uninit)();
-		DRM(free)( dev->agp, sizeof(*dev->agp), DRM_MEM_AGPLISTS );
-		dev->agp = NULL;
-	}
+		if ( dev->agp ) {
+			DRM(agp_uninit)();
+			DRM(free)( dev->agp, sizeof(*dev->agp), DRM_MEM_AGPLISTS );
+			dev->agp = NULL;
+		}
 #endif
+	}
+	DRIVER_POSTCLEANUP();
+	kfree(DRM(minor));
+	kfree(DRM(device));
+	DRM(numdevs) = 0;
 }
 
 #ifdef __linux__
@@ -853,15 +937,30 @@ int DRM(version)( DRM_OS_IOCTL )
 
 #ifdef __linux__
 int DRM(open)( struct inode *inode, struct file *filp )
-{
-	drm_device_t *dev = &DRM(device);
 #endif
 #ifdef __FreeBSD__
 int DRM( open)(dev_t kdev, int flags, int fmt, struct proc *p)
-{
-	drm_device_t  *dev    = DRIVER_SOFTC(minor(kdev));
 #endif
+{
+	drm_device_t *dev = NULL;
 	int retcode = 0;
+	int i;
+
+	for (i = 0; i < DRM(numdevs); i++) {
+		if (MINOR(inode->i_rdev) == DRM(minor)[i]) {
+#ifdef __linux__
+			dev = &(DRM(device)[i]);
+#endif
+#ifdef __FreeBSD__
+			/* FIXME ??? - multihead */
+			dev    = DRIVER_SOFTC(minor(kdev));
+#endif
+			break;
+		}
+	}
+	if (!dev) {
+		DRM_OS_RETURN(ENODEV);
+	}
 
 	DRM_DEBUG( "open_count = %d\n", dev->open_count );
 
@@ -1276,6 +1375,12 @@ int DRM(lock)( DRM_OS_IOCTL )
 #if __HAVE_DMA_QUIESCENT
                 if ( lock.flags & _DRM_LOCK_QUIESCENT ) {
 			DRIVER_DMA_QUIESCENT();
+		}
+#endif
+#if __HAVE_KERNEL_CTX_SWITCH
+		if ( dev->last_context != lock.context ) {
+			DRM(context_switch)(dev, dev->last_context,
+					    lock.context);
 		}
 #endif
         }
