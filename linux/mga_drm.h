@@ -37,6 +37,7 @@
  */
 #ifndef _MGA_DEFINES_
 #define _MGA_DEFINES_
+
 #define MGA_F  0x1		/* fog */
 #define MGA_A  0x2		/* alpha */
 #define MGA_S  0x4		/* specular */
@@ -61,11 +62,11 @@
 
 #define MGA_MAX_G400_PIPES 16
 #define MGA_MAX_G200_PIPES  8	/* no multitex */
-
 #define MGA_MAX_WARP_PIPES MGA_MAX_G400_PIPES
 
 #define MGA_CARD_TYPE_G200 1
 #define MGA_CARD_TYPE_G400 2
+
 #define MGA_FRONT   0x1
 #define MGA_BACK    0x2
 #define MGA_DEPTH   0x4
@@ -110,8 +111,8 @@
 #define MGA_UPLOAD_TEX0       0x2
 #define MGA_UPLOAD_TEX1       0x4
 #define MGA_UPLOAD_PIPE       0x8
-#define MGA_UPLOAD_TEX0IMAGE  0x10
-#define MGA_UPLOAD_TEX1IMAGE  0x20
+#define MGA_UPLOAD_TEX0IMAGE  0x10 /* handled client-side */
+#define MGA_UPLOAD_TEX1IMAGE  0x20 /* handled client-side */
 #define MGA_UPLOAD_2D 	      0x40
 #define MGA_WAIT_AGE          0x80 /* handled client-side */
 #define MGA_UPLOAD_CLIPRECTS  0x100 /* handled client-side */
