@@ -1024,10 +1024,7 @@ int mach64_do_dispatch_pseudo_dma( drm_mach64_private_t *dev_priv )
 					fifo = 16;
 				}
 				--fifo;
-				if (target == MACH64_BM_HOSTDATA)
-					MACH64_WRITE(reg, *buf_ptr++);
-				else
-					MACH64_WRITE(reg, le32_to_cpu(*buf_ptr++));
+				MACH64_WRITE(reg, le32_to_cpu(*buf_ptr++));
 				used--; remaining--;
 					
 				reg += 4;
