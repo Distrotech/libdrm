@@ -297,6 +297,8 @@ extern int	DRM(lock)( DRM_OS_IOCTL );
 extern int	DRM(unlock)( DRM_OS_IOCTL );
 extern int	DRM(open)(struct inode *inode, struct file *filp);
 extern int	DRM(release)(struct inode *inode, struct file *filp);
+extern int	DRM(open_helper)(struct inode *inode, struct file *filp,
+							drm_device_t *dev);
 
 /* Misc. IOCTL support (drm_ioctl.h) */
 extern int	DRM(irq_busid)( DRM_OS_IOCTL );
@@ -397,6 +399,9 @@ extern int	DRM(sg_free)( DRM_OS_IOCTL );
 #endif
 
 /* Stub support (drm_stub.h) */
+extern int	DRM(stub_register)(const char *name,
+				 struct file_operations *fops,
+				 drm_device_t *dev);
 extern int	DRM(stub_unregister)(int minor);
 
 /* Mapping support (drm_vm.h) */

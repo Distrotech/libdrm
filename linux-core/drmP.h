@@ -64,6 +64,9 @@
 #define DRM_DEBUG_CODE 0	  /* Include debugging code (if > 1, then
 				     also include looping detection. */
 
+typedef struct drm_device drm_device_t;
+typedef struct drm_file drm_file_t;
+
 /* There's undoubtably more of this file to go into these OS dependent ones. */
 #ifdef __linux__
 #include "drm_os_linux.h"
@@ -279,7 +282,7 @@ typedef struct drm_hw_lock {
 } drm_hw_lock_t;
 
 #ifdef __linux__
-typedef struct drm_file {
+struct drm_file {
 	int		  authenticated;
 	int		  minor;
 	pid_t		  pid;
@@ -290,11 +293,11 @@ typedef struct drm_file {
 	struct drm_file	  *prev;
 	struct drm_device *dev;
 	int 		  remove_auth_on_close;
-} drm_file_t;
+};
 #endif /* __linux__ */
 #ifdef __FreeBSD__
 typedef TAILQ_HEAD(drm_file_list, drm_file) drm_file_list_t;
-typedef struct drm_file {
+struct drm_file {
 	TAILQ_ENTRY(drm_file) link;
 	int		  authenticated;
 	int		  minor;
@@ -304,7 +307,7 @@ typedef struct drm_file {
 	drm_magic_t	  magic;
 	unsigned long	  ioctl_count;
 	struct drm_device *devXX;
-} drm_file_t;
+};
 #endif /* __FreeBSD__ */
 
 typedef struct drm_queue {
@@ -430,7 +433,7 @@ typedef struct drm_map_list_entry {
 } drm_map_list_entry_t;
 #endif /* __FreeBSD__ */
 
-typedef struct drm_device {
+struct drm_device {
 	const char	  *name;	/* Simple driver name		   */
 	char		  *unique;	/* Unique identifier: e.g., busid  */
 	int		  unique_len;	/* Length of unique field	   */
@@ -569,7 +572,7 @@ typedef struct drm_device {
 	void		  *dev_private;
 	drm_sigdata_t     sigdata; /* For block_all_signals */
 	sigset_t          sigmask;
-} drm_device_t;
+};
 
 extern int	     DRM(flags);
 extern void	     DRM(parse_options)( char *s );
@@ -583,10 +586,6 @@ extern int           DRM(remove_magic)(drm_device_t *dev, drm_magic_t magic);
 				/* Driver support (drm_drv.h) */
 extern int           DRM(version)( DRM_OS_IOCTL );
 extern int	     DRM(write_string)(drm_device_t *dev, const char *s);
-#ifdef __linux__ 
-extern int	DRM(open_helper)(struct inode *inode, struct file *filp,
-							drm_device_t *dev);
-#endif /* __linux__ */
 
 				/* Memory management support (drm_memory.h) */
 extern void	     DRM(mem_init)(void);
@@ -705,13 +704,6 @@ extern int            DRM(proc_cleanup)(int minor,
 				/* Scatter Gather Support (drm_scatter.h) */
 extern void           DRM(sg_cleanup)(drm_sg_mem_t *entry);
 #endif
-
-#ifdef __linux__
-/* Stub support (drm_stub.h) */
-extern int	DRM(stub_register)(const char *name,
-				 struct file_operations *fops,
-				 drm_device_t *dev);
-#endif /* __linux__ */
 
 #if __REALLY_HAVE_SG
                                /* ATI PCIGART support (ati_pcigart.h) */
