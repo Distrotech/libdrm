@@ -465,7 +465,7 @@ static int mach64_do_get_frames_queued( drm_mach64_private_t *dev_priv )
 /* Copy and verify a client submited buffer.
  * FIXME: Make an assembly optimized version
  */
-unsigned long copy_and_verify_from_user( u32 *to, const u32 *from, unsigned long n)
+static unsigned long copy_and_verify_from_user( u32 *to, const u32 *from, unsigned long n )
 {
 	unsigned long copied = 0;
 
@@ -493,11 +493,13 @@ unsigned long copy_and_verify_from_user( u32 *to, const u32 *from, unsigned long
 					__copy_from_user( to, from, count << 2 );
 					to += count;
 					copied += 1 + count;
+				} else {
+					return 0;
 				}
 
 				from += count;
 			} else {
-				break;
+				return 0;
 			}
 		}
 
@@ -514,15 +516,16 @@ static int mach64_dma_dispatch_vertex( drm_device_t *dev, void *buf, unsigned lo
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	drm_buf_t *copy_buf;
 	int done = 0;
+	int verify_failed = 0;
 	DMALOCALS;
 
-	DRM_DEBUG( "%s: buf=%p used=%d nbox=%d\n",
+	DRM_DEBUG( "%s: buf=%p used=%lu nbox=%d\n",
 		   __FUNCTION__, buf, used, sarea_priv->nbox );
 
 	if ( used ) {
 		int ret = 0;
 		int i = 0;
-		
+
 		copy_buf = mach64_freelist_get( dev_priv );
 		if (copy_buf == NULL) {
 			DRM_ERROR("%s: couldn't get buffer in DMAGETPTR\n",
@@ -530,39 +533,41 @@ static int mach64_dma_dispatch_vertex( drm_device_t *dev, void *buf, unsigned lo
 			return -EAGAIN;
 		}
 
-		copy_buf->used = copy_and_verify_from_user( GETBUFPTR( copy_buf ), buf, used );
-		
-		DMASETPTR( copy_buf );
+		if ((copy_buf->used = copy_and_verify_from_user( GETBUFPTR( copy_buf ), buf, used )) == 0) {
+			verify_failed = 1;
+		} else {
+			DMASETPTR( copy_buf );
 
-		if ( sarea_priv->dirty & ~MACH64_UPLOAD_CLIPRECTS ) {
-			ret = mach64_emit_state( dev_priv );
-			if (ret < 0) return ret;
-		}
-		
-		do {
-			/* Emit the next cliprect */
-			if ( i < sarea_priv->nbox ) {
-				ret = mach64_emit_cliprect(dev_priv, &sarea_priv->boxes[i]);
-				if ( ret < 0 ) {
-					/* failed to get buffer */
-					return ret;
-				} else if ( ret != 0 ) {
-					/* null intersection with scissor */
-					continue;
-				}
+			if ( sarea_priv->dirty & ~MACH64_UPLOAD_CLIPRECTS ) {
+				ret = mach64_emit_state( dev_priv );
+				if (ret < 0) return ret;
 			}
-			if ((i >= sarea_priv->nbox - 1))
-				done = 1;
+		
+			do {
+				/* Emit the next cliprect */
+				if ( i < sarea_priv->nbox ) {
+					ret = mach64_emit_cliprect(dev_priv, &sarea_priv->boxes[i]);
+					if ( ret < 0 ) {
+						/* failed to get buffer */
+						return ret;
+					} else if ( ret != 0 ) {
+						/* null intersection with scissor */
+						continue;
+					}
+				}
+				if ((i >= sarea_priv->nbox - 1))
+					done = 1;
 
-			/* Add the buffer to the DMA queue */
-			DMAADVANCE( dev_priv, done );
+				/* Add the buffer to the DMA queue */
+				DMAADVANCE( dev_priv, done );
 
-		} while ( ++i < sarea_priv->nbox );
+			} while ( ++i < sarea_priv->nbox );
+		}
 
 		if (copy_buf->pending && !done) {
 			DMADISCARDBUF();
 		} else if (!done) {
-			/* This buffer wasn't used (no cliprects), so place it back
+			/* This buffer wasn't used (no cliprects or verify failed), so place it back
 			 * on the free list
 			 */
 			struct list_head *ptr;
@@ -572,7 +577,7 @@ static int mach64_dma_dispatch_vertex( drm_device_t *dev, void *buf, unsigned lo
 				entry = list_entry(ptr, drm_mach64_freelist_t, list);
 				if (copy_buf == entry->buf) {
 					DRM_ERROR( "%s: Trying to release a pending buf\n",
-						 __FUNCTION__ );
+						   __FUNCTION__ );
 					return -EFAULT;
 				}
 			}
@@ -591,7 +596,12 @@ static int mach64_dma_dispatch_vertex( drm_device_t *dev, void *buf, unsigned lo
 	sarea_priv->dirty &= ~MACH64_UPLOAD_CLIPRECTS;
 	sarea_priv->nbox = 0;
 
-	return 0;
+	if (verify_failed) {
+		DRM_ERROR( "%s: Vertex buffer verification failed\n", __FUNCTION__ );
+		return -EINVAL;
+	} else {
+		return 0;
+	}
 }
 
 
@@ -776,8 +786,8 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 	drm_device_t *dev = priv->dev;
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
-	drm_device_dma_t *dma = dev->dma;
 #if 0
+	drm_device_dma_t *dma = dev->dma;
 	drm_buf_t *buf;
 #endif
 	drm_mach64_vertex_t vertex;
@@ -829,7 +839,8 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 #endif
 
 	/* FIXME: Update the IOCTL interface */
-	return mach64_dma_dispatch_vertex( dev, vertex.idx, vertex.count, vertex.prim, vertex.discard );
+	return mach64_dma_dispatch_vertex( dev, (void *)vertex.idx, vertex.count, 
+					   vertex.prim, vertex.discard );
 }
 
 int mach64_dma_blit( struct inode *inode, struct file *filp,
