@@ -1,5 +1,5 @@
 /* ati_pcigart.h -- ATI PCI GART support -*- linux-c -*-
- * Created: Tue Jan 23 21:52:19 2000 by jhartmann@valinux.com
+ * Created: Wed Dec 13 21:52:19 2000 by gareth@valinux.com
  *
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
@@ -27,13 +27,100 @@
  *   Gareth Hughes <gareth@valinux.com>
  */
 
-#ifndef _ATI_PCIGART_H_
-#define _ATI_PCIGART_H_
+#define __NO_VERSION__
+#include "drmP.h"
 
 #define ATI_PCIGART_TABLE_ORDER 	3
 #define ATI_PCIGART_TABLE_PAGES 	(1 << 3)
 #define ATI_MAX_PCIGART_PAGES		8192	/* 32 MB aperture */
 
-extern unsigned long ati_pcigart_init(drm_device_t *dev);
-extern int ati_pcigart_cleanup(unsigned long address);
+static unsigned long DRM(ati_alloc_pcigart_table)( void )
+{
+	unsigned long address;
+	struct page *page;
+	int i;
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
+
+	address = __get_free_pages( GFP_KERNEL, ATI_PCIGART_TABLE_ORDER );
+	if ( address == 0UL ) {
+		return 0;
+	}
+
+	page = virt_to_page( address );
+
+	for ( i = 0 ; i <= ATI_PCIGART_TABLE_PAGES ; i++, page++ ) {
+		atomic_inc( &page->count );
+		SetPageReserved( page );
+	}
+
+	DRM_DEBUG( "%s: returning 0x%08lx\n", __FUNCTION__, address );
+	return address;
+}
+
+static void DRM(ati_free_pcigart_table)( unsigned long address )
+{
+	struct page *page;
+	int i;
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
+
+	if ( !address ) return;
+
+	page = virt_to_page( address );
+
+	for ( i = 0 ; i <= ATI_PCIGART_TABLE_PAGES ; i++, page++ ) {
+		atomic_dec( &page->count );
+		ClearPageReserved( page );
+	}
+
+	free_pages( address, ATI_PCIGART_TABLE_ORDER );
+}
+
+unsigned long DRM(ati_pcigart_init)( drm_device_t *dev )
+{
+	drm_sg_mem_t *entry = dev->sg;
+	unsigned long address;
+	unsigned long pages;
+	u32 *pci_gart;
+	int i;
+
+	if ( !entry ) {
+		DRM_ERROR( "no scatter/gather memory!\n" );
+		return 0;
+	}
+
+	address = DRM(ati_alloc_pcigart_table)();
+	if ( !address ) {
+		DRM_ERROR( "cannot allocate PCI GART page!\n" );
+		return 0;
+	}
+
+	pci_gart = (u32 *)address;
+
+	pages = ( entry->pages <= ATI_MAX_PCIGART_PAGES )
+		? entry->pages : ATI_MAX_PCIGART_PAGES;
+
+	memset( pci_gart, 0, ATI_MAX_PCIGART_PAGES * sizeof(u32) );
+
+	for ( i = 0 ; i < pages ; i++ ) {
+		struct page *page = entry->pagelist[i];
+		pci_gart[i] = cpu_to_le32( virt_to_bus( page->virtual ) );
+	}
+
+#if __i386__
+	asm volatile ( "wbinvd" ::: "memory" );
+#else
+	mb();
 #endif
+
+	return address;
+}
+
+int DRM(ati_pcigart_cleanup)( unsigned long address )
+{
+
+	if ( address ) {
+		DRM(ati_free_pcigart_table)( address );
+	}
+
+	return 0;
+}

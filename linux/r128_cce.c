@@ -315,7 +315,13 @@ static void r128_cce_init_ring_buffer( drm_device_t *dev )
 	/* The manual (p. 2) says this address is in "VM space".  This
 	 * means it's an offset from the start of AGP space.
 	 */
-	ring_start = dev_priv->cce_ring->offset - dev->agp->base;
+#if __REALLY_HAVE_AGP
+	if ( !dev_priv->is_pci )
+		ring_start = dev_priv->cce_ring->offset - dev->agp->base;
+	else
+#endif
+		ring_start = dev_priv->cce_ring->offset - dev->sg->handle;
+
 	R128_WRITE( R128_PM4_BUFFER_OFFSET, ring_start | R128_AGP_OFFSET );
 
 	R128_WRITE( R128_PM4_BUFFER_DL_WPTR, 0 );
@@ -323,8 +329,25 @@ static void r128_cce_init_ring_buffer( drm_device_t *dev )
 
 	/* DL_RPTR_ADDR is a physical address in AGP space. */
 	*dev_priv->ring.head = 0;
-	R128_WRITE( R128_PM4_BUFFER_DL_RPTR_ADDR,
-		    dev_priv->ring_rptr->offset );
+
+	if ( !dev_priv->is_pci ) {
+		R128_WRITE( R128_PM4_BUFFER_DL_RPTR_ADDR,
+			    dev_priv->ring_rptr->offset );
+	} else {
+		drm_sg_mem_t *entry = dev->sg;
+		unsigned long tmp_ofs, page_ofs;
+
+		tmp_ofs = dev_priv->ring_rptr->offset - dev->sg->handle;
+		page_ofs = tmp_ofs >> PAGE_SHIFT;
+
+		R128_WRITE( R128_PM4_BUFFER_DL_RPTR_ADDR,
+			    virt_to_bus(entry->pagelist[page_ofs]->virtual));
+
+		DRM_DEBUG( "ring rptr: offset=0x%08lx handle=0x%08lx\n",
+			   virt_to_bus(entry->pagelist[page_ofs]->virtual),
+			   entry->handle + tmp_ofs );
+	   
+	}
 
 	/* Set watermark control */
 	R128_WRITE( R128_PM4_BUFFER_WM_CNTL,
@@ -355,15 +378,12 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 
 	dev_priv->is_pci = init->is_pci;
 
-	/* GH: We don't support PCI cards until PCI GART is implemented.
-	 * Fail here so we can remove all checks for PCI cards around
-	 * the CCE ring code.
-	 */
-	if ( dev_priv->is_pci ) {
-		DRM(free)( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
+	if ( dev_priv->is_pci && !dev->sg ) {
+		DRM_ERROR( "PCI GART memory not allocated!\n" );
+		drm_free( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
 		dev->dev_private = NULL;
 		return -EINVAL;
-	}
+       }
 
 	dev_priv->usec_timeout = init->usec_timeout;
 	if ( dev_priv->usec_timeout < 1 ||
@@ -475,10 +495,25 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 	dev_priv->sarea_priv =
 		(drm_r128_sarea_t *)((u8 *)dev_priv->sarea->handle +
 				     init->sarea_priv_offset);
+	if ( !dev_priv->is_pci ) {
+		DRM_IOREMAP( dev_priv->cce_ring );
+		DRM_IOREMAP( dev_priv->ring_rptr );
+		DRM_IOREMAP( dev_priv->buffers );
+	} else {
+		dev_priv->cce_ring->handle =
+			(void *)dev_priv->cce_ring->offset;
+		dev_priv->ring_rptr->handle =
+			(void *)dev_priv->ring_rptr->offset;
+		dev_priv->buffers->handle = (void *)dev_priv->buffers->offset;
+	}
 
-	DRM_IOREMAP( dev_priv->cce_ring );
-	DRM_IOREMAP( dev_priv->ring_rptr );
-	DRM_IOREMAP( dev_priv->buffers );
+
+#if __REALLY_HAVE_AGP
+	if ( !dev_priv->is_pci )
+		dev_priv->cce_buffers_offset = dev->agp->base;
+	else
+#endif
+		dev_priv->cce_buffers_offset = dev->sg->handle;
 
 	dev_priv->ring.head = ((__volatile__ u32 *)
 			       dev_priv->ring_rptr->handle);
@@ -500,6 +535,19 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 	dev_priv->sarea_priv->last_dispatch = 0;
 	R128_WRITE( R128_LAST_DISPATCH_REG,
 		    dev_priv->sarea_priv->last_dispatch );
+
+	if ( dev_priv->is_pci ) {
+		dev_priv->phys_pci_gart = DRM(ati_pcigart_init)( dev );
+		if ( !dev_priv->phys_pci_gart ) {
+			DRM_ERROR( "failed to init PCI GART!\n" );
+			DRM(free)( dev_priv, sizeof(*dev_priv),
+				   DRM_MEM_DRIVER );
+			dev->dev_private = NULL;
+			return -EINVAL;
+		}
+		R128_WRITE( R128_PCI_GART_PAGE,
+			    virt_to_bus( (void *)dev_priv->phys_pci_gart ) );
+	}
 
 	r128_cce_init_ring_buffer( dev );
 	r128_cce_load_microcode( dev_priv );

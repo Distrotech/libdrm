@@ -572,6 +572,13 @@ typedef struct drm_agp_head {
 } drm_agp_head_t;
 #endif
 
+typedef struct drm_sg_mem {
+	unsigned long	handle;
+	void		*virtual;
+	int		pages;
+	struct page	**pagelist;
+} drm_sg_mem_t;
+
 typedef struct drm_sigdata {
 	int           context;
 	drm_hw_lock_t *lock;
@@ -652,6 +659,7 @@ typedef struct drm_device {
 #if __REALLY_HAVE_AGP
 	drm_agp_head_t    *agp;
 #endif
+	drm_sg_mem_t	  *sg;	/* Scatter gather memory */
 	unsigned long     *ctx_bitmap;
 	void		  *dev_private;
 	drm_sigdata_t     sigdata; /* For block_all_signals */
@@ -706,6 +714,9 @@ extern unsigned long DRM(vm_shm_nopage_lock)(struct vm_area_struct *vma,
 extern unsigned long DRM(vm_dma_nopage)(struct vm_area_struct *vma,
 					unsigned long address,
 					int write_access);
+extern unsigned long DRM(vm_sg_nopage)(struct vm_area_struct *vma,
+				       unsigned long address,
+				       int write_access);
 #else
 				/* Return type changed in 2.3.23 */
 extern struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
@@ -720,6 +731,10 @@ extern struct page *DRM(vm_shm_nopage_lock)(struct vm_area_struct *vma,
 extern struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
 				       unsigned long address,
 				       int write_access);
+extern struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
+				      unsigned long address,
+				      int write_access);
+
 #endif
 extern void	     DRM(vm_open)(struct vm_area_struct *vma);
 extern void	     DRM(vm_close)(struct vm_area_struct *vma);
@@ -929,6 +944,17 @@ extern struct proc_dir_entry *DRM(proc_init)(drm_device_t *dev,
 extern int            DRM(proc_cleanup)(int minor,
 					struct proc_dir_entry *root,
 					struct proc_dir_entry *dev_root);
+
+				/* Scatter Gather Support (drm_scatter.h) */
+extern void	      DRM(sg_cleanup)(drm_sg_mem_t *entry);
+extern int	      DRM(sg_alloc)(struct inode *inode, struct file *filp,
+				    unsigned int cmd, unsigned long arg);
+extern int	      DRM(sg_free)(struct inode *inode, struct file *filp,
+				   unsigned int cmd, unsigned long arg);
+
+				/* ATI Pcigart support (ati_pcigart.h) */
+extern unsigned long  DRM(ati_pcigart_init)(drm_device_t *dev);
+extern int	      DRM(ati_pcigart_cleanup)(unsigned long address);
 
 #endif /* __KERNEL__ */
 #endif
