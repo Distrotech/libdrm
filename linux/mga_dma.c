@@ -41,7 +41,7 @@
 #ifdef __linux__
 #include <linux/interrupt.h>	/* For task queue support */
 #include <linux/delay.h>
-#endif
+#endif /* __linux__ */
 
 #define MGA_DEFAULT_USEC_TIMEOUT	10000
 #define MGA_FREELIST_DEBUG		0
@@ -640,7 +640,7 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 
 #ifdef __linux__
 	spin_lock_init( &dev_priv->prim.list_lock );
-#endif
+#endif /* __linux__ */
 
 	dev_priv->prim.status[0] = dev_priv->primary->offset;
 	dev_priv->prim.status[1] = 0;
@@ -732,7 +732,7 @@ int mga_dma_flush( DRM_OS_IOCTL )
 	if ( lock.flags & _DRM_LOCK_QUIESCENT ) {
 #if MGA_DMA_DEBUG
 		int ret = mga_do_wait_for_idle( dev_priv );
-#ifdef __linux
+#ifdef __linux__
 		if ( ret < 0 )
 #endif /* __linux__ */
 #ifdef __FreeBSD__

@@ -660,7 +660,7 @@ do {									\
 		radeon_freelist_reset( dev );				\
 	}								\
 } while (0)
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 #define VB_AGE_TEST_WITH_RETURN( dev_priv )				\
 do {									\
@@ -672,7 +672,7 @@ do {									\
 		radeon_freelist_reset( dev );				\
 	}								\
 } while (0)
-#endif
+#endif /* __FreeBSD__ */
 
 #define RADEON_DISPATCH_AGE( age ) do {					\
 	OUT_RING( CP_PACKET0( RADEON_LAST_DISPATCH_REG, 0 ) );		\

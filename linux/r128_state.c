@@ -30,7 +30,7 @@
 #ifdef __linux__
 #define __NO_VERSION__
 #include <linux/delay.h>
-#endif
+#endif /* __linux__ */
 
 #include "r128.h"
 #include "drmP.h"
