@@ -462,22 +462,89 @@ static int mach64_do_get_frames_queued( drm_mach64_private_t *dev_priv )
 	return sarea_priv->frames_queued;
 }
 
+/* #define MACH64_COPY_BUF */
+
+/* Copy and verify a client submited buffer.
+ * FIXME: Make an assembly optimized version
+ */
+u32 copy_and_verify( u32 *dst, u32 *src, u32 used)
+{
+	u32 copied = 0;
+	used >>= 2;
+
+	while ( used ) {
+		u32 data, reg, count;
+
+		data = *src++;
+		used--;
+	
+		reg = le32_to_cpu(data);
+		count = (reg >> 16) + 1;
+		if( count <= used ) {
+			used -= count;
+			reg &= 0xffff;
+#if 0
+			/* This is an exact match of Mach64's Setup Engine register.
+			 */
+			if( (reg >= 0x0190 && reg <= 0x01c1) || (reg >= 0x01ca && reg >= 0x01cf) ) {
+#else
+			/* This is faster but it covers undefined addresses.
+			 * FIXME: It must be verified that these addresses can't compromise the
+			 * bus mastering or cause a DoS.
+			 */
+			if( (reg & 0xff80) == 0x0180 ) {
+#endif
+				*dst++ = data;
+				copied += 1 + count;
+				while( count-- ) {
+					*dst++ = *src++;
+				}
+			} else {
+				while( count-- ) {
+					src++;
+				}
+			}
+		} else {
+			used = 0;
+		}
+	}
+
+	copied <<= 2;
+	return copied;
+}
+
 static int mach64_dma_dispatch_vertex( drm_device_t *dev, drm_buf_t *buf, 
 				       int prim, int discard )
 {
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
+	drm_buf_t *copy_buf;
 	int done = 0;
 	DMALOCALS;
 
 	DRM_DEBUG( "%s: buf=%d nbox=%d\n",
 		   __FUNCTION__, buf->idx, sarea_priv->nbox );
 
-	DMASETPTR( buf );
-
 	if ( buf->used ) {
 		int ret = 0;
 		int i = 0;
+		
+#ifdef MACH64_COPY_BUF
+		copy_buf = mach64_freelist_get( dev_priv );
+		if (copy_buf == NULL) {
+			DRM_ERROR("%s: couldn't get buffer in DMAGETPTR\n",
+				   __FUNCTION__ );
+			return -EAGAIN;
+		}
+
+		/* FIXME: This should be done from a client space buffer and not from a DMA buffer. */
+		copy_buf->used = copy_and_verify( GETBUFPTR( copy_buf ), GETBUFPTR( buf ), buf->used );
+		
+		DMASETPTR( copy_buf );
+#else
+		DMASETPTR( buf );
+#endif
+
 		if ( sarea_priv->dirty & ~MACH64_UPLOAD_CLIPRECTS ) {
 			ret = mach64_emit_state( dev_priv );
 			if (ret < 0) return ret;
@@ -495,22 +562,60 @@ static int mach64_dma_dispatch_vertex( drm_device_t *dev, drm_buf_t *buf,
 					continue;
 				}
 			}
+#ifdef MACH64_COPY_BUF
+			if ((i >= sarea_priv->nbox - 1))
+#else
 			if ((i >= sarea_priv->nbox - 1) && discard)
+#endif
 				done = 1;
 
 			/* Add the buffer to the DMA queue */
 			DMAADVANCE( dev_priv, done );
 
 		} while ( ++i < sarea_priv->nbox );
+
+#ifdef MACH64_COPY_BUF
+	if (copy_buf->pending && !done) {
+		DMADISCARDBUF();
+	} else if (!done) {
+	        /* This buffer wasn't used (no cliprects), so place it back
+		 * on the free list
+		 */
+		struct list_head *ptr;
+		drm_mach64_freelist_t *entry;
+#if MACH64_EXTRA_CHECKING
+		list_for_each(ptr, &dev_priv->pending) {
+			entry = list_entry(ptr, drm_mach64_freelist_t, list);
+			if (copy_buf == entry->buf) {
+				DRM_ERROR( "%s: Trying to release a pending buf\n",
+				  	 __FUNCTION__ );
+				return -EFAULT;
+			}
+		}
+#endif
+		ptr = dev_priv->placeholders.next;
+		entry = list_entry(ptr, drm_mach64_freelist_t, list);
+		copy_buf->pending = 0;
+		copy_buf->used = 0;
+		entry->buf = copy_buf;
+		entry->discard = 1;
+		list_del(ptr);
+		list_add_tail(ptr, &dev_priv->free_list);
+	}
+#endif
 	}
 
 	/* If this is a reused buffer and we're discarding it,
 	 * make sure the discard flag gets set so the buffer
 	 * is reclaimed when it finishes processing
 	 */
+#ifdef MACH64_COPY_BUF
+	if (discard) {
+#else
 	if (buf->pending && discard && !done) {
 		DMADISCARDBUF();
 	} else if (discard && !done) {
+#endif
 	        /* This buffer wasn't used (no cliprects), so place it back
 		 * on the free list
 		 */
