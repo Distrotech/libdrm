@@ -352,7 +352,7 @@ static int DRM(setup)( drm_device_t *dev )
 
 	dev->maplist = DRM(alloc)(sizeof(*dev->maplist),
 				  DRM_MEM_MAPS);
-	if(dev->maplist == NULL) return -ENOMEM;
+	if(dev->maplist == NULL) DRM_OS_RETURN(ENOMEM);
 	memset(dev->maplist, 0, sizeof(*dev->maplist));
 #ifdef __linux__
 	INIT_LIST_HEAD(&dev->maplist->head);
@@ -610,7 +610,7 @@ static int DRM(init)( device_t nbdev )
 	DRM(mem_init)();
 
 	if ((DRM(minor) = DRM(stub_register)(DRIVER_NAME, &DRM(fops),dev)) < 0)
-		return -EPERM;
+		DRM_OS_RETURN(EPERM);
 	dev->device = MKDEV(DRM_MAJOR, DRM(minor) );
 	dev->name   = DRIVER_NAME;
 #endif
@@ -762,7 +762,7 @@ int DRM(version)( DRM_OS_IOCTL )
 	name##_len = strlen( value );					\
 	if ( len && name ) {						\
 		if ( copy_to_user( name, value, len ) )			\
-			return -EFAULT;					\
+			DRM_OS_RETURN(EFAULT);				\
 	}
 
 	version.version_major = DRIVER_MAJOR;
@@ -1093,7 +1093,7 @@ int DRM(lock)( DRM_OS_IOCTL )
         if ( lock.context == DRM_KERNEL_CONTEXT ) {
                 DRM_ERROR( "Process %d using kernel context %d\n",
 			   DRM_OS_CURRENTPID, lock.context );
-                return -EINVAL;
+                DRM_OS_RETURN(EINVAL);
         }
 
         DRM_DEBUG( "%d (pid %d) requests lock (0x%08x), flags = 0x%08x\n",
@@ -1102,10 +1102,10 @@ int DRM(lock)( DRM_OS_IOCTL )
 
 #if __HAVE_DMA_QUEUE
         if ( lock.context < 0 )
-                return -EINVAL;
+                DRM_OS_RETURN(EINVAL);
 #elif __HAVE_MULTIPLE_DMA_QUEUES
         if ( lock.context < 0 || lock.context >= dev->queue_count )
-                return -EINVAL;
+                DRM_OS_RETURN(EINVAL);
 	q = dev->queuelist[lock.context];
 #endif
 
@@ -1210,7 +1210,7 @@ int DRM(unlock)( DRM_OS_IOCTL )
 	if ( lock.context == DRM_KERNEL_CONTEXT ) {
 		DRM_ERROR( "Process %d using kernel context %d\n",
 			   DRM_OS_CURRENTPID, lock.context );
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 	}
 
 	atomic_inc( &dev->counts[_DRM_STAT_UNLOCKS] );

@@ -35,25 +35,58 @@
 #ifdef __linux__
 #include <linux/poll.h>
 #endif
+#ifdef __FreeBSD__
+#include <sys/signalvar.h>
+#include <sys/poll.h>
 
-/* drm_open is called whenever a process opens /dev/drm. */
+drm_file_t *DRM(find_file_by_proc)(drm_device_t *dev, struct proc *p)
+{
+	uid_t uid = p->p_cred->p_svuid;
+	pid_t pid = p->p_pid;
+	drm_file_t *priv;
 
+	TAILQ_FOREACH(priv, &dev->files, link)
+		if (priv->pid == pid && priv->uid == uid)
+			return priv;
+	return NULL;
+}
+#endif
+
+/* DRM(open) is called whenever a process opens /dev/drm. */
+
+#ifdef __linux__
 int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 {
-	kdev_t	     minor = MINOR(inode->i_rdev);
+	kdev_t	     m = MINOR(inode->i_rdev);
+#endif
+#ifdef __FreeBSD__
+int DRM(open_helper)(dev_t kdev, int flags, int fmt, struct proc *p,
+		    drm_device_t *dev)
+{
+	int	     m = minor(kdev);
+#endif
 	drm_file_t   *priv;
 
-	if (filp->f_flags & O_EXCL)   return -EBUSY; /* No exclusive opens */
-	if (!DRM(cpu_valid)())        return -EINVAL;
+#ifdef __linux__
+	if (filp->f_flags & O_EXCL) return -EBUSY; /* No exclusive opens */
+#endif
+#ifdef __FreeBSD__
+	if (flags & O_EXCL)
+		return EBUSY; /* No exclusive opens */
+	dev->flags = flags;
+#endif
+	if (!DRM(cpu_valid)())
+		DRM_OS_RETURN(EINVAL);
 
-	DRM_DEBUG("pid = %d, minor = %d\n", current->pid, minor);
+	DRM_DEBUG("pid = %d, minor = %d\n", DRM_OS_CURRENTPID, m);
 
-	priv		    = DRM(alloc)(sizeof(*priv), DRM_MEM_FILES);
+#ifdef __linux__
+	priv = (drm_file_t *) DRM(alloc)(sizeof(*priv), DRM_MEM_FILES);
 	memset(priv, 0, sizeof(*priv));
 	filp->private_data  = priv;
 	priv->uid	    = current->euid;
 	priv->pid	    = current->pid;
-	priv->minor	    = minor;
+	priv->minor	    = m;
 	priv->dev	    = dev;
 	priv->ioctl_count   = 0;
 	priv->authenticated = capable(CAP_SYS_ADMIN);
@@ -71,7 +104,31 @@ int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 		dev->file_last	     = priv;
 	}
 	up(&dev->struct_sem);
+#endif
+#ifdef __FreeBSD__
+	/* FIXME: linux mallocs and bzeros here */
+	priv = (drm_file_t *) DRM(find_find_by_proc)(dev, p);
+	if (priv) {
+		priv->refs++;
+	} else {
+		priv = (drm_file_t *) DRM(alloc)(sizeof(*priv), DRM_MEM_FILES);
+		bzero(priv, sizeof(*priv));
+		priv->uid		= p->p_cred->p_svuid;
+		priv->pid		= p->p_pid;
+		priv->refs		= 1;
+		priv->minor		= m;
+		priv->devXX		= dev;
+		priv->ioctl_count 	= 0;
+		priv->authenticated	= !suser(p);
+		lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, p);
+		TAILQ_INSERT_TAIL(&dev->files, priv, link);
+		lockmgr(&dev->dev_lock, LK_RELEASE, 0, p);
+	}
 
+	kdev->si_drv1 = dev;
+#endif
+
+#ifdef __linux__
 #ifdef __alpha__
 	/*
 	 * Default the hose
@@ -86,14 +143,16 @@ int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 		}
 	}
 #endif
+#endif
 
 	return 0;
 }
 
+#ifdef __linux__
 int DRM(flush)(struct file *filp)
 {
-	drm_file_t    *priv   = filp->private_data;
-	drm_device_t  *dev    = priv->dev;
+	drm_file_t	*priv	= filp->private_data;
+	drm_device_t	*dev	= priv->dev;
 
 	DRM_DEBUG("pid = %d, device = 0x%x, open_count = %d\n",
 		  current->pid, dev->device, dev->open_count);
@@ -102,8 +161,8 @@ int DRM(flush)(struct file *filp)
 
 int DRM(fasync)(int fd, struct file *filp, int on)
 {
-	drm_file_t    *priv   = filp->private_data;
-	drm_device_t  *dev    = priv->dev;
+	drm_file_t	*priv	= filp->private_data;
+	drm_device_t	*dev	= priv->dev;
 	int	      retcode;
 
 	DRM_DEBUG("fd = %d, device = 0x%x\n", fd, dev->device);
@@ -111,39 +170,59 @@ int DRM(fasync)(int fd, struct file *filp, int on)
 	if (retcode < 0) return retcode;
 	return 0;
 }
-
+#endif
 
 /* The drm_read and drm_write_string code (especially that which manages
    the circular buffer), is based on Alessandro Rubini's LINUX DEVICE
    DRIVERS (Cambridge: O'Reilly, 1998), pages 111-113. */
 
+#ifdef __linux__
 ssize_t DRM(read)(struct file *filp, char *buf, size_t count, loff_t *off)
+#endif
+#ifdef __FreeBSD__
+ssize_t DRM(read)(dev_t kdev, struct uio *uio, int ioflag)
+#endif
 {
-	drm_file_t    *priv   = filp->private_data;
-	drm_device_t  *dev    = priv->dev;
+	DRM_OS_DEVICE;
 	int	      left;
 	int	      avail;
 	int	      send;
 	int	      cur;
+	int           error = 0;
 
 	DRM_DEBUG("%p, %p\n", dev->buf_rp, dev->buf_wp);
 
 	while (dev->buf_rp == dev->buf_wp) {
 		DRM_DEBUG("  sleeping\n");
-		if (filp->f_flags & O_NONBLOCK) {
+#ifdef __linux__
+		if (filp->f_flags & O_NONBLOCK)
 			return -EAGAIN;
-		}
 		interruptible_sleep_on(&dev->buf_readers);
 		if (signal_pending(current)) {
 			DRM_DEBUG("  interrupted\n");
 			return -ERESTARTSYS;
 		}
+#endif
+#ifdef __FreeBSD__
+		if (dev->flags & FASYNC)
+			return EWOULDBLOCK;
+		error = tsleep(&dev->buf_rp, PZERO|PCATCH, "drmrd", 0);
+		if (error) {
+			DRM_DEBUG("  interrupted\n");
+			return error;
+		}
+#endif
 		DRM_DEBUG("  awake\n");
 	}
 
 	left  = (dev->buf_rp + DRM_BSZ - dev->buf_wp) % DRM_BSZ;
 	avail = DRM_BSZ - left;
+#ifdef __linux__
 	send  = DRM_MIN(avail, count);
+#endif
+#ifdef __FreeBSD__
+	send  = DRM_MIN(avail, uio->uio_resid);
+#endif
 
 	while (send) {
 		if (dev->buf_wp > dev->buf_rp) {
@@ -151,15 +230,28 @@ ssize_t DRM(read)(struct file *filp, char *buf, size_t count, loff_t *off)
 		} else {
 			cur = DRM_MIN(send, dev->buf_end - dev->buf_rp);
 		}
+#ifdef __linux__
 		if (copy_to_user(buf, dev->buf_rp, cur))
 			return -EFAULT;
+#endif
+#ifdef __FreeBSD__
+		error = uiomove(dev->buf_rp, cur, uio);
+		if (error)
+			break;
+#endif
 		dev->buf_rp += cur;
 		if (dev->buf_rp == dev->buf_end) dev->buf_rp = dev->buf;
 		send -= cur;
 	}
 
+#ifdef __linux__
 	wake_up_interruptible(&dev->buf_writers);
 	return DRM_MIN(avail, count);;
+#endif
+#ifdef __FreeBSD__
+	wakeup(&dev->buf_wp);
+	return error;
+#endif
 }
 
 int DRM(write_string)(drm_device_t *dev, const char *s)
@@ -216,8 +308,7 @@ int DRM(write_string)(drm_device_t *dev, const char *s)
 
 unsigned int DRM(poll)(struct file *filp, struct poll_table_struct *wait)
 {
-	drm_file_t   *priv = filp->private_data;
-	drm_device_t *dev  = priv->dev;
+	DRM_OS_DEVICE;
 
 	poll_wait(filp, &dev->buf_readers, wait);
 	if (dev->buf_wp != dev->buf_rp) return POLLIN | POLLRDNORM;
