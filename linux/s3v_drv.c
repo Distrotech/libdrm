@@ -5,6 +5,7 @@
 #include <linux/config.h>
 #include "s3v.h"
 #include "drmP.h"
+#include "s3v_drm.h"
 #include "s3v_drv.h"
 
 #define DRIVER_AUTHOR		"Max Lingua (ladybug)"
