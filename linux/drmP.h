@@ -496,6 +496,10 @@ typedef struct drm_agp_head {
    	int 		   agp_mtrr;
 	int		   cant_use_aperture;
 	unsigned long	   page_mask;
+	int		   context;
+	struct list_head   *agp_extended_info;
+	int		   num_ctxs;
+	int		   agp_page_shift;
 } drm_agp_head_t;
 #endif
 
@@ -699,10 +703,10 @@ extern void	     *DRM(ioremap_nocache)(unsigned long offset, unsigned long size)
 extern void	     DRM(ioremapfree)(void *pt, unsigned long size);
 
 #if __REALLY_HAVE_AGP
-extern agp_memory    *DRM(alloc_agp)(int pages, u32 type);
-extern int           DRM(free_agp)(agp_memory *handle, int pages);
-extern int           DRM(bind_agp)(agp_memory *handle, unsigned int start);
-extern int           DRM(unbind_agp)(agp_memory *handle);
+extern agp_memory    *DRM(alloc_agp)(drm_device_t *dev, int pages, u32 type);
+extern int           DRM(free_agp)(drm_device_t *dev, agp_memory *handle, int pages);
+extern int           DRM(bind_agp)(drm_device_t *dev, agp_memory *handle, unsigned int start);
+extern int           DRM(unbind_agp)(drm_device_t *dev, agp_memory *handle);
 #endif
 
 				/* Misc. IOCTL support (drm_ioctl.h) */
@@ -880,10 +884,31 @@ extern int            DRM(agp_unbind)(struct inode *inode, struct file *filp,
 				      unsigned int cmd, unsigned long arg);
 extern int            DRM(agp_bind)(struct inode *inode, struct file *filp,
 				    unsigned int cmd, unsigned long arg);
-extern agp_memory     *DRM(agp_allocate_memory)(size_t pages, u32 type);
-extern int            DRM(agp_free_memory)(agp_memory *handle);
-extern int            DRM(agp_bind_memory)(agp_memory *handle, off_t start);
-extern int            DRM(agp_unbind_memory)(agp_memory *handle);
+extern agp_memory     *DRM(agp_allocate_memory)(drm_device_t *dev, 
+						size_t pages, u32 type);
+extern int            DRM(agp_free_memory)(drm_device_t *dev,
+					   agp_memory *handle);
+extern int            DRM(agp_bind_memory)(drm_device_t *dev, 
+					   agp_memory *handle, off_t start);
+extern int            DRM(agp_unbind_memory)(drm_device_t *dev,
+					     agp_memory *handle);
+/* New functionality provided by agp 3.0 infrastructure. */
+extern int	      DRM(agp_supports_vma_map)(void);
+extern int	      DRM(agp_usermap)(drm_device_t *dev, drm_map_t *map, 
+				       struct vm_area_struct *vma);
+extern int	      DRM(agp_getmap)(struct inode *inode, struct file *filp,
+				      unsigned int cmd, unsigned long arg);
+extern int	      DRM(agp_e_info)(struct inode *inode, struct file *filp,
+				      unsigned int cmd, unsigned long arg);
+extern int	      DRM(agp_e_size)(struct inode *inode, struct file *filp,
+				      unsigned int cmd, unsigned long arg);
+extern int	      DRM(agp_no_ctxs)(struct inode *inode, struct file *filp,
+				       unsigned int cmd, unsigned long arg);
+extern int	      DRM(agp_chg_ctx)(struct inode *inode, struct file *filp,
+				       unsigned int cmd, unsigned long arg);
+
+
+
 #endif
 
 				/* Stub support (drm_stub.h) */

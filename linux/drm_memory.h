@@ -362,7 +362,7 @@ void DRM(ioremapfree)(void *pt, unsigned long size)
 
 #if __REALLY_HAVE_AGP
 
-agp_memory *DRM(alloc_agp)(int pages, u32 type)
+agp_memory *DRM(alloc_agp)(drm_device_t *dev, int pages, u32 type)
 {
 	agp_memory *handle;
 
@@ -371,7 +371,8 @@ agp_memory *DRM(alloc_agp)(int pages, u32 type)
 		return NULL;
 	}
 
-	if ((handle = DRM(agp_allocate_memory)(pages, type))) {
+	if ((handle = DRM(agp_allocate_memory)(dev, pages, type))) {
+		printk("Returning handle : %p\n", handle);
 		spin_lock(&DRM(mem_lock));
 		++DRM(mem_stats)[DRM_MEM_TOTALAGP].succeed_count;
 		DRM(mem_stats)[DRM_MEM_TOTALAGP].bytes_allocated
@@ -385,7 +386,7 @@ agp_memory *DRM(alloc_agp)(int pages, u32 type)
 	return NULL;
 }
 
-int DRM(free_agp)(agp_memory *handle, int pages)
+int DRM(free_agp)(drm_device_t *dev, agp_memory *handle, int pages)
 {
 	int           alloc_count;
 	int           free_count;
@@ -397,7 +398,7 @@ int DRM(free_agp)(agp_memory *handle, int pages)
 		return retval;;
 	}
 
-	if (DRM(agp_free_memory)(handle)) {
+	if (DRM(agp_free_memory)(dev, handle)) {
 		spin_lock(&DRM(mem_lock));
 		free_count  = ++DRM(mem_stats)[DRM_MEM_TOTALAGP].free_count;
 		alloc_count =   DRM(mem_stats)[DRM_MEM_TOTALAGP].succeed_count;
@@ -414,17 +415,18 @@ int DRM(free_agp)(agp_memory *handle, int pages)
 	return retval;
 }
 
-int DRM(bind_agp)(agp_memory *handle, unsigned int start)
+int DRM(bind_agp)(drm_device_t *dev, agp_memory *handle, unsigned int start)
 {
 	int retcode = -EINVAL;
 
+	printk("%s\n", __func__);
 	if (!handle) {
 		DRM_MEM_ERROR(DRM_MEM_BOUNDAGP,
 			      "Attempt to bind NULL AGP handle\n");
 		return retcode;
 	}
 
-	if (!(retcode = DRM(agp_bind_memory)(handle, start))) {
+	if (!(retcode = DRM(agp_bind_memory)(dev, handle, start))) {
 		spin_lock(&DRM(mem_lock));
 		++DRM(mem_stats)[DRM_MEM_BOUNDAGP].succeed_count;
 		DRM(mem_stats)[DRM_MEM_BOUNDAGP].bytes_allocated
@@ -438,7 +440,7 @@ int DRM(bind_agp)(agp_memory *handle, unsigned int start)
 	return retcode;
 }
 
-int DRM(unbind_agp)(agp_memory *handle)
+int DRM(unbind_agp)(drm_device_t *dev, agp_memory *handle)
 {
 	int alloc_count;
 	int free_count;
@@ -450,7 +452,7 @@ int DRM(unbind_agp)(agp_memory *handle)
 		return retcode;
 	}
 
-	if ((retcode = DRM(agp_unbind_memory)(handle))) return retcode;
+	if ((retcode = DRM(agp_unbind_memory)(dev, handle))) return retcode;
 	spin_lock(&DRM(mem_lock));
 	free_count  = ++DRM(mem_stats)[DRM_MEM_BOUNDAGP].free_count;
 	alloc_count = DRM(mem_stats)[DRM_MEM_BOUNDAGP].succeed_count;

@@ -158,6 +158,26 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
 		map->offset = map->offset + dev->sg->handle;
 		break;
 
+	/* The offset here is the agp memory blocks handle, try and find it
+	 * and see if it matches.  MMap can now map it using kernel routines.
+	 */
+#if __REALLY_HAVE_AGP
+	case _DRM_AGP_MEM:
+		{
+			drm_agp_mem_t *entry;
+
+			entry = DRM(agp_lookup_entry)(dev, map->offset);
+			if(!entry || !DRM(agp_supports_vma_map)() || 
+			   map->size > 
+			   entry->pages << dev->agp->agp_page_shift) {
+				DRM(free)(map, sizeof(*map), DRM_MEM_MAPS);
+				return -EINVAL;
+			}
+			map->offset = 0;
+			map->handle = entry;
+		}
+		break;
+#endif
 	default:
 		DRM(free)( map, sizeof(*map), DRM_MEM_MAPS );
 		return -EINVAL;
@@ -253,6 +273,7 @@ int DRM(rmmap)(struct inode *inode, struct file *filp,
 			break;
 		case _DRM_AGP:
 		case _DRM_SCATTER_GATHER:
+		case _DRM_AGP_MEM:
 			break;
 		}
 		DRM(free)(map, sizeof(*map), DRM_MEM_MAPS);

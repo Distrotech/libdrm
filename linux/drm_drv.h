@@ -48,6 +48,9 @@
  * #define DRM(x)		mga_##x
  */
 
+#ifndef __TRY_AGP_3_0
+#define __TRY_AGP_3_0			0
+#endif
 #ifndef __MUST_HAVE_AGP
 #define __MUST_HAVE_AGP			0
 #endif
@@ -227,6 +230,18 @@ static drm_ioctl_desc_t		  DRM(ioctls)[] = {
 #endif
 
 	DRIVER_IOCTLS
+
+/* Add these at the end since we are using a larger ioctl number since
+ * we don't have the room for this many ioctls at a lower number.
+ * Consider the ioctl range 0x70 -> 0x79 is reserved for agp extensions.
+ */
+#if __REALLY_HAVE_AGP
+	[DRM_IOCTL_NR(DRM_IOCTL_AGP_GETMAP)]   = { DRM(agp_getmap),  1, 1 },
+	[DRM_IOCTL_NR(DRM_IOCTL_AGP_QUERY)]    = { DRM(agp_e_info),  1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_AGP_QUERY_SZ)] = { DRM(agp_e_size),  1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_AGP_NUM_CTX)]  = { DRM(agp_no_ctxs), 1, 1 },
+	[DRM_IOCTL_NR(DRM_IOCTL_AGP_CHG_CTX)]  = { DRM(agp_chg_ctx), 1, 1 },
+#endif
 };
 
 #define DRIVER_IOCTL_COUNT	DRM_ARRAY_SIZE( DRM(ioctls) )
@@ -399,8 +414,8 @@ static int DRM(takedown)( drm_device_t *dev )
                                    intact until drv_cleanup is called. */
 		for ( entry = dev->agp->memory ; entry ; entry = nexte ) {
 			nexte = entry->next;
-			if ( entry->bound ) DRM(unbind_agp)( entry->memory );
-			DRM(free_agp)( entry->memory, entry->pages );
+			if ( entry->bound ) DRM(unbind_agp)( dev, entry->memory );
+			DRM(free_agp)( dev, entry->memory, entry->pages );
 			DRM(free)( entry, sizeof(*entry), DRM_MEM_AGPLISTS );
 		}
 		dev->agp->memory = NULL;
@@ -450,6 +465,7 @@ static int DRM(takedown)( drm_device_t *dev )
 				break;
 
 			case _DRM_AGP:
+			case _DRM_AGP_MEM:
 				/* Do nothing here, because this is all
 				 * handled in the AGP/GART driver.
 				 */

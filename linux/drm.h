@@ -161,7 +161,8 @@ typedef enum drm_map_type {
 	_DRM_REGISTERS	    = 1,  /* no caching, no core dump		    */
 	_DRM_SHM	    = 2,  /* shared, cached			    */
 	_DRM_AGP            = 3,  /* AGP/GART                               */
-	_DRM_SCATTER_GATHER = 4	  /* Scatter/gather memory for PCI DMA      */
+	_DRM_SCATTER_GATHER = 4,  /* Scatter/gather memory for PCI DMA      */
+	_DRM_AGP_MEM        = 5,  /* AGP/GART memory block		    */
 } drm_map_type_t;
 
 typedef enum drm_map_flags {
@@ -375,6 +376,104 @@ typedef struct drm_agp_mode {
 	unsigned long mode;
 } drm_agp_mode_t;
 
+/* Added for agp 3.0 */
+typedef struct drm_agp_buffer_info {
+	unsigned long size;	/* In bytes -- will round to page boundary */
+	unsigned long handle;	/* Used for BIND/UNBIND ioctls */
+	unsigned long type;     /* Type of memory to allocate  */
+        unsigned long physical; /* Physical used by i810       */
+	unsigned long offset;	/* In bytes -- will round to page boundary */
+} drm_agp_buffer_info_t;
+
+/* Masters and targets flags */
+#define _DRM_AGP_SUPPORTS_ISOCHRONOUS		(1<<0)
+#define _DRM_AGP_SUPPORTS_SBA			(1<<1)
+#define _DRM_AGP_SUPPORTS_AGP_3_0_ENABLED	(1<<2)
+#define _DRM_AGP_SUPPORTS_OVER4G_ADDR		(1<<3)
+#define _DRM_AGP_SUPPORTS_FAST_WRITE 		(1<<4)
+#define _DRM_AGP_SUPPORTS_SPEED_1X		(1<<5)
+#define _DRM_AGP_SUPPORTS_SPEED_2X		(1<<6)
+#define _DRM_AGP_SUPPORTS_SPEED_4X		(1<<7)
+#define _DRM_AGP_SUPPORTS_SPEED_8X		(1<<8)
+#define _DRM_AGP_SUPPORTS_ISO_PAYLOAD_32_B	(1<<9)
+#define _DRM_AGP_SUPPORTS_ISO_PAYLOAD_64_B	(1<<10)
+#define _DRM_AGP_SUPPORTS_ISO_PAYLOAD_128_B	(1<<11)
+#define _DRM_AGP_SUPPORTS_ISO_PAYLOAD_256_B	(1<<12)
+
+/* valid for targets only */
+#define _DRM_AGP_SUPPORTS_CACHED_MEMORY		(1<<13)
+#define _DRM_AGP_SUPPORTS_APER_MMAP		(1<<14)
+
+/* reserved bits for future use */
+#define _DRM_AGP_SUPPORTS_RESERVED_0		(1<<15)
+#define _DRM_AGP_SUPPORTS_RESERVED_1		(1<<16)
+#define _DRM_AGP_SUPPORTS_RESERVED_2		(1<<17)
+#define _DRM_AGP_SUPPORTS_RESERVED_3 		(1<<18)
+#define _DRM_AGP_SUPPORTS_RESERVED_4 		(1<<19)
+#define _DRM_AGP_SUPPORTS_RESERVED_5 		(1<<20)
+#define _DRM_AGP_SUPPORTS_RESERVED_6 		(1<<21)
+#define _DRM_AGP_SUPPORTS_RESERVED_7 		(1<<22)
+#define _DRM_AGP_SUPPORTS_RESERVED_8 		(1<<23)
+#define _DRM_AGP_SUPPORTS_RESERVED_9 		(1<<24)
+#define _DRM_AGP_SUPPORTS_RESERVED_10		(1<<25)
+#define _DRM_AGP_SUPPORTS_RESERVED_11		(1<<26)
+#define _DRM_AGP_SUPPORTS_RESERVED_12		(1<<27)
+#define _DRM_AGP_SUPPORTS_RESERVED_13		(1<<28)
+#define _DRM_AGP_SUPPORTS_RESERVED_14		(1<<29)
+#define _DRM_AGP_SUPPORTS_RESERVED_15		(1<<30)
+#define _DRM_AGP_SUPPORTS_RESERVED_16		(1<<31)
+
+/* Driver flags, all the rest of the values are reserved */
+#define _DRM_AGP_USE_AGP_3_0_MODES		(1<<0)
+#define _DRM_AGP_CAN_MAP_APERTURE		(1<<1)
+#define _DRM_AGP_MAPS_USE_CACHE_ATTRS		(1<<2)
+#define _DRM_AGP_CAN_DO_CACHED			(1<<3)
+#define _DRM_AGP_DRIVER_ACTIVE			(1<<4)
+
+typedef struct drm_agp_master {
+	int agp_major_version;
+	int agp_minor_version;
+	int vendor_pci_id;
+	int device_pci_id;
+	int num_requests_enqueue;
+	int calibration_cycle_ms;
+	int max_bandwidth_bpp;
+	int num_trans_per_period;
+	int max_requests;
+	int payload_size;
+	unsigned long flags;
+} drm_agp_master_t;
+
+typedef struct drm_agp_driver_info {
+	char *driver_name;		/* Driver name or empty string */
+	int agp_major_version;
+	int agp_minor_version;
+	int num_requests_enqueue;
+	int calibration_cycle_ms;
+	int optimum_request_size;	
+	int max_bandwidth_bpp;
+	int iso_latency_in_periods;
+	int num_trans_per_period;
+	int payload_size;
+	int target_vendor_pci_id;
+	int target_device_pci_id;
+	unsigned long target_flags;
+	unsigned long driver_flags;
+	unsigned long aper_base;
+	unsigned long aper_size;
+	int agp_page_shift;
+	int alloc_page_shift;
+	unsigned long agp_page_mask;
+	unsigned long alloc_page_mask;
+	int max_system_pages;
+	int current_memory;
+	int context_id;
+	int num_masters;
+	drm_agp_master_t *masters;	/* Pointer to array of master data
+					 * if no masters == NULL.
+					 */
+} drm_agp_driver_info_t;
+
 				/* For drm_agp_alloc -- allocated a buffer */
 typedef struct drm_agp_buffer {
 	unsigned long size;	/* In bytes -- will round to page boundary */
@@ -470,5 +569,15 @@ typedef struct drm_scatter_gather {
 /* Device specfic ioctls should only be in their respective headers
  * The device specific ioctl range is 0x40 to 0x79.                  */
 #define DRM_COMMAND_BASE                0x40
+
+/* Actually lets use 0x70 -> 0x79 for agp ioctls, not devices.  We can
+ * always extend the ioctl numbers by providing an ioctl which calls
+ * an extended range of numbers.
+ */
+#define DRM_IOCTL_AGP_GETMAP		0x70
+#define DRM_IOCTL_AGP_QUERY		0x71
+#define DRM_IOCTL_AGP_QUERY_SZ		0x72
+#define DRM_IOCTL_AGP_NUM_CTX		0x73
+#define DRM_IOCTL_AGP_CHG_CTX		0x74
 
 #endif

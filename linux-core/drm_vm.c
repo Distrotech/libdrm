@@ -214,6 +214,7 @@ void DRM(vm_shm_close)(struct vm_area_struct *vma)
 				break;
 			case _DRM_AGP:
 			case _DRM_SCATTER_GATHER:
+			case _DRM_AGP_MEM:
 				break;
 			}
 			DRM(free)(map, sizeof(*map), DRM_MEM_MAPS);
@@ -420,6 +421,11 @@ int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 	}
 
 	switch (map->type) {
+	case _DRM_AGP_MEM:
+#if __REALLY_HAVE_AGP
+		/* Use agpgart to map this block of agp memory. */
+		return DRM(agp_usermap)(dev, map, vma);
+#endif
         case _DRM_AGP:
 #if defined(__alpha__)
                 /*
