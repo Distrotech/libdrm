@@ -216,6 +216,7 @@ static int mga_takedown(drm_device_t *dev)
 
 	DRM_DEBUG("\n");
 
+	if (dev->dev_private) mga_dma_cleanup(dev);
 	if (dev->irq) mga_irq_uninstall(dev);
 
 	down(&dev->struct_sem);
@@ -410,7 +411,6 @@ static void mga_cleanup(void)
 		DRM_INFO("Module unloaded\n");
 	}
 	drm_ctxbitmap_cleanup(dev);
-	mga_dma_cleanup(dev);
 #ifdef CONFIG_MTRR
    	if(dev->agp && dev->agp->agp_mtrr) {
 	   	int retval;
@@ -518,11 +518,6 @@ int mga_release(struct inode *inode, struct file *filp)
 		drm_lock_free(dev,
 			      &dev->lock.hw_lock->lock,
 			      _DRM_LOCKING_CONTEXT(dev->lock.hw_lock->lock));
-
-				/* FIXME: may require heavy-handed reset of
-                                   hardware at this point, possibly
-                                   processed via a callback to the X
-                                   server. */
 	} else if (dev->lock.hw_lock) {
 	   	/* The lock is required to reclaim buffers */
 	   	DECLARE_WAITQUEUE(entry, current);
@@ -562,6 +557,13 @@ int mga_release(struct inode *inode, struct file *filp)
 	drm_fasync(-1, filp, 0);
 
 	down(&dev->struct_sem);
+	if (priv->remove_auth_on_close == 1) {
+		drm_file_t *temp = dev->file_first;
+		while(temp) {
+			temp->authenticated = 0;
+			temp = temp->next;
+		}
+	}
 	if (priv->prev) priv->prev->next = priv->next;
 	else		dev->file_first	 = priv->next;
 	if (priv->next) priv->next->prev = priv->prev;

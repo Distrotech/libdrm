@@ -589,6 +589,8 @@ int mga_dma_schedule(drm_device_t *dev, int locked)
 		}
 	}
 
+	clear_bit(0, &dev->dma_flag);
+
 sch_out_wakeup:
       	if(test_bit(MGA_IN_FLUSH, &dev_priv->dispatch_status) &&
 	   atomic_read(&dev_priv->pending_bufs) == 0) {
@@ -601,7 +603,6 @@ sch_out_wakeup:
 	   && dev_priv->tail->age < dev_priv->last_prim_age)
 		wake_up_interruptible(&dev_priv->buf_queue);
 
-   	clear_bit(0, &dev->dma_flag);
 	return retval;
 }
 
@@ -638,6 +639,9 @@ int mga_dma_cleanup(drm_device_t *dev)
 	if(dev->dev_private) {
 		drm_mga_private_t *dev_priv =
 			(drm_mga_private_t *) dev->dev_private;
+
+		if (dev->irq) mga_flush_queue(dev);
+		mga_dma_quiescent(dev);
 
 		if(dev_priv->ioremap) {
 			int temp = (dev_priv->warp_ucode_size +
