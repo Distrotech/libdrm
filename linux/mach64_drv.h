@@ -93,12 +93,10 @@ typedef struct drm_mach64_private {
 	atomic_t do_gui;       /* Flag for the bottom half to know what to do */
 	atomic_t do_blit;      /* Flag for the bottom half to know what to do */
 #endif
-
-	int ring_running;
 	
 	/* DMA descriptor table (ring buffer) */
-	struct pci_pool *pool;   /* DMA memory pool */
 	drm_mach64_descriptor_ring_t ring;
+	int ring_running;
 
 	struct list_head free_list;     /* Free-list head */
 	struct list_head placeholders;  /* Placeholder list for buffers held by clients */

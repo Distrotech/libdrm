@@ -516,15 +516,15 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 	u32 *table, *data;
 	u32 regs[3], expected[3];
 	u32 saved_src_cntl;
-	int i, count;
+	int i, count, failed;
 
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
 	table = (u32 *) dev_priv->ring.start;
 
-	/* FIXME: get a dma buffer from the freelist here rather than using the pool */
+	/* FIXME: get a dma buffer from the freelist here */
 	DRM_DEBUG( "Allocating data memory ...\n" );
-	cpu_addr_data = pci_pool_alloc( dev_priv->pool, SLAB_ATOMIC, &data_handle );
+	cpu_addr_data = pci_alloc_consistent( dev->pdev, 0x1000, &data_handle );
 	if (!cpu_addr_data || !data_handle) {
 		DRM_INFO( "data-memory allocation failed!\n" );
 		return -ENOMEM;
@@ -601,7 +601,7 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 		mach64_do_wait_for_fifo( dev_priv, 1 );
 		MACH64_WRITE( MACH64_SRC_CNTL, saved_src_cntl );
 		DRM_INFO( "freeing data buffer memory.\n" );
-		pci_pool_free( dev_priv->pool, cpu_addr_data, data_handle );
+		pci_free_consistent( dev->pdev, 0x1000, cpu_addr_data, data_handle );
 		DRM_INFO( "returning ...\n" );
 		return i;
 	}
@@ -637,7 +637,7 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 		mach64_do_wait_for_fifo( dev_priv, 1 );
 		MACH64_WRITE( MACH64_SRC_CNTL, saved_src_cntl );
 		DRM_INFO( "freeing data buffer memory.\n" );
-		pci_pool_free( dev_priv->pool, cpu_addr_data, data_handle );
+		pci_free_consistent( dev->pdev, 0x1000, cpu_addr_data, data_handle );
 		DRM_INFO( "returning ...\n" );
 		return i;
 	}
@@ -646,22 +646,23 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 
 	mach64_do_wait_for_fifo( dev_priv, 1 );
 	MACH64_WRITE( MACH64_SRC_CNTL, saved_src_cntl );
-	
+
+	failed = 0;
+
 	/* Check register values to see if the GUI master operation succeeded */
 	for ( i = 0; i < 3; i++ ) {
 		regs[i] = MACH64_READ( (MACH64_VERTEX_1_S + i*4) );
 		DRM_DEBUG( "(After DMA Transfer) reg %d = 0x%08x\n", i, regs[i] );
 		if (regs[i] != expected[i]) {
-			pci_pool_free( dev_priv->pool, cpu_addr_data, data_handle );
-			return -1; /* GUI master operation failed */
+			failed = -1;
 		}
 	}
 
 	DRM_DEBUG( "freeing data buffer memory.\n" );
-	pci_pool_free( dev_priv->pool, cpu_addr_data, data_handle );
+	pci_free_consistent( dev->pdev, 0x1000, cpu_addr_data, data_handle );
 	DRM_DEBUG( "returning ...\n" );
-	
-	return 0;
+
+	return failed;
 }
 
 
@@ -802,32 +803,23 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 			}
 		}
 
-		/* create pci pool for descriptor memory */
-		DRM_INFO( "Creating pci pool\n");
-		dev_priv->ring.size = 0x4000; /* 16KB */
-		dev_priv->pool = pci_pool_create( "mach64",            /* name */ 
-						  NULL,                /* dev */
-						  dev_priv->ring.size, /* size */
-						  dev_priv->ring.size, /* align */
-						  dev_priv->ring.size, /* alloc */
-						  SLAB_ATOMIC          /* flags */ 
-			);
-
-		if (!dev_priv->pool) {
-			dev_priv->driver_mode = MACH64_MODE_MMIO;
-			DRM_INFO( "pci_pool_create failed, using pseudo-DMA mode\n");
-			return 0;
+		/* check DMA addressing limitations */
+		DRM_INFO( "Setting 32-bit pci dma mask\n" );
+		if ((ret=pci_set_dma_mask( dev->pdev, 0xffffffff ))) {
+			DRM_INFO( "Setting 32-bit pci dma mask failed\n" );
+			mach64_do_cleanup_dma( dev );
+			return ret;
 		}
 
 		/* allocate descriptor memory from pci pool */
-		DRM_INFO( "Allocating descriptor table memory\n" );
-		dev_priv->ring.start = pci_pool_alloc( dev_priv->pool, SLAB_ATOMIC, 
-							   &dev_priv->ring.handle );
+		DRM_INFO( "Allocating dma descriptor ring\n" );
+		dev_priv->ring.size = 0x4000; /* 16KB */
+		dev_priv->ring.start = pci_alloc_consistent( dev->pdev, dev_priv->ring.size, 
+							     &dev_priv->ring.handle );
+
 		if (!dev_priv->ring.start || !dev_priv->ring.handle) {
-			pci_pool_destroy( dev_priv->pool );
-			dev_priv->driver_mode = MACH64_MODE_MMIO;
-			DRM_INFO( "pci_pool_alloc failed, using pseudo-DMA mode\n");
-			return 0;
+			DRM_ERROR( "Allocating dma descriptor ring failed\n");
+			return -ENOMEM;
 		} else {
 			dev_priv->ring.start_addr = (u32) dev_priv->ring.handle;
 			memset( dev_priv->ring.start, 0x0, 0x4000 );
@@ -859,7 +851,7 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 #else
 			mach64_do_cleanup_dma( dev );
 			DRM_ERROR( "DMA test failed (ret=%d)\n", ret );
-			return -EINVAL;
+			return -EIO;
 #endif
 		}
 
@@ -1265,15 +1257,11 @@ int mach64_do_cleanup_dma( drm_device_t *dev )
 		drm_mach64_private_t *dev_priv = dev->dev_private;
 
 		/* Discard the allocations for the descriptor table... */
-		if ( (dev_priv->pool != NULL) && 
+		if ( (dev->pdev != NULL) && 
 		     (dev_priv->ring.start != NULL) && dev_priv->ring.handle ) {
-			DRM_INFO( "freeing descriptor ring from pci pool\n" );
-			pci_pool_free( dev_priv->pool, dev_priv->ring.start, 
-				       dev_priv->ring.handle );
-		}
-		if ( dev_priv->pool != NULL ) {
-			DRM_INFO( "destroying pci pool\n" );
-			pci_pool_destroy( dev_priv->pool );
+			DRM_INFO( "freeing dma descriptor ring\n" );
+			pci_free_consistent( dev->pdev, dev_priv->ring.size, 
+					     dev_priv->ring.start, dev_priv->ring.handle );
 		}
 
 		if ( dev_priv->buffers ) {
