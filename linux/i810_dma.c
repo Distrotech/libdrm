@@ -138,6 +138,17 @@ static int i810_freelist_put(drm_device_t *dev, drm_buf_t *buf)
    	return 0;
 }
 
+static struct file_operations i810_buffer_fops = {
+	open:	 i810_open,
+	flush:	 drm_flush,
+	release: i810_release,
+	ioctl:	 i810_ioctl,
+	mmap:	 i810_mmap_buffers,
+	read:	 drm_read,
+	fasync:	 drm_fasync,
+      	poll:	 drm_poll,
+};
+
 int i810_mmap_buffers(struct file *filp, struct vm_area_struct *vma)
 {
 	vma->vm_flags |= VM_IO;
@@ -152,15 +163,17 @@ static int i810_map_buffer(drm_buf_t *buf, struct file *filp)
 {
 	drm_i810_buf_priv_t *buf_priv = buf->dev_private;
 	int retcode = 0;
+   	struct file_operations *old_fops;
 
 	if(buf_priv->currently_mapped == I810_BUF_MAPPED) return -EINVAL;
 	down(&current->mm->mmap_sem);
-	filp->f_op->mmap = i810_mmap_buffers;   	
+   	old_fops = filp->f_op;
+	filp->f_op = &i810_buffer_fops;
 	buf_priv->virtual = (void *)do_mmap(filp, 0, buf->total, 
 					    PROT_READ|PROT_WRITE,
 					    MAP_SHARED, 
 					    buf->bus_address);
-   	filp->f_op->mmap = drm_mmap;
+   	filp->f_op = old_fops;
 	if ((unsigned long)buf_priv->virtual > -1024UL) {
 		/* Real error */
 		DRM_DEBUG("mmap error\n");
