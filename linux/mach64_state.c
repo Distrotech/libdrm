@@ -467,43 +467,50 @@ static int mach64_do_get_frames_queued( drm_mach64_private_t *dev_priv )
 /* Copy and verify a client submited buffer.
  * FIXME: Make an assembly optimized version
  */
-u32 copy_and_verify( u32 *dst, u32 *src, u32 used)
+unsigned long copy_and_verify_from_user( u32 *to, const u32 *from, unsigned long n)
 {
-	u32 copied = 0;
-	used >>= 2;
+	unsigned long copied = 0;
 
-	while ( used ) {
-		u32 data, reg, count;
-
-		data = *src++;
-		used--;
+#if 0
+	if ( access_ok( VERIFY_READ, from, n ) ) {
+#else
+	/* FIXME: Don't verify the area while we're reading from DMA buffers. */
+	{
+#endif
+		n >>= 2;
 	
-		reg = le32_to_cpu(data);
-		count = (reg >> 16) + 1;
-		if( count <= used ) {
-			used -= count;
-			reg &= 0xffff;
+		while ( n ) {
+			u32 data, reg, count;
 
-			/* This is an exact match of Mach64's Setup Engine registers,
-			 * excluding SETUP_CNTL (1_C1).
-			 */
-			if( (reg >= 0x0190 && reg < 0x01c1) || (reg >= 0x01ca && reg <= 0x01cf) ) {
-				*dst++ = data;
-				copied += 1 + count;
-				while( count-- ) {
-					*dst++ = *src++;
+			if ( __get_user( data, from++ ) )
+				break;
+			n--;
+		
+			reg = le32_to_cpu(data);
+			count = (reg >> 16) + 1;
+			if( count <= n ) {
+				n -= count;
+				reg &= 0xffff;
+
+				/* This is an exact match of Mach64's Setup Engine registers,
+				 * excluding SETUP_CNTL (1_C1).
+				 */
+				if( (reg >= 0x0190 && reg < 0x01c1) || (reg >= 0x01ca && reg <= 0x01cf) ) {
+					*to++ = data;
+					__copy_from_user( to, from, count << 2 );
+					to += count;
+					copied += 1 + count;
 				}
+
+				from += count;
 			} else {
-				while( count-- ) {
-					src++;
-				}
+				break;
 			}
-		} else {
-			used = 0;
 		}
+
+		copied <<= 2;
 	}
 
-	copied <<= 2;
 	return copied;
 }
 
@@ -532,7 +539,7 @@ static int mach64_dma_dispatch_vertex( drm_device_t *dev, drm_buf_t *buf,
 		}
 
 		/* FIXME: This should be done from a client space buffer and not from a DMA buffer. */
-		copy_buf->used = copy_and_verify( GETBUFPTR( copy_buf ), GETBUFPTR( buf ), buf->used );
+		copy_buf->used = copy_and_verify_from_user( GETBUFPTR( copy_buf ), GETBUFPTR( buf ), buf->used );
 		
 		DMASETPTR( copy_buf );
 #else
