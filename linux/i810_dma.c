@@ -473,10 +473,6 @@ static inline void i810_dma_dispatch_vertex(drm_device_t *dev, drm_buf_t *buf)
    	ADVANCE_LP_RING();
 }
 
-static inline void i810_dma_quiescent(drm_device_t *dev)
-{
-   	/* Not written yet */
-}
 
 /* Interrupts are only for flushing */
 static void i810_dma_service(int irq, void *device, struct pt_regs *regs)
@@ -630,12 +626,60 @@ static inline void i810_dma_emit_flush(drm_device_t *dev)
    	i810_kernel_lost_context(dev);
    	BEGIN_LP_RING(2);
       	OUT_RING( CMD_REPORT_HEAD );
-#if 0
-   	OUT_RING( GFX_OP_BREAKPOINT_INTERRUPT );
-#else
    	OUT_RING( GFX_OP_USER_INTERRUPT );
-#endif
       	ADVANCE_LP_RING();
+}
+
+static inline void i810_dma_quiescent_emit(drm_device_t *dev)
+{
+      	drm_i810_private_t *dev_priv = dev->dev_private;
+   	RING_LOCALS;
+
+  	i810_kernel_lost_context(dev);
+   	BEGIN_LP_RING(4);
+
+   	OUT_RING( INST_PARSER_CLIENT | INST_OP_FLUSH | INST_FLUSH_MAP_CACHE );
+   	OUT_RING( CMD_REPORT_HEAD );
+   	OUT_RING( GFX_OP_USER_INTERRUPT );
+   	OUT_RING( 0 );
+   	ADVANCE_LP_RING();
+}
+
+static void i810_dma_quiescent(drm_device_t *dev)
+{
+      	DECLARE_WAITQUEUE(entry, current);
+  	drm_i810_private_t *dev_priv = (drm_i810_private_t *)dev->dev_private;
+   	int startTime = 0;
+   	int curTime = 0;
+      	int timeout_millis = 3000;
+      
+
+   	if(dev_priv == NULL) {
+	   	return;
+	}
+      	atomic_set(&dev_priv->flush_done, 0);
+   	current->state = TASK_INTERRUPTIBLE;
+   	add_wait_queue(&dev_priv->flush_queue, &entry);
+   	for (;;) {
+	      	i810_dma_quiescent_emit(dev);
+	   	if (atomic_read(&dev_priv->flush_done) == 1) break;
+	   	curTime = __gettimeinmillis();
+	   	if (startTime == 0 || curTime < startTime /*wrap case*/) {
+		   	startTime = curTime;
+	   	} else if (curTime - startTime > timeout_millis) {
+		   	DRM_ERROR("lockup\n");
+		   	break;
+		}	   
+	      	schedule_timeout(HZ*3);
+	      	if (signal_pending(current)) {
+		   	break;
+		}
+	}
+   
+   	current->state = TASK_RUNNING;
+   	remove_wait_queue(&dev_priv->flush_queue, &entry);
+   
+   	return;
 }
 
 static int i810_flush_queue(drm_device_t *dev)
@@ -657,13 +701,12 @@ static int i810_flush_queue(drm_device_t *dev)
    	for (;;) {
 	      	i810_dma_emit_flush(dev);
 	   	if (atomic_read(&dev_priv->flush_done) == 1) break;
-	   	if (atomic_read(&dev_priv->flush_done) == 1) break;	
 	   	curTime = __gettimeinmillis();
 	   	if (startTime == 0 || curTime < startTime /*wrap case*/) {
 		   	startTime = curTime;
 	   	} else if (curTime - startTime > timeout_millis) {
 		   	DRM_ERROR("lockup\n");
-		   	goto out_wait_flush;
+		   	break;
 		}	   
 	      	schedule_timeout(HZ*3);
 	      	if (signal_pending(current)) {
@@ -672,7 +715,6 @@ static int i810_flush_queue(drm_device_t *dev)
 		}
 	}
    
-out_wait_flush:
    	current->state = TASK_RUNNING;
    	remove_wait_queue(&dev_priv->flush_queue, &entry);
    
@@ -778,7 +820,7 @@ int i810_lock(struct inode *inode, struct file *filp, unsigned int cmd,
 	if (!ret) {
 		if (lock.flags & _DRM_LOCK_QUIESCENT) {
 		   DRM_DEBUG("_DRM_LOCK_QUIESCENT\n");
-		   i810_flush_queue(dev);
+		   DRM_DEBUG("fred\n");
 		   i810_dma_quiescent(dev);
 		}
 	}
@@ -794,7 +836,6 @@ int i810_flush_ioctl(struct inode *inode, struct file *filp,
    
    	DRM_DEBUG("i810_flush_ioctl\n");
    	i810_flush_queue(dev);
-   	i810_dma_quiescent(dev);
    	return 0;
 }
 

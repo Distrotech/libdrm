@@ -69,6 +69,10 @@ int i810_dma_general(struct inode *inode, struct file *filp,
 #define CMD_STORE_DWORD_IDX		((0x21<<23) | 0x1)
 #define CMD_OP_BATCH_BUFFER  ((0x0<<29)|(0x30<<23)|0x1)
 
+#define INST_PARSER_CLIENT   0x00000000
+#define INST_OP_FLUSH        0x02000000
+#define INST_FLUSH_MAP_CACHE 0x00000001
+
 
 #define BB1_START_ADDR_MASK   (~0x7)
 #define BB1_PROTECTED         (1<<0)
