@@ -24,6 +24,8 @@
  *
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
+ *    Leif Delgass <ldelgass@retinalburn.net>
+ *    José Fonseca <j_r_fonseca@yahoo.co.uk>
  */
 
 #define __NO_VERSION__
@@ -72,6 +74,8 @@ static int mach64_emit_cliprect( drm_mach64_private_t *dev_priv,
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	drm_mach64_context_regs_t *regs = &sarea_priv->context_state;
 	DMALOCALS;
+
+	DRM_DEBUG( "%s: box=%p\n", __FUNCTION__, box );
 
 	/* Get GL scissor */
 	/* FIXME: store scissor in SAREA as a cliprect instead of in
@@ -403,18 +407,59 @@ static int mach64_dma_dispatch_swap( drm_device_t *dev )
 
 	}
 
-#if MACH64_USE_FRAME_AGING
-	/* Increment the frame counter.  The client-side 3D driver must
-	 * throttle the framerate by waiting for this value before
-	 * performing the swapbuffer ioctl.
-	 */
-	dev_priv->sarea_priv->last_frame++;
-
-	DMAOUTREG( MACH64_LAST_FRAME_REG, dev_priv->sarea_priv->last_frame );
-#endif
 	DMAADVANCE( dev_priv, 1 );
 
+	if (dev_priv->driver_mode == MACH64_MODE_DMA_ASYNC) {
+		for (i = 0; i < MACH64_MAX_QUEUED_FRAMES - 1; i++) {
+			dev_priv->frame_ofs[i] = dev_priv->frame_ofs[i+1];
+		}
+		dev_priv->frame_ofs[i] = GETRINGOFFSET();
+
+		dev_priv->sarea_priv->frames_queued++;
+	}
+
 	return 0;
+}
+
+static int mach64_do_get_frames_queued( drm_mach64_private_t *dev_priv )
+{
+	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring;
+	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
+	int i, start;
+	u32 head, tail, ofs;
+
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
+
+	if (sarea_priv->frames_queued == 0)
+		return 0;
+
+	tail = ring->tail;
+	mach64_ring_tick( dev_priv, ring );
+	head = ring->head;
+
+	start = ( MACH64_MAX_QUEUED_FRAMES - 
+		  DRM_MIN(MACH64_MAX_QUEUED_FRAMES, sarea_priv->frames_queued) );
+
+	if ( head == tail ) {
+		sarea_priv->frames_queued = 0;
+		for (i = start; i < MACH64_MAX_QUEUED_FRAMES; i++) {
+			dev_priv->frame_ofs[i] = ~0;
+		}
+		return 0;
+	}
+
+	for ( i = start; i < MACH64_MAX_QUEUED_FRAMES; i++ ) {
+		ofs = dev_priv->frame_ofs[i];
+		DRM_DEBUG( "frame_ofs[%d] ofs: %d\n", i, ofs );
+		if ( ofs == ~0 ||
+		     ( head < tail && (ofs < head || ofs >= tail) ) ||
+		     ( head > tail && (ofs < head && ofs >= tail) ) ) {
+			sarea_priv->frames_queued = (MACH64_MAX_QUEUED_FRAMES - 1) - i;
+			dev_priv->frame_ofs[i] = ~0;
+		}
+	}
+
+	return sarea_priv->frames_queued;
 }
 
 static int mach64_dma_dispatch_vertex( drm_device_t *dev, drm_buf_t *buf, 
@@ -423,10 +468,12 @@ static int mach64_dma_dispatch_vertex( drm_device_t *dev, drm_buf_t *buf,
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	int done = 0;
-	/* Don't need DMALOCALS, since buf is a parameter */
+	DMALOCALS;
 
 	DRM_DEBUG( "%s: buf=%d nbox=%d\n",
 		   __FUNCTION__, buf->idx, sarea_priv->nbox );
+
+	DMASETPTR( buf );
 
 	if ( buf->used ) {
 		int ret = 0;
@@ -462,21 +509,7 @@ static int mach64_dma_dispatch_vertex( drm_device_t *dev, drm_buf_t *buf,
 	 * is reclaimed when it finishes processing
 	 */
 	if (buf->pending && discard && !done) {
-		struct list_head *ptr;
-		drm_mach64_freelist_t *entry;
-
-		ptr = dev_priv->pending.prev;
-		entry = list_entry(ptr, drm_mach64_freelist_t, list);
-		while (entry->buf != buf) {
-			if (ptr == &dev_priv->pending) {
-				DRM_ERROR( "%s: couldn't find pending buf\n",
-				  	 __FUNCTION__ );
-				return -EFAULT;
-			}
-			ptr = ptr->prev;
-			entry = list_entry(ptr, drm_mach64_freelist_t, list);
-		}
-		entry->discard = 1;
+		DMADISCARDBUF();
 	} else if (discard && !done) {
 	        /* This buffer wasn't used (no cliprects), so place it back
 		 * on the free list
@@ -516,7 +549,8 @@ static int mach64_dma_dispatch_blit( drm_device_t *dev,
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_device_dma_t *dma = dev->dma;
 	int dword_shift, dwords;
-	DMALOCALS; /* declares buf=NULL, p, outcount=0 */
+	drm_buf_t *buf;
+	DMALOCALS;
 
 	/* The compiler won't optimize away a division by a variable,
 	 * even if the only legal values are powers of two.  Thus, we'll
@@ -541,7 +575,6 @@ static int mach64_dma_dispatch_blit( drm_device_t *dev,
 	}
 
 	/* Dispatch the blit buffer.
-	 * We don't need DMAGETPTR, since we already have one
 	 */
 	buf = dma->buflist[blit->idx];
 	
@@ -556,11 +589,15 @@ static int mach64_dma_dispatch_blit( drm_device_t *dev,
 		return -EINVAL;
 	}
 
-	p = GETBUFPTR( buf );
-
+	/* Set buf->used to the bytes of blit data based on the blit dimensions 
+	 * and verify the size.  When the setup is emitted to the buffer with 
+	 * the DMA* macros below, buf->used is incremented to include the bytes 
+	 * used for setup as well as the blit data.
+	 */
 	dwords =  (blit->width * blit->height) >> dword_shift;
 	buf->used = dwords << 2;
-	if ( buf->used <= 0 || buf->used > MACH64_BUFFER_SIZE ) {
+	if ( buf->used <= 0 || 
+	     buf->used > MACH64_BUFFER_SIZE - MACH64_HOSTDATA_BLIT_OFFSET ) {
 		DRM_ERROR( "Invalid blit size: %d bytes\n", buf->used );
 		return -EINVAL;
 	}
@@ -573,6 +610,8 @@ static int mach64_dma_dispatch_blit( drm_device_t *dev,
 	 * a register command every 16 dwords.  State setup is added at the start of the 
 	 * buffer -- the client leaves space for this based on MACH64_HOSTDATA_BLIT_OFFSET
 	 */
+	DMASETPTR( buf );
+
 	DMAOUTREG( MACH64_Z_CNTL, 0 );
 	DMAOUTREG( MACH64_SCALE_3D_CNTL, 0 );
 
@@ -610,10 +649,6 @@ static int mach64_dma_dispatch_blit( drm_device_t *dev,
 	/* Add the buffer to the queue */
 	DMAADVANCEHOSTDATA( dev_priv );
 
-	dev_priv->sarea_priv->dirty |= (MACH64_UPLOAD_CONTEXT |
-					MACH64_UPLOAD_MISC | 
-					MACH64_UPLOAD_CLIPRECTS);
-
 	return 0;
 }
 
@@ -639,7 +674,6 @@ int mach64_dma_clear( struct inode *inode, struct file *filp,
 			     sizeof(clear) ) )
 		return -EFAULT;
 
-	VB_AGE_TEST_WITH_RETURN( dev_priv );
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 	
 	if ( sarea_priv->nbox > MACH64_NR_SAREA_CLIPRECTS )
@@ -669,7 +703,6 @@ int mach64_dma_swap( struct inode *inode, struct file *filp,
 
 	LOCK_TEST_WITH_RETURN( dev );
 
-	VB_AGE_TEST_WITH_RETURN( dev_priv );
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 	
 	if ( sarea_priv->nbox > MACH64_NR_SAREA_CLIPRECTS )
@@ -715,14 +748,13 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 			   vertex.idx, dma->buf_count - 1 );
 		return -EINVAL;
 	}
-#if 0
+
 	if ( vertex.prim < 0 ||
-	     vertex.prim > R128_CCE_VC_CNTL_PRIM_TYPE_TRI_TYPE2 ) {
+	     vertex.prim > MACH64_PRIM_POLYGON ) {
 		DRM_ERROR( "buffer prim %d\n", vertex.prim );
 		return -EINVAL;
 	}
-#endif
-	VB_AGE_TEST_WITH_RETURN( dev_priv );
+
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 
 	if ( sarea_priv->nbox > MACH64_NR_SAREA_CLIPRECTS )
@@ -748,7 +780,9 @@ int mach64_dma_blit( struct inode *inode, struct file *filp,
 	drm_device_t *dev = priv->dev;
 	drm_device_dma_t *dma = dev->dma;
 	drm_mach64_private_t *dev_priv = dev->dev_private;
+	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	drm_mach64_blit_t blit;
+	int ret;
 
 	LOCK_TEST_WITH_RETURN( dev );
 
@@ -765,9 +799,46 @@ int mach64_dma_blit( struct inode *inode, struct file *filp,
 		return -EINVAL;
 	}
 
-	VB_AGE_TEST_WITH_RETURN( dev_priv );
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 
-	return mach64_dma_dispatch_blit( dev, &blit );
+	ret = mach64_dma_dispatch_blit( dev, &blit );
 
+	/* Make sure we restore the 3D state next time.
+	 */
+	sarea_priv->dirty |= (MACH64_UPLOAD_CONTEXT |
+			      MACH64_UPLOAD_MISC | 
+			      MACH64_UPLOAD_CLIPRECTS);
+
+	return ret;
+}
+
+int mach64_get_param( struct inode *inode, struct file *filp,
+		      unsigned int cmd, unsigned long arg )
+{
+        drm_file_t *priv = filp->private_data;
+        drm_device_t *dev = priv->dev;
+	drm_mach64_private_t *dev_priv = dev->dev_private;
+	drm_mach64_getparam_t param;
+	int value;
+
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
+
+	LOCK_TEST_WITH_RETURN( dev );
+
+	if ( copy_from_user( &param, (drm_mach64_getparam_t *)arg,
+			     sizeof(param) ) )
+		return -EFAULT;
+
+	switch ( param.param ) {
+	case MACH64_PARAM_FRAMES_QUEUED:
+		value = mach64_do_get_frames_queued( dev_priv );
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if ( copy_to_user( param.value, &value, sizeof(int) ) )
+		return -EFAULT;
+
+	return 0;
 }

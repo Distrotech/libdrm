@@ -36,30 +36,23 @@
 #include <linux/delay.h>
 #include <linux/list.h>
 
+/* Some early 2.4.x kernels need this */
 #ifndef list_for_each_safe
 #define list_for_each_safe(pos, n, head) \
 	for (pos = (head)->next, n = pos->next; pos != (head); \
 		pos = n, n = pos->next)
 #endif
 
-/* Development driver options - FIXME: remove these when not needed */
-
-#define MACH64_USE_BUFFER_AGING   0
-#define MACH64_USE_FRAME_AGING    0
-#define MACH64_NO_BATCH_DISPATCH  1
-#define MACH64_EXTRA_CHECKING     1
-#define MACH64_DEFAULT_MODE       MACH64_MODE_DMA_ASYNC
-
+/* FIXME: remove these when not needed */
+/* Development driver options */
+#define MACH64_EXTRA_CHECKING     0 /* Extra sanity checks for DMA/freelist management */
+#define MACH64_VERBOSE		  0 /* Verbose debugging output */
 
 typedef struct drm_mach64_freelist {
 	struct list_head  list;  /* Linux LIST structure... */
    	drm_buf_t *buf;
 	int discard;             /* This flag is set when we're done (re)using a buffer */
-#if MACH64_USE_BUFFER_AGING
-	unsigned int age;
-#else
 	u32 ring_ofs;            /* dword offset in ring of last descriptor for this buffer */
-#endif
 } drm_mach64_freelist_t;
 
 typedef struct drm_mach64_descriptor_ring {
@@ -81,20 +74,15 @@ typedef struct drm_mach64_private {
 	drm_mach64_sarea_t *sarea_priv;
 
 	int is_pci;
-	enum {
-		MACH64_MODE_MMIO,
-		MACH64_MODE_DMA_SYNC,
-		MACH64_MODE_DMA_ASYNC
-	} driver_mode;
+	drm_mach64_dma_mode_t driver_mode;
 
 	int usec_timeout;      /* Number of microseconds to wait in the idle functions */
 
 #if MACH64_INTERRUPTS
-	atomic_t dma_timeout;  /* Number of interrupt dispatches since last DMA dispatch */
-	atomic_t do_gui;       /* Flag for the bottom half to know what to do */
-	atomic_t do_blit;      /* Flag for the bottom half to know what to do */
+	atomic_t intr_vblank;       /* Flag for the bottom half to know what to do */
+	atomic_t intr_bm_complete;  /* Flag for the bottom half to know what to do */
 #endif
-	
+
 	/* DMA descriptor table (ring buffer) */
 	drm_mach64_descriptor_ring_t ring;
 	int ring_running;
@@ -102,7 +90,9 @@ typedef struct drm_mach64_private {
 	struct list_head free_list;     /* Free-list head */
 	struct list_head placeholders;  /* Placeholder list for buffers held by clients */
 	struct list_head pending;    	/* Buffers pending completion */
-	struct list_head dma_queue;     /* Submission queue head -- only used in old path */
+
+	/* dword ring offsets of most recent swaps */
+	u32 frame_ofs[MACH64_MAX_QUEUED_FRAMES];
 
 	unsigned int fb_bpp;
 	unsigned int front_offset, front_pitch;
@@ -136,15 +126,13 @@ extern int mach64_dma_buffers( struct inode *inode, struct file *filp,
 
 extern int mach64_init_freelist( drm_device_t *dev );
 extern void mach64_destroy_freelist( drm_device_t *dev );
-#ifdef MACH64_USE_BUFFER_AGING
-extern void mach64_freelist_reset( drm_mach64_private_t *dev_priv );
-#endif
 extern drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv );
 
 extern int mach64_do_wait_for_fifo( drm_mach64_private_t *dev_priv,
 				    int entries );
 extern int mach64_do_wait_for_idle( drm_mach64_private_t *dev_priv );
 extern int mach64_wait_ring( drm_mach64_private_t *dev_priv, int n );
+extern int mach64_do_dispatch_pseudo_dma( drm_mach64_private_t *dev_priv );
 extern int mach64_do_release_used_buffers( drm_mach64_private_t *dev_priv );
 extern void mach64_dump_engine_info( drm_mach64_private_t *dev_priv );
 extern void mach64_dump_ring_info( drm_mach64_private_t *dev_priv );
@@ -163,6 +151,8 @@ extern int mach64_dma_vertex( struct inode *inode, struct file *filp,
 			      unsigned int cmd, unsigned long arg );
 extern int mach64_dma_blit( struct inode *inode, struct file *filp,
 			    unsigned int cmd, unsigned long arg );
+extern int mach64_get_param( struct inode *inode, struct file *filp,
+			     unsigned int cmd, unsigned long arg );
 
 /* ================================================================
  * Registers
@@ -422,11 +412,6 @@ extern int mach64_dma_blit( struct inode *inode, struct file *filp,
 #define MACH64_DATATYPE_RGB8				9
 #define MACH64_DATATYPE_ARGB4444			15
 
-/* Constants */
-#define MACH64_LAST_FRAME_REG			MACH64_PAT_REG0
-#define MACH64_LAST_DISPATCH_REG		MACH64_PAT_REG1
-#define MACH64_MAX_VB_AGE		0x7fffffff
-
 #define MACH64_BASE(reg)	((unsigned long)(dev_priv->mmio->handle))
 
 #define MACH64_ADDR(reg)	(MACH64_BASE(reg) + reg)
@@ -469,10 +454,12 @@ static inline void mach64_ring_start( drm_mach64_private_t *dev_priv )
 		mach64_do_engine_reset( dev_priv );
 	}
 
-	/* enable bus mastering and block 1 registers */
-	MACH64_WRITE( MACH64_BUS_CNTL, 
-		      ( MACH64_READ(MACH64_BUS_CNTL) & 	~MACH64_BUS_MASTER_DIS ) 
-		      | MACH64_BUS_EXT_REG_EN );
+	if (dev_priv->driver_mode != MACH64_MODE_MMIO ) {
+		/* enable bus mastering and block 1 registers */
+		MACH64_WRITE( MACH64_BUS_CNTL, 
+			      ( MACH64_READ(MACH64_BUS_CNTL) & 	~MACH64_BUS_MASTER_DIS ) 
+			      | MACH64_BUS_EXT_REG_EN );
+	}
 
 	mach64_do_wait_for_idle( dev_priv );
 	
@@ -494,13 +481,27 @@ static inline void mach64_ring_resume( drm_mach64_private_t *dev_priv,
 	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, 
 		      ring->head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB );
 
-	/* enable GUI bus mastering, and sync the bus master to the GUI */
-	MACH64_WRITE( MACH64_SRC_CNTL, 
-		      MACH64_SRC_BM_ENABLE | MACH64_SRC_BM_SYNC |
-		      MACH64_SRC_BM_OP_SYSTEM_TO_REG );
+	if ( dev_priv->driver_mode == MACH64_MODE_MMIO ) {
+		mach64_do_dispatch_pseudo_dma( dev_priv );
+	} else {
+		/* enable GUI bus mastering, and sync the bus master to the GUI */
+		MACH64_WRITE( MACH64_SRC_CNTL, 
+			      MACH64_SRC_BM_ENABLE | MACH64_SRC_BM_SYNC |
+			      MACH64_SRC_BM_OP_SYSTEM_TO_REG );
 
-	/* kick off the transfer */
-	MACH64_WRITE( MACH64_DST_HEIGHT_WIDTH, 0 );
+		/* kick off the transfer */
+		MACH64_WRITE( MACH64_DST_HEIGHT_WIDTH, 0 );
+		if ( dev_priv->driver_mode == MACH64_MODE_DMA_SYNC ) {
+			if ( (mach64_do_wait_for_idle( dev_priv )) < 0 ) {
+				DRM_ERROR( "%s: idle failed, resetting engine\n", 
+					   __FUNCTION__);
+				mach64_dump_engine_info( dev_priv );
+				mach64_do_engine_reset( dev_priv );
+				return;
+			}
+			mach64_do_release_used_buffers( dev_priv );
+		}
+	}
 }
 
 static inline void mach64_ring_tick( drm_mach64_private_t *dev_priv, 
@@ -616,53 +617,36 @@ do {											\
  __ring_space_done:									\
 } while (0)
 
-#if MACH64_USE_BUFFER_AGING
-
-#define VB_AGE_TEST_WITH_RETURN( dev_priv )				\
-do {									\
-	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;		\
-	if ( sarea_priv->last_dispatch >= MACH64_MAX_VB_AGE ) {		\
-		int __ret = mach64_do_dma_idle( dev_priv );		\
-		if ( __ret < 0 ) return __ret;				\
-		sarea_priv->last_dispatch = 0;				\
-		mach64_freelist_reset( dev_priv );			\
-	}								\
-} while (0)
-
-#else
-
-#define VB_AGE_TEST_WITH_RETURN( dev_priv )
-
-#endif
-
 /* ================================================================
  * DMA constants
  */
 
-#define DMA_FRAME_BUF_OFFSET	0
-#define DMA_SYS_MEM_ADDR	1
-#define DMA_COMMAND		2
-#define DMA_RESERVED		3
-#define DMA_HOLD_OFFSET         (1<<30)
-#define DMA_EOL                 (1<<31)
+/* DMA descriptor field indices:
+ * The descriptor fields are loaded into the read-only 
+ * BM_* system bus master registers during a bus-master operation
+ */
+#define MACH64_DMA_FRAME_BUF_OFFSET	0        /* BM_FRAME_BUF_OFFSET */
+#define MACH64_DMA_SYS_MEM_ADDR		1        /* BM_SYSTEM_MEM_ADDR */
+#define MACH64_DMA_COMMAND		2        /* BM_COMMAND */
+#define MACH64_DMA_RESERVED		3        /* BM_STATUS */
 
-#define MACH64_DMA_TIMEOUT      10          /* 10 vertical retraces should be enough */
-#define MACH64_DMA_SIZE         96          /* Queue high water mark (number of buffers) */
-#define DMA_CHUNKSIZE		0x1000      /* 4kB per DMA descriptor */
-#define APERTURE_OFFSET		0x7ff800
+/* BM_COMMAND descriptor field flags */
+#define MACH64_DMA_HOLD_OFFSET		(1<<30)  /* Don't increment DMA_FRAME_BUF_OFFSET */
+#define MACH64_DMA_EOL			(1<<31)  /* End of descriptor list flag */
 
-
-#define MACH64_VERBOSE		0
-
-#define mach64_flush_write_combine()	mb()
+#define MACH64_DMA_CHUNKSIZE	        0x1000   /* 4kB per DMA descriptor */
+#define MACH64_APERTURE_OFFSET	        0x7ff800 /* frame-buffer offset for gui-masters */
 
 /* ================================================================
  * DMA descriptor ring macros
  */
 
-#define RING_LOCALS	int tail, write; unsigned int mask; volatile u32 *ring
+#define mach64_flush_write_combine()	mb()
 
-#define RING_WRITE_OFS write
+#define RING_LOCALS									\
+	int _ring_tail, _ring_write; unsigned int _ring_mask; volatile u32 *_ring
+
+#define RING_WRITE_OFS  _ring_write
 
 #define BEGIN_RING( n ) 								\
 do {											\
@@ -680,19 +664,19 @@ do {											\
 		}									\
 	}										\
 	dev_priv->ring.space -= (n) * sizeof(u32);					\
-	ring = (u32 *) dev_priv->ring.start;						\
-	tail = write = dev_priv->ring.tail;						\
-	mask = dev_priv->ring.tail_mask;						\
+	_ring = (u32 *) dev_priv->ring.start;						\
+	_ring_tail = _ring_write = dev_priv->ring.tail;					\
+	_ring_mask = dev_priv->ring.tail_mask;						\
 } while (0)
 
 #define OUT_RING( x )						\
 do {								\
 	if ( MACH64_VERBOSE ) {					\
 		DRM_INFO( "   OUT_RING( 0x%08x ) at 0x%x\n",	\
-			   (unsigned int)(x), write );		\
+			   (unsigned int)(x), _ring_write );	\
 	}							\
-	ring[write++] = cpu_to_le32( x );			\
-	write &= mask;						\
+	_ring[_ring_write++] = cpu_to_le32( x );		\
+	_ring_write &= _ring_mask;				\
 } while (0)
 
 
@@ -708,7 +692,7 @@ static __inline__ void mach64_clear_dma_eol( volatile u32 * addr )
                 :"Ir" (nr));
 #elif defined(__powerpc__)
 	u32 old;
-	u32 mask = cpu_to_le32( DMA_EOL );
+	u32 mask = cpu_to_le32( MACH64_DMA_EOL );
 
 	/* Taken from the include/asm-ppc/bitops.h linux header */
 	__asm__ __volatile__("\n\
@@ -721,7 +705,7 @@ static __inline__ void mach64_clear_dma_eol( volatile u32 * addr )
 	: "cc");
 #elif defined(__alpha__)
 	u32 temp;
-	u32 mask = ~DMA_EOL;
+	u32 mask = ~MACH64_DMA_EOL;
 
 	/* Taken from the include/asm-alpha/bitops.h linux header */
 	__asm__ __volatile__(
@@ -735,7 +719,7 @@ static __inline__ void mach64_clear_dma_eol( volatile u32 * addr )
 	:"=&r" (temp), "=m" (*addr)
 	:"Ir" (mask), "m" (*addr));
 #else
-	u32 mask = cpu_to_le32( ~DMA_EOL );
+	u32 mask = cpu_to_le32( ~MACH64_DMA_EOL );
 
 	*addr &= mask;
 #endif
@@ -745,12 +729,12 @@ static __inline__ void mach64_clear_dma_eol( volatile u32 * addr )
 do {									\
 	if ( MACH64_VERBOSE ) {						\
 		DRM_INFO( "ADVANCE_RING() wr=0x%06x tail=0x%06x\n",	\
-			  write, tail );				\
+			  _ring_write, _ring_tail );			\
 	}								\
 	mach64_flush_write_combine();					\
-	mach64_clear_dma_eol( &ring[(tail - 2) & mask] );		\
+	mach64_clear_dma_eol( &_ring[(_ring_tail - 2) & _ring_mask] );	\
 	mach64_flush_write_combine();					\
-	dev_priv->ring.tail = write;					\
+	dev_priv->ring.tail = _ring_write;				\
 	mach64_ring_tick( dev_priv, &(dev_priv)->ring );		\
 } while (0)
 
@@ -759,17 +743,47 @@ do {									\
  * DMA macros
  */
 
-#define DMALOCALS  drm_buf_t *buf = NULL; u32 *p; int outcount = 0
+#define DMALOCALS				\
+	drm_mach64_freelist_t *_entry = NULL;	\
+	drm_buf_t *_buf = NULL; 		\
+	u32 *_buf_wptr; int _outcount
 
-#define GETBUFPTR( _buf )						\
+#define GETBUFPTR( __buf )						\
 ((dev_priv->is_pci) ? 							\
-	((u32 *)(_buf)->address) : 					\
-	((u32 *)((char *)dev_priv->buffers->handle + (_buf)->offset)))
+	((u32 *)(__buf)->address) : 					\
+	((u32 *)((char *)dev_priv->buffers->handle + (__buf)->offset)))
 
-#define GETBUFADDR( _buf )				\
+#define GETBUFADDR( __buf )				\
 ((dev_priv->is_pci) ? 					\
-	((u32)virt_to_bus((void *)(_buf)->address)) : 	\
-	((u32)(_buf)->bus_address))
+	((u32)virt_to_bus((void *)(__buf)->address)) : 	\
+	((u32)(__buf)->bus_address))
+
+#define GETRINGOFFSET() (_entry->ring_ofs)
+
+static inline int mach64_find_pending_buf_entry ( drm_mach64_private_t *dev_priv, 
+						  drm_mach64_freelist_t *entry, 
+						  drm_buf_t *buf )
+{
+	struct list_head *ptr;
+
+	ptr = dev_priv->pending.prev;
+	entry = list_entry(ptr, drm_mach64_freelist_t, list);
+	while (entry->buf != buf) {
+		if (ptr == &dev_priv->pending) {
+			return -EFAULT;
+		}
+		ptr = ptr->prev;
+		entry = list_entry(ptr, drm_mach64_freelist_t, list);
+	}
+	return 0;
+}
+
+#define DMASETPTR( _p ) 			\
+do {						\
+	_buf = (_p);				\
+	_outcount = 0;				\
+	_buf_wptr = GETBUFPTR( _buf );		\
+} while(0)
 
 /* FIXME: use a private set of smaller buffers for state emits, clears, and swaps? */
 #define DMAGETPTR( dev_priv, n )					\
@@ -778,21 +792,21 @@ do {									\
 		DRM_INFO( "DMAGETPTR( %d ) in %s\n",			\
 			  n, __FUNCTION__ );				\
 	}								\
-	buf = mach64_freelist_get( dev_priv );				\
-	if (buf == NULL) {						\
+	_buf = mach64_freelist_get( dev_priv );				\
+	if (_buf == NULL) {						\
 		DRM_ERROR("%s: couldn't get buffer in DMAGETPTR\n",	\
 			   __FUNCTION__ );				\
 		return -EAGAIN;						\
 	}								\
-	if (buf->pending) {						\
+	if (_buf->pending) {						\
 	        DRM_ERROR("%s: pending buf in DMAGETPTR\n",		\
 			   __FUNCTION__ );				\
 		return -EFAULT;						\
 	}								\
-	buf->pid = current->pid;					\
-	outcount = 0;							\
+	_buf->pid = current->pid;					\
+	_outcount = 0;							\
 									\
-        p = GETBUFPTR( buf );						\
+        _buf_wptr = GETBUFPTR( _buf );					\
 } while (0)
 
 #define DMAOUTREG( reg, val )					\
@@ -801,95 +815,101 @@ do {								\
 		DRM_INFO( "   DMAOUTREG( 0x%x = 0x%08x )\n",	\
 			  reg, val );				\
 	}							\
-	p[outcount++] = cpu_to_le32(DMAREG(reg));		\
-	p[outcount++] = cpu_to_le32((val));			\
-	buf->used += 8;						\
+	_buf_wptr[_outcount++] = cpu_to_le32(DMAREG(reg));	\
+	_buf_wptr[_outcount++] = cpu_to_le32((val));		\
+	_buf->used += 8;					\
 } while (0)
 
-#define DMAADVANCE( dev_priv, _discard )						      \
-do {											      \
-	struct list_head *ptr;								      \
-	drm_mach64_freelist_t *entry;							      \
-	RING_LOCALS;									      \
-											      \
-	if ( MACH64_VERBOSE ) {								      \
-		DRM_INFO( "DMAADVANCE() in %s\n", __FUNCTION__ );			      \
-	}										      \
-											      \
-	if (buf->used <= 0) {								      \
-		DRM_ERROR( "DMAADVANCE() in %s: sending empty buf %d\n",		      \
-				   __FUNCTION__, buf->idx );				      \
-		return -EFAULT;								      \
-	}										      \
-	if (buf->pending) {								      \
-                /* This is a resued buffer, so we need to find it in the pending list */      \
-		ptr = dev_priv->pending.prev;						      \
-		entry = list_entry(ptr, drm_mach64_freelist_t, list);			      \
-		while (entry->buf != buf) {						      \
-			if (ptr == &dev_priv->pending) {				      \
-				DRM_ERROR( "DMAADVANCE() in %s: couldn't find pending buf\n", \
-				  	 __FUNCTION__ );				      \
-				return -EFAULT;						      \
-			}								      \
-			ptr = ptr->prev;						      \
-			entry = list_entry(ptr, drm_mach64_freelist_t, list);		      \
-		}									      \
-		if (entry->discard) {							      \
-			DRM_ERROR( "DMAADVANCE() in %s: sending discarded pending buf %d\n",  \
-				   __FUNCTION__, buf->idx );				      \
-			return -EFAULT;							      \
-		}									      \
-     	} else {									      \
-		if (list_empty(&dev_priv->placeholders)) {				      \
-			DRM_ERROR( "DMAADVANCE() in %s: empty placeholder list\n",	      \
-			   	__FUNCTION__ );						      \
-			return -EFAULT;							      \
-		}									      \
-		ptr = dev_priv->placeholders.next;					      \
-		list_del(ptr);								      \
-		entry = list_entry(ptr, drm_mach64_freelist_t, list);			      \
-		buf->pending = 1;							      \
-		entry->buf = buf;							      \
-		list_add_tail(ptr, &dev_priv->pending);					      \
-	}										      \
-	entry->discard = (_discard);							      \
-	ADD_BUF_TO_RING( dev_priv, entry );						      \
+#define DMAADVANCE( dev_priv, _discard )						     \
+do {											     \
+	struct list_head *ptr;								     \
+	RING_LOCALS;									     \
+											     \
+	if ( MACH64_VERBOSE ) {								     \
+		DRM_INFO( "DMAADVANCE() in %s\n", __FUNCTION__ );			     \
+	}										     \
+											     \
+	if (_buf->used <= 0) {								     \
+		DRM_ERROR( "DMAADVANCE() in %s: sending empty buf %d\n",		     \
+				   __FUNCTION__, _buf->idx );				     \
+		return -EFAULT;								     \
+	}										     \
+	if (_buf->pending) {								     \
+                /* This is a resued buffer, so we need to find it in the pending list */     \
+		int ret;								     \
+		if ( (ret=mach64_find_pending_buf_entry(dev_priv, _entry, _buf)) ) {	     \
+			DRM_ERROR( "DMAADVANCE() in %s: couldn't find pending buf %d\n",     \
+				   __FUNCTION__, _buf->idx );				     \
+			return ret;							     \
+		}									     \
+		if (_entry->discard) {							     \
+			DRM_ERROR( "DMAADVANCE() in %s: sending discarded pending buf %d\n", \
+				   __FUNCTION__, _buf->idx );				     \
+			return -EFAULT;							     \
+		}									     \
+     	} else {									     \
+		if (list_empty(&dev_priv->placeholders)) {				     \
+			DRM_ERROR( "DMAADVANCE() in %s: empty placeholder list\n",	     \
+			   	__FUNCTION__ );						     \
+			return -EFAULT;							     \
+		}									     \
+		ptr = dev_priv->placeholders.next;					     \
+		list_del(ptr);								     \
+		_entry = list_entry(ptr, drm_mach64_freelist_t, list);			     \
+		_buf->pending = 1;							     \
+		_entry->buf = _buf;							     \
+		list_add_tail(ptr, &dev_priv->pending);					     \
+	}										     \
+	_entry->discard = (_discard);							     \
+	ADD_BUF_TO_RING( dev_priv );							     \
 } while (0)
 
-#define ADD_BUF_TO_RING( dev_priv, entry )						\
+#define DMADISCARDBUF()									\
+do {											\
+	if (_entry == NULL) {								\
+		int ret;								\
+		if ( (ret=mach64_find_pending_buf_entry(dev_priv, _entry, _buf)) ) {	\
+			DRM_ERROR( "%s: couldn't find pending buf %d\n",		\
+				   __FUNCTION__, _buf->idx );				\
+			return ret;							\
+		}									\
+	}										\
+	_entry->discard = 1;								\
+} while(0)
+
+#define ADD_BUF_TO_RING( dev_priv )							\
 do {											\
 	int bytes, pages, remainder;							\
-	drm_buf_t *buf = entry->buf;							\
 	u32 address, page;								\
 	int i;										\
 											\
-	bytes = buf->used;								\
-	address = GETBUFADDR( buf );							\
+	bytes = _buf->used;								\
+	address = GETBUFADDR( _buf );							\
 											\
-	pages = (bytes + DMA_CHUNKSIZE - 1) / DMA_CHUNKSIZE;				\
+	pages = (bytes + MACH64_DMA_CHUNKSIZE - 1) / MACH64_DMA_CHUNKSIZE;		\
 											\
 	BEGIN_RING( pages * 4 );							\
 											\
 	for ( i = 0 ; i < pages-1 ; i++ ) {						\
-		page = address + i * DMA_CHUNKSIZE;					\
-		OUT_RING( APERTURE_OFFSET + MACH64_BM_ADDR );				\
+		page = address + i * MACH64_DMA_CHUNKSIZE;				\
+		OUT_RING( MACH64_APERTURE_OFFSET + MACH64_BM_ADDR );			\
 		OUT_RING( page );							\
-		OUT_RING( DMA_CHUNKSIZE | DMA_HOLD_OFFSET );				\
+		OUT_RING( MACH64_DMA_CHUNKSIZE | MACH64_DMA_HOLD_OFFSET );		\
 		OUT_RING( 0 );								\
 	}										\
 											\
 	/* generate the final descriptor for any remaining commands in this buffer */	\
-	page = address + i * DMA_CHUNKSIZE;						\
-	remainder = bytes - i * DMA_CHUNKSIZE;						\
+	page = address + i * MACH64_DMA_CHUNKSIZE;					\
+	remainder = bytes - i * MACH64_DMA_CHUNKSIZE;					\
 											\
 	/* Save dword offset of last descriptor for this buffer.			\
 	 * This is needed to check for completion of the buffer in freelist_get		\
 	 */										\
-	entry->ring_ofs = RING_WRITE_OFS;						\
+	_entry->ring_ofs = RING_WRITE_OFS;						\
 											\
-	OUT_RING( APERTURE_OFFSET + MACH64_BM_ADDR );					\
+	OUT_RING( MACH64_APERTURE_OFFSET + MACH64_BM_ADDR );				\
 	OUT_RING( page );								\
-	OUT_RING( remainder | DMA_HOLD_OFFSET | DMA_EOL );				\
+	OUT_RING( remainder | MACH64_DMA_HOLD_OFFSET | MACH64_DMA_EOL );		\
 	OUT_RING( 0 );									\
 											\
 	ADVANCE_RING();									\
@@ -898,16 +918,15 @@ do {											\
 #define DMAADVANCEHOSTDATA( dev_priv )							\
 do {											\
 	struct list_head *ptr;								\
-	drm_mach64_freelist_t *entry;							\
 	RING_LOCALS;									\
 											\
 	if ( MACH64_VERBOSE ) {								\
 		DRM_INFO( "DMAADVANCEHOSTDATA() in %s\n", __FUNCTION__ );		\
 	}										\
 											\
-	if (buf->used <= 0) {								\
+	if (_buf->used <= 0) {								\
 		DRM_ERROR( "DMAADVANCEHOSTDATA() in %s: sending empty buf %d\n",	\
-				   __FUNCTION__, buf->idx );				\
+				   __FUNCTION__, _buf->idx );				\
 		return -EFAULT;								\
 	}										\
 	if (list_empty(&dev_priv->placeholders)) {					\
@@ -918,54 +937,53 @@ do {											\
 											\
         ptr = dev_priv->placeholders.next;						\
 	list_del(ptr);									\
-	entry = list_entry(ptr, drm_mach64_freelist_t, list);				\
-	entry->buf = buf;								\
-	entry->buf->pending = 1;							\
+	_entry = list_entry(ptr, drm_mach64_freelist_t, list);				\
+	_entry->buf = _buf;								\
+	_entry->buf->pending = 1;							\
 	list_add_tail(ptr, &dev_priv->pending);						\
-	entry->discard = 1;								\
-	ADD_HOSTDATA_BUF_TO_RING( dev_priv, entry );					\
+	_entry->discard = 1;								\
+	ADD_HOSTDATA_BUF_TO_RING( dev_priv );						\
 } while (0)
 
-#define ADD_HOSTDATA_BUF_TO_RING( dev_priv, entry )					 \
+#define ADD_HOSTDATA_BUF_TO_RING( dev_priv )						 \
 do {											 \
 	int bytes, pages, remainder;							 \
-	drm_buf_t *buf = entry->buf;							 \
 	u32 address, page;								 \
 	int i;										 \
 											 \
-	bytes = buf->used - MACH64_HOSTDATA_BLIT_OFFSET;				 \
-	pages = (bytes + DMA_CHUNKSIZE - 1) / DMA_CHUNKSIZE;				 \
-	address = GETBUFADDR( buf );							 \
+	bytes = _buf->used - MACH64_HOSTDATA_BLIT_OFFSET;				 \
+	pages = (bytes + MACH64_DMA_CHUNKSIZE - 1) / MACH64_DMA_CHUNKSIZE;		 \
+	address = GETBUFADDR( _buf );							 \
 											 \
 	BEGIN_RING( 4 + pages * 4 );							 \
 											 \
-	OUT_RING( APERTURE_OFFSET + MACH64_BM_ADDR );					 \
+	OUT_RING( MACH64_APERTURE_OFFSET + MACH64_BM_ADDR );				 \
 	OUT_RING( address );								 \
-	OUT_RING( MACH64_HOSTDATA_BLIT_OFFSET | DMA_HOLD_OFFSET );			 \
+	OUT_RING( MACH64_HOSTDATA_BLIT_OFFSET | MACH64_DMA_HOLD_OFFSET );		 \
 	OUT_RING( 0 );									 \
 											 \
 	address += MACH64_HOSTDATA_BLIT_OFFSET;						 \
 											 \
 	for ( i = 0 ; i < pages-1 ; i++ ) {						 \
-		page = address + i * DMA_CHUNKSIZE;					 \
-		OUT_RING( APERTURE_OFFSET + MACH64_BM_HOSTDATA );			 \
+		page = address + i * MACH64_DMA_CHUNKSIZE;				 \
+		OUT_RING( MACH64_APERTURE_OFFSET + MACH64_BM_HOSTDATA );		 \
 		OUT_RING( page );							 \
-		OUT_RING( DMA_CHUNKSIZE | DMA_HOLD_OFFSET );				 \
+		OUT_RING( MACH64_DMA_CHUNKSIZE | MACH64_DMA_HOLD_OFFSET );		 \
 		OUT_RING( 0 );								 \
 	}										 \
 											 \
 	/* generate the final descriptor for any remaining commands in this buffer */	 \
-	page = address + i * DMA_CHUNKSIZE;						 \
-	remainder = bytes - i * DMA_CHUNKSIZE;						 \
+	page = address + i * MACH64_DMA_CHUNKSIZE;					 \
+	remainder = bytes - i * MACH64_DMA_CHUNKSIZE;					 \
 											 \
 	/* Save dword offset of last descriptor for this buffer.			 \
 	 * This is needed to check for completion of the buffer in freelist_get		 \
 	 */										 \
-	entry->ring_ofs = RING_WRITE_OFS;						 \
+	_entry->ring_ofs = RING_WRITE_OFS;						 \
 											 \
-	OUT_RING( APERTURE_OFFSET + MACH64_BM_HOSTDATA );				 \
+	OUT_RING( MACH64_APERTURE_OFFSET + MACH64_BM_HOSTDATA );			 \
 	OUT_RING( page );								 \
-	OUT_RING( remainder | DMA_HOLD_OFFSET | DMA_EOL );				 \
+	OUT_RING( remainder | MACH64_DMA_HOLD_OFFSET | MACH64_DMA_EOL );		 \
 	OUT_RING( 0 );									 \
 											 \
 	ADVANCE_RING();									 \

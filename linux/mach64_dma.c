@@ -40,14 +40,11 @@
 
 #if MACH64_INTERRUPTS
 
-int mach64_handle_dma( drm_mach64_private_t *dev_priv );
-int mach64_do_complete_blit( drm_mach64_private_t *dev_priv );
-
 static DECLARE_WAIT_QUEUE_HEAD(read_wait);
 
 
 /* ================================================================
- * Interrupt handler
+ * Interrupt service routine and bottom half - currently unused
  */
 
 void mach64_dma_service(int irq, void *device, struct pt_regs *regs)
@@ -66,13 +63,13 @@ void mach64_dma_service(int irq, void *device, struct pt_regs *regs)
         {                
                 /* VBLANK -- GUI-master dispatch and polling... */
                 MACH64_WRITE(MACH64_CRTC_INT_CNTL, flags | MACH64_CRTC_VBLANK_INT_AK);
-                atomic_inc(&dev_priv->do_gui);
+                atomic_inc(&dev_priv->intr_vblank);
 	}
 	if (flags & MACH64_CRTC_BUSMASTER_EOL_INT)
         {                
-                /* Completion of BLIT op */
+                /* Completion of BM_SYSTEM_TABLE system bus master */
                 MACH64_WRITE(MACH64_CRTC_INT_CNTL, flags | MACH64_CRTC_BUSMASTER_EOL_INT_AK);
-                atomic_inc(&dev_priv->do_blit);
+                atomic_inc(&dev_priv->intr_bm_complete);
         }
         /* Check for an error condition in the engine...  */
         if (MACH64_READ(MACH64_FIFO_STAT) & 0x80000000) 
@@ -99,26 +96,30 @@ void mach64_dma_service(int irq, void *device, struct pt_regs *regs)
         return;
 }
 
-/* Handle the DMA dispatch/completion */
+/* Bottom half - handle the interrupts acknowleded by the service routine */
 void mach64_dma_immediate_bh(void *device)
 {
         drm_device_t *dev = (drm_device_t *) device;
         drm_mach64_private_t *dev_priv = (drm_mach64_private_t *)dev->dev_private;
 
-        /* Handle the completion of a blit pass... */
-        if (atomic_read(&dev_priv->do_blit) > 0)
+        /* Received system bus master completion interrupt */
+        if (atomic_read(&dev_priv->intr_bm_complete) > 0)
         {
-                atomic_set(&dev_priv->do_blit, 0);
-		/*  mach64_do_complete_blit(dev_priv); */
-        }        
+                atomic_set(&dev_priv->intr_bm_complete, 0);
 
-        /* Check to see if we've been told to handle gui-mastering... */
-        if (atomic_read(&dev_priv->do_gui) > 0)
-        {
-		atomic_set(&dev_priv->do_gui, 0);
-		/*  mach64_handle_dma(dev_priv); */
+		/* TODO: handler code */
+
         }
-        
+
+        /* Received VBLANK interrupt */
+        if (atomic_read(&dev_priv->intr_vblank) > 0)
+        {
+		atomic_set(&dev_priv->intr_vblank, 0);
+
+		/* TODO: handler code */
+
+        }
+
         wake_up_interruptible(&read_wait);
         return;
 }
@@ -298,6 +299,10 @@ int mach64_do_engine_reset( drm_mach64_private_t *dev_priv )
 	
 	return 0;
 }
+
+/* ================================================================
+ * Debugging output
+ */
 
 void mach64_dump_engine_info( drm_mach64_private_t *dev_priv )
 {
@@ -581,10 +586,13 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 	data[count++] = 0;
 
 	DRM_DEBUG( "Preparing table ...\n" );
-	table[0] = cpu_to_le32(MACH64_BM_ADDR + APERTURE_OFFSET);
-	table[1] = cpu_to_le32(data_addr);
-	table[2] = cpu_to_le32(count * sizeof( u32 ) | 0x80000000 | 0x40000000);
-	table[3] = 0;
+	table[MACH64_DMA_FRAME_BUF_OFFSET] = cpu_to_le32(MACH64_BM_ADDR + 
+							 MACH64_APERTURE_OFFSET);
+	table[MACH64_DMA_SYS_MEM_ADDR]     = cpu_to_le32(data_addr);
+	table[MACH64_DMA_COMMAND]          = cpu_to_le32(count * sizeof( u32 ) 
+							 | MACH64_DMA_HOLD_OFFSET 
+							 | MACH64_DMA_EOL);
+	table[MACH64_DMA_RESERVED]         = 0;
 
 	DRM_DEBUG( "table[0] = 0x%08x\n", table[0] );
 	DRM_DEBUG( "table[1] = 0x%08x\n", table[1] );
@@ -690,7 +698,7 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 	drm_mach64_private_t *dev_priv;
 	struct list_head *list;
 	u32 tmp;
-	int ret;
+	int i, ret;
 
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
@@ -725,15 +733,13 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 	INIT_LIST_HEAD(&dev_priv->free_list);
 	INIT_LIST_HEAD(&dev_priv->placeholders);
 	INIT_LIST_HEAD(&dev_priv->pending);
-	INIT_LIST_HEAD(&dev_priv->dma_queue);
 
 #if MACH64_INTERRUPTS
         /* Set up for interrupt handling proper- clear state on the handler
 	 * The handler is enabled by the DDX via the DRM(control) ioctl once we return 
 	 */
-        atomic_set(&dev_priv->do_gui, 0);                
-        atomic_set(&dev_priv->do_blit, 0);                
-        atomic_set(&dev_priv->dma_timeout, -1);
+        atomic_set(&dev_priv->intr_vblank, 0);                
+        atomic_set(&dev_priv->intr_bm_complete, 0);                
 #endif
 
 	list_for_each(list, &dev->maplist->head) {
@@ -798,54 +804,54 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 
 	dev->dev_private = (void *) dev_priv;
 
-	/* FIXME: We should support MMIO or remove the option */
-#if 0
-	if ( !init->pseudo_dma ) {
-#endif
-		/* changing the FIFO size from the default causes problems with DMA */
-		tmp = MACH64_READ( MACH64_GUI_CNTL );
-		if ( (tmp & MACH64_CMDFIFO_SIZE_MASK) != MACH64_CMDFIFO_SIZE_128 ) {
-			DRM_INFO( "Setting FIFO size to 128 entries\n");
-			/* FIFO must be empty to change the FIFO depth */
-			if ((ret=mach64_do_wait_for_idle( dev_priv ))) {
-				DRM_ERROR("wait for idle failed before changing FIFO depth!\n");
-				mach64_do_cleanup_dma( dev );
-				return ret;
-			}
-			MACH64_WRITE( MACH64_GUI_CNTL, ( ( tmp & ~MACH64_CMDFIFO_SIZE_MASK ) \
-							 | MACH64_CMDFIFO_SIZE_128 ) );
-			/* need to read GUI_STAT for proper sync according to docs */
-			if ((ret=mach64_do_wait_for_idle( dev_priv ))) {
-				DRM_ERROR("wait for idle failed when changing FIFO depth!\n");
-				mach64_do_cleanup_dma( dev );
-				return ret;
-			}
-		}
+	dev_priv->driver_mode = init->dma_mode;
 
-		/* check DMA addressing limitations */
-		DRM_INFO( "Setting 32-bit pci dma mask\n" );
-		if ((ret=pci_set_dma_mask( dev->pdev, 0xffffffff ))) {
-			DRM_ERROR( "Setting 32-bit pci dma mask failed\n" );
+	/* changing the FIFO size from the default causes problems with DMA */
+	tmp = MACH64_READ( MACH64_GUI_CNTL );
+	if ( (tmp & MACH64_CMDFIFO_SIZE_MASK) != MACH64_CMDFIFO_SIZE_128 ) {
+		DRM_INFO( "Setting FIFO size to 128 entries\n");
+		/* FIFO must be empty to change the FIFO depth */
+		if ((ret=mach64_do_wait_for_idle( dev_priv ))) {
+			DRM_ERROR("wait for idle failed before changing FIFO depth!\n");
 			mach64_do_cleanup_dma( dev );
 			return ret;
 		}
-
-		/* allocate descriptor memory from pci pool */
-		DRM_INFO( "Allocating dma descriptor ring\n" );
-		dev_priv->ring.size = 0x4000; /* 16KB */
-		dev_priv->ring.start = pci_alloc_consistent( dev->pdev, dev_priv->ring.size, 
-							     &dev_priv->ring.handle );
-
-		if (!dev_priv->ring.start || !dev_priv->ring.handle) {
-			DRM_ERROR( "Allocating dma descriptor ring failed\n");
-			return -ENOMEM;
-		} else {
-			dev_priv->ring.start_addr = (u32) dev_priv->ring.handle;
-			memset( dev_priv->ring.start, 0x0, 0x4000 );
+		MACH64_WRITE( MACH64_GUI_CNTL, ( ( tmp & ~MACH64_CMDFIFO_SIZE_MASK ) \
+						 | MACH64_CMDFIFO_SIZE_128 ) );
+		/* need to read GUI_STAT for proper sync according to docs */
+		if ((ret=mach64_do_wait_for_idle( dev_priv ))) {
+			DRM_ERROR("wait for idle failed when changing FIFO depth!\n");
+			mach64_do_cleanup_dma( dev );
+			return ret;
 		}
+	}
 
-		DRM_INFO( "descriptor ring: cpu addr 0x%08x, bus addr: 0x%08x\n", 
-			  (u32) dev_priv->ring.start, dev_priv->ring.start_addr );
+	/* check DMA addressing limitations */
+	DRM_INFO( "Setting 32-bit pci dma mask\n" );
+	if ((ret=pci_set_dma_mask( dev->pdev, 0xffffffff ))) {
+		DRM_ERROR( "Setting 32-bit pci dma mask failed\n" );
+		mach64_do_cleanup_dma( dev );
+		return ret;
+	}
+
+	/* allocate descriptor memory from pci pool */
+	DRM_INFO( "Allocating dma descriptor ring\n" );
+	dev_priv->ring.size = 0x4000; /* 16KB */
+	dev_priv->ring.start = pci_alloc_consistent( dev->pdev, dev_priv->ring.size, 
+						     &dev_priv->ring.handle );
+
+	if (!dev_priv->ring.start || !dev_priv->ring.handle) {
+		DRM_ERROR( "Allocating dma descriptor ring failed\n");
+		return -ENOMEM;
+	} else {
+		dev_priv->ring.start_addr = (u32) dev_priv->ring.handle;
+		memset( dev_priv->ring.start, 0x0, 0x4000 );
+	}
+
+	DRM_INFO( "descriptor ring: cpu addr 0x%08x, bus addr: 0x%08x\n", 
+		  (u32) dev_priv->ring.start, dev_priv->ring.start_addr );
+
+	if ( dev_priv->driver_mode != MACH64_MODE_MMIO ) {
 
 		/* enable block 1 registers and bus mastering */
 		MACH64_WRITE( MACH64_BUS_CNTL, 
@@ -855,414 +861,193 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 
 		/* try a DMA GUI-mastering pass and fall back to MMIO if it fails */
 		DRM_INFO( "Starting DMA test...\n");
-		if ( (ret=mach64_bm_dma_test( dev )) == 0 ) {
-#if (MACH64_DEFAULT_MODE == MACH64_MODE_DMA_ASYNC)
-			dev_priv->driver_mode = MACH64_MODE_DMA_ASYNC;
-			DRM_INFO( "DMA test succeeded, using asynchronous DMA mode\n");
-#else
-			dev_priv->driver_mode = MACH64_MODE_DMA_SYNC;
-			DRM_INFO( "DMA test succeeded, using synchronous DMA mode\n");
-#endif
-		} else {
-#if 0
+		if ( (ret=mach64_bm_dma_test( dev )) ) {
 			dev_priv->driver_mode = MACH64_MODE_MMIO;
-			DRM_INFO( "DMA test failed (ret=%d), using pseudo-DMA mode\n", ret );
-#else
-			DRM_ERROR( "DMA test failed (ret=%d)\n", ret );
-			mach64_do_cleanup_dma( dev );
-			return -EIO;
-#endif
 		}
-
-		dev_priv->ring_running = 0;
-
-		/* setup offsets for physical address of table start and end */
-		dev_priv->ring.head_addr = dev_priv->ring.start_addr;
-		dev_priv->ring.head = dev_priv->ring.tail = 0;
-		dev_priv->ring.tail_mask = (dev_priv->ring.size / sizeof(u32)) - 1;
-		dev_priv->ring.space = dev_priv->ring.size;
-		dev_priv->ring.high_mark = 128;
-
-		/* setup physical address and size of descriptor table */
-		MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, 
-			      ( dev_priv->ring.head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB ) );
-#if 0
-	} else {
-		dev_priv->driver_mode = MACH64_MODE_MMIO;
-		DRM_INFO( "Forcing pseudo-DMA mode\n");
 	}
-#endif
 
-#if MACH64_USE_FRAME_AGING
-	dev_priv->sarea_priv->last_frame = 0;
-	MACH64_WRITE( MACH64_LAST_FRAME_REG, dev_priv->sarea_priv->last_frame );
-#endif
-#if MACH64_USE_BUFFER_AGING
-	dev_priv->sarea_priv->last_dispatch = 0;
-	MACH64_WRITE( MACH64_LAST_DISPATCH_REG, dev_priv->sarea_priv->last_dispatch );
-#endif
+	switch (dev_priv->driver_mode) {
+	case MACH64_MODE_MMIO:
+		MACH64_WRITE( MACH64_BUS_CNTL, ( MACH64_READ(MACH64_BUS_CNTL) 
+						 | MACH64_BUS_EXT_REG_EN
+						 | MACH64_BUS_MASTER_DIS ) );
+		if ( init->dma_mode == MACH64_MODE_MMIO ) {
+			DRM_INFO( "Forcing pseudo-DMA mode\n" );
+		} else {
+			DRM_INFO( "DMA test failed (ret=%d), using pseudo-DMA mode\n", ret );
+		}
+		break;
+	case MACH64_MODE_DMA_SYNC:
+		DRM_INFO( "DMA test succeeded, using synchronous DMA mode\n");
+		break;
+	case MACH64_MODE_DMA_ASYNC:
+	default:
+		DRM_INFO( "DMA test succeeded, using asynchronous DMA mode\n");
+	}
+
+	dev_priv->ring_running = 0;
+
+	/* setup offsets for physical address of table start and end */
+	dev_priv->ring.head_addr = dev_priv->ring.start_addr;
+	dev_priv->ring.head = dev_priv->ring.tail = 0;
+	dev_priv->ring.tail_mask = (dev_priv->ring.size / sizeof(u32)) - 1;
+	dev_priv->ring.space = dev_priv->ring.size;
+	dev_priv->ring.high_mark = 128;
+
+	/* setup physical address and size of descriptor table */
+	mach64_do_wait_for_fifo( dev_priv, 1 );
+	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, 
+		      ( dev_priv->ring.head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB ) );
+
+	/* init frame counter */
+	dev_priv->sarea_priv->frames_queued = 0;
+	for (i = 0; i < MACH64_MAX_QUEUED_FRAMES; i++) {
+		dev_priv->frame_ofs[i] = ~0; /* All ones indicates placeholder */
+	}
 
 	/* Set up the freelist, placeholder list, pending, and DMA request queues... */
 	mach64_init_freelist( dev );
-	
+
 	return 0;
 }
 
-/* ================================================================
- * Primary DMA stream management
+/* ===================================================================
+ * MMIO Pseudo-DMA (intended primarily for debugging, not performance)
  */
 
-#if MACH64_INTERRUPTS
-
-/*
-	Manage the GUI-Mastering operations of the chip.  Since the GUI-Master
-	operation is slightly less intelligent than the BLIT operation (no interrupt
-	for completion), we have to provide the completion detection, etc. in 
-	a state engine.
-*/
-int mach64_handle_dma( drm_mach64_private_t *dev_priv )
+int mach64_do_dispatch_pseudo_dma( drm_mach64_private_t *dev_priv )
 {
-	int timeout;
-		
-	timeout = atomic_read(&dev_priv->dma_timeout);
-	
-	/* Check for engine idle... */
-	if (!(MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE))
-	{
-		/* Check to see if we had a DMA pass going... */
-		if ( timeout > -1)
-		{
-			/* Ok, do the clean up for the previous pass... */
-			mach64_do_release_used_buffers(dev_priv);
-			atomic_set(&dev_priv->dma_timeout, -1);
-		}
-		
-		/* Now, check for queued buffers... */	
-		if (!list_empty(&dev_priv->dma_queue))
-		{
-			atomic_set(&dev_priv->dma_timeout, 0);
-		}
-		
-		/* Check to see if we've got a DMA pass set up */
-		if (atomic_read(&dev_priv->dma_timeout) == 0)
-		{
-			/* Make sure we're locked and fire off the prepped pass */
-			mach64_do_dma_flush(dev_priv);
-		}
-	}
-	else
-	{
-		/* Check to see if we've got a GUI-Master going... */
-		if ((timeout > -1) && (MACH64_READ( MACH64_SRC_CNTL ) & MACH64_SRC_BM_ENABLE))
-		{
-			/* Check for DMA timeout */
-			if (timeout > MACH64_DMA_TIMEOUT)
-			{
-				DRM_INFO("%s, dma timed out at: %d", __FUNCTION__, timeout);
-				/* Assume the engine's hung bigtime...  */
-				mach64_do_engine_reset(dev_priv);
-				atomic_set(&dev_priv->dma_timeout, -1);
-			}
-			else
-			{
-				atomic_inc(&dev_priv->dma_timeout);
-			}			
-		}		
-	}
-	
-        return 0;
-}
-
-
-/*
-	Perform the clean-up for the blit operation- turn off DMA
-	operation (not support) and unlock the DRM.
-*/
-int mach64_do_complete_blit( drm_mach64_private_t *dev_priv )
-{
-	/* Turn off DMA mode -- we don't have anything going because the chip
-	   tells us that it completed in this case (Why didn't they do this for
-	   GUI Master operation?!)  */	
-        MACH64_WRITE( MACH64_BUS_CNTL, MACH64_READ( MACH64_BUS_CNTL ) | MACH64_BUS_MASTER_DIS );
-	
-        return 0;
-}
-
-#endif /* MACH64_INTERRUPTS */
-
-
-#if !MACH64_NO_BATCH_DISPATCH
-/*
- * Take the pending list and build up a descriptor table for
- * GUI-Master use, then fire off the DMA engine with the list.
- * (We add a register reset buffer that the DRM only controls)
- */
-static int mach64_do_dispatch_real_dma( drm_mach64_private_t *dev_priv )
-{
-	struct list_head *ptr, *tmp;	
+	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring;
+	volatile u32 *ring_read;
+	struct list_head *ptr;
 	drm_mach64_freelist_t *entry;
-	drm_buf_t *buf;
-	int bytes, pages, remainder;
-	u32 new_head, address, page, end_flag;
-	int ret, i;
-	RING_LOCALS;
+	drm_buf_t *buf = NULL;
+	u32 *buf_ptr;
+	u32 used, reg, target;
+	int fifo, count, found, ret, no_idle_wait;
 
-#if MACH64_USE_BUFFER_AGING
-	/* bump the counter for buffer aging */
-	dev_priv->sarea_priv->last_dispatch++;
-#endif
+	fifo = count = reg = no_idle_wait = 0;
+	target = MACH64_BM_ADDR;
 
-	/* get physical (byte) address for new ring head */
-	new_head = dev_priv->ring.start_addr + dev_priv->ring.tail * sizeof(u32);
-
-	/* Iterate the queue and build a descriptor table accordingly... */	
-	list_for_each(ptr, &dev_priv->dma_queue)
-	{
-		entry = list_entry(ptr, drm_mach64_freelist_t, list);
-		buf = entry->buf;
-		bytes = buf->used;
-
-		address = GETBUFADDR( buf );
-
-		if (ptr->next == &dev_priv->dma_queue) {
-			u32 *p;
-			int idx = 0;
-			int start = 0;
-			u32 reg;
-
-			p = GETBUFPTR( buf );
-
-			/* FIXME: Make sure we don't overflow */
-#if MACH64_USE_BUFFER_AGING
-			if (MACH64_BUFFER_SIZE - buf->used < (sizeof(u32)*6)) {
-#else
-			if (MACH64_BUFFER_SIZE - buf->used < (sizeof(u32)*4)) {
-#endif
-				DRM_ERROR("buffer overflow\n");
-				return 0;
-			}
-			start = idx = (bytes/sizeof(u32));
-#if MACH64_USE_BUFFER_AGING
-			p[idx++] = cpu_to_le32(DMAREG(MACH64_LAST_DISPATCH_REG));
-			p[idx++] = cpu_to_le32(dev_priv->sarea_priv->last_dispatch);
-#endif
-			reg = MACH64_READ( MACH64_BUS_CNTL ) 
-			  | MACH64_BUS_MASTER_DIS
-			  | MACH64_BUS_EXT_REG_EN;
-			p[idx++] = cpu_to_le32(DMAREG(MACH64_BUS_CNTL));
-			p[idx++] = cpu_to_le32(reg);
-			p[idx++] = cpu_to_le32(DMAREG(MACH64_SRC_CNTL));
-			p[idx++] = cpu_to_le32(0);
-			bytes += (idx-start)*sizeof(u32);
-		}
-
-		pages = (bytes + DMA_CHUNKSIZE - 1) / DMA_CHUNKSIZE;
-
-		BEGIN_RING( pages * 4 );
-
-		for ( i = 0 ; i < pages-1 ; i++ ) {
-			page = address + i * DMA_CHUNKSIZE;
-			OUT_RING( APERTURE_OFFSET + MACH64_BM_ADDR );
-			OUT_RING( page );
-			OUT_RING( DMA_CHUNKSIZE | DMA_HOLD_OFFSET );
-			OUT_RING( 0 );
-		}
-
-		/* if this is the last buffer, we need to set the final descriptor flag */
-		end_flag = (ptr->next == &dev_priv->dma_queue) ? DMA_EOL : 0;
-
-		/* generate the final descriptor for any remaining commands in this buffer */
-		page = address + i * DMA_CHUNKSIZE;
-		remainder = bytes - i * DMA_CHUNKSIZE;
-
-#if !MACH64_USE_BUFFER_AGING
-		/* Save dword offset of last descriptor for this buffer.
-		 * This is needed to check for completion of the buffer in freelist_get
-		 */
-		entry->ring_ofs = RING_WRITE_OFS;
-#endif
-
-		OUT_RING( APERTURE_OFFSET + MACH64_BM_ADDR );
-		OUT_RING( page );
-		OUT_RING( remainder | end_flag | DMA_HOLD_OFFSET );
-		OUT_RING( 0 );
-
-		ADVANCE_RING();
-
-	}
-
-	dev_priv->ring.head_addr = new_head;
-
-	/* Now, dispatch the whole lot to the gui-master engine */
-
-	/* Ensure last pass completed without locking up */
-	if ((ret=mach64_do_wait_for_idle( dev_priv )) < 0) {
-		DRM_ERROR( "%s: idle failed before dispatch, resetting engine\n", 
-			  __FUNCTION__);
-		mach64_dump_engine_info( dev_priv );
-		mach64_do_engine_reset( dev_priv );
-		return ret;
-	}
-
-	/* release completed buffers from the last pass */
-	mach64_do_release_used_buffers( dev_priv );
-
-	/* Move everything in the queue to the pending list */
-	i = 0;
-	list_for_each_safe(ptr, tmp, &dev_priv->dma_queue)
-	{
-		entry = list_entry(ptr, drm_mach64_freelist_t, list);
-#if MACH64_USE_BUFFER_AGING
-		entry->age = dev_priv->sarea_priv->last_dispatch;
-#endif
-		list_del(ptr);
-		entry->buf->waiting = 0;
-		entry->buf->pending = 1;
-		list_add_tail(ptr, &dev_priv->pending);
-		i++;
-	}
-
-	mach64_flush_write_combine();
-
-	/* enable bus mastering and block 1 registers */
-	MACH64_WRITE( MACH64_BUS_CNTL, 
-		      ( MACH64_READ(MACH64_BUS_CNTL) & ~MACH64_BUS_MASTER_DIS ) 
-		      | MACH64_BUS_EXT_REG_EN );
-
-	/* reset descriptor table ring head */
-	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, ( dev_priv->ring.head_addr
-						 | MACH64_CIRCULAR_BUF_SIZE_16KB ) );
-
-	/* enable GUI-master operation */
-	MACH64_WRITE( MACH64_SRC_CNTL, 
-		      MACH64_SRC_BM_ENABLE | MACH64_SRC_BM_SYNC |
-		      MACH64_SRC_BM_OP_SYSTEM_TO_REG );
-	/* kick off the transfer */
-	MACH64_WRITE( MACH64_DST_HEIGHT_WIDTH, 0 );
-
-	DRM_DEBUG( "%s: dispatched %d buffers\n", __FUNCTION__, i );
-	DRM_DEBUG( "%s: head_addr: 0x%08x tail: %d space: %d\n", __FUNCTION__, 
-		   dev_priv->ring.head_addr, dev_priv->ring.tail, dev_priv->ring.space);
-
-	if ( dev_priv->driver_mode == MACH64_MODE_DMA_SYNC ) {
-		if ( (ret = mach64_do_wait_for_idle( dev_priv )) < 0 ) {
-			DRM_ERROR( "%s: idle failed after dispatch, resetting engine\n", 
-				  __FUNCTION__);
-			mach64_dump_engine_info( dev_priv );
-			mach64_do_engine_reset( dev_priv );
-			return ret;
-		}
-		mach64_do_release_used_buffers( dev_priv );
-	}
-
-        return 0;
-}
-
-static int mach64_do_dispatch_pseudo_dma( drm_mach64_private_t *dev_priv )
-{
-	struct list_head 	*ptr;
-	struct list_head 	*tmp;
-	drm_mach64_freelist_t 	*entry;
-	drm_buf_t *buf;
-	u32 *p;
-	u32 used, fifo;
-	int ret;
-	
 	if ( (ret=mach64_do_wait_for_idle( dev_priv )) < 0) {
-		DRM_INFO( "%s: idle failed before dispatch, resetting engine\n", 
+		DRM_INFO( "%s: idle failed before pseudo-dma dispatch, resetting engine\n", 
 			  __FUNCTION__);
 		mach64_dump_engine_info( dev_priv );
 		mach64_do_engine_reset( dev_priv );
 		return ret;
 	}
 
-	list_for_each_safe(ptr, tmp, &dev_priv->dma_queue)
-	{
-		entry = list_entry(ptr, drm_mach64_freelist_t, list);
-		buf = entry->buf;
+	ring_read = (u32 *) ring->start;
+
+	while ( ring->tail != ring->head ) {
+		u32 buf_addr, new_target, offset; 
+		int bytes, remaining, head, eol;
+
+		head = ring->head;
+
+		new_target = le32_to_cpu( ring_read[head++] ) - MACH64_APERTURE_OFFSET;
+		buf_addr   = le32_to_cpu( ring_read[head++] );
+		eol        = le32_to_cpu( ring_read[head]   ) & MACH64_DMA_EOL;
+		bytes      = le32_to_cpu( ring_read[head++] )
+			& ~(MACH64_DMA_HOLD_OFFSET | MACH64_DMA_EOL);
+		head++;
+		head &= ring->tail_mask;
+
+		/* can't wait for idle between a blit setup descriptor 
+		 * and a HOSTDATA descriptor or the engine will lock
+		 */
+		if (new_target == MACH64_BM_HOSTDATA && target == MACH64_BM_ADDR)
+			no_idle_wait = 1;
+
+		target = new_target;
+
+		found = 0;
+		offset = 0;
+		list_for_each(ptr, &dev_priv->pending)
+		{
+			entry = list_entry(ptr, drm_mach64_freelist_t, list);
+			buf = entry->buf;
+			offset = buf_addr - GETBUFADDR( buf );
+			if (offset >= 0 && offset < MACH64_BUFFER_SIZE) {
+				found = 1;
+				break;
+			}
+		}
+
+		if (!found || buf == NULL) {
+			DRM_ERROR("Couldn't find pending buffer: head: %d tail: %d buf_addr: 0x%08x %s\n",
+				  head, ring->tail, buf_addr, (eol ? "eol" : ""));
+			mach64_dump_ring_info( dev_priv );
+			mach64_do_engine_reset( dev_priv );
+			return -EINVAL;
+		}
 
 		/* Hand feed the buffer to the card via MMIO, waiting for the fifo 
 		 * every 16 writes 
 		 */
-		used = buf->used >> 2;
-		fifo = 0;
+		DRM_DEBUG("target: (0x%08x) %s\n", target, 
+				 (target == MACH64_BM_HOSTDATA ? "BM_HOSTDATA" : "BM_ADDR"));
+		DRM_DEBUG("offset: %d bytes: %d used: %d\n", offset, bytes, buf->used);
 
-		p = GETBUFPTR( buf );
+		remaining = (buf->used - offset) >> 2; /* dwords remaining in buffer */
+		used = bytes >> 2; /* dwords in buffer for this descriptor */
+		buf_ptr = (u32 *)((char *)GETBUFPTR( buf ) + offset);
 
 		while ( used ) {
-			u32 reg, count;
+			
+			if (count == 0) {
+				if (target == MACH64_BM_HOSTDATA) {
+					reg = DMAREG(MACH64_HOST_DATA0);
+					count = (remaining > 16) ? 16 : remaining;
+					fifo = 0;
+				} else {
+					reg = le32_to_cpu(*buf_ptr++);
+					used--;
+					count = (reg >> 16) + 1;
+				}
 
-			reg = le32_to_cpu(*p++);
-			used--;
-
-			count = (reg >> 16) + 1;
-			reg = reg & 0xffff;
-			reg = MMSELECT( reg );
+				reg = reg & 0xffff;
+				reg = MMSELECT( reg );
+			}
 			while ( count && used ) {
 				if ( !fifo ) {
-					if ( (ret=mach64_do_wait_for_fifo( dev_priv, 16 )) < 0 ) {
-						return ret;
+					if (no_idle_wait) {
+						if ( (ret=mach64_do_wait_for_fifo( dev_priv, 16 )) < 0 ) {
+							no_idle_wait = 0;
+							return ret;
+						}
+					} else {
+						if ( (ret=mach64_do_wait_for_idle( dev_priv )) < 0 ) {
+							return ret;
+						}
 					}
-					
 					fifo = 16;
 				}
-					--fifo;
-				/* data is already little-endian */
-				MACH64_WRITE(reg, le32_to_cpu(*p++));
-				used--;
-				
+				--fifo;
+				if (target == MACH64_BM_HOSTDATA)
+					MACH64_WRITE(reg, *buf_ptr++);
+				else
+					MACH64_WRITE(reg, le32_to_cpu(*buf_ptr++));
+				used--; remaining--;
+					
 				reg += 4;
 				count--;
 			}
 		}
-
-		list_del(ptr);
-		entry->buf->waiting = 0;
-		entry->buf->pending = 1;
-		list_add_tail(ptr, &dev_priv->pending);
-
+		ring->head = head;
+		ring->head_addr = ring->start_addr + (ring->head * sizeof(u32));
+		ring->space += (4 * sizeof(u32));
 	}
 
-	/* free the "pending" list, since we're done */
-	mach64_do_release_used_buffers( dev_priv );
+	if ( (ret=mach64_do_wait_for_idle( dev_priv )) < 0 ) {
+		return ret;
+	}
+	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, 
+		      ring->head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB );
 
 	DRM_DEBUG( "%s completed\n", __FUNCTION__ );
 	return 0;
 }
-
-#endif /* MACH64_NO_BATCH_DISPATCH */
-
-/* IMPORTANT: This function should only be called when the engine is idle or locked up, 
- * as it assumes all buffers in the pending list have been completed by the hardware.
- */
-int mach64_do_release_used_buffers( drm_mach64_private_t *dev_priv )
-{
-	struct list_head *ptr;
-	struct list_head *tmp;
-	drm_mach64_freelist_t *entry;
-	int i;
-
-	if ( list_empty(&dev_priv->pending) )
-		return 0;
-
-	/* Iterate the pending list and move all buffers into the freelist... */
-	i = 0;
-	list_for_each_safe(ptr, tmp, &dev_priv->pending)
-	{
-		entry = list_entry(ptr, drm_mach64_freelist_t, list);
-		if (entry->discard) {
-			entry->buf->pending = 0;
-			list_del(ptr);
-			list_add_tail(ptr, &dev_priv->free_list);
-			i++;
-		}
-	}
-
-	DRM_DEBUG( "%s: released %d buffers from pending list\n", __FUNCTION__, i );
-
-        return 0;
-}
-
 
 /* ================================================================
  * DMA cleanup
@@ -1349,8 +1134,6 @@ int mach64_dma_flush( struct inode *inode, struct file *filp,
 
 	LOCK_TEST_WITH_RETURN( dev );
 
-	VB_AGE_TEST_WITH_RETURN( dev_priv );
-
 	return mach64_do_dma_flush( dev_priv );
 }
 
@@ -1384,7 +1167,9 @@ int mach64_init_freelist( drm_device_t *dev )
 	DRM_DEBUG("%s: adding %d buffers to freelist\n", __FUNCTION__, dma->buf_count);
 
 	for ( i = 0 ; i < dma->buf_count ; i++ ) {
-		if ((entry = (drm_mach64_freelist_t *) DRM(alloc)(sizeof(drm_mach64_freelist_t), DRM_MEM_BUFLISTS)) == NULL)
+		if ((entry = 
+		     (drm_mach64_freelist_t *) DRM(alloc)(sizeof(drm_mach64_freelist_t), 
+							  DRM_MEM_BUFLISTS)) == NULL)
 			return -ENOMEM;
 		memset( entry, 0, sizeof(drm_mach64_freelist_t) );
 		entry->buf = dma->buflist[i];
@@ -1410,14 +1195,6 @@ void mach64_destroy_freelist( drm_device_t *dev )
 		entry = list_entry(ptr, drm_mach64_freelist_t, list);
 		DRM(free)(entry, sizeof(*entry), DRM_MEM_BUFLISTS);
 	}
-
-	list_for_each_safe(ptr, tmp, &dev_priv->dma_queue)
-	{
-		list_del(ptr);
-		entry = list_entry(ptr, drm_mach64_freelist_t, list);
-		DRM(free)(entry, sizeof(*entry), DRM_MEM_BUFLISTS);
-	}
-
 	list_for_each_safe(ptr, tmp, &dev_priv->placeholders)
 	{
 		list_del(ptr);
@@ -1433,6 +1210,37 @@ void mach64_destroy_freelist( drm_device_t *dev )
 	}
 }
 
+/* IMPORTANT: This function should only be called when the engine is idle or locked up, 
+ * as it assumes all buffers in the pending list have been completed by the hardware.
+ */
+int mach64_do_release_used_buffers( drm_mach64_private_t *dev_priv )
+{
+	struct list_head *ptr;
+	struct list_head *tmp;
+	drm_mach64_freelist_t *entry;
+	int i;
+
+	if ( list_empty(&dev_priv->pending) )
+		return 0;
+
+	/* Iterate the pending list and move all buffers into the freelist... */
+	i = 0;
+	list_for_each_safe(ptr, tmp, &dev_priv->pending)
+	{
+		entry = list_entry(ptr, drm_mach64_freelist_t, list);
+		if (entry->discard) {
+			entry->buf->pending = 0;
+			list_del(ptr);
+			list_add_tail(ptr, &dev_priv->free_list);
+			i++;
+		}
+	}
+
+	DRM_DEBUG( "%s: released %d buffers from pending list\n", __FUNCTION__, i );
+
+        return 0;
+}
+
 drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 {
 	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring;
@@ -1445,27 +1253,13 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 		u32 head, tail, ofs;
 
 		if ( list_empty( &dev_priv->pending ) ) {
-#ifdef MACH64_NO_BATCH_DISPATCH
 			DRM_ERROR( "Couldn't get buffer - pending and free lists empty\n" );
-#if MACH64_EXTRA_CHECKING
 			t = 0;
 			list_for_each( ptr, &dev_priv->placeholders ) {
 				t++;
 			}
 			DRM_INFO( "Placeholders: %d\n", t );
-#endif /* MACH64_EXTRA_CHECKING */
 			return NULL;
-#else
-			/* All 3 lists should never be empty - this is here for debugging */
-			if ( list_empty( &dev_priv->dma_queue ) ) {
-				DRM_ERROR( "Couldn't get buffer - all lists empty\n" );
-				return NULL;
-			} else {
-				/* There's nothing to recover, so flush the queue */
-				DRM_DEBUG("Flushing queue in freelist_get\n");
-				mach64_do_dma_flush( dev_priv );
-			}
-#endif /* MACH64_NO_BATCH_DISPATCH */
 		}
 
 		tail = ring->tail;
@@ -1538,43 +1332,6 @@ _freelist_entry_found:
 	list_add_tail(ptr, &dev_priv->placeholders);
 	return entry->buf;
 }
-
-#if MACH64_USE_BUFFER_AGING
-
-/* Engine must be idle and buffers recleaimed before calling this */
-void mach64_freelist_reset( drm_mach64_private_t *dev_priv )
-{
-	drm_mach64_freelist_t *entry;
-	struct list_head *ptr;
-
-	DRM_DEBUG("%s\n", __FUNCTION__);
-
-	list_for_each(ptr, &dev_priv->dma_queue)
-	{
-		entry = list_entry(ptr, drm_mach64_freelist_t, list);
-		entry->age = 0;
-	}
-
-	list_for_each(ptr, &dev_priv->placeholders)
-	{
-		entry = list_entry(ptr, drm_mach64_freelist_t, list);
-		entry->age = 0;
-	}
-
-	list_for_each(ptr, &dev_priv->free_list)
-	{
-		entry = list_entry(ptr, drm_mach64_freelist_t, list);
-		entry->age = 0;
-	}
-
-	/* Pending list should be empty if engine is idle and buffers were released */
-	if (!list_empty(&dev_priv->pending)) {
-		DRM_ERROR("Pending list not empty in freelist_reset!\n");
-	}
-
-}
-
-#endif /* MACH64_USE_BUFFER_AGING */
 
 /* ================================================================
  * DMA buffer request and submission IOCTL handler

@@ -64,6 +64,11 @@
  */
 #define MACH64_BUFFER_SIZE		16384
 
+/* Max number of swaps allowed on the ring
+ * before the client must wait
+ */
+#define MACH64_MAX_QUEUED_FRAMES        3
+
 /* Byte offsets for host blit buffer data
  */
 #define MACH64_HOSTDATA_BLIT_OFFSET	104
@@ -136,8 +141,7 @@ typedef struct drm_mach64_sarea {
 
 	/* Counters for client-side throttling of rendering clients.
 	 */
-	unsigned int last_frame;
-	unsigned int last_dispatch;
+	unsigned int frames_queued;
 
 	/* Texture memory LRU.
 	 */
@@ -163,6 +167,8 @@ typedef struct drm_mach64_sarea {
 #define DRM_IOCTL_MACH64_VERTEX         DRM_IOW( 0x45, drm_mach64_vertex_t)
 #define DRM_IOCTL_MACH64_BLIT           DRM_IOW( 0x46, drm_mach64_blit_t)
 #define DRM_IOCTL_MACH64_FLUSH          DRM_IO(  0x47)
+#define DRM_IOCTL_MACH64_GETPARAM       DRM_IOWR(0x48, drm_mach64_getparam_t)
+
 
 /* Buffer flags for clears
  */
@@ -183,6 +189,13 @@ typedef struct drm_mach64_sarea {
 #define MACH64_PRIM_QUAD_STRIP		0x00000008
 #define MACH64_PRIM_POLYGON		0x00000009
 
+
+typedef enum _drm_mach64_dma_mode_t {
+   MACH64_MODE_DMA_ASYNC,
+   MACH64_MODE_DMA_SYNC,
+   MACH64_MODE_MMIO
+} drm_mach64_dma_mode_t;
+
 typedef struct drm_mach64_init {
 	enum {
 		DRM_MACH64_INIT_DMA = 0x01,
@@ -191,7 +204,7 @@ typedef struct drm_mach64_init {
 
 	unsigned long sarea_priv_offset;
 	int is_pci;
-	int pseudo_dma;
+	drm_mach64_dma_mode_t dma_mode;
 
 	unsigned int fb_bpp;
 	unsigned int front_offset, front_pitch;
@@ -228,5 +241,12 @@ typedef struct drm_mach64_blit {
 	unsigned short x, y;
 	unsigned short width, height;
 } drm_mach64_blit_t;
+
+typedef struct drm_mach64_getparam {
+	enum {
+		MACH64_PARAM_FRAMES_QUEUED = 0x01
+	} param;
+	int *value;
+} drm_mach64_getparam_t;
 
 #endif
