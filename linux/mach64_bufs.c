@@ -31,10 +31,12 @@
 #include "mach64_drv.h"
 
 
+#define DRIVER_DEVICE_PRIVATE	drm_mach64_private_t
 #define DRIVER_BUFFER_PRIVATE	drm_mach64_buf_priv_t
 
-#define HAVE_PCI_DMA		1
+#define HAVE_AGP		1
 
+#define DRIVER_AGP_BUFFER_MAP	dev_priv->buffers
 
 #define TAG(x) mach64_##x
 #include "bufs_tmp.h"

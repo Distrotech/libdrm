@@ -386,6 +386,7 @@ int TAG(mapbufs)( struct inode *inode, struct file *filp,
 {
 	drm_file_t		*priv		= filp->private_data;
 	drm_device_t		*dev		= priv->dev;
+	DRIVER_DEVICE_PRIVATE	*dev_priv	= dev->dev_private;
 	drm_device_dma_t	*dma		= dev->dma;
 	int			 retcode	= 0;
 	const int		 zero		= 0;

@@ -69,6 +69,7 @@ static void mach64_dma_dispatch_clear( drm_device_t *dev,
 	DMALOCALS;
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
+#if 0
 	switch ( dev_priv->fb_bpp ) {
 	case 16:
 		fb_bpp = MACH64_DATATYPE_RGB565;
@@ -196,6 +197,10 @@ static void mach64_dma_dispatch_clear( drm_device_t *dev,
 			DMAADVANCE( dev_priv );
 		}
 	}
+
+
+#endif
+
 }
 
 static void mach64_dma_dispatch_swap( drm_device_t *dev )

@@ -159,6 +159,7 @@ typedef struct drm_mach64_init {
 
 	unsigned int fb_offset;
 	unsigned int mmio_offset;
+	unsigned int buffers_offset;
 } drm_mach64_init_t;
 
 typedef struct drm_mach64_clear {
