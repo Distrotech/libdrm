@@ -375,14 +375,15 @@ void mach64_dump_buf_info( drm_mach64_private_t *dev_priv, drm_buf_t *buf)
 		u32 reg, count;
 
 		reg = le32_to_cpu(*p++);
+		DRM_INFO("%08x:  0x%08x\n", addr, reg);
 		addr += 4;
 		used--;
-
+		
 		count = (reg >> 16) + 1;
 		reg = reg & 0xffff;
 		reg = MMSELECT( reg );
 		while ( count && used ) {
-			DRM_INFO("%08x:\t%04x <- %08x\n", addr, reg, le32_to_cpu(*p));
+			DRM_INFO("%08x:    0x%04x = 0x%08x\n", addr, reg, le32_to_cpu(*p));
 			p++;
 			addr += 4;
 			used--;
@@ -400,7 +401,7 @@ void mach64_dump_ring_info( drm_mach64_private_t *dev_priv )
 	
 	DRM_INFO( "\n" );
 	
-	DRM_INFO("\tring head_addr: 0x%08x head: %d tail: %d\n", ring->head_addr, ring->head, ring->tail );
+	DRM_INFO("ring head_addr: 0x%08x head: %d tail: %d\n", ring->head_addr, ring->head, ring->tail );
 	
 	if ( ring->head <= ring->tail ) {
 		i0 = ring->head;
@@ -410,26 +411,28 @@ void mach64_dump_ring_info( drm_mach64_private_t *dev_priv )
 		i1 = ring->head;
 	}
 	
-	if ( (i0 = (i0 - 16) & 0xffffff0) < 0)
+	if ( (i0 = (i0 - 16) & 0xfffffff0) < 0)
 		i0 = 0;
-	if ( (i1 = (i1 + 16) & 0xffffff0) > ring->size / sizeof(u32) )
+	if ( (i1 = (i1 + 16) & 0xfffffff0) > ring->size / sizeof(u32) )
 		i1 = ring->size / sizeof(u32);
 	for ( i = i0; i < i1; i += 4) {
 		DRM_INFO( "  0x%08x:  0x%08x 0x%08x 0x%08x 0x%08x%s%s\n",
 			ring->start_addr + i * sizeof(u32),
-			((u32*) ring->start)[i + 0],
-			((u32*) ring->start)[i + 1],
-			((u32*) ring->start)[i + 2], 
-			((u32*) ring->start)[i + 3],
+			le32_to_cpu(((u32*) ring->start)[i + 0]),
+			le32_to_cpu(((u32*) ring->start)[i + 1]),
+			le32_to_cpu(((u32*) ring->start)[i + 2]), 
+			le32_to_cpu(((u32*) ring->start)[i + 3]),
 			i == ring->head ? " (head)" : "",
 			i == ring->tail ? " (tail)" : ""
 		);
 	}
 
-	{
+	DRM_INFO( "\n" );
+	
+	if( ring->head >= 0 && ring->head < ring->size / sizeof(u32) ) {
 		struct list_head *ptr;
 		struct list_head *tmp;
-		u32 addr = ((u32 *)ring->start)[ring->head + 1];
+		u32 addr = le32_to_cpu(((u32 *)ring->start)[ring->head + 1]);
 
 		list_for_each_safe(ptr, tmp, &dev_priv->pending) {
 			drm_mach64_freelist_t *entry = list_entry(ptr, drm_mach64_freelist_t, list);
