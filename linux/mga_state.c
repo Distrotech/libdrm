@@ -48,8 +48,8 @@ static void mgaEmitClipRect( drm_mga_private_t *dev_priv, xf86drmClipRectRec *bo
    
    	/* Force reset of dwgctl (eliminates clip disable) */
 	PRIMOUTREG( MGAREG_DMAPAD, 0 );
-	PRIMOUTREG( MGAREG_DMAPAD, 0 );
-	PRIMOUTREG( MGAREG_DMAPAD, 0 );
+	PRIMOUTREG( MGAREG_DWGSYNC, dev_priv->last_sync_tag - 1 );
+	PRIMOUTREG( MGAREG_DMAPAD, dev_priv->last_sync_tag - 1 );
    	PRIMOUTREG( MGAREG_DWGCTL, regs[MGA_CTXREG_DWGCTL] );
 
 	PRIMOUTREG( MGAREG_DMAPAD, 0 );
