@@ -435,28 +435,41 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 			{
 				u32 *p = (u32 *)((char *)dev_priv->buffers->handle + buf->offset);
 				u32 used = buf->used >> 2;
+				u32 fifo = 0;
 
-				while(used)
-				{
+				while ( used ) {
 					u32 reg, count;
 
-					reg = *p & 0xffff;
-					reg = MMSELECT( reg );
-					count = (*p >> 16) + 1;
-
-					p++;
+					reg = *p++;
 					used--;
+					
+					count = (reg >> 16) + 1;
+					reg = reg & 0xffff;
+					reg = MMSELECT( reg );
 
-					while(count && used)
-					{
-						u32 data;
+					while ( count && used ) {
+#if 0
+						/* FIXME: this lowers significantly the frame rate */
+						if ( !fifo ) {
+							u32 t = 0;
 
-						data = *p;
-
-						MACH64_WRITE( reg, data );
-						reg += 4;
-						p++;
+							while ( MACH64_READ( MACH64_GUI_STAT ) & MACH64_GUI_ACTIVE ) {
+								if ( ++t > 1000000 ) {
+									DRM_ERROR( "timeout writing register\n" );
+									return;
+								}
+							}	
+							
+							fifo = 16;
+						}
+						else
+							--fifo;
+#endif
+						
+						MACH64_WRITE( reg, *p++ );
 						used--;
+						
+						reg += 4;
 						count--;
 					}
 				}
