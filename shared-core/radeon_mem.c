@@ -118,7 +118,7 @@ static void free_block( struct mem_block *p )
 		p->size += q->size;
 		p->next = q->next;
 		p->next->prev = p;
-		kfree(p);
+		DRM_FREE(p);
 	}
 
 	if (p->prev->pid == 0) {
@@ -126,7 +126,7 @@ static void free_block( struct mem_block *p )
 		q->size += p->size;
 		q->next = p->next;
 		q->next->prev = q;
-		kfree(p);
+		DRM_FREE(p);
 	}
 }
 
@@ -151,7 +151,7 @@ static int init_heap(struct mem_block **heap, int start, int size)
 	
 	*heap = DRM_MALLOC(sizeof(**heap));
 	if (!*heap) {
-		kfree( blocks );
+		DRM_FREE( blocks );
 		return -ENOMEM;
 	}
 
@@ -174,18 +174,10 @@ void radeon_mem_release( struct mem_block *heap )
 	int pid = DRM_CURRENTPID;
 	struct mem_block *p;
 
-	printk("%s\n", __FUNCTION__);
-
 	for (p = heap->next ; p != heap ; p = p->next) {
-		if (p->pid == pid) {
-			printk("%s free 0x%x owner %d\n", __FUNCTION__,  
-			       p->start, p->pid);
+		if (p->pid == pid) 
 			p->pid = 0;
-		}
 	}
-
-	printk("%s stage 1:\n", __FUNCTION__);
-	print_heap(heap);
 
 	/* Assumes a single contiguous range.  Needs a special pid in
 	 * 'heap' to stop it being subsumed.
@@ -196,12 +188,9 @@ void radeon_mem_release( struct mem_block *heap )
 			p->size += q->size;
 			p->next = q->next;
 			p->next->prev = p;
-			kfree(q);
+			DRM_FREE(q);
 		}
 	}
-
-	printk("%s stage 2:\n", __FUNCTION__);
-	print_heap(heap);
 }
 
 /* Shutdown.
@@ -213,10 +202,10 @@ void radeon_mem_takedown( struct mem_block **heap )
 	for (p = (*heap)->next ; p != *heap ; ) {
 		struct mem_block *q = p;
 		p = p->next;
-		kfree(q);
+		DRM_FREE(q);
 	}
 
-	kfree( *heap );
+	DRM_FREE( *heap );
 	*heap = 0;
 }
 
@@ -244,8 +233,6 @@ int radeon_mem_alloc( DRM_IOCTL_ARGS )
 	drm_radeon_mem_alloc_t alloc;
 	struct mem_block *block, **heap;
 
-	printk("%s\n", __FUNCTION__);
-
 	if ( !dev_priv ) {
 		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
 		return DRM_ERR(EINVAL);
@@ -270,10 +257,6 @@ int radeon_mem_alloc( DRM_IOCTL_ARGS )
 	if (!block) 
 		return DRM_ERR(ENOMEM);
 
-	printk("%s start 0x%x size 0x%x\n", __FUNCTION__,
-	       block->start, block->size);
-	print_heap(*heap);
-		
 	if ( DRM_COPY_TO_USER( alloc.region_offset, &block->start, 
 			       sizeof(int) ) ) {
 		DRM_ERROR( "copy_to_user\n" );
@@ -291,8 +274,6 @@ int radeon_mem_free( DRM_IOCTL_ARGS )
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	drm_radeon_mem_free_t memfree;
 	struct mem_block *block, **heap;
-
-	printk("%s\n", __FUNCTION__);
 
 	if ( !dev_priv ) {
 		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
@@ -323,8 +304,6 @@ int radeon_mem_init_heap( DRM_IOCTL_ARGS )
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	drm_radeon_mem_init_heap_t initheap;
 	struct mem_block **heap;
-
-	printk("%s\n", __FUNCTION__);
 
 	if ( !dev_priv ) {
 		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
