@@ -611,9 +611,6 @@ int mga_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 	atomic_inc(&dev->total_ioctl);
 	++priv->ioctl_count;
 
-	DRM_DEBUG("pid = %d, cmd = 0x%02x, nr = 0x%02x, dev 0x%x, auth = %d\n",
-		  current->pid, cmd, nr, dev->device, priv->authenticated);
-
 	if (nr >= MGA_IOCTL_COUNT) {
 		retcode = -EINVAL;
 	} else {
@@ -621,7 +618,10 @@ int mga_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 		func	  = ioctl->func;
 
 		if (!func) {
-			DRM_DEBUG("no function\n");
+			DRM_DEBUG("no function: pid = %d, cmd = 0x%02x,"
+				  " nr = 0x%02x, dev 0x%x, auth = %d\n",
+				  current->pid, cmd, nr, dev->device,
+				  priv->authenticated);
 			retcode = -EINVAL;
 		} else if ((ioctl->root_only && !capable(CAP_SYS_ADMIN))
 			    || (ioctl->auth_needed && !priv->authenticated)) {
@@ -651,9 +651,6 @@ int mga_unlock(struct inode *inode, struct file *filp, unsigned int cmd,
 		return -EINVAL;
 	}
 
-	DRM_DEBUG("%d frees lock (%d holds)\n",
-		  lock.context,
-		  _DRM_LOCKING_CONTEXT(dev->lock.hw_lock->lock));
 	atomic_inc(&dev->total_unlocks);
 	if (_DRM_LOCK_IS_CONT(dev->lock.hw_lock->lock))
 		atomic_inc(&dev->total_contends);

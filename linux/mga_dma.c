@@ -210,9 +210,6 @@ drm_buf_t *mga_freelist_get(drm_device_t *dev)
 	static int failed = 0;
 	int return_null = 0;
 
-	DRM_DEBUG("tail->age : %d last_prim_age : %d\n",
-	       dev_priv->tail->age, dev_priv->last_prim_age);
-
 	if(failed >= 1000 && dev_priv->tail->age >= dev_priv->last_prim_age) {
 		DRM_DEBUG("Waiting on freelist,"
 			  " tail->age = %d, last_prim_age= %d\n",
@@ -542,7 +539,7 @@ int mga_dma_schedule(drm_device_t *dev, int locked)
 {
       	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
       	drm_device_dma_t  *dma	    = dev->dma;
-	int retval = 0;
+	int               retval    = 0;
 
    	if (!dev_priv) return -EBUSY;
 	
@@ -1022,7 +1019,8 @@ int mga_lock(struct inode *inode, struct file *filp, unsigned int cmd,
 		}
 	}
 
-	DRM_DEBUG("%d %s\n", lock.context, ret ? "interrupted" : "has lock");
+	if (ret) DRM_DEBUG("%d %s\n", lock.context,
+			   ret ? "interrupted" : "has lock");
 	return ret;
 }
 

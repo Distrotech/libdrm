@@ -50,7 +50,6 @@
 
 MODS=           gamma.o tdfx.o r128.o
 LIBS=           libdrm.a
-PROGS=		drmstat
 
 DRMOBJS=	init.o memory.o proc.o auth.o context.o drawable.o bufs.o \
 		lists.o lock.o ioctl.o fops.o vm.o dma.o ctxbitmap.o
@@ -64,9 +63,6 @@ TDFXHEADERS=    tdfx_drv.h $(DRMHEADERS)
 
 R128OBJS=	r128_drv.o r128_dma.o r128_bufs.o r128_context.o
 R128HEADERS=	r128_drv.h r128_drm.h $(DRMHEADERS)
-
-PROGOBJS=       drmstat.po xf86drm.po xf86drmHash.po xf86drmRandom.po sigio.po
-PROGHEADERS=    xf86drm.h $(DRMHEADERS)
 
 INC=		/usr/include
 
@@ -165,7 +161,7 @@ all::;@echo === KERNEL HEADERS IN $(TREE)
 all::;@echo === SMP=${SMP} MODVERSIONS=${MODVERSIONS} AGP=${AGP} SIS=${SIS}
 all::;@echo === kill_fasync has $(PARAMS) parameters
 all::;@echo === Compiling for machine $(MACHINE)
-all:: $(LIBS) $(MODS) $(PROGS)
+all:: $(LIBS) $(MODS)
 endif
 
 # **** End of SMP/MODVERSIONS detection
@@ -217,9 +213,6 @@ i810.o: $(I810OBJS) $(LIBS)
 	$(LD) -r $^ -o $@
 endif
 
-drmstat: $(PROGOBJS)
-	$(CC) $(PRGCFLAGS) $^ $(PRGLIBS) -o $@
-
 .PHONY: ChangeLog
 ChangeLog:
 	@rm -f Changelog
@@ -244,7 +237,6 @@ ifeq ($(AGP),1)
 $(MGAOBJS): $(MGAHEADERS)
 $(I810OBJS): $(I810HEADERS)
 endif
-$(PROGOBJS): $(PROGHEADERS)
 
 clean:
-	rm -f *.o *.a *.po *~ core $(PROGS)
+	rm -f *.o *.a *.po *~ core
