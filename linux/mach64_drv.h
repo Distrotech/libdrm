@@ -682,47 +682,35 @@ do {								\
 } while (0)
 
 
-#if defined(__i386__)
-
-/* Taken from include/asm-i386/bitops.h linux header */
-static __inline__ void mach64_clear_bit(int nr, volatile void * addr)
+static __inline__ void mach64_clear_dma_eol( volatile u32 * addr )
 {
+#if defined(__i386__)
+	int nr = 31;
+	
+	/* Taken from include/asm-i386/bitops.h linux header */
         __asm__ __volatile__( "lock;"
                 "btrl %1,%0"
-                :"=m" (*(volatile long *) addr)
+                :"=m" (*addr)
                 :"Ir" (nr));
-}
-
 #elif defined(__powerpc__)
+	u32 old;
+	u32 mask = cpu_to_le32( DMA_EOL );
 
-/* Taken from the include/asm-ppc/bitops.h linux header */
-static __inline__ void mach64_clear_bit(int nr, volatile void *addr)
-{
-	unsigned long old;
-	unsigned long mask = 1 << (nr & 0x1f);
-	unsigned long *p = ((unsigned long *)addr) + (nr >> 5);
-
+	/* Taken from the include/asm-ppc/bitops.h linux header */
 	__asm__ __volatile__("\n\
 1:	lwarx	%0,0,%3 \n\
 	andc	%0,%0,%2 \n\
 	stwcx.	%0,0,%3 \n\
 	bne-	1b"
-	: "=&r" (old), "=m" (*p)
-	: "r" (mask), "r" (p), "m" (*p)
+	: "=&r" (old), "=m" (*addr)
+	: "r" (mask), "r" (addr), "m" (*addr)
 	: "cc");
-}
-
 #else
+	u32 mask = cpu_to_le32( ~DMA_EOL );
 
-static __inline__ void mach64_clear_bit(int nr, volatile void *addr)
-{
-	unsigned long mask = 1 << (nr & 0x1f);
-	volatile unsigned long *p = ((unsigned long *)addr) + (nr >> 5);
-
-	*p &= ~mask;
-}
-
+	*addr &= mask;
 #endif
+}
 
 #define ADVANCE_RING() 							\
 do {									\
@@ -731,8 +719,7 @@ do {									\
 			  write, tail );				\
 	}								\
 	mach64_flush_write_combine();					\
-	/* Clear DMA_EOL */						\
-	mach64_clear_bit(31, &ring[(tail - 2) & mask]);			\
+	mach64_clear_dma_eol( &ring[(tail - 2) & mask] );		\
 	mach64_flush_write_combine();					\
 	dev_priv->ring.tail = write;					\
 	UPDATE_RING_HEAD( dev_priv, &(dev_priv)->ring );		\
