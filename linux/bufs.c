@@ -103,9 +103,11 @@ int drm_addmap(struct inode *inode, struct file *filp, unsigned int cmd,
 			dev->lock.hw_lock = map->handle; /* Pointer to lock */
 		}
 		break;
+#ifdef DRM_AGP
 	case _DRM_AGP:
 		map->offset = map->offset + dev->agp->base;
 		break;
+#endif
 	default:
 		drm_free(map, sizeof(*map), DRM_MEM_MAPS);
 		return -EINVAL;
