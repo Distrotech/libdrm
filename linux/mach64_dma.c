@@ -34,8 +34,6 @@
 #include "mach64_drv.h"
 
 #include <linux/interrupt.h>	/* For task queue support */
-#include <linux/delay.h>
-#include <linux/list.h>
 
 int mach64_do_cleanup_dma( drm_device_t *dev );
 int mach64_handle_dma( drm_mach64_private_t *dev_priv );
@@ -180,10 +178,10 @@ int mach64_do_wait_for_dma( drm_mach64_private_t *dev_priv )
 		}
 		udelay( 1 );
 	}
-	
+
 	if (ret != 0)
 		DRM_INFO( "do_wait_for_dma failed! GUI_STAT=0x%08x\n", MACH64_READ( MACH64_GUI_STAT ) );
-	
+
 	return ret;
 }
 

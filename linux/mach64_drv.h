@@ -32,8 +32,14 @@
 #ifndef __MACH64_DRV_H__
 #define __MACH64_DRV_H__
 
-#include <linux/list.h>
 #include <linux/delay.h>
+#include <linux/list.h>
+
+#ifndef list_for_each_safe
+#define list_for_each_safe(pos, n, head) \
+	for (pos = (head)->next, n = pos->next; pos != (head); \
+		pos = n, n = pos->next)
+#endif
 
 /* Development driver options - FIXME: remove these when not needed */
 
