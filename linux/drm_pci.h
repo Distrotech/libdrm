@@ -77,7 +77,7 @@ DRM(pci_alloc)(drm_device_t *dev, size_t size, size_t align,
 	 */
 	if (align > size)
 		return NULL;
-	
+
 	if (pci_set_dma_mask( dev->pdev, maxaddr ) != 0) {
 		DRM_ERROR( "Setting pci dma mask failed\n" );
 		return NULL;

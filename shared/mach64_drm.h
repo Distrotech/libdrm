@@ -121,12 +121,6 @@ typedef struct {
 	unsigned int tex_offset;
 } drm_mach64_context_regs_t;
 
-typedef struct drm_mach64_tex_region {
-	unsigned char next, prev;
-	unsigned char in_use;
-	int age;
-} drm_mach64_tex_region_t;
-
 typedef struct drm_mach64_sarea {
 	/* The channel for communication of state information to the kernel
 	 * on firing a vertex dma buffer.
@@ -146,9 +140,8 @@ typedef struct drm_mach64_sarea {
 
 	/* Texture memory LRU.
 	 */
-	drm_mach64_tex_region_t tex_list[MACH64_NR_TEX_HEAPS]
-					[MACH64_NR_TEX_REGIONS+1];
-	int tex_age[MACH64_NR_TEX_HEAPS];
+	drm_tex_region_t tex_list[MACH64_NR_TEX_HEAPS][MACH64_NR_TEX_REGIONS+1];
+	unsigned int tex_age[MACH64_NR_TEX_HEAPS];
 	int ctx_owner;
 } drm_mach64_sarea_t;
 

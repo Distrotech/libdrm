@@ -41,43 +41,41 @@
 #define MACH64_VERBOSE		  0 /* Verbose debugging output */
 
 typedef struct drm_mach64_freelist {
-	struct list_head  list;  /* Linux LIST structure... */
-   	drm_buf_t *buf;
+	struct list_head  list;  /* List pointers for free_list, placeholders, or pending list */
+   	drm_buf_t *buf;          /* Pointer to the buffer */
 	int discard;             /* This flag is set when we're done (re)using a buffer */
 	u32 ring_ofs;            /* dword offset in ring of last descriptor for this buffer */
 } drm_mach64_freelist_t;
 
 typedef struct drm_mach64_descriptor_ring {
-	dma_addr_t handle;  /* handle (bus address) of ring returned by pci_alloc_consistent() */
-	void *start;        /* write pointer (cpu address) to start of descriptor ring */
-	u32 start_addr;     /* bus address of beginning of descriptor ring */
-       	int size;           /* size of ring in bytes */
+	dma_addr_t handle;       /* handle (bus address) of ring returned by pci_alloc_consistent() */
+	void *start;             /* write pointer (cpu address) to start of descriptor ring */
+	u32 start_addr;          /* bus address of beginning of descriptor ring */
+       	int size;                /* size of ring in bytes */
 
-	u32 head_addr;      /* bus address of descriptor ring head */
-	u32 head;           /* dword offset of descriptor ring head */
-	u32 tail;           /* dword offset of descriptor ring tail */
-	u32 tail_mask;      /* mask used to wrap ring */
-	int space;          /* number of free bytes in ring */
+	u32 head_addr;           /* bus address of descriptor ring head */
+	u32 head;                /* dword offset of descriptor ring head */
+	u32 tail;                /* dword offset of descriptor ring tail */
+	u32 tail_mask;           /* mask used to wrap ring */
+	int space;               /* number of free bytes in ring */
 } drm_mach64_descriptor_ring_t;
 
 typedef struct drm_mach64_private {
 	drm_mach64_sarea_t *sarea_priv;
 
 	int is_pci;
-	drm_mach64_dma_mode_t driver_mode;
+	drm_mach64_dma_mode_t driver_mode;       /* Async DMA, sync DMA, or MMIO */
 
-	int usec_timeout;      /* Number of microseconds to wait in the idle functions */
+	int usec_timeout;                        /* Timeout for the wait functions */
 
-	/* DMA descriptor table (ring buffer) */
-	drm_mach64_descriptor_ring_t ring;
-	int ring_running;
+	drm_mach64_descriptor_ring_t ring;       /* DMA descriptor table (ring buffer) */
+	int ring_running;                        /* Is bus mastering is enabled */
 
-	struct list_head free_list;     /* Free-list head */
-	struct list_head placeholders;  /* Placeholder list for buffers held by clients */
-	struct list_head pending;    	/* Buffers pending completion */
+	struct list_head free_list;              /* Free-list head */
+	struct list_head placeholders;           /* Placeholder list for buffers held by clients */
+	struct list_head pending;                /* Buffers pending completion */
 
-	/* dword ring offsets of most recent swaps */
-	u32 frame_ofs[MACH64_MAX_QUEUED_FRAMES];
+	u32 frame_ofs[MACH64_MAX_QUEUED_FRAMES]; /* dword ring offsets of most recent frame swaps */
 
 	unsigned int fb_bpp;
 	unsigned int front_offset, front_pitch;
