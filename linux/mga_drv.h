@@ -102,18 +102,6 @@ typedef struct drm_mga_private {
 	drm_map_t *agp_textures;
 } drm_mga_private_t;
 
-				/* mga_drv.c */
-extern int mga_version( struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg );
-extern int mga_open( struct inode *inode, struct file *filp );
-extern int mga_release( struct inode *inode, struct file *filp );
-extern int mga_ioctl( struct inode *inode, struct file *filp,
-		      unsigned int cmd, unsigned long arg );
-extern int mga_lock( struct inode *inode, struct file *filp,
-		     unsigned int cmd, unsigned long arg );
-extern int mga_unlock( struct inode *inode, struct file *filp,
-		       unsigned int cmd, unsigned long arg );
-
 				/* mga_dma.c */
 extern int mga_dma_init( struct inode *inode, struct file *filp,
 			 unsigned int cmd, unsigned long arg );
@@ -121,8 +109,6 @@ extern int mga_dma_flush( struct inode *inode, struct file *filp,
 			  unsigned int cmd, unsigned long arg );
 extern int mga_dma_reset( struct inode *inode, struct file *filp,
 			  unsigned int cmd, unsigned long arg );
-extern int mga_control( struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg );
 extern int mga_dma_buffers( struct inode *inode, struct file *filp,
 			    unsigned int cmd, unsigned long arg );
 
@@ -136,7 +122,8 @@ extern void mga_do_dma_flush( drm_mga_private_t *dev_priv );
 extern void mga_do_dma_wrap_start( drm_mga_private_t *dev_priv );
 extern void mga_do_dma_wrap_end( drm_mga_private_t *dev_priv );
 
-extern int mga_irq_uninstall( drm_device_t *dev );
+extern int mga_freelist_put( drm_device_t *dev, drm_buf_t *buf );
+
 
 				/* mga_state.c */
 extern int  mga_dma_clear( struct inode *inode, struct file *filp,
@@ -165,7 +152,8 @@ extern int mga_warp_init( drm_device_t *dev );
 #define MGA_DEREF( reg )	*(volatile u32 *)MGA_ADDR( reg )
 #define MGA_READ( reg )		MGA_DEREF( reg )
 #define MGA_WRITE( reg, val )	do { MGA_DEREF( reg ) = val; } while (0)
-
+#define MGA_DEREF8( reg )	*(volatile u8 *)MGA_ADDR( reg )
+#define MGA_WRITE8( reg, val )  do { MGA_DEREF8( reg ) = val; } while (0)
 
 #define DWGREG0 	0x1c00
 #define DWGREG0_END 	0x1dff
@@ -329,6 +317,7 @@ do {									\
 
 /* A reduced set of the mga registers.
  */
+#define MGA_CRTC_INDEX			0x1fd4
 
 #define MGA_ALPHACTRL 			0x2c7c
 #define MGA_AR0 			0x1c60
