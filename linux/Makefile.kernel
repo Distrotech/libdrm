@@ -36,22 +36,26 @@ else
  endif
 endif
 
-gamma-objs := $(lib-objs) gamma_drv.o gamma_dma.o
-tdfx-objs  := $(lib-objs) tdfx_drv.o                tdfx_context.o
-r128-objs  := $(lib-objs) r128_drv.o  r128_dma.o    r128_context.o r128_bufs.o
-ffb-objs   := $(lib-objs) ffb_drv.o                 ffb_context.o
-mga-objs   := $(lib-objs) mga_drv.o   mga_dma.o     mga_context.o  mga_bufs.o \
-	      mga_state.o
-i810-objs  := $(lib-objs) i810_drv.o  i810_dma.o    i810_context.o i810_bufs.o
+gamma-objs  := $(lib-objs) gamma_drv.o  gamma_dma.o
+tdfx-objs   := $(lib-objs) tdfx_drv.o                tdfx_context.o
+r128-objs   := $(lib-objs) r128_drv.o   r128_dma.o   r128_context.o \
+	       r128_bufs.o
+ffb-objs    := $(lib-objs) ffb_drv.o                 ffb_context.o
+mga-objs    := $(lib-objs) mga_drv.o    mga_dma.o    mga_context.o  \
+	       mga_bufs.o mga_state.o
+i810-objs   := $(lib-objs) i810_drv.o   i810_dma.o   i810_context.o i810_bufs.o
+mach64-objs := $(lib-objs) mach64_drv.o mach64_dma.o mach64_context.o \
+	       mach64_state.o
 
-obj-$(CONFIG_DRM_GAMMA) += gamma.o $(gamma-objs)
-obj-$(CONFIG_DRM_TDFX)  += tdfx.o  $(tdfx-objs)
-obj-$(CONFIG_DRM_R128)  += r128.o  $(r128-objs)
-obj-$(CONFIG_DRM_FFB)   += ffb.o   $(ffb-objs)
+obj-$(CONFIG_DRM_GAMMA)  += gamma.o  $(gamma-objs)
+obj-$(CONFIG_DRM_TDFX)   += tdfx.o   $(tdfx-objs)
+obj-$(CONFIG_DRM_R128)   += r128.o   $(r128-objs)
+obj-$(CONFIG_DRM_FFB)    += ffb.o    $(ffb-objs)
+obj-$(CONFIG_DRM_MACH64) += mach64.o $(mach64-objs)
 
 ifneq ($CONFIG_AGP),)
-obj-$(CONFIG_DRM_MGA)   += mga.o   $(mga-objs)
-obj-$(CONFIG_DRM_I810)  += i810.o  $(i810-objs)
+obj-$(CONFIG_DRM_MGA)    += mga.o    $(mga-objs)
+obj-$(CONFIG_DRM_I810)   += i810.o   $(i810-objs)
 endif
 
 # Take module names out of obj-y and int-m
@@ -86,3 +90,6 @@ r128.o: $(r128-objs)
 
 ffb.o: $(ffb-objs)
 	$(LD) -r -o $@ $(ffb-objs)
+
+mach64.o: $(mach64-objs)
+	$(LD) -r -o $@ $(mach64-objs)

@@ -34,8 +34,8 @@
 #define DRIVER_AUTHOR		"Gareth Hughes"
 
 #define DRIVER_NAME		"mach64"
-#define DRIVER_DESC		"ATI Rage Pro"
-#define DRIVER_DATE		"20001124"
+#define DRIVER_DESC		"DRM module for the ATI Rage Pro"
+#define DRIVER_DATE		"20001203"
 
 #define DRIVER_MAJOR		1
 #define DRIVER_MINOR		0
@@ -52,7 +52,7 @@ static drm_ioctl_desc_t		mach64_ioctls[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_BLOCK)]	        = { drm_block,         1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_UNBLOCK)]       = { drm_unblock,       1, 1 },
 #if 0
-	[DRM_IOCTL_NR(DRM_IOCTL_CONTROL)]       = { drm_control,       1, 1 },
+	[DRM_IOCTL_NR(DRM_IOCTL_CONTROL)]       = { mach64_control,    1, 1 },
 #endif
 	[DRM_IOCTL_NR(DRM_IOCTL_AUTH_MAGIC)]    = { drm_authmagic,     1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_ADD_MAP)]       = { drm_addmap,        1, 1 },
@@ -90,13 +90,14 @@ static drm_ioctl_desc_t		mach64_ioctls[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_AGP_UNBIND)]    = { drm_agp_unbind,    1, 1 },
 #endif
 
-#if 0
    	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_INIT)]   = { mach64_dma_init,   1, 1 },
-   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_SWAP)]   = { mach64_dma_swap,   1, 1 },
-   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_CLEAR)]  = { mach64_dma_clear,  1, 1 },
-   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_VERTEX)] = { mach64_dma_vertex, 1, 1 },
-   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_BLIT)]   = { mach64_dma_blit,   1, 1 },
-   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_FLUSH)]  = { mach64_dma_flush,  1, 1 },
+   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_CLEAR)]  = { mach64_dma_clear,  1, 0 },
+   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_SWAP)]   = { mach64_dma_swap,   1, 0 },
+   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_IDLE)]   = { mach64_dma_idle,   1, 0 },
+#if 0
+   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_VERTEX)] = { mach64_vertex,     1, 0 },
+   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_BLIT)]   = { mach64_blit,       1, 0 },
+   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_FLUSH)]  = { mach64_flush,      1, 0 },
 #endif
 };
 

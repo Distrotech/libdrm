@@ -36,8 +36,24 @@
 #ifndef __MACH64_DEFINES__
 #define __MACH64_DEFINES__
 
-/* FIXME: fill this in...
+/* What needs to be changed for the current vertex buffer?
  */
+#define MACH64_UPLOAD_CONTEXT		0x001
+#define MACH64_UPLOAD_SETUP		0x002
+#define MACH64_UPLOAD_TEX0		0x004
+#define MACH64_UPLOAD_TEX1		0x008
+#define MACH64_UPLOAD_TEX0IMAGES	0x010
+#define MACH64_UPLOAD_TEX1IMAGES	0x020
+#define MACH64_UPLOAD_CORE		0x040
+#define MACH64_UPLOAD_MASKS		0x080
+#define MACH64_UPLOAD_WINDOW		0x100
+#define MACH64_UPLOAD_CLIPRECTS		0x200	/* handled client-side */
+#define MACH64_REQUIRE_QUIESCENCE	0x400
+#define MACH64_UPLOAD_ALL		0x7ff
+
+#define MACH64_FRONT			0x1
+#define MACH64_BACK			0x2
+#define MACH64_DEPTH			0x4
 
 /* Keep these small for testing.
  */
@@ -49,40 +65,37 @@
 #define MACH64_CARD_HEAP		0
 #define MACH64_AGP_HEAP			1
 #define MACH64_NR_TEX_HEAPS		2
-#define MACH64_NR_TEX_REGIONS		16
+#define MACH64_NR_TEX_REGIONS		64
 #define MACH64_LOG_TEX_GRANULARITY	16
 
-#endif
+#endif /* __MACH64_SAREA_DEFINES__ */
 
 typedef struct drm_mach64_init {
 	enum {
 		MACH64_INIT_DMA = 0x01,
 		MACH64_CLEANUP_DMA = 0x02
 	} func;
-	int sarea_priv_offset;
-	int is_pci;
-	int cpp;
 
-	unsigned int pitch;
-	unsigned int front_offset;
-	unsigned int back_offset;
-	unsigned int depth_offset;
+	unsigned int sarea_priv_offset;
 
-	unsigned int texture_offset;
-	unsigned int texture_size;
+	unsigned int fb_bpp;
+	unsigned int front_offset, front_pitch;
+	unsigned int back_offset, back_pitch;
 
-	unsigned int agp_texture_offset;
-	unsigned int agp_texture_size;
+	unsigned int depth_bpp;
+	unsigned int depth_offset, depth_pitch;
+	unsigned int span_offset;
 
+	unsigned int fb_offset;
 	unsigned int mmio_offset;
-} drm_r128_init_t;
+} drm_mach64_init_t;
 
 
-typedef struct drm_tex_region {
+typedef struct drm_mach64_tex_region {
 	unsigned char next, prev;
 	unsigned char in_use;
 	int age;
-} drm_tex_region_t;
+} drm_mach64_tex_region_t;
 
 typedef struct drm_mach64_sarea {
 	/* The channel for communication of state information to the kernel
@@ -93,7 +106,7 @@ typedef struct drm_mach64_sarea {
 
 	/* The current cliprects, or a subset thereof.
 	 */
-	drm_clip_rect_t boxes[R128_NR_SAREA_CLIPRECTS];
+	drm_clip_rect_t boxes[MACH64_NR_SAREA_CLIPRECTS];
 	unsigned int nbox;
 
 	/* Counters for client-side throttling of rendering clients.
@@ -103,9 +116,19 @@ typedef struct drm_mach64_sarea {
 
 	/* Texture memory LRU.
 	 */
-	drm_tex_region_t tex_list[MACH64_NR_TEX_HEAPS][MACH64_NR_TEX_REGIONS+1];
+	drm_mach64_tex_region_t tex_list[MACH64_NR_TEX_HEAPS]
+					[MACH64_NR_TEX_REGIONS+1];
 	int tex_age[MACH64_NR_TEX_HEAPS];
 	int ctx_owner;
 } drm_mach64_sarea_t;
+
+typedef struct drm_mach64_clear {
+	unsigned int flags;
+	int x, y, w, h;
+	unsigned int clear_color;
+	unsigned int clear_depth;
+	unsigned int color_mask;
+	unsigned int depth_mask;
+} drm_mach64_clear_t;
 
 #endif

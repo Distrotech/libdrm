@@ -63,7 +63,7 @@ TDFXHEADERS=    tdfx_drv.h $(DRMHEADERS)
 R128OBJS=	r128_drv.o r128_dma.o r128_bufs.o r128_context.o
 R128HEADERS=	r128_drv.h r128_drm.h $(DRMHEADERS)
 
-MACH64OBJS=	mach64_drv.o mach64_context.o
+MACH64OBJS=	mach64_drv.o mach64_context.o mach64_dma.o mach64_state.o
 MACH64HEADERS=	mach64_drv.h mach64_drm.h $(DRMHEADERS)
 
 INC=		/usr/include

@@ -11,11 +11,11 @@
  * the rights to use, copy, modify, merge, publish, distribute, sublicense,
  * and/or sell copies of the Software, and to permit persons to whom the
  * Software is furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice (including the next
  * paragraph) shall be included in all copies or substantial portions of the
  * Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
@@ -23,7 +23,7 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
- * 
+ *
  * Authors:
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *
@@ -83,6 +83,7 @@ typedef struct drm_clip_rect {
 #include "i810_drm.h"
 #include "r128_drm.h"
 #include "sis_drm.h"
+#include "mach64_drm.h"
 
 typedef struct drm_version {
 	int    version_major;	  /* Major version			    */
@@ -379,5 +380,11 @@ typedef struct drm_agp_info {
 #define SIS_IOCTL_FLIP         DRM_IOW( 0x48, drm_sis_flip_t)
 #define SIS_IOCTL_FLIP_INIT    DRM_IO( 0x49)
 #define SIS_IOCTL_FLIP_FINAL   DRM_IO( 0x50)
+
+/* Mach64 specific ioctls */
+#define DRM_IOCTL_MACH64_INIT	DRM_IOW( 0x40, drm_mach64_init_t)
+#define DRM_IOCTL_MACH64_CLEAR	DRM_IOW( 0x41, drm_mach64_clear_t)
+#define DRM_IOCTL_MACH64_SWAP	DRM_IO(  0x42)
+#define DRM_IOCTL_MACH64_IDLE	DRM_IO(  0x43)
 
 #endif
