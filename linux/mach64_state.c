@@ -77,6 +77,8 @@ static inline int mach64_emit_state( drm_mach64_private_t *dev_priv )
 		DMAOUTREG( MACH64_DP_SRC, regs->dp_src );
 		DMAOUTREG( MACH64_CLR_CMP_CNTL, regs->clr_cmp_cntl );
 		DMAOUTREG( MACH64_GUI_TRAJ_CNTL, regs->gui_traj_cntl );
+		DMAOUTREG( MACH64_SC_LEFT_RIGHT, regs->sc_left_right );
+		DMAOUTREG( MACH64_SC_TOP_BOTTOM, regs->sc_top_bottom );
 		sarea_priv->dirty &= ~MACH64_UPLOAD_MISC;
 	}
 
@@ -122,11 +124,16 @@ static inline int mach64_emit_state( drm_mach64_private_t *dev_priv )
 		sarea_priv->dirty &= ~MACH64_UPLOAD_TEXTURE;
 	}
 
+#if 0
+	/* FIXME: move to emit_cliprects and use hardware scissors for cliprects with
+	 * vertex dispatches? 
+	 */
 	if ( dirty & MACH64_UPLOAD_CLIPRECTS ) {
 		DMAOUTREG( MACH64_SC_LEFT_RIGHT, regs->sc_left_right );
 		DMAOUTREG( MACH64_SC_TOP_BOTTOM, regs->sc_top_bottom );
 		sarea_priv->dirty &= ~MACH64_UPLOAD_CLIPRECTS;
 	}
+#endif
 
 	DMAADVANCE( dev_priv );
 	
@@ -355,6 +362,7 @@ static int mach64_dma_dispatch_swap( drm_device_t *dev )
 
 	}
 
+#if MACH64_USE_FRAME_AGING
 	/* Increment the frame counter.  The client-side 3D driver must
 	 * throttle the framerate by waiting for this value before
 	 * performing the swapbuffer ioctl.
@@ -362,6 +370,7 @@ static int mach64_dma_dispatch_swap( drm_device_t *dev )
 	dev_priv->sarea_priv->last_frame++;
 
 	DMAOUTREG( MACH64_LAST_FRAME_REG, dev_priv->sarea_priv->last_frame );
+#endif
 	DMAADVANCE( dev_priv );
 
 	DMAFLUSH( dev_priv );
@@ -373,26 +382,22 @@ static int mach64_dma_dispatch_vertex( drm_device_t *dev,
 {
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
-	int ret, i = 0;
 	/* Don't need DMALOCALS, since buf is a parameter */
 
 	DRM_DEBUG( "%s: buf=%d nbox=%d\n",
 		   __FUNCTION__, buf->idx, sarea_priv->nbox );
 
 	if ( buf->used ) {
-#if 0
 		if ( sarea_priv->dirty & ~MACH64_UPLOAD_CLIPRECTS ) {
-			mach64_emit_state( dev_priv );
-		}
-#else
-		if ( sarea_priv->dirty ) {
+			int ret = 0;
 			ret = mach64_emit_state( dev_priv );
 			if (ret < 0) return ret;
 		}
-#endif
-
-		do {
+		/* FIXME: deal with cliprects, at least for drawing on the front buffer */
+		/* Mach64 doesn't have hardware cliprects, just one hardware scissor */
 #if 0
+		do {
+			int i = 0;
 			/* Emit the next set of up to three cliprects */
 			if ( i < sarea_priv->nbox ) {
 				mach64_emit_clip_rects( dev_priv,
@@ -401,8 +406,9 @@ static int mach64_dma_dispatch_vertex( drm_device_t *dev,
 #endif
 			/* Add the buffer to the DMA queue */
 			DMAADVANCE( dev_priv );
-
+#if 0
 		} while ( ++i < sarea_priv->nbox );
+#endif
 	}
 
 	sarea_priv->dirty &= ~MACH64_UPLOAD_CLIPRECTS;
@@ -417,7 +423,9 @@ static int mach64_dma_dispatch_blit( drm_device_t *dev,
 {
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_device_dma_t *dma = dev->dma;
+#if 0	
 	drm_mach64_buf_priv_t *buf_priv;
+#endif
 	int dword_shift, dwords;
 	DMALOCALS; /* declares buf=NULL, p, outcount=0 */
 
@@ -447,8 +455,7 @@ static int mach64_dma_dispatch_blit( drm_device_t *dev,
 	 * We don't need DMAGETPTR, since we already have one
 	 */
 	buf = dma->buflist[blit->idx];
-	buf_priv = buf->dev_private;
-
+	
 	if ( buf->pid != current->pid ) {
 		DRM_ERROR( "process %d using buffer owned by %d\n",
 			   current->pid, buf->pid );
@@ -460,6 +467,7 @@ static int mach64_dma_dispatch_blit( drm_device_t *dev,
 		return -EINVAL;
 	}
 #if 0
+	buf_priv = buf->dev_private;
 	buf_priv->discard = 1;
 #endif
 	
@@ -515,6 +523,9 @@ static int mach64_dma_dispatch_blit( drm_device_t *dev,
 	/* Add the buffer to the queue */
 	DMAADVANCE( dev_priv );
 	
+	dev_priv->sarea_priv->dirty |= (MACH64_UPLOAD_CONTEXT |
+					MACH64_UPLOAD_MISC);
+
 	return 0;
 }
 
@@ -553,8 +564,7 @@ int mach64_dma_clear( struct inode *inode, struct file *filp,
 	/* Make sure we restore the 3D state next time.
 	 */
 	sarea_priv->dirty |= (MACH64_UPLOAD_CONTEXT |
-			      MACH64_UPLOAD_MISC |
-			      MACH64_UPLOAD_CLIPRECTS);
+			      MACH64_UPLOAD_MISC);
 	return ret;
 }
 
@@ -582,8 +592,7 @@ int mach64_dma_swap( struct inode *inode, struct file *filp,
 	/* Make sure we restore the 3D state next time.
 	 */
 	sarea_priv->dirty |= (MACH64_UPLOAD_CONTEXT |
-			      MACH64_UPLOAD_MISC | 
-			      MACH64_UPLOAD_CLIPRECTS);
+			      MACH64_UPLOAD_MISC);
 	return ret;
 }
 
@@ -595,7 +604,9 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_t *buf;
+#if 0
 	drm_mach64_buf_priv_t *buf_priv;
+#endif
 	drm_mach64_vertex_t vertex;
 
 	LOCK_TEST_WITH_RETURN( dev );
@@ -657,7 +668,6 @@ int mach64_dma_blit( struct inode *inode, struct file *filp,
 	drm_device_dma_t *dma = dev->dma;
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_mach64_blit_t blit;
-	int ret;
 
 	LOCK_TEST_WITH_RETURN( dev );
 
@@ -676,13 +686,7 @@ int mach64_dma_blit( struct inode *inode, struct file *filp,
 
 	VB_AGE_TEST_WITH_RETURN( dev_priv );
 	QUEUE_SPACE_TEST_WITH_RETURN( dev_priv );
-	
-	ret = mach64_dma_dispatch_blit( dev, &blit );
 
-	dev_priv->sarea_priv->dirty |= (MACH64_UPLOAD_CONTEXT |
-					MACH64_UPLOAD_MISC |
-					MACH64_UPLOAD_CLIPRECTS);
-
-	return ret;
+	return mach64_dma_dispatch_blit( dev, &blit );
 
 }

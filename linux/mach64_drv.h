@@ -33,11 +33,23 @@
 #define __MACH64_DRV_H__
 
 #include <linux/list.h>
+#include <linux/delay.h>
+
+/* Development driver options - FIXME: remove these when not needed */
+
+#define MACH64_USE_BUFFER_AGING   0
+#define MACH64_USE_FRAME_AGING    0
+#define MACH64_DEFAULT_MODE       MACH64_MODE_DMA_ASYNC
+
 
 typedef struct drm_mach64_freelist {
 	struct list_head  list;			/* Linux LIST structure... */
    	drm_buf_t *buf;
+#if MACH64_USE_BUFFER_AGING
 	unsigned int age;
+#else
+	u32 descr_addr;     /* physical address of last descriptor for this buffer */
+#endif
 } drm_mach64_freelist_t;
 
 typedef struct drm_mach64_private {
@@ -107,8 +119,9 @@ extern int mach64_engine_reset( struct inode *inode, struct file *filp,
 				unsigned int cmd, unsigned long arg );
 extern int mach64_dma_buffers( struct inode *inode, struct file *filp,
 			       unsigned int cmd, unsigned long arg );
-
+#ifdef MACH64_USE_BUFFER_AGING
 extern void mach64_freelist_reset( drm_mach64_private_t *dev_priv );
+#endif
 extern drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv );
 
 extern int mach64_do_wait_for_fifo( drm_mach64_private_t *dev_priv,
@@ -451,6 +464,8 @@ do {											 \
 __queue_space_done:									 \
 } while (0)
 
+#if MACH64_USE_BUFFER_AGING
+
 #define VB_AGE_TEST_WITH_RETURN( dev_priv )				\
 do {									\
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;		\
@@ -462,6 +477,11 @@ do {									\
 	}								\
 } while (0)
 
+#else
+
+#define VB_AGE_TEST_WITH_RETURN( dev_priv )
+
+#endif
 
 /* ================================================================
  * DMA macros
@@ -482,15 +502,40 @@ do {									\
 
 #define mach64_flush_write_combine()	mb()
 
+/* update our snapshot of the hardware's current position */
 #define GET_RING_HEAD( dev_priv )							   \
 do {											   \
 	dev_priv->table_start = (MACH64_READ(MACH64_BM_GUI_TABLE) & 0xfffffff0);	   \
 	/* BM_GUI_TABLE points to the next descriptor to be processed (pre-incremented) */ \
 	if (dev_priv->table_start == dev_priv->table_addr)				   \
-		dev_priv->table_start +=  (dev_priv->table_size - sizeof(u32));		   \
+		dev_priv->table_start += (dev_priv->table_size - (sizeof(u32)*4));	   \
 	else										   \
-		dev_priv->table_start -= sizeof(u32);					   \
+		dev_priv->table_start -= (sizeof(u32)*4);				   \
 } while (0)
+
+static inline int mach64_wait_ring( drm_mach64_private_t *dev_priv, u32 addr ) {
+	int t = 0;
+	while (1) {
+		GET_RING_HEAD( dev_priv );
+		if (addr != dev_priv->table_start || t > dev_priv->usec_timeout) {
+			break;
+		} else if (dev_priv->table_start == dev_priv->table_end) {
+			/* If we're waiting for the last descriptor, need to check for idle */
+			if (!(MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE))
+				break;
+		}
+		udelay( 1 );
+		t++;
+	}
+#if MACH64_VERBOSE
+	if (t > 0)
+		DRM_DEBUG("wait ring: %d usec\n", t);
+#endif
+	if (t == dev_priv->usec_timeout)
+		return -EBUSY;
+	else
+		return 0;
+}
 
 #define DMALOCALS  drm_buf_t *buf = NULL; u32 *p; int outcount = 0
 
