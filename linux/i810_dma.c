@@ -208,9 +208,10 @@ static int i810_dma_cleanup(drm_device_t *dev)
 
 static int __gettimeinmillis(void)
 {
-   struct timeval timep;   
-   get_fast_time(&timep);
-   return(timep.tv_sec * 1000) + (timep.tv_usec / 1000);
+   int millis;
+   
+   millis = ((jiffies / HZ) * 1000) + ((jiffies % HZ) * (1000 / HZ));
+   return millis;
 }
 
 static int i810_wait_ring(drm_device_t *dev, int n, int timeout_millis)
