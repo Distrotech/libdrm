@@ -1141,7 +1141,7 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 #endif /* __linux__ */
 #ifdef __FreeBSD__
 	vm_offset_t virtual, address;
-#ifdef __FreeBSD_version >= 500000
+#if __FreeBSD_version >= 500000
 	struct vmspace *vms = p->td_proc->p_vmspace;
 #else
 	struct vmspace *vms = p->p_vmspace;
