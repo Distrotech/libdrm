@@ -74,7 +74,7 @@ struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
 	if(!dev->agp || !dev->agp->cant_use_aperture) goto vm_nopage_error;
 
 	list_for_each(list, &dev->maplist->head) {
-		r_list = (drm_map_list_t *)list;
+		r_list = list_entry(list, drm_map_list_t, head);
 		map = r_list->map;
 		if (!map) continue;
 		if (map->offset == VM_OFFSET(vma)) break;
@@ -147,7 +147,7 @@ struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 }
 
 /* Special close routine which deletes map information if we are the last
- * person to close a mapping and its not in the global maplist.
+ * person to close a mapping and it's not in the global maplist.
  */
 
 void DRM(vm_shm_close)(struct vm_area_struct *vma)
@@ -190,7 +190,7 @@ void DRM(vm_shm_close)(struct vm_area_struct *vma)
 		found_maps = 0;
 		list = &dev->maplist->head;
 		list_for_each(list, &dev->maplist->head) {
-			r_list = (drm_map_list_t *) list;
+			r_list = list_entry(list, drm_map_list_t, head);
 			if (r_list->map == map) found_maps++;
 		}
 
@@ -393,7 +393,7 @@ int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 	list_for_each(list, &dev->maplist->head) {
 		unsigned long off;
 
-		r_list = (drm_map_list_t *)list;
+		r_list = list_entry(list, drm_map_list_t, head);
 		map = r_list->map;
 		if (!map) continue;
 		off = DRIVER_GET_MAP_OFS();

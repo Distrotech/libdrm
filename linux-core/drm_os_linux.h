@@ -46,18 +46,17 @@
 #define DRM_MALLOC(x) kmalloc(x, GFP_KERNEL)
 #define DRM_FREE(x,size) kfree(x)
 
-#define DRM_GETSAREA()							 \
-do { 									 \
-	struct list_head *list;						 \
-	list_for_each( list, &dev->maplist->head ) {			 \
-		drm_map_list_t *entry = (drm_map_list_t *)list;		 \
-		if ( entry->map &&					 \
-		     entry->map->type == _DRM_SHM &&			 \
-		     (entry->map->flags & _DRM_CONTAINS_LOCK) ) {	 \
-			dev_priv->sarea = entry->map;			 \
- 			break;						 \
- 		}							 \
- 	}								 \
+#define DRM_GETSAREA()							\
+do {									\
+	drm_map_list_t *entry;						\
+	list_for_each_entry( entry, &dev->maplist->head, head ) {	\
+		if ( entry->map &&					\
+		     entry->map->type == _DRM_SHM &&			\
+		     (entry->map->flags & _DRM_CONTAINS_LOCK) ) {	\
+			dev_priv->sarea = entry->map;			\
+ 			break;						\
+ 		}							\
+ 	}								\
 } while (0)
 
 #define DRM_HZ HZ
