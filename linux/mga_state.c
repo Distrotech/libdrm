@@ -47,12 +47,12 @@ static void mgaEmitClipRect( drm_mga_private_t *dev_priv, xf86drmClipRectRec *bo
 	PRIMGETPTR( dev_priv );
    
    	/* Force reset of dwgctl (eliminates clip disable) */
-	PRIMOUTREG( MGAREG_DMAPAD, 0 );
+   	PRIMOUTREG( MGAREG_DMAPAD, 0 );
 	PRIMOUTREG( MGAREG_DWGSYNC, dev_priv->last_sync_tag - 1 );
-	PRIMOUTREG( MGAREG_DMAPAD, dev_priv->last_sync_tag - 1 );
+	PRIMOUTREG( MGAREG_DWGSYNC, dev_priv->last_sync_tag - 1 );
    	PRIMOUTREG( MGAREG_DWGCTL, regs[MGA_CTXREG_DWGCTL] );
 
-	PRIMOUTREG( MGAREG_DMAPAD, 0 );
+   	PRIMOUTREG( MGAREG_DMAPAD, 0 );
 	PRIMOUTREG( MGAREG_CXBNDRY, ((box->x2)<<16)|(box->x1) );
 	PRIMOUTREG( MGAREG_YTOP, box->y1 * dev_priv->stride/2 );
 	PRIMOUTREG( MGAREG_YBOT, box->y2 * dev_priv->stride/2 );
@@ -83,8 +83,13 @@ static void mgaEmitContext(drm_mga_private_t *dev_priv )
 		PRIMOUTREG( MGAREG_WFLAG1, regs[MGA_CTXREG_WFLAG] );
 		PRIMOUTREG( MGAREG_TDUALSTAGE0, regs[MGA_CTXREG_TDUAL0] );
 		PRIMOUTREG( MGAREG_TDUALSTAGE1, regs[MGA_CTXREG_TDUAL1] );      
-		PRIMOUTREG( MGAREG_DMAPAD, 0 );
-	}   
+		PRIMOUTREG( MGAREG_FCOL, regs[MGA_CTXREG_FCOL] );
+	} else {
+	   	PRIMOUTREG( MGAREG_FCOL, regs[MGA_CTXREG_FCOL] );
+	   	PRIMOUTREG( MGAREG_DMAPAD, 0);
+	   	PRIMOUTREG( MGAREG_DMAPAD, 0);
+	   	PRIMOUTREG( MGAREG_DMAPAD, 0);
+	}
    
 	PRIMADVANCE( dev_priv );
 }
@@ -437,7 +442,7 @@ static inline void mga_dma_dispatch_tex_blit( drm_device_t *dev,
 					      unsigned int destOrg )
 {
    	drm_mga_private_t *dev_priv = dev->dev_private;
-   	int use_agp = PDEA_pagpxfer_enable;
+   	int use_agp = PDEA_pagpxfer_enable | 0x00000001;
    	u16 y2;
     	PRIMLOCALS;
     
@@ -451,7 +456,8 @@ static inline void mga_dma_dispatch_tex_blit( drm_device_t *dev,
 
 	PRIMOUTREG( MGAREG_DSTORG, destOrg);
 	PRIMOUTREG( MGAREG_MACCESS, 0x00000002);
-	PRIMOUTREG( MGAREG_SRCORG, bus_address | use_agp);
+   	DRM_DEBUG("srcorg : %lx\n", bus_address | use_agp);
+	PRIMOUTREG( MGAREG_SRCORG, (u32) bus_address | use_agp);
 	PRIMOUTREG( MGAREG_AR5, 64);  
 
 	PRIMOUTREG( MGAREG_PITCH, 64);
@@ -586,12 +592,12 @@ static inline void mga_dma_dispatch_clear( drm_device_t *dev, int flags,
 	else
 		cmd = MGA_CLEAR_CMD | DC_atype_rstr;
    
-   	primary_needed = nbox * 60;
-   	if(primary_needed == 0) primary_needed = 60;
+   	primary_needed = nbox * 70;
+   	if(primary_needed == 0) primary_needed = 70;
 	PRIM_OVERFLOW(dev, dev_priv, primary_needed);
 	PRIMGETPTR( dev_priv );
       	dev_priv->last_sync_tag = mga_create_sync_tag(dev);
-
+   
 	for (i = 0 ; i < nbox ; i++) {
 		unsigned int height = pbox[i].y2 - pbox[i].y1;
 
@@ -642,9 +648,9 @@ static inline void mga_dma_dispatch_clear( drm_device_t *dev, int flags,
 	/* Force reset of DWGCTL */
    	PRIMOUTREG( MGAREG_DMAPAD, 0);   
 	PRIMOUTREG( MGAREG_DMAPAD, 0);   
- 	PRIMOUTREG( MGAREG_DMAPAD, 0);
+      	PRIMOUTREG( MGAREG_DMAPAD, 0);
       	PRIMOUTREG( MGAREG_DWGCTL, regs[MGA_CTXREG_DWGCTL] );
-   
+
 	PRIMOUTREG( MGAREG_DMAPAD, 0);
 	PRIMOUTREG( MGAREG_DMAPAD, 0);
       	PRIMOUTREG( MGAREG_DMAPAD, 0);
@@ -693,13 +699,13 @@ static inline void mga_dma_dispatch_swap( drm_device_t *dev )
 		PRIMOUTREG(MGAREG_FXBNDRY, pbox[i].x1|((pbox[i].x2 - 1)<<16));
 		PRIMOUTREG(MGAREG_YDSTLEN+MGAREG_MGA_EXEC, (pbox[i].y1<<16)|h);
 	}
-   
+
    	/* Force reset of DWGCTL */
    	PRIMOUTREG( MGAREG_DMAPAD, 0);
       	PRIMOUTREG( MGAREG_DMAPAD, 0);
    	PRIMOUTREG( MGAREG_DMAPAD, 0);
       	PRIMOUTREG( MGAREG_DWGCTL, regs[MGA_CTXREG_DWGCTL] );
-  
+
 	PRIMOUTREG( MGAREG_SRCORG, 0);
 	PRIMOUTREG( MGAREG_DMAPAD, 0);
       	PRIMOUTREG( MGAREG_DMAPAD, 0);
@@ -777,23 +783,26 @@ int mga_iload(struct inode *inode, struct file *filp,
  	drm_mga_iload_t iload;
 	unsigned long bus_address;
    
+   	DRM_DEBUG("Starting Iload\n");
  	copy_from_user_ret(&iload, (drm_mga_iload_t *)arg, sizeof(iload),
  			   -EFAULT);
 
    	buf = dma->buflist[ iload.idx ];
 	buf_priv = buf->dev_private;
    	bus_address = buf->bus_address;
+   	DRM_DEBUG("bus_address %lx, length %d, destorg : %x\n",
+	       bus_address, iload.length, iload.destOrg);
    
 	if(mgaVerifyIload(dev_priv, 
-			  iload.destOrg, 
-			  bus_address, 
+			  bus_address,
+			  iload.destOrg,  
 			  iload.length)) {
 	      	mga_freelist_put(dev, buf);
 	   	return -EINVAL;
 	}
     
    	sarea_priv->dirty |= MGA_UPLOAD_CTX;
-    
+
    	mga_dma_dispatch_tex_blit(dev, bus_address, iload.length, 
 				  iload.destOrg);
    	buf_priv->my_freelist->age = dev_priv->last_sync_tag;

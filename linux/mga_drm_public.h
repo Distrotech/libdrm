@@ -118,7 +118,8 @@ typedef struct _xf86drmClipRectRec {
 #define MGA_CTXREG_WFLAG     6
 #define MGA_CTXREG_TDUAL0    7
 #define MGA_CTXREG_TDUAL1    8
-#define MGA_CTX_SETUP_SIZE   9
+#define MGA_CTXREG_FCOL      9
+#define MGA_CTX_SETUP_SIZE   10
 
 /* 2d state
  */
