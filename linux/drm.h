@@ -423,4 +423,8 @@ typedef struct drm_scatter_gather {
 #define DRM_IOCTL_SG_ALLOC		DRM_IOW( 0x38, drm_scatter_gather_t)
 #define DRM_IOCTL_SG_FREE		DRM_IOW( 0x39, drm_scatter_gather_t)
 
+/* Device specfic ioctls should only be in their respective headers
+ * The device specific ioctl range is 0x40 to 0x79.                  */
+#define DRM_COMMAND_BASE                0x40
+
 #endif
