@@ -35,7 +35,7 @@
 
 #define DRIVER_NAME		"mach64"
 #define DRIVER_DESC		"DRM module for the ATI Rage Pro"
-#define DRIVER_DATE		"20001207"
+#define DRIVER_DATE		"20001213"
 
 #define DRIVER_MAJOR		1
 #define DRIVER_MINOR		0

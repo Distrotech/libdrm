@@ -115,11 +115,11 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 	dev_priv->depth_offset		= init->depth_offset;
 	dev_priv->depth_pitch		= init->depth_pitch;
 
-	dev_priv->front_offset_pitch = (((dev_priv->front_pitch/8) << 21) |
+	dev_priv->front_offset_pitch = (((dev_priv->front_pitch/8) << 22) |
 					(dev_priv->front_offset >> 3));
-	dev_priv->back_offset_pitch = (((dev_priv->back_pitch/8) << 21) |
+	dev_priv->back_offset_pitch = (((dev_priv->back_pitch/8) << 22) |
 				       (dev_priv->back_offset >> 3));
-	dev_priv->depth_offset_pitch = (((dev_priv->depth_pitch/8) << 21) |
+	dev_priv->depth_offset_pitch = (((dev_priv->depth_pitch/8) << 22) |
 					(dev_priv->depth_offset >> 3));
 
 	dev_priv->usec_timeout		= 1000000;

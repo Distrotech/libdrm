@@ -127,8 +127,6 @@ typedef struct drm_mach64_clear {
 	int x, y, w, h;
 	unsigned int clear_color;
 	unsigned int clear_depth;
-	unsigned int color_mask;
-	unsigned int depth_mask;
 } drm_mach64_clear_t;
 
 #endif

@@ -56,9 +56,7 @@ static void mach64_dma_dispatch_clear( drm_device_t *dev,
 				       unsigned int flags,
 				       int cx, int cy, int cw, int ch,
 				       unsigned int clear_color,
-				       unsigned int clear_depth,
-				       unsigned int color_mask,
-				       unsigned int depth_mask )
+				       unsigned int clear_depth )
 {
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
@@ -67,24 +65,23 @@ static void mach64_dma_dispatch_clear( drm_device_t *dev,
 	u32 fb_bpp, depth_bpp;
 	int i;
 	DMALOCALS;
-	DRM_INFO( "%s\n", __FUNCTION__ );
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
 	switch ( dev_priv->fb_bpp ) {
 	case 16:
 		fb_bpp = MACH64_DATATYPE_RGB565;
 		break;
 	case 32:
-	default:
 		fb_bpp = MACH64_DATATYPE_ARGB8888;
 		break;
+	default:
+		return;
 	}
 	switch ( dev_priv->depth_bpp ) {
 	case 16:
 		depth_bpp = MACH64_DATATYPE_RGB565;
 		break;
 	case 24:
-		depth_bpp = MACH64_DATATYPE_ARGB8888;
-		break;
 	case 32:
 		depth_bpp = MACH64_DATATYPE_ARGB8888;
 		break;
@@ -98,9 +95,9 @@ static void mach64_dma_dispatch_clear( drm_device_t *dev,
 		int w = pbox[i].x2 - x;
 		int h = pbox[i].y2 - y;
 
-		DRM_INFO( "dispatch clear %d,%d-%d,%d flags 0x%x\n",
-			  pbox[i].x1, pbox[i].y1,
-			  pbox[i].x2, pbox[i].y2, flags );
+		DRM_DEBUG( "dispatch clear %d,%d-%d,%d flags 0x%x\n",
+			   pbox[i].x1, pbox[i].y1,
+			   pbox[i].x2, pbox[i].y2, flags );
 
 		if ( flags & (MACH64_FRONT | MACH64_BACK) ) {
 			/* Setup for color buffer clears
@@ -122,7 +119,8 @@ static void mach64_dma_dispatch_clear( drm_device_t *dev,
 							 (fb_bpp << 28)) );
 
 			DMAOUTREG( MACH64_DP_FRGD_CLR, clear_color );
-			DMAOUTREG( MACH64_DP_WRITE_MASK, color_mask );
+			/* FIXME: Use color mask from state info */
+			DMAOUTREG( MACH64_DP_WRITE_MASK, 0xffffffff );
 			DMAOUTREG( MACH64_DP_MIX, (MACH64_BKGD_MIX_D |
 						   MACH64_FRGD_MIX_S) );
 			DMAOUTREG( MACH64_DP_SRC, (MACH64_BKGD_SRC_FRGD_CLR |
@@ -179,7 +177,7 @@ static void mach64_dma_dispatch_clear( drm_device_t *dev,
 							 (depth_bpp << 28)) );
 
 			DMAOUTREG( MACH64_DP_FRGD_CLR, clear_depth );
-			DMAOUTREG( MACH64_DP_WRITE_MASK, depth_mask );
+			DMAOUTREG( MACH64_DP_WRITE_MASK, 0xffffffff );
 			DMAOUTREG( MACH64_DP_MIX, (MACH64_BKGD_MIX_D |
 						   MACH64_FRGD_MIX_S) );
 			DMAOUTREG( MACH64_DP_SRC, (MACH64_BKGD_SRC_FRGD_CLR |
@@ -207,7 +205,7 @@ static void mach64_dma_dispatch_swap( drm_device_t *dev )
 	u32 fb_bpp;
 	int i;
 	DMALOCALS;
-	DRM_INFO( "%s\n", __FUNCTION__ );
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
 	switch ( dev_priv->fb_bpp ) {
 	case 16:
@@ -252,7 +250,7 @@ static void mach64_dma_dispatch_swap( drm_device_t *dev )
 		int w = pbox[i].x2 - x;
 		int h = pbox[i].y2 - y;
 
-		DRM_INFO( "dispatch swap %d,%d-%d,%d\n",
+		DRM_DEBUG( "dispatch swap %d,%d-%d,%d\n",
 			  pbox[i].x1, pbox[i].y1,
 			  pbox[i].x2, pbox[i].y2 );
 
@@ -295,7 +293,7 @@ int mach64_dma_clear( struct inode *inode, struct file *filp,
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	drm_mach64_clear_t clear;
-	DRM_INFO( "%s\n", __FUNCTION__ );
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
 	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||
 	     dev->lock.pid != current->pid ) {
@@ -312,8 +310,7 @@ int mach64_dma_clear( struct inode *inode, struct file *filp,
 
 	mach64_dma_dispatch_clear( dev, clear.flags,
 				   clear.x, clear.y, clear.w, clear.h,
-				   clear.clear_color, clear.clear_depth,
-				   clear.color_mask, clear.depth_mask );
+				   clear.clear_color, clear.clear_depth );
 
 #if 0
 	/* Make sure we restore the 3D state next time.

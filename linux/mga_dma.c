@@ -534,7 +534,7 @@ int mga_dma_schedule(drm_device_t *dev, int locked)
 	int               retval    = 0;
 
    	if (!dev_priv) return -EBUSY;
-	
+
 	if (test_and_set_bit(0, &dev->dma_flag)) {
 		retval = -EBUSY;
 		goto sch_out_wakeup;
@@ -889,7 +889,7 @@ static int mga_flush_queue(drm_device_t *dev)
 
    	if(dev_priv->next_prim->num_dwords != 0) {
    		add_wait_queue(&dev_priv->flush_queue, &entry);
-		if (test_bit(MGA_IN_FLUSH, &dev_priv->dispatch_status)) 
+		if (test_bit(MGA_IN_FLUSH, &dev_priv->dispatch_status))
 			DRM_ERROR("Incorrect mga_flush_queue logic\n");
 		set_bit(MGA_IN_FLUSH, &dev_priv->dispatch_status);
 		mga_dma_schedule(dev, 0);
@@ -924,7 +924,7 @@ void mga_reclaim_buffers(drm_device_t *dev, pid_t pid)
 	if(dma->buflist == NULL) return;
 
 	DRM_DEBUG("buf_count=%d\n", dma->buf_count);
-	
+
         mga_flush_queue(dev);
 
 	for (i = 0; i < dma->buf_count; i++) {
@@ -941,6 +941,7 @@ void mga_reclaim_buffers(drm_device_t *dev, pid_t pid)
 	}
 }
 
+#if 0
 int mga_lock(struct inode *inode, struct file *filp, unsigned int cmd,
 	       unsigned long arg)
 {
@@ -1014,6 +1015,7 @@ int mga_lock(struct inode *inode, struct file *filp, unsigned int cmd,
 			   ret ? "interrupted" : "has lock");
 	return ret;
 }
+#endif
 
 int mga_flush_ioctl(struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long arg)
