@@ -281,6 +281,9 @@ do {									\
 #define DRM_OS_COPYFROMUSR(arg1, arg2, arg3) \
 	copy_from_user(arg1, arg2, arg3)
 
+#define DRM_OS_READMEMORYBARRIER mb()
+#define DRM_OS_WRITEMEMORYBARRIER wmb()
+
 /* Internal functions */
 
 /* drm_drv.h */

@@ -33,8 +33,10 @@
 #include "drmP.h"
 #include "radeon_drv.h"
 
+#ifdef __linux__
 #include <linux/interrupt.h>	/* For task queue support */
 #include <linux/delay.h>
+#endif
 
 #define RADEON_FIFO_DEBUG	0
 
@@ -356,7 +358,7 @@ static int radeon_do_pixcache_flush( drm_radeon_private_t *dev_priv )
 		       & RADEON_RB2D_DC_BUSY) ) {
 			return 0;
 		}
-		udelay( 1 );
+		DRM_OS_DELAY( 1 );
 	}
 
 #if RADEON_FIFO_DEBUG
@@ -375,7 +377,7 @@ static int radeon_do_wait_for_fifo( drm_radeon_private_t *dev_priv,
 		int slots = ( RADEON_READ( RADEON_RBBM_STATUS )
 			      & RADEON_RBBM_FIFOCNT_MASK );
 		if ( slots >= entries ) return 0;
-		udelay( 1 );
+		DRM_OS_DELAY( 1 );
 	}
 
 #if RADEON_FIFO_DEBUG
@@ -398,7 +400,7 @@ static int radeon_do_wait_for_idle( drm_radeon_private_t *dev_priv )
 			radeon_do_pixcache_flush( dev_priv );
 			return 0;
 		}
-		udelay( 1 );
+		DRM_OS_DELAY( 1 );
 	}
 
 #if RADEON_FIFO_DEBUG

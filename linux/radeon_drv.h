@@ -126,29 +126,21 @@ typedef struct drm_radeon_buf_priv {
 } drm_radeon_buf_priv_t;
 
 				/* radeon_cp.c */
-extern int radeon_cp_init( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int radeon_cp_start( struct inode *inode, struct file *filp,
-			    unsigned int cmd, unsigned long arg );
-extern int radeon_cp_stop( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int radeon_cp_reset( struct inode *inode, struct file *filp,
-			    unsigned int cmd, unsigned long arg );
-extern int radeon_cp_idle( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int radeon_engine_reset( struct inode *inode, struct file *filp,
-				unsigned int cmd, unsigned long arg );
-extern int radeon_fullscreen( struct inode *inode, struct file *filp,
-			      unsigned int cmd, unsigned long arg );
-extern int radeon_cp_buffers( struct inode *inode, struct file *filp,
-			      unsigned int cmd, unsigned long arg );
+extern int radeon_cp_init( DRM_OS_IOCTL );
+extern int radeon_cp_start( DRM_OS_IOCTL );
+extern int radeon_cp_stop( DRM_OS_IOCTL );
+extern int radeon_cp_reset( DRM_OS_IOCTL );
+extern int radeon_cp_idle( DRM_OS_IOCTL );
+extern int radeon_engine_reset( DRM_OS_IOCTL );
+extern int radeon_fullscreen( DRM_OS_IOCTL );
+extern int radeon_cp_buffers( DRM_OS_IOCTL );
 
 extern void radeon_freelist_reset( drm_device_t *dev );
 extern drm_buf_t *radeon_freelist_get( drm_device_t *dev );
 
 extern int radeon_wait_ring( drm_radeon_private_t *dev_priv, int n );
 
-static inline void
+static __inline__ void
 radeon_update_ring_snapshot( drm_radeon_ring_buffer_t *ring )
 {
 	ring->space = (*(volatile int *)ring->head - ring->tail) * sizeof(u32);
@@ -161,21 +153,13 @@ extern int radeon_do_cleanup_cp( drm_device_t *dev );
 extern int radeon_do_cleanup_pageflip( drm_device_t *dev );
 
 				/* radeon_state.c */
-extern int radeon_cp_clear( struct inode *inode, struct file *filp,
-			    unsigned int cmd, unsigned long arg );
-extern int radeon_cp_swap( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int radeon_cp_vertex( struct inode *inode, struct file *filp,
-			     unsigned int cmd, unsigned long arg );
-extern int radeon_cp_indices( struct inode *inode, struct file *filp,
-			      unsigned int cmd, unsigned long arg );
-extern int radeon_cp_texture( struct inode *inode, struct file *filp,
-			      unsigned int cmd, unsigned long arg );
-extern int radeon_cp_stipple( struct inode *inode, struct file *filp,
-			      unsigned int cmd, unsigned long arg );
-extern int radeon_cp_indirect( struct inode *inode, struct file *filp,
-			       unsigned int cmd, unsigned long arg );
-
+extern int radeon_cp_clear( DRM_OS_IOCTL );
+extern int radeon_cp_swap( DRM_OS_IOCTL );
+extern int radeon_cp_vertex( DRM_OS_IOCTL );
+extern int radeon_cp_indices( DRM_OS_IOCTL );
+extern int radeon_cp_texture( DRM_OS_IOCTL );
+extern int radeon_cp_stipple( DRM_OS_IOCTL );
+extern int radeon_cp_indirect( DRM_OS_IOCTL );
 
 /* Register definitions, register access macros and drmAddMap constants
  * for Radeon kernel driver.
@@ -530,12 +514,12 @@ extern int radeon_cp_indirect( struct inode *inode, struct file *filp,
 #define RADEON_READ(reg)	(_RADEON_READ((u32 *)RADEON_ADDR( reg )))
 static inline u32 _RADEON_READ(u32 *addr)
 {
-	mb();
+	DRM_OS_READMEMORYBARRIER;
 	return *(volatile u32 *)addr;
 }
 #define RADEON_WRITE(reg,val)						\
 do {									\
-	wmb();								\
+	DRM_OS_WRITEMEMORYBARRIER;					\
 	RADEON_DEREF(reg) = val;					\
 } while (0)
 #else
@@ -548,12 +532,12 @@ do {									\
 #define RADEON_READ8(reg)	_RADEON_READ8((u8 *)RADEON_ADDR( reg ))
 static inline u8 _RADEON_READ8(u8 *addr)
 {
-	mb();
+	DRM_OS_READMEMORYBARRIER;
 	return *(volatile u8 *)addr;
 }
 #define RADEON_WRITE8(reg,val)						\
 do {									\
-	wmb();								\
+	DRM_OS_WRITEMEMORYBARRIER;					\
 	RADEON_DEREF8( reg ) = val;					\
 } while (0)
 #else
@@ -693,7 +677,7 @@ do {									\
  * Ring control
  */
 
-#define radeon_flush_write_combine()	mb()
+#define radeon_flush_write_combine()	DRM_OS_READMEMORYBARRIER
 
 
 #define RADEON_VERBOSE	0

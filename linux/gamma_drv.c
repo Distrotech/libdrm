@@ -32,6 +32,12 @@
 #ifdef __linux__
 #include <linux/config.h>
 #endif
+#ifdef __FreeBSD__
+#include <sys/types.h>
+#include <sys/bus.h>
+#include <pci/pcivar.h>
+#include <opt_drm_linux.h>
+#endif
 #include "gamma.h"
 #include "drmP.h"
 #include "gamma_drv.h"
@@ -48,6 +54,26 @@
 
 #define DRIVER_IOCTLS							  \
 	[DRM_IOCTL_NR(DRM_IOCTL_DMA)]	     = { gamma_dma,	  1, 0 }
+
+#ifdef __FreeBSD__
+static int gamma_probe(device_t dev)
+{
+	const char *s = 0;
+
+	switch (pci_get_devid(dev)) {
+	case 0x00083d3d:
+		s = "3DLabs Gamma";
+		break;
+	}
+
+	if (s) {
+		device_set_desc(dev, s);
+		return 0;
+	}
+
+	return ENXIO;
+}
+#endif
 
 
 #define __HAVE_COUNTERS		5
@@ -79,4 +105,8 @@
 #endif
 #ifdef __FreeBSD__
 #include "drm_sysctl.h"
+#endif
+
+#ifdef __FreeBSD__
+DRIVER_MODULE(gamma, pci, gamma_driver, gamma_devclass, 0, 0);
 #endif

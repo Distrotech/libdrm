@@ -514,13 +514,13 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 	if ( !irq )
 		DRM_OS_RETURN(EINVAL);
 
-	down( &dev->struct_sem );
+	DRM_OS_LOCK;
 	if ( dev->irq ) {
-		up( &dev->struct_sem );
+		DRM_OS_UNLOCK;
 		DRM_OS_RETURN(EBUSY);
 	}
 	dev->irq = irq;
-	up( &dev->struct_sem );
+	DRM_OS_UNLOCK;
 
 	DRM_DEBUG( "%s: irq=%d\n", __FUNCTION__, irq );
 
@@ -546,9 +546,9 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 	ret = request_irq( dev->irq, DRM(dma_service),
 			   0, dev->devname, dev );
 	if ( ret < 0 ) {
-		down( &dev->struct_sem );
+		DRM_OS_LOCK;
 		dev->irq = 0;
-		up( &dev->struct_sem );
+		DRM_OS_UNLOCK;
 		return ret;
 	}
 
@@ -562,10 +562,10 @@ int DRM(irq_uninstall)( drm_device_t *dev )
 {
 	int irq;
 
-	down( &dev->struct_sem );
+	DRM_OS_LOCK;
 	irq = dev->irq;
 	dev->irq = 0;
-	up( &dev->struct_sem );
+	DRM_OS_UNLOCK;
 
 	if ( !irq )
 		DRM_OS_RETURN(EINVAL);
@@ -579,8 +579,7 @@ int DRM(irq_uninstall)( drm_device_t *dev )
 	return 0;
 }
 
-int DRM(control)( struct inode *inode, struct file *filp,
-		  unsigned int cmd, unsigned long arg )
+int DRM(control)( DRM_OS_IOCTL )
 {
 	drm_file_t *priv = filp->private_data;
 	drm_device_t *dev = priv->dev;

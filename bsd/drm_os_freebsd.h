@@ -76,6 +76,18 @@ do {								\
 #define DRM_OS_COPYFROMUSR(arg1, arg2, arg3) \
 	copyin(arg2, arg1, arg3)
 
+#define DRM_OS_READMEMORYBARRIER \
+{												\
+   	int xchangeDummy;									\
+	DRM_DEBUG("%s\n", __FUNCTION__);							\
+   	__asm__ volatile(" push %%eax ; xchg %%eax, %0 ; pop %%eax" : : "m" (xchangeDummy));	\
+   	__asm__ volatile(" push %%eax ; push %%ebx ; push %%ecx ; push %%edx ;"			\
+			 " movl $0,%%eax ; cpuid ; pop %%edx ; pop %%ecx ; pop %%ebx ;"		\
+			 " pop %%eax" : /* no outputs */ :  /* no inputs */ );			\
+} while (0);
+
+#define DRM_OS_WRITEMEMORYBARRIER DRM_OS_READMEMORYBARRIER
+
 #define PAGE_ALIGN(addr) (((addr)+PAGE_SIZE-1)&PAGE_MASK)
 
 typedef unsigned long atomic_t;
