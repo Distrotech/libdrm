@@ -1225,6 +1225,7 @@ int i810_copybuf( DRM_OS_IOCTL )
 	buf = dma->buflist[ d.idx ];
    	buf_priv = buf->dev_private;
 	if (buf_priv->currently_mapped != I810_BUF_MAPPED) return -EPERM;
+	if(d.used < 0 || d.used > buf->total) DRM_OS_RETURN(EINVAL);
 
    	if (DRM_OS_COPYFROMUSR(buf_priv->virtual, d.address, d.used))
 		DRM_OS_RETURN( EFAULT );

@@ -429,6 +429,12 @@ int DRM(addbufs_agp)( DRM_OS_IOCTL )
 		DRM_OS_RETURN(ENOMEM); /* May only call once for each order */
 	}
 
+	if (count < 0 || count > 4096) {
+		up( &dev->struct_sem );
+		atomic_dec( &dev->buf_alloc );
+		return -EINVAL;
+	}
+
 	entry->buflist = DRM(alloc)( count * sizeof(*entry->buflist),
 				    DRM_MEM_BUFS );
 	if ( !entry->buflist ) {
@@ -581,6 +587,12 @@ int DRM(addbufs_pci)( DRM_OS_IOCTL )
 		DRM_OS_RETURN(ENOMEM);	/* May only call once for each order */
 	}
 
+	if (count < 0 || count > 4096) {
+		DRM_OS_UNLOCK;
+		atomic_dec( &dev->buf_alloc );
+		DRM_OS_RETURN(EINVAL);
+	}
+
 	entry->buflist = DRM(alloc)( count * sizeof(*entry->buflist),
 				    DRM_MEM_BUFS );
 	if ( !entry->buflist ) {
@@ -687,6 +699,7 @@ int DRM(addbufs_pci)( DRM_OS_IOCTL )
 
 	atomic_dec( &dev->buf_alloc );
 	return 0;
+
 }
 #endif /* __HAVE_PCI_DMA */
 
@@ -758,6 +771,12 @@ int DRM(addbufs_sg)( DRM_OS_IOCTL )
                atomic_dec( &dev->buf_alloc );
                	DRM_OS_RETURN(ENOMEM); /* May only call once for each order */
        }
+
+	if (count < 0 || count > 4096) {
+		up( &dev->struct_sem );
+		atomic_dec( &dev->buf_alloc );
+		return -EINVAL;
+	}
 
        entry->buflist = DRM(alloc)( count * sizeof(*entry->buflist),
                                    DRM_MEM_BUFS );

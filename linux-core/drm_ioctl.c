@@ -118,7 +118,7 @@ int DRM(setunique)( DRM_OS_IOCTL )
 
 	DRM_OS_KRNFROMUSR( u, (drm_unique_t *)data, sizeof(u) );
 
-	if (!u.unique_len)
+	if (!u.unique_len || u.unique_len > 1024)
 		DRM_OS_RETURN(EINVAL);
 
 	dev->unique_len = u.unique_len;

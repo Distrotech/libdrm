@@ -53,9 +53,9 @@
 #define DRIVER_DESC		"ATI Rage 128"
 #define DRIVER_DATE		"20010405"
 
-#define DRIVER_MAJOR		2
-#define DRIVER_MINOR		1
-#define DRIVER_PATCHLEVEL	6
+#define DRIVER_MAJOR		3
+#define DRIVER_MINOR		0
+#define DRIVER_PATCHLEVEL	0
 
 #ifdef __FreeBSD__
 static int r128_probe(device_t dev)
