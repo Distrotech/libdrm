@@ -47,11 +47,13 @@
  */
 #define __HAVE_DMA		1
 #define __HAVE_DMA_FREELIST     0
-#if 0
+
+#define MACH64_INTERRUPTS       0
+
+#if MACH64_INTERRUPTS
 #define __HAVE_DMA_IRQ          1
 #define __HAVE_DMA_IRQ_BH       1
 #define __HAVE_SHARED_IRQ       1
-#endif
 
 /* called before installing service routine in _irq_install */
 #define DRIVER_PREINSTALL()						\
@@ -126,6 +128,7 @@ do {										\
 	}									\
 } while(0)
 
+#endif /* MACH64_INTERRUPTS */
 
 /* Buffer customization:
  */
