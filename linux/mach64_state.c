@@ -168,7 +168,7 @@ static void mach64_dma_dispatch_clear( drm_device_t *dev,
 		if ( flags & MACH64_DEPTH ) {
 			/* Setup for depth buffer clear
 			 */
-			DMAGETPTR( dev_priv, 12 );
+			DMAGETPTR( dev_priv, 14 );
 			
 			DMAOUTREG( MACH64_Z_CNTL, 0 );
 			DMAOUTREG( MACH64_SCALE_3D_CNTL, 0 );
@@ -228,7 +228,7 @@ static void mach64_dma_dispatch_swap( drm_device_t *dev )
 		break;
 	}
 
-	DMAGETPTR( dev_priv, 10 );
+	DMAGETPTR( dev_priv, 12 );
 
 	DMAOUTREG( MACH64_Z_CNTL, 0 );
 	DMAOUTREG( MACH64_SCALE_3D_CNTL, 0 );
