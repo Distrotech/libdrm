@@ -364,18 +364,28 @@ void mach64_dump_engine_info( drm_mach64_private_t *dev_priv )
 	DRM_INFO( "\n" );
 }
 
+#define MACH64_DUMP_CONTEXT	3
+
 void mach64_dump_buf_info( drm_mach64_private_t *dev_priv, drm_buf_t *buf)
 {
 	u32 addr = GETBUFADDR( buf );
 	u32 used = buf->used >> 2;
-
+	u32 sys_addr = MACH64_READ( MACH64_BM_SYSTEM_MEM_ADDR );
 	u32 *p = GETBUFPTR( buf );
+	int skipped = 0;
 
+	DRM_INFO( "buffer contents:\n" );
+	
 	while ( used ) {
 		u32 reg, count;
 
 		reg = le32_to_cpu(*p++);
-		DRM_INFO("%08x:  0x%08x\n", addr, reg);
+		if( addr <= GETBUFADDR( buf ) + MACH64_DUMP_CONTEXT * 4 ||
+		    (addr >= sys_addr - MACH64_DUMP_CONTEXT * 4 &&
+		    addr <= sys_addr + MACH64_DUMP_CONTEXT * 4) ||
+		    addr >= GETBUFADDR( buf ) + buf->used - MACH64_DUMP_CONTEXT * 4) {
+			DRM_INFO("%08x:  0x%08x\n", addr, reg);
+		}
 		addr += 4;
 		used--;
 		
@@ -383,7 +393,18 @@ void mach64_dump_buf_info( drm_mach64_private_t *dev_priv, drm_buf_t *buf)
 		reg = reg & 0xffff;
 		reg = MMSELECT( reg );
 		while ( count && used ) {
-			DRM_INFO("%08x:    0x%04x = 0x%08x\n", addr, reg, le32_to_cpu(*p));
+			if( addr <= GETBUFADDR( buf ) + MACH64_DUMP_CONTEXT * 4 ||
+			    (addr >= sys_addr - MACH64_DUMP_CONTEXT * 4 &&
+			    addr <= sys_addr + MACH64_DUMP_CONTEXT * 4) ||
+			    addr >= GETBUFADDR( buf ) + buf->used - MACH64_DUMP_CONTEXT * 4) {
+				DRM_INFO("%08x:    0x%04x = 0x%08x\n", addr, reg, le32_to_cpu(*p));
+				skipped = 0;
+			} else {
+				if( !skipped ) {
+					DRM_INFO( "  ...\n" );
+					skipped = 1;
+				}
+			}
 			p++;
 			addr += 4;
 			used--;
@@ -392,39 +413,44 @@ void mach64_dump_buf_info( drm_mach64_private_t *dev_priv, drm_buf_t *buf)
 			count--;
 		}
 	}
+	
+	DRM_INFO( "\n" );
 }
 	
 void mach64_dump_ring_info( drm_mach64_private_t *dev_priv )
 {
 	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring;
-	int i, i0, i1;
+	int i, skipped;
 	
 	DRM_INFO( "\n" );
 	
-	DRM_INFO("ring head_addr: 0x%08x head: %d tail: %d\n", ring->head_addr, ring->head, ring->tail );
+	DRM_INFO("ring contents:\n");
+	DRM_INFO("\thead_addr: 0x%08x head: %d tail: %d\n\n", ring->head_addr, ring->head, ring->tail );
 	
-	if ( ring->head <= ring->tail ) {
-		i0 = ring->head;
-		i1 = ring->tail;
-	} else {
-		i0 = ring->tail;
-		i1 = ring->head;
-	}
-	
-	if ( (i0 = (i0 - 16) & 0xfffffff0) < 0)
-		i0 = 0;
-	if ( (i1 = (i1 + 16) & 0xfffffff0) > ring->size / sizeof(u32) )
-		i1 = ring->size / sizeof(u32);
-	for ( i = i0; i < i1; i += 4) {
-		DRM_INFO( "  0x%08x:  0x%08x 0x%08x 0x%08x 0x%08x%s%s\n",
-			ring->start_addr + i * sizeof(u32),
-			le32_to_cpu(((u32*) ring->start)[i + 0]),
-			le32_to_cpu(((u32*) ring->start)[i + 1]),
-			le32_to_cpu(((u32*) ring->start)[i + 2]), 
-			le32_to_cpu(((u32*) ring->start)[i + 3]),
-			i == ring->head ? " (head)" : "",
-			i == ring->tail ? " (tail)" : ""
-		);
+	skipped = 0;
+	for ( i = 0; i < ring->size / sizeof(u32); i += 4) {
+		if( i <= MACH64_DUMP_CONTEXT * 4 || 
+		    i >= ring->size / sizeof(u32) - MACH64_DUMP_CONTEXT * 4 ||
+		    (i >= ring->tail - MACH64_DUMP_CONTEXT * 4 &&
+		    i <= ring->tail + MACH64_DUMP_CONTEXT * 4) ||
+		    (i >= ring->head - MACH64_DUMP_CONTEXT * 4 &&
+		    i <= ring->head + MACH64_DUMP_CONTEXT * 4)) {
+			DRM_INFO( "  0x%08x:  0x%08x 0x%08x 0x%08x 0x%08x%s%s\n",
+				ring->start_addr + i * sizeof(u32),
+				le32_to_cpu(((u32*) ring->start)[i + 0]),
+				le32_to_cpu(((u32*) ring->start)[i + 1]),
+				le32_to_cpu(((u32*) ring->start)[i + 2]), 
+				le32_to_cpu(((u32*) ring->start)[i + 3]),
+				i == ring->head ? " (head)" : "",
+				i == ring->tail ? " (tail)" : ""
+			);
+			skipped = 0;
+		} else {
+			if( !skipped ) {
+				DRM_INFO( "  ...\n" );
+				skipped = 1;
+			}
+		}
 	}
 
 	DRM_INFO( "\n" );
