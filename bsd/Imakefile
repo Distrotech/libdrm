@@ -21,7 +21,7 @@ LinkFileList(tdfxinc, $(LINUXDRM)/tdfx.h $(LINUXDRM)/tdfx_drv.c, tdfx, .)
 
 LinkFileList(r128inc, $(LINUXDRM)/r128.h $(LINUXDRM)/r128_cce.c $(LINUXDRM)/r128_drv.c $(LINUXDRM)/r128_drv.h $(LINUXDRM)/r128_state.c, r128, .)
 
-LinkFileList(radeoninc, $(LINUXDRM)/radeon.h $(LINUXDRM)/radeon_drv.h $(LINUXDRM)/radeon_bufs.c $(LINUXDRM)/radeon_cp.c $(LINUXDRM)/radeon_drv.c $(LINUXDRM)/radeon_state.c, radeon, .)
+LinkFileList(radeoninc, $(LINUXDRM)/radeon.h $(LINUXDRM)/radeon_drv.h $(LINUXDRM)/radeon_cp.c $(LINUXDRM)/radeon_drv.c $(LINUXDRM)/radeon_state.c, radeon, .)
 
 LinkFileList(i810inc, $(LINUXDRM)/i810.h $(LINUXDRM)/i810_dma.c $(LINUXDRM)/i810_drv.c $(LINUXDRM)/i810_drv.h, i810, .)
 
