@@ -144,6 +144,7 @@
 #define DRM_MEM_BOUNDAGP  17
 #define DRM_MEM_CTXBITMAP 18
 #define DRM_MEM_STUB      19
+#define DRM_MEM_SGLISTS   20
 
 #define DRM_MAX_CTXBITMAP (PAGE_SIZE * 8)
 
@@ -540,7 +541,8 @@ typedef struct drm_device_dma {
 	unsigned long	  *pagelist;
 	unsigned long	  byte_count;
 	enum {
-		_DRM_DMA_USE_AGP = 0x01
+		_DRM_DMA_USE_AGP = 0x01,
+		_DRM_DMA_USE_SG  = 0x02
 	} flags;
 
 				/* DMA support */

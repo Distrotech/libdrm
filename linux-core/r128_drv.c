@@ -33,6 +33,7 @@
 #include "r128.h"
 #include "drmP.h"
 #include "r128_drv.h"
+#include "ati_pcigart.h"
 
 #define DRIVER_AUTHOR		"Gareth Hughes, VA Linux Systems Inc."
 
@@ -86,5 +87,6 @@
 #include "drm_lock.h"
 #include "drm_memory.h"
 #include "drm_proc.h"
+#include "drm_scatter.h"
 #include "drm_vm.h"
 #include "drm_stub.h"

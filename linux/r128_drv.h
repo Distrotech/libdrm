@@ -67,6 +67,8 @@ typedef struct drm_r128_private {
 
 	int usec_timeout;
 	int is_pci;
+	unsigned long phys_pci_gart;
+	unsigned long cce_buffers_offset;
 
 	atomic_t idle_count;
 
@@ -241,6 +243,7 @@ extern int r128_cce_indirect( struct inode *inode, struct file *filp,
 #	define R128_PC_FLUSH_ALL		0x00ff
 #	define R128_PC_BUSY			(1 << 31)
 
+#define R128_PCI_GART_PAGE              0x017c
 #define R128_PRIM_TEX_CNTL_C		0x1cb0
 
 #define R128_SCALE_3D_CNTL		0x1a00
@@ -370,8 +373,8 @@ extern int r128_cce_indirect( struct inode *inode, struct file *filp,
 #define R128_ADDR(reg)		(R128_BASE( reg ) + reg)
 
 #define R128_DEREF(reg)		*(volatile u32 *)R128_ADDR( reg )
-#define R128_READ(reg)		R128_DEREF( reg )
-#define R128_WRITE(reg,val)	do { R128_DEREF( reg ) = val; } while (0)
+#define R128_READ(reg)		le32_to_cpu( R128_DEREF( reg ) )
+#define R128_WRITE(reg,val)	do { R128_DEREF( reg ) = cpu_to_le32( val ); } while (0)
 
 #define R128_DEREF8(reg)	*(volatile u8 *)R128_ADDR( reg )
 #define R128_READ8(reg)		R128_DEREF8( reg )
@@ -400,6 +403,10 @@ extern int R128_READ_PLL(drm_device_t *dev, int addr);
  * Misc helper macros
  */
 
+#define GET_RING_HEAD(ring)	le32_to_cpu( *(ring)->head )
+#define SET_RING_HEAD(ring,x)	*(ring)->head = cpu_to_le32( x )
+
+
 #define LOCK_TEST_WITH_RETURN( dev )					\
 do {									\
 	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||		\
@@ -415,7 +422,7 @@ do {									\
 	drm_r128_ring_buffer_t *ring = &dev_priv->ring; int i;		\
 	if ( ring->space < ring->high_mark ) {				\
 		for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {	\
-			ring->space = *ring->head - ring->tail;		\
+			ring->space = GET_RING_HEAD(ring) - ring->tail;	\
 			if ( ring->space <= 0 )				\
 				ring->space += ring->size;		\
 			if ( ring->space >= ring->high_mark )		\
@@ -498,7 +505,7 @@ do {									\
 		DRM_INFO( "   OUT_RING( 0x%08x ) at 0x%x\n",		\
 			   (unsigned int)(x), write );			\
 	}								\
-	ring[write++] = (x);						\
+	ring[write++] = cpu_to_le32( x );				\
 	write &= tail_mask;						\
 } while (0)
 

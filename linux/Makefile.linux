@@ -47,7 +47,7 @@
 
 # **** End of SMP/MODVERSIONS detection
 
-MODS =		gamma.o tdfx.o
+MODS =		gamma.o tdfx.o r128.o
 LIBS =
 
 DRMTEMPLATES =	drm_auth.h drm_bufs.h drm_context.h drm_dma.h drm_drawable.h \
@@ -57,6 +57,9 @@ DRMHEADERS =	drm.h drmP.h compat-pre24.h
 
 GAMMAOBJS =	gamma_drv.o gamma_dma.o
 GAMMAHEADERS =	gamma_drv.h $(DRMHEADERS) $(DRMTEMPLATES)
+
+R128OBJS =	r128_drv.o r128_cce.o r128_state.o
+R128HEADERS =	r128.h r128_drv.h r128_drm.h $(DRMHEADERS) $(DRMTEMPLATES)
 
 TDFXOBJS =	tdfx_drv.o
 TDFXHEADERS =	tdfx.h $(DRMHEADERS)
@@ -132,7 +135,7 @@ ifeq ($(AGP),1)
 MODCFLAGS += -DCONFIG_AGP -DCONFIG_AGP_MODULE
 DRMTEMPLATES += drm_agpsupport.h
 DRMHEADERS += agpsupport-pre24.h
-MODS += mga.o r128.o radeon.o
+MODS += mga.o radeon.o
 ifeq ($(MACHINE),i386)
 MODS += i810.o
 endif
@@ -146,9 +149,6 @@ MGAHEADERS =	mga.h mga_drv.h mga_drm.h $(DRMHEADERS) $(DRMTEMPLATES)
 
 I810OBJS =	i810_drv.o i810_dma.o
 I810HEADERS =	i810.h i810_drv.h i810_drm.h $(DRMHEADERS) $(DRMTEMPLATES)
-
-R128OBJS =	r128_drv.o r128_cce.o r128_state.o
-R128HEADERS =	r128.h r128_drv.h r128_drm.h $(DRMHEADERS) $(DRMTEMPLATES)
 
 RADEONOBJS =	radeon_drv.o radeon_cp.o radeon_state.o
 RADEONHEADERS =	radeon.h radeon_drv.h radeon_drm.h $(DRMHEADERS) \
@@ -210,6 +210,11 @@ gamma_drv.o: gamma_drv.c
 gamma.o: $(GAMMAOBJS)
 	$(LD) -r $^ -o $@
 
+r128_drv.o: r128_drv.c
+	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
+r128.o: $(R128OBJS) $(LIBS)
+	$(LD) -r $^ -o $@
+
 tdfx_drv.o: tdfx_drv.c
 	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
 tdfx.o: $(TDFXOBJS) $(LIBS)
@@ -227,11 +232,6 @@ mga.o: $(MGAOBJS)
 i810_drv.o: i810_drv.c
 	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
 i810.o: $(I810OBJS) $(LIBS)
-	$(LD) -r $^ -o $@
-
-r128_drv.o: r128_drv.c
-	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
-r128.o: $(R128OBJS) $(LIBS)
 	$(LD) -r $^ -o $@
 
 radeon_drv.o: radeon_drv.c
@@ -254,11 +254,11 @@ ChangeLog:
 	$(CC) $(MODCFLAGS) -I$(TREE) -c $< -o $@
 
 $(GAMMAOBJS): $(GAMMAHEADERS)
+$(R128OBJS): $(R128HEADERS)
 $(TDFXOBJS): $(TDFXHEADERS)
 ifeq ($(AGP),1)
 $(MGAOBJS): $(MGAHEADERS)
 $(I810OBJS): $(I810HEADERS)
-$(R128OBJS): $(R128HEADERS)
 $(RADEONOBJS): $(RADEONHEADERS)
 endif
 

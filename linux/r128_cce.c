@@ -206,9 +206,10 @@ static void r128_do_cce_flush( drm_r128_private_t *dev_priv )
 int r128_do_cce_idle( drm_r128_private_t *dev_priv )
 {
 	int i;
-
+	drm_r128_ring_buffer_t *ring = &dev_priv->ring;
+	
 	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
-		if ( *dev_priv->ring.head == dev_priv->ring.tail ) {
+		if ( GET_RING_HEAD(ring) == dev_priv->ring.tail ) {
 			int pm4stat = R128_READ( R128_PM4_STAT );
 			if ( ( (pm4stat & R128_PM4_FIFOCNT_MASK) >=
 			       dev_priv->cce_fifo_size ) &&
@@ -249,7 +250,7 @@ static void r128_do_cce_reset( drm_r128_private_t *dev_priv )
 {
 	R128_WRITE( R128_PM4_BUFFER_DL_WPTR, 0 );
 	R128_WRITE( R128_PM4_BUFFER_DL_RPTR, 0 );
-	*dev_priv->ring.head = 0;
+	SET_RING_HEAD( &dev_priv->ring, 0 );
 	dev_priv->ring.tail = 0;
 }
 
@@ -328,7 +329,7 @@ static void r128_cce_init_ring_buffer( drm_device_t *dev )
 	R128_WRITE( R128_PM4_BUFFER_DL_RPTR, 0 );
 
 	/* DL_RPTR_ADDR is a physical address in AGP space. */
-	*dev_priv->ring.head = 0;
+	SET_RING_HEAD( &dev_priv->ring, 0 );
 
 	if ( !dev_priv->is_pci ) {
 		R128_WRITE( R128_PM4_BUFFER_DL_RPTR_ADDR,
@@ -380,7 +381,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 
 	if ( dev_priv->is_pci && !dev->sg ) {
 		DRM_ERROR( "PCI GART memory not allocated!\n" );
-		drm_free( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
+		DRM(free)( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
 		dev->dev_private = NULL;
 		return -EINVAL;
        }
@@ -887,7 +888,7 @@ int r128_wait_ring( drm_r128_private_t *dev_priv, int n )
 	int i;
 
 	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
-		ring->space = *ring->head - ring->tail;
+		ring->space = GET_RING_HEAD( ring ) - ring->tail;
 		if ( ring->space <= 0 )
 			ring->space += ring->size;
 
@@ -906,7 +907,7 @@ void r128_update_ring_snapshot( drm_r128_private_t *dev_priv )
 {
 	drm_r128_ring_buffer_t *ring = &dev_priv->ring;
 
-	ring->space = *ring->head - ring->tail;
+	ring->space = GET_RING_HEAD( ring ) - ring->tail;
 #if R128_PERFORMANCE_BOXES
 	if ( ring->space == 0 )
 		atomic_inc( &dev_priv->idle_count );
