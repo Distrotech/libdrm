@@ -113,20 +113,7 @@ ifeq ($(AGP),0)
 AGP := $(shell gcc -E -nostdinc -I$(TREE) picker.c 2>/dev/null \
 	| grep -s 'AGP_MODULE = ' | cut -d' ' -f3)
 endif
-all::;@echo KERNEL HEADERS IN $(TREE): SMP=${SMP} MODVERSIONS=${MODVERSIONS} \
-	AGP=${AGP}
-all:: $(LIBS) $(MODS)
-endif
 
-# **** End of SMP/MODVERSIONS detection
-
-# **** Handle SMP/MODVERSIONS
-ifeq ($(SMP),1)
-MODCFLAGS += -D__SMP__
-endif
-ifeq ($(MODVERSIONS),1)
-MODCFLAGS += -DMODVERSIONS -include $(TREE)/linux/modversions.h
-endif
 ifeq ($(AGP),1)
 MODCFLAGS += -DDRM_AGP
 DRMOBJS += agpsupport.o
@@ -139,7 +126,21 @@ I810OBJS=	i810_drv.o i810_dma.o i810_bufs.o i810_context.o
 I810HEADERS=	i810_drv.h i810_drm_public.h $(DRMHEADERS)
 endif
 
+all::;@echo KERNEL HEADERS IN $(TREE): SMP=${SMP} MODVERSIONS=${MODVERSIONS} \
+	AGP=${AGP}
 all:: $(LIBS) $(MODS) $(PROGS)
+endif
+
+# **** End of SMP/MODVERSIONS detection
+
+# **** Handle SMP/MODVERSIONS
+ifeq ($(SMP),1)
+MODCFLAGS += -D__SMP__
+endif
+ifeq ($(MODVERSIONS),1)
+MODCFLAGS += -DMODVERSIONS -include $(TREE)/linux/modversions.h
+endif
+
 
 # **** End of configuration
 
