@@ -351,11 +351,9 @@ extern int mach64_dma_vertex( struct inode *inode, struct file *filp,
 
 #define MACH64_ADDR(reg)	(MACH64_BASE(reg) + reg)
 
-#define MACH64_DEREF(reg)	*(__volatile__ u32 *)MACH64_ADDR(reg)
-#define MACH64_READ(reg)	MACH64_DEREF(reg)
-#define MACH64_WRITE(reg,val)	do { MACH64_DEREF(reg) = val; } while (0)
-
-
+#define MACH64_DEREF(reg)	*(volatile u32 *)MACH64_ADDR(reg)
+#define MACH64_READ(reg)	le32_to_cpu(MACH64_DEREF(reg))
+#define MACH64_WRITE(reg,val)	do { MACH64_DEREF(reg) = cpu_to_le32(val); } while (0)
 
 
 #define DWMREG0		0x0400
