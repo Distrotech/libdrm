@@ -778,6 +778,9 @@ static void i810_dma_dispatch_vertex(drm_device_t *dev,
 		}
 	}
 
+	if (used > 4*1024) 
+		used = 0;
+
 	if (sarea_priv->dirty)
 	   i810EmitState( dev );
 
@@ -791,16 +794,20 @@ static void i810_dma_dispatch_vertex(drm_device_t *dev,
 	DRM_DEBUG(  "used : %d\n", used);
    	DRM_DEBUG(  "start + used - 4 : %ld\n", start + used - 4);
 
-	if (used) {
+	if (buf_priv->currently_mapped == I810_BUF_MAPPED) {
 		*(u32 *)buf_priv->virtual = (GFX_OP_PRIMITIVE |
 					     sarea_priv->vertex_prim |
 					     ((used/4)-2));
-
+		
 		if (used & 4) {
-		   *(u32 *)((u32)buf_priv->virtual + used) = 0;
-		   used += 4;
+			*(u32 *)((u32)buf_priv->virtual + used) = 0;
+			used += 4;
 		}
+
+		i810_unmap_buffer(buf);
+	}
 		   
+	if (used) {
 		do {
 			if (i < nbox) {
 				BEGIN_LP_RING(4);
@@ -838,10 +845,6 @@ static void i810_dma_dispatch_vertex(drm_device_t *dev,
       	OUT_RING( CMD_REPORT_HEAD );
 	OUT_RING( 0 );
    	ADVANCE_LP_RING();
-
-	if(buf_priv->currently_mapped == I810_BUF_MAPPED) {
-		i810_unmap_buffer(buf);
-	}
 }
 
 
