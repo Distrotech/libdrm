@@ -26,6 +26,8 @@ int DRM(mmap)(dev_t kdev, vm_offset_t offset, int prot)
 	
 /*	DRM_DEBUG("offset = 0x%x\n", offset);*/
 
+	if (!priv->authenticated) DRM_OS_RETURN(EACCES);
+
 	if (dev->dma
 	    && offset >= 0
 	    && offset < ptoa(dev->dma->page_count))
