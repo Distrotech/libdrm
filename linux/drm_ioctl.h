@@ -31,21 +31,61 @@
 
 #define __NO_VERSION__
 #include "drmP.h"
+#ifdef __FreeBSD__
+#include <sys/bus.h>
+#include <pci/pcivar.h>
+#endif
 
 int DRM(irq_busid)( DRM_OS_IOCTL )
 {
-	drm_irq_busid_t p;
+	drm_irq_busid_t id;
+#ifdef __linux__
 	struct pci_dev	*dev;
+#endif
+#ifdef __FreeBSD__
+	devclass_t pci;
+	device_t bus, dev;
+	device_t *kids;
+	int error, i, num_kids;
+#endif
 
-	DRM_OS_KRNFROMUSR( p, (drm_irq_busid_t *)data, sizeof(p) );
+	DRM_OS_KRNFROMUSR( id, (drm_irq_busid_t *)data, sizeof(id) );
 
-	dev = pci_find_slot(p.busnum, PCI_DEVFN(p.devnum, p.funcnum));
-	if (dev) p.irq = dev->irq;
-	else	 p.irq = 0;
+#ifdef __linux__
+	dev = pci_find_slot(id.busnum, PCI_DEVFN(id.devnum, id.funcnum));
+	if (dev) id.irq = dev->irq;
+	else	 id.irq = 0;
+#endif
+#ifdef __FreeBSD__
+	pci = devclass_find("pci");
+	if (!pci)
+		return ENOENT;
+	bus = devclass_get_device(pci, id.busnum);
+	if (!bus)
+		return ENOENT;
+	error = device_get_children(bus, &kids, &num_kids);
+	if (error)
+		return error;
+
+	dev = 0;
+	for (i = 0; i < num_kids; i++) {
+		dev = kids[i];
+		if (pci_get_slot(dev) == id.devnum
+		    && pci_get_function(dev) == id.funcnum)
+			break;
+	}
+
+	free(kids, M_TEMP);
+
+	if (i != num_kids)
+		id.irq = pci_get_irq(dev);
+	else
+		id.irq = 0;
+#endif
 	DRM_DEBUG("%d:%d:%d => IRQ %d\n",
-		  p.busnum, p.devnum, p.funcnum, p.irq);
+		  id.busnum, id.devnum, id.funcnum, id.irq);
 	
-	DRM_OS_KRNTOUSR( (drm_irq_busid_t *)data, p, sizeof(p) );
+	DRM_OS_KRNTOUSR( (drm_irq_busid_t *)data, id, sizeof(id) );
 
 	return 0;
 }
@@ -202,6 +242,7 @@ int DRM(getclient)( DRM_OS_IOCTL )
 
 	idx = client.idx;
 	DRM_OS_LOCK;
+#ifdef __linux__
 	for (i = 0, pt = dev->file_first; i < idx && pt; i++, pt = pt->next)
 		;
 
@@ -214,6 +255,24 @@ int DRM(getclient)( DRM_OS_IOCTL )
 	client.uid   = pt->uid;
 	client.magic = pt->magic;
 	client.iocs  = pt->ioctl_count;
+#endif
+#ifdef __FreeBSD__
+	TAILQ_FOREACH(pt, &dev->files, link) {
+		if (i==idx)
+		{
+			client.auth  = pt->authenticated;
+			client.pid   = pt->pid;
+			client.uid   = pt->uid;
+			client.magic = pt->magic;
+			client.iocs  = pt->ioctl_count;
+			lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc);
+
+			*(drm_client_t *)data = client;
+			return 0;
+		}
+		i++;
+	}
+#endif
 	DRM_OS_UNLOCK;
 
 	DRM_OS_KRNTOUSR( (drm_client_t *)data, client, sizeof(client) );

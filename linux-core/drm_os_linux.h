@@ -316,6 +316,10 @@ extern ssize_t	DRM(read)(struct file *filp, char *buf, size_t count,
 extern unsigned int  DRM(poll)(struct file *filp,
 			       struct poll_table_struct *wait);
 
+/* Memory management support (drm_memory.h) */
+extern int	DRM(mem_info)(char *buf, char **start, off_t offset,
+				   int request, int *eof, void *data);
+
 /* Locking IOCTL support (drm_lock.h) */
 extern int	DRM(block)( DRM_OS_IOCTL );
 extern int	DRM(unblock)( DRM_OS_IOCTL );

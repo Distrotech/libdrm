@@ -32,15 +32,13 @@
 #define __NO_VERSION__
 #include "drmP.h"
 
-int DRM(block)(struct inode *inode, struct file *filp, unsigned int cmd,
-	       unsigned long arg)
+int DRM(block)( DRM_OS_IOCTL )
 {
 	DRM_DEBUG("\n");
 	return 0;
 }
 
-int DRM(unblock)(struct inode *inode, struct file *filp, unsigned int cmd,
-		 unsigned long arg)
+int DRM(unblock)( DRM_OS_IOCTL )
 {
 	DRM_DEBUG("\n");
 	return 0;
@@ -49,13 +47,22 @@ int DRM(unblock)(struct inode *inode, struct file *filp, unsigned int cmd,
 int DRM(lock_take)(__volatile__ unsigned int *lock, unsigned int context)
 {
 	unsigned int old, new, prev;
+#ifdef __FreeBSD__
+	char failed;
+#endif
 
 	do {
 		old = *lock;
 		if (old & _DRM_LOCK_HELD) new = old | _DRM_LOCK_CONT;
 		else			  new = context | _DRM_LOCK_HELD;
+#ifdef __linux__
 		prev = cmpxchg(lock, old, new);
 	} while (prev != old);
+#endif
+#ifdef __FreeBSD__
+		_DRM_CAS(lock, old, new, failed);
+	} while (failed);
+#endif
 	if (_DRM_LOCKING_CONTEXT(old) == context) {
 		if (old & _DRM_LOCK_HELD) {
 			if (context != DRM_KERNEL_CONTEXT) {
@@ -78,13 +85,22 @@ int DRM(lock_transfer)(drm_device_t *dev,
 		       __volatile__ unsigned int *lock, unsigned int context)
 {
 	unsigned int old, new, prev;
+#ifdef __FreeBSD__
+	char failed;
+#endif
 
 	dev->lock.pid = 0;
 	do {
 		old  = *lock;
 		new  = context | _DRM_LOCK_HELD;
+#ifdef __linux__
 		prev = cmpxchg(lock, old, new);
 	} while (prev != old);
+#endif
+#ifdef __FreeBSD__
+		_DRM_CAS(lock, old, new, failed);
+	} while (failed);
+#endif
 	return 1;
 }
 
@@ -93,13 +109,22 @@ int DRM(lock_free)(drm_device_t *dev,
 {
 	unsigned int old, new, prev;
 	pid_t        pid = dev->lock.pid;
+#ifdef __FreeBSD__
+	char failed;
+#endif
 
 	dev->lock.pid = 0;
 	do {
 		old  = *lock;
 		new  = 0;
+#ifdef __linux__
 		prev = cmpxchg(lock, old, new);
 	} while (prev != old);
+#endif
+#ifdef __FreeBSD__
+		_DRM_CAS(lock, old, new, failed);
+	} while (failed);
+#endif
 	if (_DRM_LOCK_IS_HELD(old) && _DRM_LOCKING_CONTEXT(old) != context) {
 		DRM_ERROR("%d freed heavyweight lock held by %d (pid %d)\n",
 			  context,
@@ -107,13 +132,23 @@ int DRM(lock_free)(drm_device_t *dev,
 			  pid);
 		return 1;
 	}
+#ifdef __linux__
 	wake_up_interruptible(&dev->lock.lock_queue);
+#endif
+#ifdef __FreeBSD__
+	wakeup( &dev->lock.lock_queue );
+#endif
 	return 0;
 }
 
 static int DRM(flush_queue)(drm_device_t *dev, int context)
 {
+#ifdef __linux__
 	DECLARE_WAITQUEUE(entry, current);
+#endif
+#ifdef __FreeBSD__
+	int               error;
+#endif
 	int		  ret	= 0;
 	drm_queue_t	  *q	= dev->queuelist[context];
 
@@ -122,8 +157,9 @@ static int DRM(flush_queue)(drm_device_t *dev, int context)
 	atomic_inc(&q->use_count);
 	if (atomic_read(&q->use_count) > 1) {
 		atomic_inc(&q->block_write);
-		add_wait_queue(&q->flush_queue, &entry);
 		atomic_inc(&q->block_count);
+#ifdef __linux__
+		add_wait_queue(&q->flush_queue, &entry);
 		for (;;) {
 			current->state = TASK_INTERRUPTIBLE;
 			if (!DRM_BUFCOUNT(&q->waitlist)) break;
@@ -133,9 +169,17 @@ static int DRM(flush_queue)(drm_device_t *dev, int context)
 				break;
 			}
 		}
+#endif
+#ifdef __FreeBSD__
+		error = tsleep(&q->flush_queue, PZERO|PCATCH, "drmfq", 0);
+		if (error)
+			return error;
+#endif
 		atomic_dec(&q->block_count);
+#ifdef __linux__
 		current->state = TASK_RUNNING;
 		remove_wait_queue(&q->flush_queue, &entry);
+#endif
 	}
 	atomic_dec(&q->use_count);
 
@@ -154,7 +198,12 @@ static int DRM(flush_unblock_queue)(drm_device_t *dev, int context)
 	if (atomic_read(&q->use_count) > 1) {
 		if (atomic_read(&q->block_write)) {
 			atomic_dec(&q->block_write);
+#ifdef __linux__
 			wake_up_interruptible(&q->write_queue);
+#endif
+#ifdef __FreeBSD__
+			wakeup(&q->write_queue);
+#endif
 		}
 	}
 	atomic_dec(&q->use_count);
@@ -201,18 +250,16 @@ int DRM(flush_unblock)(drm_device_t *dev, int context, drm_lock_flags_t flags)
 	return ret;
 }
 
-int DRM(finish)(struct inode *inode, struct file *filp, unsigned int cmd,
-		unsigned long arg)
+int DRM(finish)( DRM_OS_IOCTL )
 {
-	drm_file_t	  *priv	  = filp->private_data;
-	drm_device_t	  *dev	  = priv->dev;
+	DRM_OS_DEVICE;
 	int		  ret	  = 0;
 	drm_lock_t	  lock;
 
 	DRM_DEBUG("\n");
 
-	if (copy_from_user(&lock, (drm_lock_t *)arg, sizeof(lock)))
-		return -EFAULT;
+	DRM_OS_KRNFROMUSR( lock, (drm_lock_t *)data, sizeof(lock) );
+
 	ret = DRM(flush_block_and_flush)(dev, lock.context, lock.flags);
 	DRM(flush_unblock)(dev, lock.context, lock.flags);
 	return ret;
@@ -234,6 +281,9 @@ int DRM(notifier)(void *priv)
 {
 	drm_sigdata_t *s = (drm_sigdata_t *)priv;
 	unsigned int  old, new, prev;
+#ifdef __FreeBSD__
+	char failed;
+#endif
 
 
 				/* Allow signal delivery if lock isn't held */
@@ -245,7 +295,13 @@ int DRM(notifier)(void *priv)
 	do {
 		old  = s->lock->lock;
 		new  = old | _DRM_LOCK_CONT;
+#ifdef __linux__
 		prev = cmpxchg(&s->lock->lock, old, new);
 	} while (prev != old);
+#endif
+#ifdef __FreeBSD__
+		_DRM_CAS(&s->lock->lock, old, new, failed);
+	} while (failed);
+#endif
 	return 0;
 }

@@ -236,6 +236,9 @@ extern d_ioctl_t	DRM(freebufs);
 extern d_ioctl_t	DRM(mapbufs);
 #endif
 
+/* Memory management support (drm_memory.h) */
+extern int		DRM(mem_info)SYSCTL_HANDLER_ARGS;
+
 /* DMA support (drm_dma.h) */
 #if __HAVE_DMA_IRQ
 extern d_ioctl_t	DRM(control);

@@ -614,8 +614,6 @@ extern int	     DRM(mmap_dma)(struct file *filp,
 
 				/* Memory management support (drm_memory.h) */
 extern void	     DRM(mem_init)(void);
-extern int	     DRM(mem_info)(char *buf, char **start, off_t offset,
-				   int request, int *eof, void *data);
 extern void	     *DRM(alloc)(size_t size, int area);
 extern void	     *DRM(realloc)(void *oldpt, size_t oldsize, size_t size,
 				   int area);
