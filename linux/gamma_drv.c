@@ -29,7 +29,9 @@
  *    Gareth Hughes <gareth@valinux.com>
  */
 
+#ifdef __linux__
 #include <linux/config.h>
+#endif
 #include "gamma.h"
 #include "drmP.h"
 #include "gamma_drv.h"
@@ -68,6 +70,13 @@
 #include "drm_lists.h"
 #include "drm_lock.h"
 #include "drm_memory.h"
+#ifdef __linux__
 #include "drm_proc.h"
+#endif
 #include "drm_vm.h"
+#ifdef __linux__
 #include "drm_stub.h"
+#endif
+#ifdef __FreeBSD__
+#include "drm_sysctl.h"
+#endif

@@ -354,16 +354,19 @@ int DRM(addbufs_agp)( DRM_OS_IOCTL )
 
 	if ( !dma ) DRM_OS_RETURN(EINVAL);
 
-	if ( copy_from_user( &request, (drm_buf_desc_t *)data,
-			     sizeof(request) ) )
-		DRM_OS_RETURN(EFAULT);
+	DRM_OS_KRNFROMUSR( request, (drm_buf_desc_t *)data, sizeof(request) );
 
 	count = request.count;
 	order = DRM(order)( request.size );
 	size = 1 << order;
 
 	alignment  = (request.flags & _DRM_PAGE_ALIGN)
+#ifdef __linux__
 		? PAGE_ALIGN(size) : size;
+#endif
+#ifdef __FreeBSD__
+		? round_page(size) : size;
+#endif
 	page_order = order - PAGE_SHIFT > 0 ? order - PAGE_SHIFT : 0;
 	total = PAGE_SIZE << page_order;
 
@@ -383,13 +386,13 @@ int DRM(addbufs_agp)( DRM_OS_IOCTL )
 	if ( dev->queue_count ) 
 		DRM_OS_RETURN(EBUSY); /* Not while in use */
 
-	spin_lock( &dev->count_lock );
+	DRM_OS_SPINLOCK( &dev->count_lock );
 	if ( dev->buf_use ) {
-		spin_unlock( &dev->count_lock );
+		DRM_OS_SPINUNLOCK( &dev->count_lock );
 		DRM_OS_RETURN(EBUSY);
 	}
 	atomic_inc( &dev->buf_alloc );
-	spin_unlock( &dev->count_lock );
+	DRM_OS_SPINUNLOCK( &dev->count_lock );
 
 	DRM_OS_LOCK;
 	entry = &dma->bufs[order];
@@ -426,7 +429,12 @@ int DRM(addbufs_agp)( DRM_OS_IOCTL )
 		buf->next    = NULL;
 		buf->waiting = 0;
 		buf->pending = 0;
+#ifdef __linux__
 		init_waitqueue_head( &buf->dma_wait );
+#endif
+#ifdef __FreeBSD__
+		buf->dma_wait = 0;
+#endif
 		buf->pid     = 0;
 
 		buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
@@ -523,17 +531,22 @@ int DRM(addbufs_pci)( DRM_OS_IOCTL )
 		DRM_OS_RETURN(EBUSY); /* Not while in use */
 
 	alignment = (request.flags & _DRM_PAGE_ALIGN)
+#ifdef __linux__
 		? PAGE_ALIGN(size) : size;
+#endif
+#ifdef __FreeBSD__
+		? round_page(size) : size;
+#endif
 	page_order = order - PAGE_SHIFT > 0 ? order - PAGE_SHIFT : 0;
 	total = PAGE_SIZE << page_order;
 
-	spin_lock( &dev->count_lock );
+	DRM_OS_SPINLOCK( &dev->count_lock );
 	if ( dev->buf_use ) {
-		spin_unlock( &dev->count_lock );
+		DRM_OS_SPINUNLOCK( &dev->count_lock );
 		DRM_OS_RETURN(EBUSY);
 	}
 	atomic_inc( &dev->buf_alloc );
-	spin_unlock( &dev->count_lock );
+	DRM_OS_SPINUNLOCK( &dev->count_lock );
 
 	DRM_OS_LOCK;
 	entry = &dma->bufs[order];
@@ -601,7 +614,12 @@ int DRM(addbufs_pci)( DRM_OS_IOCTL )
 			buf->next    = NULL;
 			buf->waiting = 0;
 			buf->pending = 0;
+#ifdef __linux__
 			init_waitqueue_head( &buf->dma_wait );
+#endif
+#ifdef __FreeBSD__
+			buf->dma_wait = 0;
+#endif
 			buf->pid     = 0;
 #if __HAVE_DMA_HISTOGRAM
 			buf->time_queued     = 0;
@@ -675,7 +693,12 @@ int DRM(addbufs_sg)( DRM_OS_IOCTL )
        size = 1 << order;
 
        alignment  = (request.flags & _DRM_PAGE_ALIGN)
+#ifdef __linux__
                ? PAGE_ALIGN(size) : size;
+#endif
+#ifdef __FreeBSD__
+		? round_page(size) : size;
+#endif
        page_order = order - PAGE_SHIFT > 0 ? order - PAGE_SHIFT : 0;
        total = PAGE_SIZE << page_order;
 
@@ -695,13 +718,13 @@ int DRM(addbufs_sg)( DRM_OS_IOCTL )
        if ( dev->queue_count ) 
 		DRM_OS_RETURN(EBUSY); /* Not while in use */
 
-       spin_lock( &dev->count_lock );
+	DRM_OS_SPINLOCK( &dev->count_lock );
        if ( dev->buf_use ) {
-               spin_unlock( &dev->count_lock );
+		DRM_OS_SPINUNLOCK( &dev->count_lock );
                DRM_OS_RETURN(EBUSY);
        }
        atomic_inc( &dev->buf_alloc );
-       spin_unlock( &dev->count_lock );
+	DRM_OS_SPINUNLOCK( &dev->count_lock );
 
 	DRM_OS_LOCK;
        entry = &dma->bufs[order];
@@ -738,7 +761,12 @@ int DRM(addbufs_sg)( DRM_OS_IOCTL )
                buf->next    = NULL;
                buf->waiting = 0;
                buf->pending = 0;
+#ifdef __linux__
                init_waitqueue_head( &buf->dma_wait );
+#endif
+#ifdef __FreeBSD__
+		buf->dma_wait = 0;
+#endif
                buf->pid     = 0;
 
                buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
@@ -805,16 +833,31 @@ int DRM(addbufs)( DRM_OS_IOCTL )
 
 #if __REALLY_HAVE_AGP
 	if ( request.flags & _DRM_AGP_BUFFER )
+#ifdef __linux__
 		return DRM(addbufs_agp)( inode, filp, cmd, data );
+#endif
+#ifdef __FreeBSD__
+		return DRM(addbufs_agp)( kdev, cmd, data, flags, p );
+#endif
 	else
 #endif
 #if __HAVE_SG
 	if ( request.flags & _DRM_SG_BUFFER )
+#ifdef __linux__
 		return DRM(addbufs_sg)( inode, filp, cmd, data );
+#endif
+#ifdef __FreeBSD__
+		return DRM(addbufs_sg)( kdev, cmd, data, flags, p );
+#endif
 	else
 #endif
 #if __HAVE_PCI_DMA
+#ifdef __linux__
 		return DRM(addbufs_pci)( inode, filp, cmd, data );
+#endif
+#ifdef __FreeBSD__
+		return DRM(addbufs_pci)( kdev, cmd, data, flags, p );
+#endif
 #else
 		DRM_OS_RETURN(EINVAL);
 #endif
@@ -830,13 +873,13 @@ int DRM(infobufs)( DRM_OS_IOCTL )
 
 	if ( !dma ) DRM_OS_RETURN(EINVAL);
 
-	spin_lock( &dev->count_lock );
+	DRM_OS_SPINLOCK( &dev->count_lock );
 	if ( atomic_read( &dev->buf_alloc ) ) {
-		spin_unlock( &dev->count_lock );
+		DRM_OS_SPINUNLOCK( &dev->count_lock );
 		DRM_OS_RETURN(EBUSY);
 	}
 	++dev->buf_use;		/* Can't allocate more after this call */
-	spin_unlock( &dev->count_lock );
+	DRM_OS_SPINUNLOCK( &dev->count_lock );
 
 	DRM_OS_KRNFROMUSR( request, (drm_buf_info_t *)data, sizeof(request) );
 
@@ -938,9 +981,9 @@ int DRM(freebufs)( DRM_OS_IOCTL )
 			DRM_OS_RETURN(EINVAL);
 		}
 		buf = dma->buflist[idx];
-		if ( buf->pid != current->pid ) {
+		if ( buf->pid != DRM_OS_CURRENTPID ) {
 			DRM_ERROR( "Process %d freeing buffer owned by %d\n",
-				   current->pid, buf->pid );
+				   DRM_OS_CURRENTPID, buf->pid );
 			DRM_OS_RETURN(EINVAL);
 		}
 		DRM(free_buffer)( dev, buf );
@@ -962,13 +1005,13 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 
 	if ( !dma ) DRM_OS_RETURN(EINVAL);
 
-	spin_lock( &dev->count_lock );
+	DRM_OS_SPINLOCK( &dev->count_lock );
 	if ( atomic_read( &dev->buf_alloc ) ) {
-		spin_unlock( &dev->count_lock );
+		DRM_OS_SPINUNLOCK( &dev->count_lock );
 		DRM_OS_RETURN(EBUSY);
 	}
 	dev->buf_use++;		/* Can't allocate more after this call */
-	spin_unlock( &dev->count_lock );
+	DRM_OS_SPINUNLOCK( &dev->count_lock );
 
 	DRM_OS_KRNFROMUSR( request, (drm_buf_map_t *)data, sizeof(request) );
 
