@@ -49,6 +49,10 @@
 #ifdef CONFIG_MTRR
 #include <asm/mtrr.h>
 #endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,0)
+#include <asm/spinlock.h>
+#include <linux/poll.h>
+#endif
 #include "drm.h"
 
 #define DRM_DEBUG_CODE 2	  /* Include debugging code (if > 1, then
@@ -478,6 +482,7 @@ extern int	     drm_fasync(int fd, struct file *filp, int on);
 extern ssize_t	     drm_read(struct file *filp, char *buf, size_t count,
 			      loff_t *off);
 extern int	     drm_write_string(drm_device_t *dev, const char *s);
+extern unsigned int  drm_poll(struct file *filp, struct poll_table_struct *wait);
 
 				/* Mapping support (vm.c) */
 #if LINUX_VERSION_CODE < 0x020317

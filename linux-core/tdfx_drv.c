@@ -53,6 +53,7 @@ static struct file_operations tdfx_fops = {
 	mmap:	 drm_mmap,
 	read:	 drm_read,
 	fasync:	 drm_fasync,
+	poll: drm_poll
 };
 
 static struct miscdevice      tdfx_misc = {
