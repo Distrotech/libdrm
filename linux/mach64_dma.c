@@ -505,14 +505,8 @@ int mach64_do_cleanup_dma( drm_device_t *dev )
 	if ( dev->dev_private ) {
 		drm_mach64_private_t *dev_priv = dev->dev_private;
 		
-		if (dev_priv->buffers) {
-			DRM_IOREMAPFREE( dev_priv->buffers );
-		}
-		DRM(free)( dev_priv, sizeof(drm_mach64_private_t),
-			   DRM_MEM_DRIVER );
-		dev->dev_private = NULL;
-
-		if ( dev_priv->table_handle ) {
+		if ( (dev_priv->pool != NULL) && 
+		     (dev_priv->cpu_addr_table != NULL) && !dev_priv->table_handle ) {
 			DRM_INFO( "freeing descriptor table from pci pool\n" );
 			pci_pool_free( dev_priv->pool, dev_priv->cpu_addr_table, 
 				       dev_priv->table_handle );
@@ -522,6 +516,13 @@ int mach64_do_cleanup_dma( drm_device_t *dev )
 			pci_pool_destroy( dev_priv->pool );
 		}
 
+		if ( dev_priv->buffers ) {
+			DRM_IOREMAPFREE( dev_priv->buffers );
+		}
+
+		DRM(free)( dev_priv, sizeof(drm_mach64_private_t),
+			   DRM_MEM_DRIVER );
+		dev->dev_private = NULL;
 	}
 	
 	return 0;
