@@ -864,6 +864,13 @@ extern int            DRM(sg_free)(struct inode *inode, struct file *filp,
 				   unsigned int cmd, unsigned long arg);
 #endif
 
+#if __HAVE_PCI_DMA
+				/* Consistent PCI DMA support (drm_pci.h) */
+extern void           *DRM(pci_alloc)(drm_device_t *dev, size_t size, size_t align, 
+				      dma_addr_t maxaddr, dma_addr_t *busaddr);
+extern void           DRM(pci_free)(drm_device_t *dev, size_t size, void *vaddr, dma_addr_t busaddr);
+#endif
+
                                /* ATI PCIGART support (ati_pcigart.h) */
 extern int            DRM(ati_pcigart_init)(drm_device_t *dev,
 					    unsigned long *addr,
