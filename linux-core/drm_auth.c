@@ -123,11 +123,18 @@ int DRM(getmagic)(DRM_OS_IOCTL)
 	static spinlock_t  lock	    = SPIN_LOCK_UNLOCKED;
 #endif
 #ifdef __FreeBSD__
-	static struct simplelock  lock;
+	static DRM_OS_SPINTYPE lock;
+	static int	   first = 1;
 #endif
 	DRM_OS_DEVICE;
 	DRM_OS_PRIV;
 
+#ifdef __FreeBSD__
+	if (first) {
+		DRM_OS_SPININIT(&lock, "drm getmagic");
+		first = 0;
+	}
+#endif
 
 				/* Find unique magic */
 	if (priv->magic) {

@@ -43,9 +43,13 @@
 #define DRM_OS_LOCK	lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, curproc)
 #define DRM_OS_UNLOCK 	lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc)
 #if __FreeBSD_version >= 500000
+#define DRM_OS_SPINTYPE		struct mtx
+#define DRM_OS_SPININIT(l,name)	mtx_init(l, name, MTX_DEF)
 #define DRM_OS_SPINLOCK(l)	mtx_lock(l)
 #define DRM_OS_SPINUNLOCK(u)	mtx_unlock(u);
 #else
+#define DRM_OS_SPINTYPE		struct simplelock
+#define DRM_OS_SPININIT(l,name)	simple_lock_init(l)
 #define DRM_OS_SPINLOCK(l)	simple_lock(l)
 #define DRM_OS_SPINUNLOCK(u)	simple_unlock(u);
 #endif

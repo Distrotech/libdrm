@@ -286,7 +286,11 @@ static struct cdevsw DRM( cdevsw) = {
 	/* dump */	nodump,
 	/* psize */	nopsize,
 	/* flags */	D_TTY | D_TRACKCLOSE,
+#if __FreeBSD_version >= 500000
+	/* kqfilter */	0
+#else
 	/* bmaj */	-1
+#endif
 };
 #endif
 
@@ -387,7 +391,11 @@ static int DRM(setup)( drm_device_t *dev )
 	init_waitqueue_head( &dev->context_wait );
 #endif
 #ifdef __FreeBSD__
+#if __FreeBSD_version >= 500000
+	callout_init( &dev->timer, 1 );
+#else
 	callout_init( &dev->timer );
+#endif
 	dev->context_wait = 0;
 #endif
 
@@ -638,7 +646,7 @@ static int DRM(init)( device_t nbdev )
 #endif
 #endif
 #ifdef __FreeBSD__
-	simple_lock_init(&dev->count_lock);
+	DRM_OS_SPININIT(&dev->count_lock, "drm device");
 	lockinit(&dev->dev_lock, PZERO, "drmlk", 0, 0);
 #endif
 

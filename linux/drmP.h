@@ -448,7 +448,7 @@ typedef struct drm_device {
 	struct semaphore  struct_sem;	/* For others			   */
 #endif
 #ifdef __FreeBSD__
-	struct simplelock count_lock;	/* For inuse, open_count, buf_use  */
+	DRM_OS_SPINTYPE	  count_lock;	/* For inuse, open_count, buf_use  */
 	struct lock       dev_lock;	/* For others			   */
 #endif
 				/* Usage Counters */

@@ -65,7 +65,7 @@ typedef struct drm_mem_stats {
 static spinlock_t	  DRM(mem_lock)	     = SPIN_LOCK_UNLOCKED;
 #endif
 #ifdef __FreeBSD__
-static struct simplelock  DRM(mem_lock);
+static DRM_OS_SPINTYPE	  DRM(mem_lock);
 #endif
 static unsigned long	  DRM(ram_available) = 0; /* In pages */
 static unsigned long	  DRM(ram_used)      = 0;
@@ -99,6 +99,10 @@ void DRM(mem_init)(void)
 	drm_mem_stats_t *mem;
 #ifdef __linux__
 	struct sysinfo	si;
+#endif
+
+#if defined(__FreeBSD__)
+	DRM_OS_SPININIT(&DRM(mem_lock), "drm memory");
 #endif
 
 	for (mem = DRM(mem_stats); mem->name; ++mem) {
