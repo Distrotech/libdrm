@@ -115,6 +115,7 @@ typedef struct drm_device drm_device_t;
 
 #include "drm_agp.h"
 #include "drm_sg.h"
+#include "drm_bufs.h"
 
 
 /***********************************************************************/
@@ -420,74 +421,6 @@ typedef struct drm_vma_entry {
 	pid_t		      pid;
 } drm_vma_entry_t;
 
-/**
- * DMA buffer.
- */
-typedef struct drm_buf {
-	int		  idx;	       /**< Index into master buflist */
-	int		  total;       /**< Buffer size */
-	int		  order;       /**< log-base-2(total) */
-	int		  used;	       /**< Amount of buffer in use (for DMA) */
-	unsigned long	  offset;      /**< Byte offset (used internally) */
-	void		  *address;    /**< Address of buffer */
-	unsigned long	  bus_address; /**< Bus address of buffer */
-	struct drm_buf	  *next;       /**< Kernel-only: used for free list */
-	__volatile__ int  waiting;     /**< On kernel DMA queue */
-	__volatile__ int  pending;     /**< On hardware DMA queue */
-	wait_queue_head_t dma_wait;    /**< Processes waiting */
-	struct file       *filp;       /**< Pointer to holding file descr */
-	int		  context;     /**< Kernel queue for this buffer */
-	int		  while_locked;/**< Dispatch this buffer while locked */
-	enum {
-		DRM_LIST_NONE	 = 0,
-		DRM_LIST_FREE	 = 1,
-		DRM_LIST_WAIT	 = 2,
-		DRM_LIST_PEND	 = 3,
-		DRM_LIST_PRIO	 = 4,
-		DRM_LIST_RECLAIM = 5
-	}		  list;	       /**< Which list we're on */
-
-	int		  dev_priv_size; /**< Size of buffer private storage */
-	void		  *dev_private;  /**< Per-buffer private storage */
-} drm_buf_t;
-
-
-/** bufs is one longer than it has to be */
-typedef struct drm_waitlist {
-	int		  count;	/**< Number of possible buffers */
-	drm_buf_t	  **bufs;	/**< List of pointers to buffers */
-	drm_buf_t	  **rp;		/**< Read pointer */
-	drm_buf_t	  **wp;		/**< Write pointer */
-	drm_buf_t	  **end;	/**< End pointer */
-	spinlock_t	  read_lock;
-	spinlock_t	  write_lock;
-} drm_waitlist_t;
-
-typedef struct drm_freelist {
-	int		  initialized; /**< Freelist in use */
-	atomic_t	  count;       /**< Number of free buffers */
-	drm_buf_t	  *next;       /**< End pointer */
-
-	wait_queue_head_t waiting;     /**< Processes waiting on free bufs */
-	int		  low_mark;    /**< Low water mark */
-	int		  high_mark;   /**< High water mark */
-	atomic_t	  wfh;	       /**< If waiting for high mark */
-	spinlock_t        lock;
-} drm_freelist_t;
-
-/**
- * Buffer entry.  There is one of this for each buffer size order.
- */
-typedef struct drm_buf_entry {
-	int		  buf_size;	/**< size */
-	int		  buf_count;	/**< number of buffers */
-	drm_buf_t	  *buflist;	/**< buffer list */
-	int		  seg_count;
-	int		  page_order;
-	unsigned long	  *seglist;
-
-	drm_freelist_t	  freelist;
-} drm_buf_entry_t;
 
 /**
  * Hardware lock.
@@ -865,25 +798,8 @@ extern int	     DRM(lock_free)(drm_device_t *dev,
 				    unsigned int context);
 extern int           DRM(notifier)(void *priv);
 
-				/* Buffer management support (drm_bufs.h) */
-extern int	     DRM(order)( unsigned long size );
-extern int	     DRM(addmap)( struct inode *inode, struct file *filp,
-				  unsigned int cmd, unsigned long arg );
-extern int	     DRM(rmmap)( struct inode *inode, struct file *filp,
-				 unsigned int cmd, unsigned long arg );
-#if __HAVE_DMA
-extern int	     DRM(addbufs)( struct inode *inode, struct file *filp,
-				   unsigned int cmd, unsigned long arg );
-extern int	     DRM(infobufs)( struct inode *inode, struct file *filp,
-				    unsigned int cmd, unsigned long arg );
-extern int	     DRM(markbufs)( struct inode *inode, struct file *filp,
-				    unsigned int cmd, unsigned long arg );
-extern int	     DRM(freebufs)( struct inode *inode, struct file *filp,
-				    unsigned int cmd, unsigned long arg );
-extern int	     DRM(mapbufs)( struct inode *inode, struct file *filp,
-				   unsigned int cmd, unsigned long arg );
-
 				/* DMA support (drm_dma.h) */
+#if __HAVE_DMA
 extern int	     DRM(dma_setup)(drm_device_t *dev);
 extern void	     DRM(dma_takedown)(drm_device_t *dev);
 extern void	     DRM(free_buffer)(drm_device_t *dev, drm_buf_t *buf);
@@ -908,7 +824,6 @@ extern void          DRM(vbl_send_signals)( drm_device_t *dev );
 extern void          DRM(dma_immediate_bh)( void *dev );
 #endif
 #endif
-
 #endif /* __HAVE_DMA */
 
 
