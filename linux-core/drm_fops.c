@@ -88,6 +88,8 @@ int DRM(open_helper)(dev_t kdev, int flags, int fmt, struct proc *p,
 
 #ifdef __linux__
 	priv = (drm_file_t *) DRM(alloc)(sizeof(*priv), DRM_MEM_FILES);
+	if(!priv) DRM_OS_RETURN(ENOMEM);
+
 	memset(priv, 0, sizeof(*priv));
 	filp->private_data  = priv;
 	priv->uid	    = current->euid;

@@ -123,12 +123,20 @@ int DRM(setunique)( DRM_OS_IOCTL )
 
 	dev->unique_len = u.unique_len;
 	dev->unique	= DRM(alloc)(u.unique_len + 1, DRM_MEM_DRIVER);
+
+	if(!dev->unique) DRM_OS_RETURN(ENOMEM);
+
 	if (DRM_OS_COPYFROMUSR(dev->unique, u.unique, dev->unique_len))
 		DRM_OS_RETURN(EFAULT);
+
 	dev->unique[dev->unique_len] = '\0';
 
 	dev->devname = DRM(alloc)(strlen(dev->name) + strlen(dev->unique) + 2,
 				  DRM_MEM_DRIVER);
+	if(!dev->devname) {
+		DRM(free)(dev->devname, sizeof(*dev->devname), DRM_MEM_DRIVER);
+		return -ENOMEM;
+	}
 	sprintf(dev->devname, "%s@%s", dev->name, dev->unique);
 
 #ifdef __linux__
@@ -148,8 +156,10 @@ int DRM(setunique)( DRM_OS_IOCTL )
                 if (*p) break;
  
                 pci_dev = pci_find_slot(b, PCI_DEVFN(d,f));
-                if (pci_dev)
+                if (pci_dev) {
+			dev->pdev = pci_dev;
                         dev->hose = pci_dev->sysdata;
+		}
         } while(0);
 #endif
 #endif
