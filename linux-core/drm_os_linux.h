@@ -272,6 +272,10 @@ do {									\
 #define DRM_OS_KRNFROMUSR(arg1, arg2, arg3) \
 	if ( copy_from_user(&arg1, arg2, arg3) ) \
 		return -EFAULT
+#define DRM_OS_COPYTOUSR(arg1, arg2, arg3) \
+	copy_to_user(arg1, arg2, arg3)
+#define DRM_OS_COPYFROMUSR(arg1, arg2, arg3) \
+	copy_from_user(arg1, arg2, arg3)
 
 /* Internal functions */
 

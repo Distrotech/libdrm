@@ -798,7 +798,7 @@ int DRM(version)( DRM_OS_IOCTL )
 	if ( len > name##_len ) len = name##_len;			\
 	name##_len = strlen( value );					\
 	if ( len && name ) {						\
-		if ( copy_to_user( name, value, len ) )			\
+		if ( DRM_OS_COPYTOUSR( name, value, len ) )		\
 			DRM_OS_RETURN(EFAULT);				\
 	}
 

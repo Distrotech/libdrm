@@ -852,16 +852,16 @@ int DRM(infobufs)( DRM_OS_IOCTL )
 				drm_buf_desc_t *to = &request.list[count];
 				drm_buf_entry_t *from = &dma->bufs[i];
 				drm_freelist_t *list = &dma->bufs[i].freelist;
-				if ( copy_to_user( &to->count,
+				if ( DRM_OS_COPYTOUSR( &to->count,
 						   &from->buf_count,
 						   sizeof(from->buf_count) ) ||
-				     copy_to_user( &to->size,
+				     DRM_OS_COPYTOUSR( &to->size,
 						   &from->buf_size,
 						   sizeof(from->buf_size) ) ||
-				     copy_to_user( &to->low_mark,
+				     DRM_OS_COPYTOUSR( &to->low_mark,
 						   &list->low_mark,
 						   sizeof(list->low_mark) ) ||
-				     copy_to_user( &to->high_mark,
+				     DRM_OS_COPYTOUSR( &to->high_mark,
 						   &list->high_mark,
 						   sizeof(list->high_mark) ) )
 					DRM_OS_RETURN(EFAULT);
@@ -928,7 +928,7 @@ int DRM(freebufs)( DRM_OS_IOCTL )
 
 	DRM_DEBUG( "%d\n", request.count );
 	for ( i = 0 ; i < request.count ; i++ ) {
-		if ( copy_from_user( &idx,
+		if ( DRM_OS_COPYFROMUSR( &idx,
 				     &request.list[i],
 				     sizeof(idx) ) )
 			DRM_OS_RETURN(EFAULT);
@@ -1029,29 +1029,29 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 		request.virtual = (void *)virtual;
 
 		for ( i = 0 ; i < dma->buf_count ; i++ ) {
-			if ( copy_to_user( &request.list[i].idx,
+			if ( DRM_OS_COPYTOUSR( &request.list[i].idx,
 					   &dma->buflist[i]->idx,
 					   sizeof(request.list[0].idx) ) ) {
-				retcode = -EFAULT;
+				retcode = EFAULT;
 				goto done;
 			}
-			if ( copy_to_user( &request.list[i].total,
+			if ( DRM_OS_COPYTOUSR( &request.list[i].total,
 					   &dma->buflist[i]->total,
 					   sizeof(request.list[0].total) ) ) {
-				retcode = -EFAULT;
+				retcode = EFAULT;
 				goto done;
 			}
-			if ( copy_to_user( &request.list[i].used,
+			if ( DRM_OS_COPYTOUSR( &request.list[i].used,
 					   &zero,
 					   sizeof(zero) ) ) {
-				retcode = -EFAULT;
+				retcode = EFAULT;
 				goto done;
 			}
 			address = virtual + dma->buflist[i]->offset; /* *** */
-			if ( copy_to_user( &request.list[i].address,
+			if ( DRM_OS_COPYTOUSR( &request.list[i].address,
 					   &address,
 					   sizeof(address) ) ) {
-				retcode = -EFAULT;
+				retcode = EFAULT;
 				goto done;
 			}
 		}
@@ -1062,7 +1062,7 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 
 	DRM_OS_KRNTOUSR( (drm_buf_map_t *)data, request, sizeof(request) );
 
-	return retcode;
+	DRM_OS_RETURN(retcode);
 }
 
 #endif /* __HAVE_DMA */

@@ -291,7 +291,7 @@ int DRM(resctx)( DRM_OS_IOCTL )
 		memset( &ctx, 0, sizeof(ctx) );
 		for ( i = 0 ; i < DRM_RESERVED_CONTEXTS ; i++ ) {
 			ctx.handle = i;
-			if ( copy_to_user( &res.contexts[i],
+			if ( DRM_OS_COPYTOUSR( &res.contexts[i],
 					   &i, sizeof(i) ) )
 				DRM_OS_RETURN(EFAULT);
 		}
@@ -581,7 +581,7 @@ int DRM(resctx)( DRM_OS_IOCTL )
 		memset(&ctx, 0, sizeof(ctx));
 		for (i = 0; i < DRM_RESERVED_CONTEXTS; i++) {
 			ctx.handle = i;
-			if (copy_to_user(&res.contexts[i],
+			if (DRM_OS_COPYTOUSR(&res.contexts[i],
 					 &i,
 					 sizeof(i)))
 				DRM_OS_RETURN(EFAULT);

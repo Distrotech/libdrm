@@ -98,7 +98,7 @@ int DRM(getunique)( DRM_OS_IOCTL )
 	DRM_OS_KRNFROMUSR( u, (drm_unique_t *)data, sizeof(u) );
 
 	if (u.unique_len >= dev->unique_len) {
-		if (copy_to_user(u.unique, dev->unique, dev->unique_len))
+		if (DRM_OS_COPYTOUSR(u.unique, dev->unique, dev->unique_len))
 			DRM_OS_RETURN(EFAULT);
 	}
 	u.unique_len = dev->unique_len;
@@ -123,7 +123,7 @@ int DRM(setunique)( DRM_OS_IOCTL )
 
 	dev->unique_len = u.unique_len;
 	dev->unique	= DRM(alloc)(u.unique_len + 1, DRM_MEM_DRIVER);
-	if (copy_from_user(dev->unique, u.unique, dev->unique_len))
+	if (DRM_OS_COPYFROMUSR(dev->unique, u.unique, dev->unique_len))
 		DRM_OS_RETURN(EFAULT);
 	dev->unique[dev->unique_len] = '\0';
 
@@ -169,7 +169,7 @@ int DRM(getmap)( DRM_OS_IOCTL )
 	drm_map_list_entry_t *list;
 #endif
 	int          idx;
-	int	     i;
+	int	     i = 0;
 
 	DRM_OS_KRNFROMUSR( map, (drm_map_t *)data, sizeof(map) );
 
@@ -181,7 +181,6 @@ int DRM(getmap)( DRM_OS_IOCTL )
 		DRM_OS_RETURN(EINVAL);
 	}
 
-	i = 0;
 #ifdef __linux__
 	list_for_each(list, &dev->maplist->head) {
 		if(i == idx) {
@@ -236,7 +235,7 @@ int DRM(getclient)( DRM_OS_IOCTL )
 	drm_client_t client;
 	drm_file_t   *pt;
 	int          idx;
-	int          i;
+	int          i = 0;
 
 	DRM_OS_KRNFROMUSR( client, (drm_client_t *)data, sizeof(client) );
 

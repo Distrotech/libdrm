@@ -45,8 +45,12 @@
 	*arg1 = arg2
 #define DRM_OS_KRNFROMUSR(arg1, arg2, arg3) \
 	arg1 = *arg2
+#define DRM_OS_COPYTOUSR(arg1, arg2, arg3) \
+	copyout(arg2, arg1, arg3)
+#define DRM_OS_COPYFROMUSR(arg1, arg2, arg3) \
+	copyin(arg2, arg1, arg3)
 
-typedef u_int32_t atomic_t;
+typedef unsigned long atomic_t;
 typedef u_int32_t cycles_t;
 typedef u_int32_t spinlock_t;
 typedef u_int32_t u32;
