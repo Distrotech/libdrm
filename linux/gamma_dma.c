@@ -108,7 +108,7 @@ void gamma_dma_ready(drm_device_t *dev)
 
 static inline int gamma_dma_is_ready(drm_device_t *dev)
 {
-#if !QUEUED_DMA!QUEUED_DMA!QUEUED_DMA!QUEUED_DMA!QUEUED_DMA!QUEUED_DMA!QUEUED_DMA!QUEUED_DMA
+#if !QUEUED_DMA
 	return(!GAMMA_READ(GAMMA_DMACOUNT));
 #else
 	return(GAMMA_READ(GAMMA_GCOMMANDSTATUS) & 0x04);
