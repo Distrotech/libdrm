@@ -39,6 +39,7 @@ typedef struct drm_i810_buf_priv {
 	void *virtual;
 	void *kernel_virtual;
 	int map_count;
+   	struct vm_area_struct *vma;
 } drm_i810_buf_priv_t;
 
 typedef struct _drm_i810_ring_buffer{

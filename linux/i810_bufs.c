@@ -120,6 +120,7 @@ int i810_addbufs_agp(struct inode *inode, struct file *filp, unsigned int cmd,
 		buf->dev_private = drm_alloc(sizeof(drm_i810_buf_priv_t), 
 					     DRM_MEM_BUFS);
 		buf->dev_priv_size = sizeof(drm_i810_buf_priv_t);
+	   	memset(buf->dev_private, 0, sizeof(drm_i810_buf_priv_t));
 
 #if DRM_DMA_HISTOGRAM
 		buf->time_queued = 0;
