@@ -79,7 +79,7 @@ static int mach64_do_wait_for_idle( drm_mach64_private_t *dev_priv )
 	int i, ret;
 
 	ret = mach64_do_wait_for_fifo( dev_priv, 16 );
-	if ( !ret ) return ret;
+	if ( ret ) return ret;
 
 	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
 		if ( !(MACH64_READ( MACH64_GUI_STAT ) & MACH64_GUI_ACTIVE) ) {

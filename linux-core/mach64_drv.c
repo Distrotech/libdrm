@@ -35,7 +35,7 @@
 
 #define DRIVER_NAME		"mach64"
 #define DRIVER_DESC		"DRM module for the ATI Rage Pro"
-#define DRIVER_DATE		"20001203"
+#define DRIVER_DATE		"20001207"
 
 #define DRIVER_MAJOR		1
 #define DRIVER_MINOR		0
@@ -51,9 +51,6 @@ static drm_ioctl_desc_t		mach64_ioctls[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_SET_UNIQUE)]    = { drm_setunique,     1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_BLOCK)]	        = { drm_block,         1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_UNBLOCK)]       = { drm_unblock,       1, 1 },
-#if 0
-	[DRM_IOCTL_NR(DRM_IOCTL_CONTROL)]       = { mach64_control,    1, 1 },
-#endif
 	[DRM_IOCTL_NR(DRM_IOCTL_AUTH_MAGIC)]    = { drm_authmagic,     1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_ADD_MAP)]       = { drm_addmap,        1, 1 },
 
