@@ -532,6 +532,82 @@ static void mga_dma_dispatch_vertex(drm_device_t *dev,
 	PRIMGETPTR( dev_priv );
    	PRIMOUTREG(MGAREG_DMAPAD, 0);
    	PRIMOUTREG(MGAREG_DMAPAD, 0);
+   	PRIMOUTREG(MGAREG_DWGSYNC, 0);
+   	PRIMOUTREG(MGAREG_DWGSYNC, dev_priv->last_sync_tag);   
+	PRIMADVANCE( dev_priv );
+}
+
+
+
+static void mga_dma_dispatch_indices(drm_device_t *dev, 
+				     drm_buf_t *buf,
+				     int start,
+				     int end)
+{
+   	drm_mga_private_t *dev_priv = dev->dev_private;
+	drm_mga_buf_priv_t *buf_priv = buf->dev_private;
+   	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
+	unsigned int address = (unsigned int)buf->bus_address;
+	int use_agp = PDEA_pagpxfer_enable;
+	int i = 0;
+   	int primary_needed;
+      	PRIMLOCALS;
+
+	DRM_DEBUG("dispatch indices %d addr 0x%lx, "
+		  "start 0x%x end 0x%x nbox %d dirty %x\n", 
+		  buf->idx, address, start, end, 
+		  sarea_priv->nbox, sarea_priv->dirty);
+
+
+   	dev_priv->last_sync_tag = mga_create_sync_tag(dev);
+
+   	if (buf_priv->discard) { 
+		buf_priv->my_freelist->age = dev_priv->last_sync_tag;
+	   	mga_freelist_put(dev, buf);
+	}
+
+
+	/* WARNING: if you change any of the state functions verify
+	 * these numbers (Overestimating this doesn't hurt).  
+	 */
+	primary_needed = (25+15+30+25+ 
+			  10 + 
+			  15 * MGA_NR_SAREA_CLIPRECTS);
+
+
+   	PRIM_OVERFLOW(dev, dev_priv, primary_needed);
+   	mgaEmitState( dev_priv );
+
+	if (start != end) {
+		do {
+			if (i < sarea_priv->nbox) {
+				DRM_DEBUG("idx %d Emit box %d/%d:"
+					  "%d,%d - %d,%d\n", 
+					  buf->idx,
+					  i, sarea_priv->nbox,
+					  sarea_priv->boxes[i].x1, 
+					  sarea_priv->boxes[i].y1,
+					  sarea_priv->boxes[i].x2, 
+					  sarea_priv->boxes[i].y2);
+				
+				mgaEmitClipRect( dev_priv, 
+						 &sarea_priv->boxes[i] );
+			}
+			
+			PRIMGETPTR(dev_priv);
+			PRIMOUTREG( MGAREG_DMAPAD, 0);
+			PRIMOUTREG( MGAREG_DMAPAD, 0);
+			PRIMOUTREG( MGAREG_SETUPADDRESS, 
+				    ((address + start) | SETADD_mode_vertlist));
+			PRIMOUTREG( MGAREG_SETUPEND, 
+				    ((address + end) | use_agp));
+			PRIMADVANCE( dev_priv );	       
+		}  while (++i < sarea_priv->nbox);
+	}
+
+	PRIMGETPTR( dev_priv );
+   	PRIMOUTREG(MGAREG_DMAPAD, 0);
+   	PRIMOUTREG(MGAREG_DMAPAD, 0);
    	PRIMOUTREG(MGAREG_DMAPAD, 0);
    	PRIMOUTREG(MGAREG_DWGSYNC, dev_priv->last_sync_tag);   
 	PRIMADVANCE( dev_priv );
@@ -827,6 +903,7 @@ int mga_vertex(struct inode *inode, struct file *filp,
 	     	buf_priv->my_freelist->age = dev_priv->last_sync_tag;
 	      	mga_freelist_put(dev, buf);
 	   }
+	   DRM_DEBUG("bad state\n");
 	   return -EINVAL;
 	}
 
@@ -837,6 +914,54 @@ int mga_vertex(struct inode *inode, struct file *filp,
       	sarea_priv->last_dispatch = status[1];
    	return 0;
 }
+
+
+int mga_indices(struct inode *inode, struct file *filp,
+		unsigned int cmd, unsigned long arg)
+{
+	drm_file_t *priv = filp->private_data;
+	drm_device_t *dev = priv->dev;
+      	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
+   	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
+      	__volatile__ unsigned int *status = 
+     		(__volatile__ unsigned int *)dev_priv->status_page;
+   	drm_device_dma_t *dma = dev->dma;
+	drm_buf_t *buf;
+      	drm_mga_buf_priv_t *buf_priv;
+	drm_mga_indices_t indices;
+
+	copy_from_user_ret(&indices, (drm_mga_indices_t *)arg, sizeof(indices),
+			   -EFAULT);
+   
+	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
+		DRM_ERROR("mga_indices called without lock held\n");
+		return -EINVAL;
+	}
+
+	DRM_DEBUG("mga_indices\n");
+
+	buf = dma->buflist[ indices.idx ];
+   	buf_priv = buf->dev_private;
+
+	buf_priv->discard = indices.discard;
+   
+	if (!mgaVerifyState(dev_priv)) {
+	   if (indices.discard) { 
+	     	buf_priv->my_freelist->age = dev_priv->last_sync_tag;
+	      	mga_freelist_put(dev, buf);
+	   }
+	   return -EINVAL;
+	}
+
+	mga_dma_dispatch_indices(dev, buf, indices.start, indices.end);
+
+   	PRIMUPDATE(dev_priv);
+	mga_dma_schedule(dev, 1);
+      	sarea_priv->last_dispatch = status[1];
+   	return 0;
+}
+
+
 
 static int mga_dma_get_buffers(drm_device_t *dev, drm_dma_t *d)
 {

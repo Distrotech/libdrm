@@ -119,11 +119,11 @@
 #define MGA_DMA_FLUSH	      0x200 /* set when someone gets the lock
                                        quiescent */
 
-/* 64 buffers of 16k each, total 1 meg.
+/* 32 buffers of 64k each, total 2 meg.
  */
-#define MGA_DMA_BUF_ORDER     14
+#define MGA_DMA_BUF_ORDER     16
 #define MGA_DMA_BUF_SZ        (1<<MGA_DMA_BUF_ORDER)
-#define MGA_DMA_BUF_NR        63
+#define MGA_DMA_BUF_NR        31
 
 /* Keep these small for testing.
  */
@@ -258,5 +258,12 @@ typedef struct _drm_mga_vertex {
 	int used;		/* bytes in use */
 	int discard;		/* client finished with buffer?  */
 } drm_mga_vertex_t;
+
+typedef struct _drm_mga_indices {
+   	int idx;		/* buffer to queue */
+	int start;		
+	int end;		
+	int discard;		/* client finished with buffer?  */
+} drm_mga_indices_t;
 
 #endif

@@ -156,6 +156,8 @@ extern int  mga_iload(struct inode *inode, struct file *filp,
 		      unsigned int cmd, unsigned long arg);
 extern int  mga_vertex(struct inode *inode, struct file *filp,
 		      unsigned int cmd, unsigned long arg);
+extern int  mga_indices(struct inode *inode, struct file *filp,
+			unsigned int cmd, unsigned long arg);
 				/* mga_context.c */
 extern int  mga_resctx(struct inode *inode, struct file *filp,
 		       unsigned int cmd, unsigned long arg);
@@ -378,6 +380,9 @@ drm_mga_prim_buf_t *tmp_buf = 					\
 #define DC_bltmod_bfcol				0x4000000
 #define DC_pattern_disable			0x0
 #define DC_transc_disable			0x0
+
+#define SETADD_mode_vertlist                   	0x0 	
+
 
 #define MGA_CLEAR_CMD (DC_opcod_trap | DC_arzero_enable | 		\
 		       DC_sgnzero_enable | DC_shftzero_enable | 	\
