@@ -277,6 +277,9 @@ extern int mach64_dma_swap( struct inode *inode, struct file *filp,
 
 #define MACH64_PAT_REG0				0x0680
 
+#define MACH64_SC_LEFT_RIGHT                    0x06a8
+#define MACH64_SC_TOP_BOTTOM                    0x06b4
+
 #define MACH64_SCALE_3D_CNTL			0x05fc
 #define MACH64_SCRATCH_REG0			0x0480
 #define MACH64_SCRATCH_REG1			0x0484

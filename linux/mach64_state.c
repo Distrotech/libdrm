@@ -63,6 +63,7 @@ static void mach64_dma_dispatch_clear( drm_device_t *dev,
 {
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
+	drm_mach64_context_regs_t *ctx = &sarea_priv->context_state;
 	int nbox = sarea_priv->nbox;
 	drm_clip_rect_t *pbox = sarea_priv->boxes;
 	u32 fb_bpp, depth_bpp;
@@ -110,6 +111,9 @@ static void mach64_dma_dispatch_clear( drm_device_t *dev,
 			DMAOUTREG( MACH64_Z_CNTL, 0 );
 			DMAOUTREG( MACH64_SCALE_3D_CNTL, 0 );
 			
+			DMAOUTREG( MACH64_SC_LEFT_RIGHT, ctx->sc_left_right );
+			DMAOUTREG( MACH64_SC_TOP_BOTTOM, ctx->sc_top_bottom );
+
 			DMAOUTREG( MACH64_CLR_CMP_CNTL, 0 );
 			DMAOUTREG( MACH64_GUI_TRAJ_CNTL,
 				   (MACH64_DST_X_LEFT_TO_RIGHT |
@@ -123,7 +127,8 @@ static void mach64_dma_dispatch_clear( drm_device_t *dev,
 			
 			DMAOUTREG( MACH64_DP_FRGD_CLR, clear_color );
 			/* FIXME: Use color mask from state info */
-			DMAOUTREG( MACH64_DP_WRITE_MASK, 0xffffffff );
+			/*DMAOUTREG( MACH64_DP_WRITE_MASK, 0xffffffff );*/
+			DMAOUTREG( MACH64_DP_WRITE_MASK, ctx->dp_write_mask );
 			DMAOUTREG( MACH64_DP_MIX, (MACH64_BKGD_MIX_D |
 						   MACH64_FRGD_MIX_S) );
 			DMAOUTREG( MACH64_DP_SRC, (MACH64_BKGD_SRC_FRGD_CLR |
@@ -168,6 +173,9 @@ static void mach64_dma_dispatch_clear( drm_device_t *dev,
 			DMAOUTREG( MACH64_Z_CNTL, 0 );
 			DMAOUTREG( MACH64_SCALE_3D_CNTL, 0 );
 			
+			DMAOUTREG( MACH64_SC_LEFT_RIGHT, ctx->sc_left_right );
+			DMAOUTREG( MACH64_SC_TOP_BOTTOM, ctx->sc_top_bottom );
+
 			DMAOUTREG( MACH64_CLR_CMP_CNTL, 0 );
 			DMAOUTREG( MACH64_GUI_TRAJ_CNTL,
 				   (MACH64_DST_X_LEFT_TO_RIGHT |
@@ -224,6 +232,9 @@ static void mach64_dma_dispatch_swap( drm_device_t *dev )
 
 	DMAOUTREG( MACH64_Z_CNTL, 0 );
 	DMAOUTREG( MACH64_SCALE_3D_CNTL, 0 );
+
+	DMAOUTREG( MACH64_SC_LEFT_RIGHT, 0 | ( 8191 << 16 ) ); /* no scissor */
+	DMAOUTREG( MACH64_SC_TOP_BOTTOM, 0 | ( 16383 << 16 ) );
 
 	DMAOUTREG( MACH64_CLR_CMP_CNTL, 0 );
 	DMAOUTREG( MACH64_GUI_TRAJ_CNTL, (MACH64_DST_X_LEFT_TO_RIGHT |
