@@ -32,7 +32,13 @@
 #ifndef _MGA_DRV_H_
 #define _MGA_DRV_H_
 
+#define MGA_BUF_IN_USE         0
+#define MGA_BUF_SWAP_PENDING   1
+#define MGA_BUF_FORCE_FIRE     2
+#define MGA_BUF_NEEDS_OVERFLOW 3
+
 typedef struct {
+	u32 buffer_status;
    	unsigned int num_dwords;
    	unsigned int max_dwords;
    	u32 *current_dma_ptr;
@@ -40,10 +46,6 @@ typedef struct {
    	u32 phys_head;
    	int sec_used;
    	int idx;
-   	int swap_pending;
-   	u32 in_use;
-   	atomic_t force_fire;
-   	atomic_t needs_overflow;
 } drm_mga_prim_buf_t;
 
 typedef struct _drm_mga_freelist {
@@ -53,7 +55,12 @@ typedef struct _drm_mga_freelist {
    	struct _drm_mga_freelist *prev;
 } drm_mga_freelist_t;
 
+#define MGA_IN_DISPATCH   0
+#define MGA_IN_FLUSH      1
+#define MGA_IN_WAIT       2
+
 typedef struct _drm_mga_private {
+   	u32 dispatch_status;
    	int reserved_map_idx;
    	int buffer_map_idx;
    	drm_mga_sarea_t *sarea_priv;
@@ -71,10 +78,6 @@ typedef struct _drm_mga_private {
 	int use_agp;
    	drm_mga_warp_index_t WarpIndex[MGA_MAX_G400_PIPES];
 	unsigned int WarpPipe;
-   	__volatile__ unsigned long softrap_age;
-   	u32 dispatch_lock;
-   	atomic_t in_flush;
-   	atomic_t in_wait;
    	atomic_t pending_bufs;
    	unsigned int last_sync_tag;
    	unsigned int sync_tag;
@@ -86,7 +89,6 @@ typedef struct _drm_mga_private {
    	drm_mga_prim_buf_t *last_prim;
    	drm_mga_prim_buf_t *current_prim;
    	int current_prim_idx;
-   	struct pci_dev *device;
    	drm_mga_freelist_t *head;
    	drm_mga_freelist_t *tail;
    	wait_queue_head_t flush_queue;	/* Processes waiting until flush    */
@@ -208,16 +210,17 @@ typedef struct {
 
 #define PRIM_OVERFLOW(dev, dev_priv, length) do {			\
 	drm_mga_prim_buf_t *tmp_buf =					\
-		dev_priv->prim_bufs[dev_priv->current_prim_idx];	\
-	if( tmp_buf->max_dwords - tmp_buf->num_dwords < length ||	\
-	    tmp_buf->sec_used > MGA_DMA_BUF_NR/2) {			\
-		atomic_set(&tmp_buf->force_fire, 1);			\
-		mga_advance_primary(dev);				\
-		mga_dma_schedule(dev, 1);				\
-	} else if( atomic_read(&tmp_buf->needs_overflow)) {		\
-		mga_advance_primary(dev);				\
-		mga_dma_schedule(dev, 1);				\
-	}								\
+ 		dev_priv->prim_bufs[dev_priv->current_prim_idx];	\
+ 	if( tmp_buf->max_dwords - tmp_buf->num_dwords < length ||	\
+ 	    tmp_buf->sec_used > MGA_DMA_BUF_NR/2) {			\
+		set_bit(MGA_BUF_FORCE_FIRE, &tmp_buf->buffer_status);	\
+ 		mga_advance_primary(dev);				\
+ 		mga_dma_schedule(dev, 1);				\
+	} else if( test_bit(MGA_BUF_NEEDS_OVERFLOW,			\
+		  &tmp_buf->buffer_status)) {				\
+ 		mga_advance_primary(dev);				\
+ 		mga_dma_schedule(dev, 1);				\
+ 	}								\
 } while(0)
 
 #define PRIMGETPTR(dev_priv) do {					\
