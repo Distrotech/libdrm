@@ -583,7 +583,11 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 	DRM_DEBUG( "table[2] = 0x%08x\n", table[2] );
 	DRM_DEBUG( "table[3] = 0x%08x\n", table[3] );
 
-	for ( i = 0 ; i < count ; i++) {
+	for ( i = 0 ; i < 8 ; i++) {
+		DRM_DEBUG( " data[%d] = 0x%08x\n", i, data[i] );
+	}
+	DRM_DEBUG( " ...\n" );
+	for ( i = count-6 ; i < count ; i++) {
 		DRM_DEBUG( " data[%d] = 0x%08x\n", i, data[i] );
 	}
 
