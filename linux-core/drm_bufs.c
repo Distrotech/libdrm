@@ -425,9 +425,9 @@ int DRM(addbufs_agp)( DRM_OS_IOCTL )
 	}
 
 	if (count < 0 || count > 4096) {
-		up( &dev->struct_sem );
+		DRM_OS_UNLOCK;
 		atomic_dec( &dev->buf_alloc );
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 	}
 
 	entry->buflist = DRM(alloc)( count * sizeof(*entry->buflist),
@@ -768,9 +768,9 @@ int DRM(addbufs_sg)( DRM_OS_IOCTL )
        }
 
 	if (count < 0 || count > 4096) {
-		up( &dev->struct_sem );
+		DRM_OS_UNLOCK;
 		atomic_dec( &dev->buf_alloc );
-		return -EINVAL;
+               	DRM_OS_RETURN(EINVAL);
 	}
 
        entry->buflist = DRM(alloc)( count * sizeof(*entry->buflist),
