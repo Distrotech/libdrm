@@ -92,7 +92,6 @@ extern drm_buf_t *mach64_freelist_get( drm_device_t *dev );
 extern int mach64_do_wait_for_fifo( drm_mach64_private_t *dev_priv,
 				    int entries );
 extern int mach64_do_wait_for_idle( drm_mach64_private_t *dev_priv );
-extern int mach64_do_wait_for_idle( drm_mach64_private_t *dev_priv );
 extern void mach64_dump_engine_info( drm_mach64_private_t *dev_priv );
 extern int mach64_do_engine_reset( drm_device_t *dev );
 extern int mach64_do_cleanup_dma( drm_device_t *dev );
