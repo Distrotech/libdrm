@@ -510,7 +510,7 @@ typedef struct drm_scatter_gather {
 #define SIS_IOCTL_FLIP_FINAL		DRM_IO(  0x50)
 
 /* I830 specific ioctls */
-#if 0
+#if 1
 #define DRM_IOCTL_I830_INIT		DRM_IOW( 0x40, drm_i830_init_t)
 #define DRM_IOCTL_I830_VERTEX		DRM_IOW( 0x41, drm_i830_vertex_t)
 #define DRM_IOCTL_I830_CLEAR		DRM_IOW( 0x42, drm_i830_clear_t)
