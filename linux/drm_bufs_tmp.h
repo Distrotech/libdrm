@@ -4,6 +4,11 @@
  * 
  * \author Rickard E. (Rik) Faith <faith@valinux.com>
  * \author Gareth Hughes <gareth@valinux.com>
+ * \author José Fonseca <jrfonseca@tungstengraphics.com>
+ *
+ * \todo The new functions here don't use the DRM(...)() convention so they will 
+ * break static kernel builds.  The idea is to move them to a seperate library
+ * in a later time that will be linked agains all modules.
  */
 
 /*
@@ -35,6 +40,256 @@
 #define __NO_VERSION__
 #include <linux/vmalloc.h>
 #include "drmP.h"
+
+
+/** \name Buffer pools initialization/cleanup */
+/*@{*/
+
+/**
+ * Initialize a buffer pool.
+ *
+ * It allocates the drm_pool::buffers but it's the caller's responsability to
+ * fill those afterwards.
+ *
+ * \note Not mean to be called directly by drivers. Use one of the functions
+ * mentioned below instead.
+ *
+ * \sa drm_pci_pool_alloc(), drm_agp_pool_alloc() and drm_sg_pool_alloc().
+ */
+int drm_pool_create(drm_pool_t *pool, size_t count, size_t size)
+{
+	memset(pool, 0, sizeof(drm_pool_t));
+	
+	pool->count = count
+	pool->size = size;
+	pool->buffers = (drm_pool_buffer_t *)DRM(alloc)(
+			count*sizeof(drm_buffer_t),
+			DRM_MEM_BUFLISTS);
+
+	if (!pool->buffers)
+		return -ENOMEM;
+
+	return 0;
+}
+
+/**
+ * Destroy a buffer pool.
+ *
+ * \note This function won't actually free the structure and should't be called
+ * directly by the drivers. Use drm_pool_free() instead.
+ */
+void drm_pool_destroy(drm_pool_t *pool)
+{
+	DRM(free)(pool->buffers, pool->count*sizeof(drm_buffer_t), DRM_MEM_BUFLISTS);
+}
+
+/**
+ * Free a buffer pool.
+ *
+ * Calls the free callback
+ */
+void drm_pool_free(drm_device_t *dev, drm_pool_t *pool)
+{
+	if (!pool->free) {
+		DRM_ERROR( "drm_pool_free called but no free callback present\n" );
+		return;
+	}
+
+	pool->free(dev, pool);
+}
+
+/*@}*/
+
+
+/** \name Free-list management */
+/*@{*/
+
+/**
+ * Initialize a free-list.
+ *
+ * \param freelist pointer to the free-list structure to initialize.
+ * \param pool DMA buffer pool associated with the free-list.
+ * \param stride stride of the list entries. This can be used to extend the
+ * information stored in each buffer.
+ * \code
+ * struct my_freelist_entry {
+ *   struct drm_freelist2_entry base;
+ *   ...
+ * } ;
+ * 
+ * ...
+ * drm_freelist2_create(my_freelist, my_pool, sizeof(my_freelist_entry));
+ * ...
+ * \endcode
+ * 
+ * \return zero on success or a negative number on failure.
+ *
+ */
+int drm_freelist2_create(drm_freelist2_t *freelist, drm_pool_t *pool, size_t stride)
+{
+	unsigned i;
+	drm_freelist2_entry_t *entry;
+
+	memset(freelist, 0, sizeof(drm_freelist2_t));
+	
+	freelist->pool = pool;
+	freelist->stride = stride;
+	freelist->entries = DRM(alloc)(
+			pool->count*stride,
+			DRM_MEM_BUFLISTS);
+
+	if (!freelist->entries)
+		return -ENOMEM;
+
+	memset(freelist->entries, 0, pool->count*stride);
+	
+	/* Add each buffer to the free list */
+	for(i = 0; i < pool->count; ++i) {
+		entry = (drm_freelist2_entry_t *)((unsigned char *)freelist->entry + i*stride);
+		entry->buffer = &pool->buffers[i];
+		list_add_tail(&entry->list, freelist->free);
+	}
+	
+	return 0;
+}
+
+/**
+ * Free the resources associated with a free-list.
+ */
+void drm_freelist2_destroy(drm_freelist2_t *freelist)
+{
+	DRM(free)(freelist->entries, freelist->pool->count*freelist->stride, DRM_MEM_BUFLISTS);
+}
+
+/**
+ * Reset the buffers.
+ *
+ * Iterates the pending list and move all discardable buffers into the
+ * free list.
+ *
+ * \warning This function should only be called when the engine is idle or
+ * locked up, as it assumes all buffers in the pending list have been completed
+ * by the hardware.
+ */
+void drm_freelist2_reset(drm_freelist2_t *freelist)
+{
+	struct list_head *ptr, *tmp;
+	drm_freelist2_entry_t *entry;
+
+	if ( list_empty(&freelist->pending) )
+		return;
+
+	list_for_each_safe(ptr, tmp, &dev_priv->pending)
+	{
+		entry = list_entry(ptr, drm_freelist2_entry_t, list);
+		if (entry->discard) {
+			list_del(ptr);
+			list_add_tail(ptr, &freelist->free);
+		}
+	}
+}
+
+/**
+ * Walks through the pending list freeing the processed buffers by comparing
+ * their stamps.
+ *
+ * \param freelist pointer to the free-list structure.
+ * \param bail_out whether to bail out on after so-many freed buffers.
+ *
+ * \return number of freed entries.
+ */
+int drm_freelist2_update(drm_freelist2_t *freelist, int bail_out)
+{
+	struct list_head *ptr, *tmp;
+	drm_freelist2_entry_t *entry;
+	int count = 0;
+
+	list_for_each_safe(ptr, tmp, &freelist->pending) {
+		entry = list_entry(ptr, drm_freelist2_entry_t, list);
+
+		if ( entry->reuse )
+			continue;
+
+		delta = freelist->last_stamp - entry->stamp;
+		if ( delta >= 0 || delta <= -0x4000000 ) {
+			/* found a processed buffer */
+			list_del(ptr);
+			list_add_tail(ptr, &freelist->free);
+			++count;
+			if (bail_out && count >= bail_out)
+				break;
+		}
+	}
+
+	return count;
+}
+	
+
+/**
+ * Get a free buffer from the free-list.
+ *
+ * \return pointer to the buffer entry on success, or NULL on failure.
+ */
+drm_freelist2_entry_t *drm_freelist2_get(drm_freelist2_t *freelist)
+{
+	struct list_head *ptr, *tmp;
+	drm_freelist2_entry_t *entry;
+
+	if ( list_empty(&freelist->free) ) {
+
+		if ( list_empty( &freelist->pending ) ) {
+			DRM_ERROR( "Couldn't get buffer - pending and free lists empty\n" );
+			return NULL;
+		}
+
+		if (freelist->wait(freelist))
+			return NULL;
+	}
+
+	ptr = freelist->free.next;
+	list_del(ptr);
+	entry = list_entry(ptr, drm_freelist2_entry_t, list);
+	entry->used = 0;
+	return entry->buf;
+}
+
+/**
+ * Helper for the drm_freelist2::wait callbacks.
+ * 
+ */
+int drm_freelist2_wait_helper(
+		drm_freelist2_t *freelist, 
+		void (*update_stamp)(drm_freelist2_t *freelist),
+		unsigned long timeout,
+		int bail_out)
+{
+	struct list_head *ptr, *tmp;
+	drm_freelist2_entry_t *entry;
+	unsigned long t;
+
+	for ( t = 0 ; t < timeout ; t++ ) {
+		update_stamp(freelist);
+
+		if (drm_freelist2_update(freelist, bail_out))
+			return 0;
+
+		DRM_UDELAY( 1 );
+	}
+
+	return -1;
+}
+
+/*@}*/
+
+
+
+
+
+
+
+
+/****************************************************************************/
+/* Deprecated stuff */
 
 #ifndef __HAVE_PCI_DMA
 #define __HAVE_PCI_DMA		0

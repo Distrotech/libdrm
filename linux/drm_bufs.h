@@ -4,6 +4,7 @@
  * 
  * \author Rickard E. (Rik) Faith <faith@valinux.com>
  * \author Gareth Hughes <gareth@valinux.com>
+ * \author José Fonseca <jrfonseca@tungstengraphics.com>
  *
  * \todo The current buffer management system assumes too much and is severily
  * limited:
@@ -48,6 +49,127 @@
 #ifndef _DRM_BUFS_H
 #define _DRM_BUFS_H
 
+
+/** \name DMA buffer pool */
+/*@{*/
+
+typedef struct drm_pool_buffer drm_pool_buffer_t;
+typedef struct drm_pool drm_pool_t;
+
+/**
+ * A buffer of the DMA buffer pool.
+ *
+ * \sa drm_pool.
+ */
+struct drm_pool_buffer {
+	void *			cpuaddr;	/**< kernel virtual address */
+	dma_addr_t		busaddr;	/**< associated bus address */
+};
+
+/**
+ * DMA buffer pool.
+ *
+ * \sa drm_pool_buffer.
+ */
+struct drm_pool {
+	size_t			count;		/**< number of buffers */
+	size_t			size;		/**< size of a buffer */
+	drm_pool_buffer_t *	buffers;	/**< buffers */
+
+	/** Callback to free the memory associated with this pool */
+	void (*free)(drm_device_t *dev, drm_pool_t *pool);
+};
+
+/*@}*/
+
+
+/** \name Free-list management */
+/*@{*/
+
+typedef struct drm_freelist2_entrys drm_freelist2_entrys_t;
+typedef struct drm_freelist2 drm_freelist2_t;
+
+/**
+ * An entrys in a freelist.
+ *
+ * This structure can be extended by passing to drm_freelist2_init a stride
+ * value greater than the size of this structure.
+ * 
+ * \sa drm_freelist2.
+ *
+ * \author Based on Leif Delgass's original freelist code for the Mach64
+ * driver.
+ */
+struct drm_freelist2_entrys {
+	struct list_head	list;		/**< Linux list */
+	drm_pool_buffer_t *	buffer;		/**< referred DMA buffer */
+	
+	/**
+	 * Used bytes of the buffer.
+	 *
+	 * This is here for convenience to the drivers since this isn't
+	 * used by the free-list management code.
+	 */
+	size_t			used;
+	
+	/**
+	 * Stamp of this buffer.
+	 *
+	 * Whenever drm_freelist2::last_stamp is greater or equal to this value
+	 * then the buffer is considered free.
+	 *
+	 * The actualy quantity used for the stamp and its granularity does not
+	 * matter, but it must be a monotonicaly increasing one. Also
+	 * differences greater than 0x7ffffff are considered the result of
+	 * arithmetic wrap-around and the buffer is freed.
+	 * 
+	 * \sa drm_freelist2::last_stamp.
+	 */
+	unsigned long stamp;
+
+	/**
+	 * Will it be reused?
+	 *
+	 * If set this flag will override the stamp mechanism above preventing
+	 * the buffer from being considered free, so that its contents can be
+	 * later reused without copying.
+	 */
+	int reuse;
+} ;
+
+/**
+ * A free-list management for DMA buffer pools.
+ *
+ * \sa drm_pool_buffer.
+ */
+struct drm_freelist2 {
+	drm_pool_t *		pool;		/**< the pool managed by this free-list */
+	
+	size_t			stride;		/**< stride of the entries */
+	void *			entries;	/**< array with the freelist entries */
+	
+	struct list_head	free;		/**< free buffers list */
+	struct list_head	pending;	/**< Buffers pending completion */
+
+	/**
+	 * Stamp of the last processed buffer.
+	 *
+	 * \sa drm_free_list2_entrys::stamp.
+	 */
+	unsigned long		last_stamp;
+	
+	/**
+	 * Callback to wait for a free buffer.
+	 */
+	int (*wait)(drm_device_t *dev, drm_freelist2_t *freelist);
+};
+
+
+/*@}*/
+
+
+/** \name Deprecated structure */
+/*@{*/
 
 /**
  * DMA buffer.
@@ -129,6 +251,8 @@ typedef struct drm_buf_entry {
 	unsigned long	  *seglist;
 	drm_freelist_t	  freelist;
 } drm_buf_entry_t;
+
+/*@}*/
 
 
 /** \name Prototypes */
