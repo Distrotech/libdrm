@@ -269,4 +269,81 @@ do {									\
 #define DRM_OS_COPYFROM(arg1, arg2, arg3) \
 	copy_from_user( arg1, arg2, arg3)
 
-#define DRM_PROT_IOCTL	int
+/* Internal functions */
+
+/* drm_drv.h */
+extern int	DRM(ioctl)( DRM_OS_IOCTL );
+extern int	DRM(lock)( DRM_OS_IOCTL );
+extern int	DRM(unlock)( DRM_OS_IOCTL );
+
+/* Misc. IOCTL support (drm_ioctl.h) */
+extern int	DRM(irq_busid)( DRM_OS_IOCTL );
+extern int	DRM(getunique)( DRM_OS_IOCTL );
+extern int	DRM(setunique)( DRM_OS_IOCTL );
+extern int	DRM(getmap)( DRM_OS_IOCTL );
+extern int	DRM(getclient)( DRM_OS_IOCTL );
+extern int	DRM(getstats)( DRM_OS_IOCTL );
+
+/* Context IOCTL support (drm_context.h) */
+extern int	DRM(resctx)( DRM_OS_IOCTL );
+extern int	DRM(addctx)( DRM_OS_IOCTL );
+extern int	DRM(modctx)( DRM_OS_IOCTL );
+extern int	DRM(getctx)( DRM_OS_IOCTL );
+extern int	DRM(switchctx)( DRM_OS_IOCTL );
+extern int	DRM(newctx)( DRM_OS_IOCTL );
+extern int	DRM(rmctx)( DRM_OS_IOCTL );
+extern int	DRM(setsareactx)( DRM_OS_IOCTL );
+extern int	DRM(getsareactx)( DRM_OS_IOCTL );
+
+/* Drawable IOCTL support (drm_drawable.h) */
+extern int	DRM(adddraw)( DRM_OS_IOCTL );
+extern int	DRM(rmdraw)( DRM_OS_IOCTL );
+
+/* Authentication IOCTL support (drm_auth.h) */
+extern int	DRM(getmagic)( DRM_OS_IOCTL );
+extern int	DRM(authmagic)( DRM_OS_IOCTL );
+
+/* Locking IOCTL support (drm_lock.h) */
+extern int	DRM(block)( DRM_OS_IOCTL );
+extern int	DRM(unblock)( DRM_OS_IOCTL );
+extern int	DRM(finish)( DRM_OS_IOCTL );
+
+/* Buffer management support (drm_bufs.h) */
+extern int	DRM(addmap)( DRM_OS_IOCTL );
+extern int	DRM(rmmap)( DRM_OS_IOCTL );
+#if __HAVE_DMA
+extern int	DRM(addbufs)( DRM_OS_IOCTL );
+extern int	DRM(infobufs)( DRM_OS_IOCTL );
+extern int	DRM(markbufs)( DRM_OS_IOCTL );
+extern int	DRM(freebufs)( DRM_OS_IOCTL );
+extern int	DRM(mapbufs)( DRM_OS_IOCTL );
+#endif
+
+/* DMA support (drm_dma.h) */
+#if __HAVE_DMA_IRQ
+extern int	DRM(control)( DRM_OS_IOCTL );
+#endif
+
+/* AGP/GART support (drm_agpsupport.h) */
+#if __REALLY_HAVE_AGP
+extern int	DRM(agp_acquire)( DRM_OS_IOCTL );
+extern int	DRM(agp_release)( DRM_OS_IOCTL );
+extern int	DRM(agp_enable)( DRM_OS_IOCTL );
+extern int	DRM(agp_info)( DRM_OS_IOCTL );
+extern int	DRM(agp_alloc)( DRM_OS_IOCTL );
+extern int	DRM(agp_free)( DRM_OS_IOCTL );
+extern int	DRM(agp_unbind)( DRM_OS_IOCTL );
+extern int	DRM(agp_bind)( DRM_OS_IOCTL );
+#endif
+
+/* Stub support (drm_stub.h) */
+extern int	DRM(stub_register)(const char *name,
+				 struct file_operations *fops,
+				 drm_device_t *dev);
+extern int	DRM(stub_unregister)(int minor);
+
+/* Scatter Gather Support (drm_scatter.h) */
+#if __HAVE_SG
+extern int	DRM(sg_alloc)( DRM_OS_IOCTL );
+extern int	DRM(sg_free)( DRM_OS_IOCTL );
+#endif

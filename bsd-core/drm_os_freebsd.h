@@ -59,12 +59,12 @@ typedef u_int32_t u32;
 #define atomic_sub(n, p)	atomic_subtract_long(p, n)
 
 /* Fake this */
-static __inline unsigned long
+static __inline unsigned int
 test_and_set_bit(int b, volatile unsigned long *p)
 {
 	int s = splhigh();
-	unsigned long m = 1<<b;
-	unsigned long r = *p & m;
+	unsigned int m = 1<<b;
+	unsigned int r = *p & m;
 	*p |= m;
 	splx(s);
 	return r;
@@ -179,3 +179,77 @@ find_first_zero_bit(volatile unsigned long *p, int max)
 			}						\
 		}							\
 	} while (0)
+
+
+/* Internal functions */
+
+/* drm_drv.h */
+extern d_ioctl_t	DRM(ioctl);
+extern d_ioctl_t	DRM(lock);
+extern d_ioctl_t	DRM(unlock);
+
+/* Misc. IOCTL support (drm_ioctl.h) */
+extern d_ioctl_t	DRM(irq_busid);
+extern d_ioctl_t	DRM(getunique);
+extern d_ioctl_t	DRM(setunique);
+extern d_ioctl_t	DRM(getmap);
+extern d_ioctl_t	DRM(getclient);
+extern d_ioctl_t	DRM(getstats);
+
+/* Context IOCTL support (drm_context.h) */
+extern d_ioctl_t	DRM(resctx);
+extern d_ioctl_t	DRM(addctx);
+extern d_ioctl_t	DRM(modctx);
+extern d_ioctl_t	DRM(getctx);
+extern d_ioctl_t	DRM(switchctx);
+extern d_ioctl_t	DRM(newctx);
+extern d_ioctl_t	DRM(rmctx);
+extern d_ioctl_t	DRM(setsareactx);
+extern d_ioctl_t	DRM(getsareactx);
+
+/* Drawable IOCTL support (drm_drawable.h) */
+extern d_ioctl_t	DRM(adddraw);
+extern d_ioctl_t	DRM(rmdraw);
+
+/* Authentication IOCTL support (drm_auth.h) */
+extern d_ioctl_t	DRM(getmagic);
+extern d_ioctl_t	DRM(authmagic);
+
+/* Locking IOCTL support (drm_lock.h) */
+extern d_ioctl_t	DRM(block);
+extern d_ioctl_t	DRM(unblock);
+extern d_ioctl_t	DRM(finish);
+
+/* Buffer management support (drm_bufs.h) */
+extern d_ioctl_t	DRM(addmap);
+extern d_ioctl_t	DRM(rmmap);
+#if __HAVE_DMA
+extern d_ioctl_t	DRM(addbufs);
+extern d_ioctl_t	DRM(infobufs);
+extern d_ioctl_t	DRM(markbufs);
+extern d_ioctl_t	DRM(freebufs);
+extern d_ioctl_t	DRM(mapbufs);
+#endif
+
+/* DMA support (drm_dma.h) */
+#if __HAVE_DMA_IRQ
+extern d_ioctl_t	DRM(control);
+#endif
+
+/* AGP/GART support (drm_agpsupport.h) */
+#if __REALLY_HAVE_AGP
+extern d_ioctl_t	DRM(agp_acquire);
+extern d_ioctl_t	DRM(agp_release);
+extern d_ioctl_t	DRM(agp_enable);
+extern d_ioctl_t	DRM(agp_info);
+extern d_ioctl_t	DRM(agp_alloc);
+extern d_ioctl_t	DRM(agp_free);
+extern d_ioctl_t	DRM(agp_unbind);
+extern d_ioctl_t	DRM(agp_bind);
+#endif
+
+/* Scatter Gather Support (drm_scatter.h) */
+#if __HAVE_SG
+extern d_ioctl_t	DRM(sg_alloc);
+extern d_ioctl_t	DRM(sg_free);
+#endif

@@ -32,63 +32,58 @@
 #define __NO_VERSION__
 #include "drmP.h"
 
-int DRM(irq_busid)(struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg)
+int DRM(irq_busid)( DRM_OS_IOCTL )
 {
 	drm_irq_busid_t p;
 	struct pci_dev	*dev;
 
 	if (copy_from_user(&p, (drm_irq_busid_t *)arg, sizeof(p)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	dev = pci_find_slot(p.busnum, PCI_DEVFN(p.devnum, p.funcnum));
 	if (dev) p.irq = dev->irq;
 	else	 p.irq = 0;
 	DRM_DEBUG("%d:%d:%d => IRQ %d\n",
 		  p.busnum, p.devnum, p.funcnum, p.irq);
 	if (copy_to_user((drm_irq_busid_t *)arg, &p, sizeof(p)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	return 0;
 }
 
-int DRM(getunique)(struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg)
+int DRM(getunique)( DRM_OS_IOCTL )
 {
-	drm_file_t	 *priv	 = filp->private_data;
-	drm_device_t	 *dev	 = priv->dev;
+	DRM_OS_DEVICE;
 	drm_unique_t	 u;
 
 	if (copy_from_user(&u, (drm_unique_t *)arg, sizeof(u)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	if (u.unique_len >= dev->unique_len) {
 		if (copy_to_user(u.unique, dev->unique, dev->unique_len))
-			return -EFAULT;
+			DRM_OS_RETURN(EFAULT);
 	}
 	u.unique_len = dev->unique_len;
 	if (copy_to_user((drm_unique_t *)arg, &u, sizeof(u)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	return 0;
 }
 
-int DRM(setunique)(struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg)
+int DRM(setunique)( DRM_OS_IOCTL )
 {
-	drm_file_t	 *priv	 = filp->private_data;
-	drm_device_t	 *dev	 = priv->dev;
+	DRM_OS_DEVICE;
 	drm_unique_t	 u;
 
 	if (dev->unique_len || dev->unique)
-		return -EBUSY;
+		DRM_OS_RETURN(EBUSY);
 
 	if (copy_from_user(&u, (drm_unique_t *)arg, sizeof(u)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 
 	if (!u.unique_len)
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 
 	dev->unique_len = u.unique_len;
 	dev->unique	= DRM(alloc)(u.unique_len + 1, DRM_MEM_DRIVER);
 	if (copy_from_user(dev->unique, u.unique, dev->unique_len))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	dev->unique[dev->unique_len] = '\0';
 
 	dev->devname = DRM(alloc)(strlen(dev->name) + strlen(dev->unique) + 2,
@@ -120,11 +115,9 @@ int DRM(setunique)(struct inode *inode, struct file *filp,
 }
 
 
-int DRM(getmap)( struct inode *inode, struct file *filp,
-		 unsigned int cmd, unsigned long arg )
+int DRM(getmap)( DRM_OS_IOCTL )
 {
-	drm_file_t   *priv = filp->private_data;
-	drm_device_t *dev  = priv->dev;
+	DRM_OS_DEVICE;
 	drm_map_t    map;
 	drm_map_list_t *r_list = NULL;
 	struct list_head *list;
@@ -132,13 +125,13 @@ int DRM(getmap)( struct inode *inode, struct file *filp,
 	int	     i;
 
 	if (copy_from_user(&map, (drm_map_t *)arg, sizeof(map)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	idx = map.offset;
 
-	down(&dev->struct_sem);
+	DRM_OS_LOCK;
 	if (idx < 0 || idx >= dev->map_count) {
-		up(&dev->struct_sem);
-		return -EINVAL;
+		DRM_OS_UNLOCK;
+		DRM_OS_RETURN(EINVAL);
 	}
 
 	i = 0;
@@ -150,8 +143,8 @@ int DRM(getmap)( struct inode *inode, struct file *filp,
 		i++;
 	}
 	if(!r_list || !r_list->map) {
-		up(&dev->struct_sem);
-		return -EINVAL;
+		DRM_OS_UNLOCK;
+		DRM_OS_RETURN(EINVAL);
 	}
 
 	map.offset = r_list->map->offset;
@@ -160,56 +153,53 @@ int DRM(getmap)( struct inode *inode, struct file *filp,
 	map.flags  = r_list->map->flags;
 	map.handle = r_list->map->handle;
 	map.mtrr   = r_list->map->mtrr;
-	up(&dev->struct_sem);
+	DRM_OS_UNLOCK;
 
-	if (copy_to_user((drm_map_t *)arg, &map, sizeof(map))) return -EFAULT;
+	if (copy_to_user((drm_map_t *)arg, &map, sizeof(map))) 
+		DRM_OS_RETURN(EFAULT);
 	return 0;
 }
 
-int DRM(getclient)( struct inode *inode, struct file *filp,
-		    unsigned int cmd, unsigned long arg )
+int DRM(getclient)( DRM_OS_IOCTL )
 {
-	drm_file_t   *priv = filp->private_data;
-	drm_device_t *dev  = priv->dev;
+	DRM_OS_DEVICE;
 	drm_client_t client;
 	drm_file_t   *pt;
 	int          idx;
 	int          i;
 
 	if (copy_from_user(&client, (drm_client_t *)arg, sizeof(client)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	idx = client.idx;
-	down(&dev->struct_sem);
+	DRM_OS_LOCK;
 	for (i = 0, pt = dev->file_first; i < idx && pt; i++, pt = pt->next)
 		;
 
 	if (!pt) {
-		up(&dev->struct_sem);
-		return -EINVAL;
+		DRM_OS_UNLOCK;
+		DRM_OS_RETURN(EINVAL);
 	}
 	client.auth  = pt->authenticated;
 	client.pid   = pt->pid;
 	client.uid   = pt->uid;
 	client.magic = pt->magic;
 	client.iocs  = pt->ioctl_count;
-	up(&dev->struct_sem);
+	DRM_OS_UNLOCK;
 
 	if (copy_to_user((drm_client_t *)arg, &client, sizeof(client)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	return 0;
 }
 
-int DRM(getstats)( struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg )
+int DRM(getstats)( DRM_OS_IOCTL )
 {
-	drm_file_t   *priv = filp->private_data;
-	drm_device_t *dev  = priv->dev;
+	DRM_OS_DEVICE;
 	drm_stats_t  stats;
 	int          i;
 
 	memset(&stats, 0, sizeof(stats));
 	
-	down(&dev->struct_sem);
+	DRM_OS_LOCK;
 
 	for (i = 0; i < dev->counters; i++) {
 		if (dev->types[i] == _DRM_STAT_LOCK)
@@ -223,9 +213,9 @@ int DRM(getstats)( struct inode *inode, struct file *filp,
 	
 	stats.count = dev->counters;
 
-	up(&dev->struct_sem);
+	DRM_OS_UNLOCK;
 
 	if (copy_to_user((drm_stats_t *)arg, &stats, sizeof(stats)))
-		return -EFAULT;
+		DRM_OS_RETURN(EFAULT);
 	return 0;
 }
