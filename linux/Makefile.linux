@@ -206,12 +206,14 @@ dristat: dristat.c
 	$(CC) $(PRGCFLAGS) $< -o $@
 
 gamma_drv.o: gamma_drv.c
-	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
+	$(CC) $(MODCFLAGS) -I$(TREE) -c $< -o $@
+#	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
 gamma.o: $(GAMMAOBJS)
 	$(LD) -r $^ -o $@
 
 tdfx_drv.o: tdfx_drv.c
-	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
+	$(CC) $(MODCFLAGS) -I$(TREE) -c $< -o $@
+#	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
 tdfx.o: $(TDFXOBJS) $(LIBS)
 	$(LD) -r $^ -o $@
 
@@ -220,22 +222,26 @@ sis.o: $(SISOBJS) $(LIBS)
 
 ifeq ($(AGP),1)
 mga_drv.o: mga_drv.c
-	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
+	$(CC) $(MODCFLAGS) -I$(TREE) -c $< -o $@
+#	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
 mga.o: $(MGAOBJS)
 	$(LD) -r $^ -o $@
 
 i810_drv.o: i810_drv.c
-	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
+	$(CC) $(MODCFLAGS) -I$(TREE) -c $< -o $@
+#	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
 i810.o: $(I810OBJS) $(LIBS)
 	$(LD) -r $^ -o $@
 
 r128_drv.o: r128_drv.c
-	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
+	$(CC) $(MODCFLAGS) -I$(TREE) -c $< -o $@
+#	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
 r128.o: $(R128OBJS) $(LIBS)
 	$(LD) -r $^ -o $@
 
 radeon_drv.o: radeon_drv.c
-	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
+	$(CC) $(MODCFLAGS) -I$(TREE) -c $< -o $@
+#	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
 radeon.o: $(RADEONOBJS) $(LIBS)
 	$(LD) -r $^ -o $@
 endif

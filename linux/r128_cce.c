@@ -484,6 +484,9 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 
 	dev_priv->ring.status = ((drm_r128_ring_status_t *)
 				 dev_priv->status->handle);
+	dev_priv->ring.status->head = 0;
+	dev_priv->ring.status->tail = 0;
+	dev_priv->ring.status->space = init->ring_size;
 
 	dev_priv->ring.start = (u32 *)dev_priv->cce_ring->handle;
 	dev_priv->ring.size = init->ring_size;
