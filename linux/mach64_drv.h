@@ -144,7 +144,7 @@ extern int mach64_dma_swap( struct inode *inode, struct file *filp,
 #	define BKGD_MIX_NOT_S				(4 << 0)
 #	define BKGD_MIX_D_XOR_S				(5 << 0)
 #	define BKGD_MIX_NOT_D_XOR_S			(6 << 0)
-#	define BKGD_MIX_S				(7 << 0)
+#	define MACH64_BKGD_MIX_S				(7 << 0)
 #	define BKGD_MIX_NOT_D_OR_NOT_S			(8 << 0)
 #	define BKGD_MIX_D_OR_NOT_S			(9 << 0)
 #	define BKGD_MIX_NOT_D_OR_S			(10 << 0)
