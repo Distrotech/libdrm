@@ -50,6 +50,7 @@ typedef struct drm_mach64_private {
 	drm_map_t *fb;
 	drm_map_t *mmio;
 	drm_map_t *buffers;
+	drm_map_t *agp_textures;
 } drm_mach64_private_t;
 
 typedef struct drm_mach64_buf_priv {

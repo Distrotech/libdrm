@@ -155,21 +155,21 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 			break;
 		}
 	}
-	if(!dev_priv->sarea) {
+	if (!dev_priv->sarea) {
 		dev->dev_private = (void *)dev_priv;
 	   	mach64_do_cleanup_dma(dev);
 	   	DRM_ERROR("can not find sarea!\n");
 	   	return -EINVAL;
 	}
 	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
-	if(!dev_priv->fb) {
+	if (!dev_priv->fb) {
 		dev->dev_private = (void *)dev_priv;
 	   	mach64_do_cleanup_dma(dev);
 	   	DRM_ERROR("can not find frame buffer map!\n");
 	   	return -EINVAL;
 	}
 	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
-	if(!dev_priv->mmio) {
+	if (!dev_priv->mmio) {
 		dev->dev_private = (void *)dev_priv;
 	   	mach64_do_cleanup_dma(dev);
 	   	DRM_ERROR("can not find mmio map!\n");
@@ -182,19 +182,27 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 
 	if( !dev_priv->is_pci ) {
 		DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
-		if( !dev_priv->buffers ) {
+		if ( !dev_priv->buffers ) {
 			dev->dev_private = (void *)dev_priv;
 			mach64_do_cleanup_dma( dev );
 			DRM_ERROR( "can not find dma buffer map!\n" );
 			return -EINVAL;
 		}
 		DRM_IOREMAP( dev_priv->buffers );
-		if( !dev_priv->buffers->handle ) {
+		if ( !dev_priv->buffers->handle ) {
 			dev->dev_private = (void *) dev_priv;
 			mach64_do_cleanup_dma( dev );
 			DRM_ERROR( "can not ioremap virtual address for"
 				   " dma buffer\n" );
 			return -ENOMEM;
+		}
+		DRM_FIND_MAP( dev_priv->agp_textures,
+			      init->agp_textures_offset );
+		if (!dev_priv->agp_textures) {
+			dev->dev_private = (void *)dev_priv;
+			mach64_do_cleanup_dma( dev );
+			DRM_ERROR("could not find agp texture region!\n");
+			return -EINVAL;
 		}
 	}
 
@@ -220,7 +228,7 @@ int mach64_do_cleanup_dma( drm_device_t *dev )
 	if ( dev->dev_private ) {
 		drm_mach64_private_t *dev_priv = dev->dev_private;
 		
-		if(dev_priv->buffers) {
+		if (dev_priv->buffers) {
 			DRM_IOREMAPFREE( dev_priv->buffers );
 		}
 		DRM(free)( dev_priv, sizeof(drm_mach64_private_t),
