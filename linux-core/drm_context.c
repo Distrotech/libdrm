@@ -93,7 +93,7 @@ int DRM(ctxbitmap_next)( drm_device_t *dev )
 						DRM_MEM_MAPS);
 				if(!dev->context_sareas) {
 					clear_bit(bit, dev->ctx_bitmap);
-					DRM_OS_UNLOCK;
+					up(&dev->struct_sem);
 					return -1;
 				}
 				dev->context_sareas[bit] = NULL;
@@ -156,7 +156,7 @@ int DRM(getsareactx)( DRM_OS_IOCTL )
 			   sizeof(request) );
 
 	DRM_OS_LOCK;
-	if ((int)request.ctx_id >= dev->max_context) {
+	if (dev->max_context < 0 || request.ctx_id >= (unsigned) dev->max_context) {
 		DRM_OS_UNLOCK;
 		DRM_OS_RETURN(EINVAL);
 	}
@@ -192,33 +192,34 @@ int DRM(setsareactx)( DRM_OS_IOCTL )
 	list_for_each(list, &dev->maplist->head) {
 		r_list = (drm_map_list_t *)list;
 		if(r_list->map &&
-		   r_list->map->handle == request.handle) break;
+		   r_list->map->handle == request.handle) 
+			goto found;
 	}
-	if (list == &(dev->maplist->head)) {
-		DRM_OS_UNLOCK;
-		DRM_OS_RETURN(EINVAL);
-	}
-	map = r_list->map;
 #endif
 #ifdef __FreeBSD__
 	TAILQ_FOREACH(list, dev->maplist, link) {
 		map=list->map;
-		if(map->handle == request.handle) break;
-	}
-	if (!list) {
-		lockmgr( &dev->dev_lock, LK_RELEASE, 0, curproc );
-		return EINVAL;
+		if(map->handle == request.handle) 
+			goto found;
 	}
 #endif
+
+bad:
 	DRM_OS_UNLOCK;
+	return -EINVAL;
 
-	if (!map) DRM_OS_RETURN(EINVAL);
-
-	DRM_OS_LOCK;
-	if ((int)request.ctx_id >= dev->max_context) {
-		DRM_OS_UNLOCK;
-		DRM_OS_RETURN(EINVAL);
-	}
+found:
+#ifdef __linux__
+	map = r_list->map;
+#endif
+#ifdef __FreeBSD__
+	map = list->map;
+#endif
+	if (!map) goto bad;
+	if (dev->max_context < 0)
+		goto bad;
+	if (request.ctx_id >= (unsigned) dev->max_context)
+		goto bad;
 	dev->context_sareas[request.ctx_id] = map;
 	DRM_OS_UNLOCK;
 	return 0;

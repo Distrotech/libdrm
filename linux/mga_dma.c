@@ -548,7 +548,6 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 		mga_do_cleanup_dma( dev );
 		DRM_OS_RETURN(EINVAL);
 	}
-
 	DRM_FIND_MAP( dev_priv->warp, init->warp_offset );
 	if(!dev_priv->warp) {
 		DRM_ERROR( "failed to find warp microcode region!\n" );

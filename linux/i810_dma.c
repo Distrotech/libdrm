@@ -452,7 +452,6 @@ static int i810_dma_initialize(drm_device_t *dev,
 	   	DRM_ERROR("can not find sarea!\n");
 	   	DRM_OS_RETURN(EINVAL);
 	}
-
 	DRM_FIND_MAP( dev_priv->mmio_map, init->mmio_offset );
 	if(!dev_priv->mmio_map) {
 		dev->dev_private = (void *)dev_priv;

@@ -158,7 +158,7 @@ int DRM(setunique)( DRM_OS_IOCTL )
                 pci_dev = pci_find_slot(b, PCI_DEVFN(d,f));
                 if (pci_dev) {
 			dev->pdev = pci_dev;
-                        dev->hose = pci_dev->sysdata;
+			dev->hose = pci_dev->sysdata;
 		}
         } while(0);
 #endif

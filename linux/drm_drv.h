@@ -155,6 +155,7 @@ static struct file_operations	DRM(fops) = {	\
 #endif /* __FreeBSD__ */
 #endif
 
+
 /*
  * The default number of instances (minor numbers) to initialize.
  */
@@ -723,6 +724,7 @@ static int __init drm_init( void )
 static int DRM(init)( device_t nbdev )
 #endif
 {
+
 	drm_device_t *dev;
 	int i;
 #if __HAVE_CTX_BITMAP
@@ -853,6 +855,8 @@ static void DRM(cleanup)(device_t nbdev)
 {
 	drm_device_t *dev;
 	int i;
+
+	DRM_DEBUG( "\n" );
 
 	for (i = DRM(numdevs) - 1; i >= 0; i--) {
 #ifdef __linux__
