@@ -1,5 +1,5 @@
-/* vm.c -- Memory mapping for DRM -*- linux-c -*-
- * Created: Mon Jan  4 08:58:31 1999 by faith@precisioninsight.com
+/* drm_vm.h -- Memory mapping for DRM -*- linux-c -*-
+ * Created: Mon Jan  4 08:58:31 1999 by faith@valinux.com
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
@@ -19,72 +19,66 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * VA LINUX SYSTEMS AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  *
  * Authors:
  *    Rickard E. (Rik) Faith <faith@valinux.com>
- *
+ *    Gareth Hughes <gareth@valinux.com>
  */
 
 #define __NO_VERSION__
 #include "drmP.h"
 
 struct vm_operations_struct   drm_vm_ops = {
-	nopage:	 drm_vm_nopage,
-	open:	 drm_vm_open,
-	close:	 drm_vm_close,
+	nopage:	 DRM(vm_nopage),
+	open:	 DRM(vm_open),
+	close:	 DRM(vm_close),
 };
 
 struct vm_operations_struct   drm_vm_shm_ops = {
-	nopage:	 drm_vm_shm_nopage,
-	open:	 drm_vm_open,
-	close:	 drm_vm_close,
+	nopage:	 DRM(vm_shm_nopage),
+	open:	 DRM(vm_open),
+	close:	 DRM(vm_close),
 };
 
 struct vm_operations_struct   drm_vm_shm_lock_ops = {
-	nopage:	 drm_vm_shm_nopage_lock,
-	open:	 drm_vm_open,
-	close:	 drm_vm_close,
+	nopage:	 DRM(vm_shm_nopage_lock),
+	open:	 DRM(vm_open),
+	close:	 DRM(vm_close),
 };
 
 struct vm_operations_struct   drm_vm_dma_ops = {
-	nopage:	 drm_vm_dma_nopage,
-	open:	 drm_vm_open,
-	close:	 drm_vm_close,
-};
-
-struct vm_operations_struct   drm_vm_sg_ops = {
-	nopage:	 drm_vm_sg_nopage,
-	open:	 drm_vm_open,
-	close:	 drm_vm_close,
+	nopage:	 DRM(vm_dma_nopage),
+	open:	 DRM(vm_open),
+	close:	 DRM(vm_close),
 };
 
 #if LINUX_VERSION_CODE < 0x020317
-unsigned long drm_vm_nopage(struct vm_area_struct *vma,
-			    unsigned long address,
-			    int write_access)
+unsigned long DRM(vm_nopage)(struct vm_area_struct *vma,
+			     unsigned long address,
+			     int write_access)
 #else
 				/* Return type changed in 2.3.23 */
-struct page *drm_vm_nopage(struct vm_area_struct *vma,
-			   unsigned long address,
-			   int write_access)
+struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
+			    unsigned long address,
+			    int write_access)
 #endif
 {
 	return NOPAGE_SIGBUS;		/* Disallow mremap */
 }
 
 #if LINUX_VERSION_CODE < 0x020317
-unsigned long drm_vm_shm_nopage(struct vm_area_struct *vma,
-				unsigned long address,
-				int write_access)
+unsigned long DRM(vm_shm_nopage)(struct vm_area_struct *vma,
+				 unsigned long address,
+				 int write_access)
 #else
 				/* Return type changed in 2.3.23 */
-struct page *drm_vm_shm_nopage(struct vm_area_struct *vma,
-			       unsigned long address,
-			       int write_access)
+struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
+				unsigned long address,
+				int write_access)
 #endif
 {
 #if LINUX_VERSION_CODE >= 0x020300
@@ -111,14 +105,14 @@ struct page *drm_vm_shm_nopage(struct vm_area_struct *vma,
 }
 
 #if LINUX_VERSION_CODE < 0x020317
-unsigned long drm_vm_shm_nopage_lock(struct vm_area_struct *vma,
-				     unsigned long address,
-				     int write_access)
+unsigned long DRM(vm_shm_nopage_lock)(struct vm_area_struct *vma,
+				      unsigned long address,
+				      int write_access)
 #else
 				/* Return type changed in 2.3.23 */
-struct page *drm_vm_shm_nopage_lock(struct vm_area_struct *vma,
-				    unsigned long address,
-				    int write_access)
+struct page *DRM(vm_shm_nopage_lock)(struct vm_area_struct *vma,
+				     unsigned long address,
+				     int write_access)
 #endif
 {
 	drm_file_t	 *priv	 = vma->vm_file->private_data;
@@ -144,14 +138,14 @@ struct page *drm_vm_shm_nopage_lock(struct vm_area_struct *vma,
 }
 
 #if LINUX_VERSION_CODE < 0x020317
-unsigned long drm_vm_dma_nopage(struct vm_area_struct *vma,
-				unsigned long address,
-				int write_access)
+unsigned long DRM(vm_dma_nopage)(struct vm_area_struct *vma,
+				 unsigned long address,
+				 int write_access)
 #else
 				/* Return type changed in 2.3.23 */
-struct page *drm_vm_dma_nopage(struct vm_area_struct *vma,
-			       unsigned long address,
-			       int write_access)
+struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
+				unsigned long address,
+				int write_access)
 #endif
 {
 	drm_file_t	 *priv	 = vma->vm_file->private_data;
@@ -178,49 +172,7 @@ struct page *drm_vm_dma_nopage(struct vm_area_struct *vma,
 #endif
 }
 
-#if LINUX_VERSION_CODE < 0x020317
-unsigned long drm_vm_sg_nopage(struct vm_area_struct *vma,
-			       unsigned long address,
-			       int write_access)
-#else
-				/* Return type changed in 2.3.23 */
-struct page *drm_vm_sg_nopage(struct vm_area_struct *vma,
-			      unsigned long address,
-			      int write_access)
-#endif
-{
-#if LINUX_VERSION_CODE >= 0x020300
-	drm_map_t	 *map	 = (drm_map_t *)vma->vm_private_data;
-#else
-	drm_map_t	 *map	 = (drm_map_t *)vma->vm_pte;
-#endif
-	drm_file_t *priv = vma->vm_file->private_data;
-	drm_device_t *dev = priv->dev;
-	drm_sg_mem_t *entry = dev->sg;
-	unsigned long offset;
-	unsigned long map_offset;
-	unsigned long page_offset;
-	struct page *page;
-
-	if (!entry)                return NOPAGE_SIGBUS; /* Error */
-	if (address > vma->vm_end) return NOPAGE_SIGBUS; /* Disallow mremap */
-	if (!entry->pagelist)      return NOPAGE_OOM ;  /* Nothing allocated */
-
-
-	offset = address - vma->vm_start;
-	map_offset = map->offset - dev->sg->handle;
-	page_offset = (offset >> PAGE_SHIFT) + (map_offset >> PAGE_SHIFT);
-	page = entry->pagelist[page_offset];
-	atomic_inc(&page->count);                       /* Dec. by kernel */
-
-#if LINUX_VERSION_CODE < 0x020317
-	return (unsigned long)virt_to_phys(page->virtual);
-#else
-	return page;
-#endif
-}
-
-void drm_vm_open(struct vm_area_struct *vma)
+void DRM(vm_open)(struct vm_area_struct *vma)
 {
 	drm_file_t	*priv	= vma->vm_file->private_data;
 	drm_device_t	*dev	= priv->dev;
@@ -238,7 +190,7 @@ void drm_vm_open(struct vm_area_struct *vma)
 
 
 #if DRM_DEBUG_CODE
-	vma_entry = drm_alloc(sizeof(*vma_entry), DRM_MEM_VMAS);
+	vma_entry = DRM(alloc)(sizeof(*vma_entry), DRM_MEM_VMAS);
 	if (vma_entry) {
 		down(&dev->struct_sem);
 		vma_entry->vma	= vma;
@@ -250,7 +202,7 @@ void drm_vm_open(struct vm_area_struct *vma)
 #endif
 }
 
-void drm_vm_close(struct vm_area_struct *vma)
+void DRM(vm_close)(struct vm_area_struct *vma)
 {
 	drm_file_t	*priv	= vma->vm_file->private_data;
 	drm_device_t	*dev	= priv->dev;
@@ -274,7 +226,7 @@ void drm_vm_close(struct vm_area_struct *vma)
 			} else {
 				dev->vmalist = pt->next;
 			}
-			drm_free(pt, sizeof(*pt), DRM_MEM_VMAS);
+			DRM(free)(pt, sizeof(*pt), DRM_MEM_VMAS);
 			break;
 		}
 	}
@@ -282,7 +234,7 @@ void drm_vm_close(struct vm_area_struct *vma)
 #endif
 }
 
-int drm_mmap_dma(struct file *filp, struct vm_area_struct *vma)
+int DRM(mmap_dma)(struct file *filp, struct vm_area_struct *vma)
 {
 	drm_file_t	 *priv	 = filp->private_data;
 	drm_device_t	 *dev;
@@ -311,11 +263,11 @@ int drm_mmap_dma(struct file *filp, struct vm_area_struct *vma)
 	++filp->f_count;
 #endif
 	vma->vm_file  =	 filp;	/* Needed for drm_vm_open() */
-	drm_vm_open(vma);
+	DRM(vm_open)(vma);
 	return 0;
 }
 
-int drm_mmap(struct file *filp, struct vm_area_struct *vma)
+int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 {
 	drm_file_t	*priv	= filp->private_data;
 	drm_device_t	*dev	= priv->dev;
@@ -325,7 +277,7 @@ int drm_mmap(struct file *filp, struct vm_area_struct *vma)
 	DRM_DEBUG("start = 0x%lx, end = 0x%lx, offset = 0x%lx\n",
 		  vma->vm_start, vma->vm_end, VM_OFFSET(vma));
 
-	if (!VM_OFFSET(vma)) return drm_mmap_dma(filp, vma);
+	if (!VM_OFFSET(vma)) return DRM(mmap_dma)(filp, vma);
 
 				/* A sequential search of a linked list is
 				   fine here because: 1) there will only be
@@ -369,13 +321,9 @@ int drm_mmap(struct file *filp, struct vm_area_struct *vma)
 				pgprot_val(vma->vm_page_prot) |= _PAGE_PCD;
 				pgprot_val(vma->vm_page_prot) &= ~_PAGE_PWT;
 			}
-#elif defined(__powerpc__)
-			pgprot_val(vma->vm_page_prot) |=
-				_PAGE_NO_CACHE | _PAGE_GUARDED;
 #elif defined(__ia64__)
 			if (map->type != _DRM_AGP)
-				vma->vm_page_prot =
-					pgprot_writecombine(vma->vm_page_prot);
+				vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 #endif
 			vma->vm_flags |= VM_IO;	/* not in core dump */
 		}
@@ -406,15 +354,6 @@ int drm_mmap(struct file *filp, struct vm_area_struct *vma)
 				   DRM_KERNEL advisory is supported. */
 		vma->vm_flags |= VM_LOCKED;
 		break;
-	case _DRM_SCATTER_GATHER:
-		vma->vm_ops = &drm_vm_sg_ops;
-#if LINUX_VERSION_CODE >= 0x020300
-		vma->vm_private_data = (void *)map;
-#else
-		vma->vm_pte = (unsigned long)map;
-#endif
-		vma->vm_flags |= VM_LOCKED;
-		break;
 	default:
 		return -EINVAL;	/* This should never happen. */
 	}
@@ -426,6 +365,6 @@ int drm_mmap(struct file *filp, struct vm_area_struct *vma)
 	++filp->f_count;
 #endif
 	vma->vm_file  =	 filp;	/* Needed for drm_vm_open() */
-	drm_vm_open(vma);
+	DRM(vm_open)(vma);
 	return 0;
 }
