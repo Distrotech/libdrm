@@ -122,7 +122,7 @@ int DRM(open_helper)(dev_t kdev, int flags, int fmt, struct proc *p,
 		priv = (drm_file_t *) DRM(alloc)(sizeof(*priv), DRM_MEM_FILES);
 		bzero(priv, sizeof(*priv));
 #if __FreeBSD_version >= 500021
-		priv->uid               = p->p_ucred->cr_svuid;
+		priv->uid		= p->p_ucred->cr_svuid;
 #else
 		priv->uid		= p->p_cred->p_svuid;
 #endif

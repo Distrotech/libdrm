@@ -136,23 +136,25 @@ static int DRM(_vm_info)DRM_SYSCTL_HANDLER_ARGS
 	error = SYSCTL_OUT(req, buf, strlen(buf));
 	if (error) return error;
 
-	TAILQ_FOREACH(listentry, dev->maplist, link) {
-		map = listentry->map;
-		if (map->type < 0 || map->type > 2) type = "??";
-		else				    type = types[map->type];
-		DRM_SYSCTL_PRINT("%4d 0x%08lx 0x%08lx %4.4s  0x%02x 0x%08lx ",
-				 i,
-				 map->offset,
-				 map->size,
-				 type,
-				 map->flags,
-				 (unsigned long)map->handle);
-		if (map->mtrr < 0) {
-			DRM_SYSCTL_PRINT("none\n");
-		} else {
-			DRM_SYSCTL_PRINT("%4d\n", map->mtrr);
+	if (dev->maplist != NULL) {
+		TAILQ_FOREACH(listentry, dev->maplist, link) {
+			map = listentry->map;
+			if (map->type < 0 || map->type > 2) type = "??";
+			else				    type = types[map->type];
+			DRM_SYSCTL_PRINT("%4d 0x%08lx 0x%08lx %4.4s  0x%02x 0x%08lx ",
+					 i,
+					 map->offset,
+					 map->size,
+					 type,
+					 map->flags,
+					 (unsigned long)map->handle);
+			if (map->mtrr < 0) {
+				DRM_SYSCTL_PRINT("none\n");
+			} else {
+				DRM_SYSCTL_PRINT("%4d\n", map->mtrr);
+			}
+			i++;
 		}
-		i++;
 	}
 	SYSCTL_OUT(req, "", 1);
 

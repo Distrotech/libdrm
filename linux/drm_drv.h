@@ -726,7 +726,7 @@ static int DRM(init)( device_t nbdev )
 	if (!DRM(device)) {
 		DRM_OS_RETURN(ENOMEM);
 	}
-	DRM(minor) = DRM_OS_MALLOC(*(DRM(minor)) * DRM(numdevs));
+	DRM(minor) = DRM_OS_MALLOC(sizeof(*(DRM(minor))) * DRM(numdevs));
 	if (!DRM(minor)) {
 		DRM_OS_FREE(DRM(device));
 		DRM_OS_RETURN(ENOMEM);
@@ -743,6 +743,7 @@ static int DRM(init)( device_t nbdev )
 		dev = &(DRM(device)[i]);
 #endif /* __linux__ */
 #ifdef __FreeBSD__
+		int unit = device_get_unit(nbdev);
 		/* FIXME??? - multihead !!! */
 		dev = device_get_softc(nbdev);
 #endif /* __FreeBSD__ */
@@ -756,15 +757,15 @@ static int DRM(init)( device_t nbdev )
 		dev->name   = DRIVER_NAME;
 #endif /* __linux__ */
 #ifdef __FreeBSD__
-		DRM_OS_SPININIT(&dev->count_lock, "drm device");
+		DRM_OS_SPININIT(dev->count_lock, "drm device");
 		lockinit(&dev->dev_lock, PZERO, "drmlk", 0, 0);
 		dev->device = nbdev;
-		dev->devnode = make_dev(&DRM( cdevsw),
-				device_get_unit(nbdev),
+		dev->devnode = make_dev( &DRM(cdevsw),
+				unit,
 				DRM_DEV_UID,
 				DRM_DEV_GID,
 				DRM_DEV_MODE,
-				"dri/card0"); /* card0 - FIXME !!! */
+				"dri/card%d", unit );
 		dev->name   = DRIVER_NAME;
 		DRM(mem_init)();
 		DRM(sysctl_init)(dev);

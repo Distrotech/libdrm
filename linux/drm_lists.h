@@ -213,7 +213,7 @@ int DRM(freelist_put)(drm_device_t *dev, drm_freelist_t *bl, drm_buf_t *buf)
 
 	atomic_inc(&bl->count);
 	if (atomic_read(&bl->count) > dma->buf_count) {
-		DRM_ERROR("%d of %d buffers free after addition of %d\n",
+		DRM_ERROR("%ld of %d buffers free after addition of %d\n",
 			  atomic_read(&bl->count), dma->buf_count, buf->idx);
 		return 1;
 	}
