@@ -220,10 +220,12 @@ int mach64_do_dma_idle( drm_mach64_private_t *dev_priv ) {
 	/* Disable bus-mastering, but keep block 1 registers enabled */
 	MACH64_WRITE( MACH64_BUS_CNTL, reg | MACH64_BUS_MASTER_DIS | MACH64_BUS_EXT_REG_EN );
 	MACH64_WRITE( MACH64_SRC_CNTL, 0 );
-#endif
+	return 0;
+#else
 	/* clean up after pass */
 	mach64_do_release_used_buffers( dev_priv );
 	return 0;
+#endif
 }
 
 /* Reset the engine.  This will stop the DMA if it is running.
