@@ -60,6 +60,7 @@ void mach64_dma_service(int irq, void *device, struct pt_regs *regs)
         /* Check to see if we've been interrupted for VBLANK or the BLIT completion
            and ack the interrupt accordingly...  Set flags for the handler to 
            know that it needs to process accordingly... */
+
         flags = MACH64_READ(MACH64_CRTC_INT_CNTL);
 	if (flags & MACH64_CRTC_VBLANK_INT)
         {                
@@ -108,14 +109,14 @@ void mach64_dma_immediate_bh(void *device)
         if (atomic_read(&dev_priv->do_blit) > 0)
         {
                 atomic_set(&dev_priv->do_blit, 0);
-                /*  mach64_do_complete_blit(dev_priv); */
+		/*  mach64_do_complete_blit(dev_priv); */
         }        
 
         /* Check to see if we've been told to handle gui-mastering... */
         if (atomic_read(&dev_priv->do_gui) > 0)
         {
 		atomic_set(&dev_priv->do_gui, 0);
-                /*  mach64_handle_dma(dev_priv); */
+		/*  mach64_handle_dma(dev_priv); */
         }
         
         wake_up_interruptible(&read_wait);
@@ -439,8 +440,10 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 	for ( i = 0; i < 3; i++ ) {
 		regs[i] = MACH64_READ( (MACH64_VERTEX_1_S + i*4) );
 		DRM_DEBUG( "(After DMA Transfer) reg %d = 0x%08x\n", i, regs[i] );
-		if (regs[i] != expected[i])
+		if (regs[i] != expected[i]) {
+			pci_pool_free( dev_priv->pool, cpu_addr_data, data_handle );
 			return -1; /* GUI master operation failed */
+		}
 	}
 
 	DRM_DEBUG( "freeing data buffer memory.\n" );
