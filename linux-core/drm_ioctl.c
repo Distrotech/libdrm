@@ -131,6 +131,7 @@ int DRM(setunique)( DRM_OS_IOCTL )
 				  DRM_MEM_DRIVER);
 	sprintf(dev->devname, "%s@%s", dev->name, dev->unique);
 
+#ifdef __linux__
 #ifdef __alpha__
 	do {
 		struct pci_dev *pci_dev;
@@ -150,6 +151,7 @@ int DRM(setunique)( DRM_OS_IOCTL )
                 if (pci_dev)
                         dev->hose = pci_dev->sysdata;
         } while(0);
+#endif
 #endif
 
 	return 0;
