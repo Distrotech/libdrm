@@ -17,6 +17,7 @@
 #define DRM_DEVICE	drm_file_t	*priv	= filp->private_data; \
 			drm_device_t	*dev	= priv->dev
 
+#define DRM_VTOPHYS(x)	virt_to_bus(x)
 #define DRM_IRQ_ARGS	        int irq, void *arg, struct pt_regs *regs
 #define DRM_TASKQUEUE_ARGS	void *arg
 
