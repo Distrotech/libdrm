@@ -52,7 +52,6 @@ typedef struct drm_radeon_ring_buffer {
 	int space;
 
 	int high_mark;
-	drm_local_map_t *ring_rptr;
 } drm_radeon_ring_buffer_t;
 
 typedef struct drm_radeon_depth_clear_t {

@@ -1209,7 +1209,6 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 		(dev_priv->ring.size / sizeof(u32)) - 1;
 
 	dev_priv->ring.high_mark = RADEON_RING_HIGH_MARK;
-	dev_priv->ring.ring_rptr = dev_priv->ring_rptr;
 
 #if __REALLY_HAVE_SG
 	if ( dev_priv->is_pci ) {
