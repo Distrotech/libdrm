@@ -182,7 +182,6 @@ static inline void mga_dma_quiescent(drm_device_t *dev)
 		for (i = 0 ; i < 2000 ; i++) mga_delay();
 	}
     	sarea_priv->dirty |= MGA_DMA_FLUSH;
-
 out_status:
     	clear_bit(MGA_IN_DISPATCH, &dev_priv->dispatch_status);
 out_nolock:
@@ -956,6 +955,8 @@ static int mga_flush_queue(drm_device_t *dev)
    	if(dev_priv == NULL) {
 	   	return 0;
 	}
+	/* Get bfscking lock */
+	drm_big_fscking_lock(dev);
 
    	if(dev_priv->next_prim->num_dwords != 0) {
    		current->state = TASK_INTERRUPTIBLE;
@@ -978,6 +979,8 @@ static int mga_flush_queue(drm_device_t *dev)
    		current->state = TASK_RUNNING;
    		remove_wait_queue(&dev_priv->flush_queue, &entry);
 	}
+	drm_big_fscking_unlock(dev);
+
    	return ret;
 }
 
