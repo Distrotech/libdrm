@@ -39,7 +39,8 @@
 #include <linux/config.h>
 #include <asm/ioctl.h>		/* For _IO* macros */
 #define DRM_IOCTL_NR(n)	     _IOC_NR(n)
-#elif defined(__FreeBSD__)
+#endif
+#if defined(__FreeBSD__)
 #include <sys/ioccom.h>
 #define DRM_IOCTL_NR(n)	     ((n) & 0xff)
 #endif

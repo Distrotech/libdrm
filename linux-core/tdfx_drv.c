@@ -42,7 +42,7 @@
 #endif
 
 #include "tdfx.h"
-#include "drmP.h
+#include "drmP.h"
 
 #define DRIVER_AUTHOR		"VA Linux Systems Inc."
 
