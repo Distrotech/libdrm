@@ -1,9 +1,9 @@
 # $FreeBSD$
 
 .PATH:	${.CURDIR}/..
-KMOD	= r128
+KMOD	= mach64
 NOMAN=	YES
-SRCS    = r128_cce.c r128_drv.c r128_state.c r128_irq.c
+SRCS    = mach64_dma.c mach64_drv.c mach64_irq.c mach64_state.c
 SRCS   += device_if.h bus_if.h pci_if.h opt_drm.h
 CFLAGS += ${DEBUG_FLAGS} -I. -I..
 
