@@ -156,7 +156,8 @@ int mach64_do_dma_flush( drm_mach64_private_t *dev_priv )
 	return mach64_ring_idle( dev_priv );
 }
 
-int mach64_do_dma_idle( drm_mach64_private_t *dev_priv ) {
+int mach64_do_dma_idle( drm_mach64_private_t *dev_priv )
+{
 	int ret;
 
 	/* wait for completion */
@@ -675,6 +676,21 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 		 init->sarea_priv_offset);
 
 	if( !dev_priv->is_pci ) {
+		DRM_FIND_MAP( dev_priv->ring_map, init->ring_offset );
+		if ( !dev_priv->ring_map ) {
+			DRM_ERROR( "can not find ring map!\n" );
+			dev->dev_private = (void *)dev_priv;
+			mach64_do_cleanup_dma(dev);
+			return -EINVAL;
+		}
+		DRM_IOREMAP( dev_priv->ring_map );
+		if ( !dev_priv->ring_map->handle ) {
+		        DRM_ERROR( "can not ioremap virtual address for"
+                                   " descriptor ring\n" );
+			dev->dev_private = (void *) dev_priv;
+			mach64_do_cleanup_dma( dev );
+			return -ENOMEM;
+                }
 	        DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
 		if ( !dev_priv->buffers ) {
 			DRM_ERROR( "can not find dma buffer map!\n" );
@@ -693,7 +709,7 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 		DRM_FIND_MAP( dev_priv->agp_textures,
 			      init->agp_textures_offset );
 		if (!dev_priv->agp_textures) {
-			DRM_ERROR("could not find agp texture region!\n");
+			DRM_ERROR( "can not find agp texture region!\n" );
 			dev->dev_private = (void *)dev_priv;
 			mach64_do_cleanup_dma( dev );
 			return DRM_ERR(EINVAL);
@@ -735,20 +751,27 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 	/* allocate descriptor memory from pci pool */
 	DRM_DEBUG( "Allocating dma descriptor ring\n" );
 	dev_priv->ring.size = 0x4000; /* 16KB */
-	dev_priv->ring.start = pci_alloc_consistent( dev->pdev, dev_priv->ring.size, 
-						     &dev_priv->ring.handle );
 
-	if (!dev_priv->ring.start || !dev_priv->ring.handle) {
-		DRM_ERROR( "Allocating dma descriptor ring failed\n");
-		return DRM_ERR(ENOMEM);
-	} else {
-		dev_priv->ring.start_addr = (u32) dev_priv->ring.handle;
-		memset( dev_priv->ring.start, 0x0, 0x4000 );
+	if ( dev_priv->is_pci ) {
+		dev_priv->ring.start = pci_alloc_consistent( dev->pdev, dev_priv->ring.size, 
+							     &dev_priv->ring.handle );
+
+		if (!dev_priv->ring.start || !dev_priv->ring.handle) {
+			DRM_ERROR( "Allocating dma descriptor ring failed\n");
+			return DRM_ERR(ENOMEM);
+		} else {
+			dev_priv->ring.start_addr = (u32) dev_priv->ring.handle;
+		}
+        } else {
+		dev_priv->ring.start = dev_priv->ring_map->handle;
+		dev_priv->ring.start_addr = (u32) dev_priv->ring_map->offset;
 	}
 
+	memset( dev_priv->ring.start, 0, dev_priv->ring.size );
 	DRM_INFO( "descriptor ring: cpu addr 0x%08x, bus addr: 0x%08x\n", 
 		  (u32) dev_priv->ring.start, dev_priv->ring.start_addr );
 
+	ret = 0;
 	if ( dev_priv->driver_mode != MACH64_MODE_MMIO ) {
 
 		/* enable block 1 registers and bus mastering */
@@ -769,11 +792,10 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 		MACH64_WRITE( MACH64_BUS_CNTL, ( MACH64_READ(MACH64_BUS_CNTL) 
 						 | MACH64_BUS_EXT_REG_EN
 						 | MACH64_BUS_MASTER_DIS ) );
-		if ( init->dma_mode == MACH64_MODE_MMIO ) {
+		if ( init->dma_mode == MACH64_MODE_MMIO )
 			DRM_INFO( "Forcing pseudo-DMA mode\n" );
-		} else {
+		else
 			DRM_INFO( "DMA test failed (ret=%d), using pseudo-DMA mode\n", ret );
-		}
 		break;
 	case MACH64_MODE_DMA_SYNC:
 		DRM_INFO( "DMA test succeeded, using synchronous DMA mode\n");
@@ -790,7 +812,6 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 	dev_priv->ring.head = dev_priv->ring.tail = 0;
 	dev_priv->ring.tail_mask = (dev_priv->ring.size / sizeof(u32)) - 1;
 	dev_priv->ring.space = dev_priv->ring.size;
-	dev_priv->ring.high_mark = 128;
 
 	/* setup physical address and size of descriptor table */
 	mach64_do_wait_for_fifo( dev_priv, 1 );
@@ -967,18 +988,19 @@ int mach64_do_cleanup_dma( drm_device_t *dev )
 	if ( dev->dev_private ) {
 		drm_mach64_private_t *dev_priv = dev->dev_private;
 
-		/* Discard the allocations for the descriptor table... */
-		if ( (dev_priv->ring.start != NULL) && dev_priv->ring.handle ) {
-			DRM_DEBUG( "freeing dma descriptor ring\n" );
-			pci_free_consistent( dev->pdev, dev_priv->ring.size, 
-					     dev_priv->ring.start, dev_priv->ring.handle );
+		if ( dev_priv->is_pci ) {
+			if ( (dev_priv->ring.start != NULL) && dev_priv->ring.handle ) {
+				pci_free_consistent( dev->pdev, dev_priv->ring.size, 
+						     dev_priv->ring.start, dev_priv->ring.handle );
+			}
+		} else {
+			if ( dev_priv->ring_map )
+				DRM_IOREMAPFREE( dev_priv->ring_map );
 		}
 
-		if ( dev_priv->buffers ) {
+		if ( dev_priv->buffers )
 			DRM_IOREMAPFREE( dev_priv->buffers );
-		}
 
-		DRM_DEBUG( "destroying dma buffer freelist\n" );
 		mach64_destroy_freelist( dev );
 
 		DRM(free)( dev_priv, sizeof(drm_mach64_private_t),

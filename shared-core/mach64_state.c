@@ -745,8 +745,6 @@ int mach64_dma_clear( DRM_IOCTL_ARGS )
 	
 	DRM_COPY_FROM_USER_IOCTL( clear, (drm_mach64_clear_t *)data,
 			     sizeof(clear) );
-
-	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 	
 	if ( sarea_priv->nbox > MACH64_NR_SAREA_CLIPRECTS )
 		sarea_priv->nbox = MACH64_NR_SAREA_CLIPRECTS;
@@ -772,8 +770,6 @@ int mach64_dma_swap( DRM_IOCTL_ARGS )
 	DRM_DEBUG( "%s: pid=%d\n", __FUNCTION__, DRM_CURRENTPID );
 
 	LOCK_TEST_WITH_RETURN( dev, filp );
-
-	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 	
 	if ( sarea_priv->nbox > MACH64_NR_SAREA_CLIPRECTS )
 		sarea_priv->nbox = MACH64_NR_SAREA_CLIPRECTS;
@@ -819,8 +815,6 @@ int mach64_dma_vertex( DRM_IOCTL_ARGS )
 		return DRM_ERR(EINVAL);
 	}
 
-	RING_SPACE_TEST_WITH_RETURN( dev_priv );
-
 	if ( sarea_priv->nbox > MACH64_NR_SAREA_CLIPRECTS )
 		sarea_priv->nbox = MACH64_NR_SAREA_CLIPRECTS;
 
@@ -850,8 +844,6 @@ int mach64_dma_blit( DRM_IOCTL_ARGS )
 			   blit.idx, dma->buf_count - 1 );
 		return DRM_ERR(EINVAL);
 	}
-
-	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 
 	ret = mach64_dma_dispatch_blit( filp, dev, &blit );
 

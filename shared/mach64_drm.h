@@ -215,6 +215,7 @@ typedef struct drm_mach64_init {
 
 	unsigned long fb_offset;
 	unsigned long mmio_offset;
+	unsigned long ring_offset;
 	unsigned long buffers_offset;
 	unsigned long agp_textures_offset;
 } drm_mach64_init_t;

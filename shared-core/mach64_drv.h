@@ -58,8 +58,6 @@ typedef struct drm_mach64_descriptor_ring {
 	u32 tail;           /* dword offset of descriptor ring tail */
 	u32 tail_mask;      /* mask used to wrap ring */
 	int space;          /* number of free bytes in ring */
-
-	int high_mark;      /* high water mark in bytes */
 } drm_mach64_descriptor_ring_t;
 
 typedef struct drm_mach64_private {
@@ -95,6 +93,7 @@ typedef struct drm_mach64_private {
 	drm_local_map_t *sarea;
 	drm_local_map_t *fb;
 	drm_local_map_t *mmio;
+	drm_local_map_t *ring_map;
 	drm_local_map_t *buffers;
 	drm_local_map_t *agp_textures;
 } drm_mach64_private_t;
@@ -610,7 +609,7 @@ static __inline__ void mach64_ring_start( drm_mach64_private_t *dev_priv )
 }
 
 static __inline__ void mach64_ring_resume( drm_mach64_private_t *dev_priv, 
-				       drm_mach64_descriptor_ring_t *ring )
+					   drm_mach64_descriptor_ring_t *ring )
 {
 	DRM_DEBUG( "%s: head_addr: 0x%08x head: %d tail: %d space: %d\n",
 		   __FUNCTION__, 
@@ -644,7 +643,7 @@ static __inline__ void mach64_ring_resume( drm_mach64_private_t *dev_priv,
 }
 
 static __inline__ void mach64_ring_tick( drm_mach64_private_t *dev_priv, 
-				     drm_mach64_descriptor_ring_t *ring )
+					 drm_mach64_descriptor_ring_t *ring )
 {
 	DRM_DEBUG( "%s: head_addr: 0x%08x head: %d tail: %d space: %d\n",
 		   __FUNCTION__, 
@@ -724,29 +723,6 @@ mach64_update_ring_snapshot( drm_mach64_private_t *dev_priv )
 	}
 }
 
-/* FIXME: right now this is needed to ensure free buffers for state emits */
-/* CHECKME: I've disabled this as it isn't necessary - we already wait for free buffers */
-#define RING_SPACE_TEST_WITH_RETURN( dev_priv )
-
-#define RING_SPACE_TEST_WITH_RETURN_( dev_priv )					\
-do {											\
-	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring; int i;			\
-	if ( ring->space < ring->high_mark ) {						\
-		for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {			\
-			mach64_update_ring_snapshot( dev_priv );			\
-			if ( ring->space >= ring->high_mark )				\
-				goto __ring_space_done;					\
-			DRM_UDELAY( 1 );						\
-		}									\
-		DRM_ERROR( "ring space check failed!\n" );				\
-		DRM_INFO( "ring: head addr: 0x%08x head: %d tail: %d space: %d\n", 	\
-			ring->head_addr, ring->head, ring->tail, ring->space );		\
-		return DRM_ERR(EBUSY);							\
-	}										\
- __ring_space_done:									\
-} while (0)
-
-
 /* ================================================================
  * DMA descriptor ring macros
  */
@@ -823,8 +799,8 @@ do {									\
 #define GETRINGOFFSET() (_entry->ring_ofs)
 
 static __inline__ int mach64_find_pending_buf_entry ( drm_mach64_private_t *dev_priv, 
-						  drm_mach64_freelist_t **entry, 
-						  drm_buf_t *buf )
+						      drm_mach64_freelist_t **entry, 
+						      drm_buf_t *buf )
 {
 	struct list_head *ptr;
 #if MACH64_EXTRA_CHECKING
