@@ -260,8 +260,9 @@ static void mach64_bm_dma_test( drm_device_t *dev )
   		  MACH64_READ( MACH64_VERTEX_1_ARGB ) );
 	DRM_INFO( "(Before DMA Transfer) VERTEX_1_X_Y = 0x%08x\n", 
   		  MACH64_READ( MACH64_VERTEX_1_X_Y ) );
-
-	data[0] = 0x00060190; /* a0 = PAT_REG0 */
+	/* a0 = PAT_REG0 */
+	/* 1_90 = VERTEX_1_S, setup 7 sequential reg writes */
+	data[0] = cpu_to_le32(0x00060190); 
 	data[1] = 0x11111111;
 	data[2] = 0x22222222;
 	data[3] = 0x33333333;
@@ -269,13 +270,13 @@ static void mach64_bm_dma_test( drm_device_t *dev )
 	data[5] = 0x55555555;
 	data[6] = 0x66666666;
 	data[7] = 0x77777777;
-	data[8] = 0x0000006d;
+	data[8] = cpu_to_le32(0x0000006d);
 	data[9] = 0x00000000;
 
 	DRM_INFO( "Preparing table ...\n" );
-	table[0] = MACH64_BM_ADDR + APERTURE_OFFSET;
-	table[1] = data_addr;
-	table[2] = 10 * sizeof( u32 ) | 0x80000000 | 0x40000000;
+	table[0] = cpu_to_le32(MACH64_BM_ADDR + APERTURE_OFFSET);
+	table[1] = cpu_to_le32(data_addr);
+	table[2] = cpu_to_le32(10 * sizeof( u32 ) | 0x80000000 | 0x40000000);
 	table[3] = 0;
 
 	DRM_INFO( "table[0] = 0x%08x\n", table[0] );

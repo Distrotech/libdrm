@@ -345,6 +345,9 @@ extern int mach64_dma_vertex( struct inode *inode, struct file *filp,
 
 #define MACH64_CRTC_INT_CNTL     0x0418
 
+/* Constants */
+#define MACH64_LAST_FRAME_REG		MACH64_SCRATCH_REG0
+#define MACH64_LAST_DISPATCH_REG	MACH64_SCRATCH_REG1
 
 
 #define MACH64_BASE(reg)	((u32)(dev_priv->mmio->handle))

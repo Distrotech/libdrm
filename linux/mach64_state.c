@@ -447,7 +447,7 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 				}
 
 				/* SRC_CNTL */
-				p[(size/4)  ] = 0x0000006d;
+				p[(size/4)  ] = cpu_to_le32(0x0000006d);
 				p[(size/4)+1] = 0x00000000;
 				size += 8;
 				pages = (size + DMA_CHUNKSIZE - 1) / DMA_CHUNKSIZE;
@@ -455,9 +455,9 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 				for ( i = 0 ; i < pages-1 ; i++ ) {
 					page = address + i * DMA_CHUNKSIZE;
 
-					table_ptr[DMA_FRAME_BUF_OFFSET] = MACH64_BM_ADDR + APERTURE_OFFSET;
-					table_ptr[DMA_SYS_MEM_ADDR] = page;
-					table_ptr[DMA_COMMAND] = DMA_CHUNKSIZE | 0x40000000;
+					table_ptr[DMA_FRAME_BUF_OFFSET] = cpu_to_le32(MACH64_BM_ADDR + APERTURE_OFFSET);
+					table_ptr[DMA_SYS_MEM_ADDR] = cpu_to_le32(page);
+					table_ptr[DMA_COMMAND] = cpu_to_le32(DMA_CHUNKSIZE | 0x40000000);
 					table_ptr[DMA_RESERVED] = 0;
 
 					tableDwords += 4;
@@ -467,9 +467,9 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 				/* generate the final descriptor for any remaining commands */
 				page = address + i * DMA_CHUNKSIZE;
 				remainder = size - i * DMA_CHUNKSIZE;
-				table_ptr[DMA_FRAME_BUF_OFFSET] = MACH64_BM_ADDR + APERTURE_OFFSET;
-				table_ptr[DMA_SYS_MEM_ADDR] = page;
-				table_ptr[DMA_COMMAND] = remainder | 0x80000000 | 0x40000000;
+				table_ptr[DMA_FRAME_BUF_OFFSET] = cpu_to_le32(MACH64_BM_ADDR + APERTURE_OFFSET);
+				table_ptr[DMA_SYS_MEM_ADDR] = cpu_to_le32(page);
+				table_ptr[DMA_COMMAND] = cpu_to_le32(remainder | 0x80000000 | 0x40000000);
 				table_ptr[DMA_RESERVED] = 0;
 
 				tableDwords += 4;
@@ -527,7 +527,7 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 				while ( used ) {
 					u32 reg, count;
 
-					reg = *p++;
+					reg = le32_to_cpu(*p++);
 					used--;
 					
 					count = (reg >> 16) + 1;
@@ -543,8 +543,8 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 						}
 
 						--fifo;
-						
-						MACH64_WRITE( reg, *p++ );
+						/* data is already little-endian */
+						MACH64_DEREF(reg) = *p++;
 						used--;
 						
 						reg += 4;
@@ -561,12 +561,11 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 		buf_priv->age = dev_priv->sarea_priv->last_dispatch;
 
 		/* Emit the vertex buffer age */
-		BEGIN_RING( 2 );
+		DMAGETPTR( dev_priv, 1 );
 
-		OUT_RING( CCE_PACKET0( MACH64_LAST_DISPATCH_REG, 0 ) );
-		OUT_RING( buf_priv->age );
-
-		ADVANCE_RING();
+		DMAOUTREG( MACH64_LAST_DISPATCH_REG, buf_priv->age );
+		
+		DMAADVANCE( dev_priv );
 
 		buf->pending = 1;
 		buf->used = 0;
