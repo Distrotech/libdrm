@@ -45,6 +45,8 @@ typedef struct drm_mach64_private {
 
 	int usec_timeout;
 
+	u32 *buffers;
+
 	drm_map_t *sarea;
 	drm_map_t *fb;
 	drm_map_t *mmio;
@@ -97,6 +99,9 @@ extern int mach64_dma_init( struct inode *inode, struct file *filp,
 			    unsigned int cmd, unsigned long arg );
 extern int mach64_dma_idle( struct inode *inode, struct file *filp,
 			    unsigned int cmd, unsigned long arg );
+
+extern int mach64_do_wait_for_fifo( drm_mach64_private_t *dev_priv,
+				    int entries );
 
 				/* r128_state.c */
 extern int mach64_dma_clear( struct inode *inode, struct file *filp,

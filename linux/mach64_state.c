@@ -38,6 +38,7 @@
 
 static void mach64_print_dirty( const char *msg, unsigned int flags )
 {
+#if 0
 	DRM_INFO( "%s: (0x%x) %s%s%s%s%s%s%s%s%s\n",
 		  msg,
 		  flags,
@@ -50,6 +51,7 @@ static void mach64_print_dirty( const char *msg, unsigned int flags )
 		  (flags & MACH64_UPLOAD_WINDOW)      ? "window, " : "",
 		  (flags & MACH64_UPLOAD_CLIPRECTS)   ? "cliprects, " : "",
 		  (flags & MACH64_REQUIRE_QUIESCENCE) ? "quiescence, " : "" );
+#endif
 }
 
 static void mach64_dma_dispatch_clear( drm_device_t *dev,
@@ -312,12 +314,10 @@ int mach64_dma_clear( struct inode *inode, struct file *filp,
 				   clear.x, clear.y, clear.w, clear.h,
 				   clear.clear_color, clear.clear_depth );
 
-#if 0
 	/* Make sure we restore the 3D state next time.
 	 */
 	dev_priv->sarea_priv->dirty |= (MACH64_UPLOAD_CONTEXT |
-					MACH64_UPLOAD_MASKS);
-#endif
+					MACH64_UPLOAD_MISC);
 	return 0;
 }
 
@@ -341,11 +341,9 @@ int mach64_dma_swap( struct inode *inode, struct file *filp,
 
 	mach64_dma_dispatch_swap( dev );
 
-#if 0
 	/* Make sure we restore the 3D state next time.
 	 */
 	dev_priv->sarea_priv->dirty |= (MACH64_UPLOAD_CONTEXT |
-					MACH64_UPLOAD_MASKS);
-#endif
+					MACH64_UPLOAD_MISC);
 	return 0;
 }

@@ -37,19 +37,25 @@
 #define __MACH64_DEFINES__
 
 /* What needs to be changed for the current vertex buffer?
+ * GH: We're going to be pedantic about this.  We want the card to do as
+ * little as possible, so let's avoid having it fetch a whole bunch of
+ * register values that don't change all that often, if at all.
  */
-#define MACH64_UPLOAD_CONTEXT		0x001
-#define MACH64_UPLOAD_SETUP		0x002
-#define MACH64_UPLOAD_TEX0		0x004
-#define MACH64_UPLOAD_TEX1		0x008
-#define MACH64_UPLOAD_TEX0IMAGES	0x010
-#define MACH64_UPLOAD_TEX1IMAGES	0x020
-#define MACH64_UPLOAD_CORE		0x040
-#define MACH64_UPLOAD_MASKS		0x080
-#define MACH64_UPLOAD_WINDOW		0x100
-#define MACH64_UPLOAD_CLIPRECTS		0x200	/* handled client-side */
-#define MACH64_REQUIRE_QUIESCENCE	0x400
-#define MACH64_UPLOAD_ALL		0x7ff
+#define MACH64_UPLOAD_DST_OFF_PITCH	0x0001
+#define MACH64_UPLOAD_Z_OFF_PITCH	0x0002
+#define MACH64_UPLOAD_Z_ALPHA_CNTL	0x0004
+#define MACH64_UPLOAD_SCALE_3D_CNTL	0x0008
+#define MACH64_UPLOAD_DP_FOG_CLR	0x0010
+#define MACH64_UPLOAD_DP_WRITE_MASK	0x0020
+#define MACH64_UPLOAD_DP_PIX_WIDTH	0x0040
+#define MACH64_UPLOAD_SETUP_CNTL	0x0080
+#define MACH64_UPLOAD_TEXTURE		0x0100
+#define MACH64_UPLOAD_MISC		0x0200
+#define MACH64_UPLOAD_TEX0IMAGE		0x0400
+#define MACH64_UPLOAD_TEX1IMAGE		0x0800
+#define MACH64_UPLOAD_CLIPRECTS		0x1000 /* handled client-side */
+#define MACH64_UPLOAD_CONTEXT		0x00ff
+#define MACH64_UPLOAD_ALL		0x1fff
 
 #define MACH64_FRONT			0x1
 #define MACH64_BACK			0x2
@@ -68,7 +74,72 @@
 #define MACH64_NR_TEX_REGIONS		64
 #define MACH64_LOG_TEX_GRANULARITY	16
 
+#define MACH64_TEX_MAXLEVELS		0
+
 #endif /* __MACH64_SAREA_DEFINES__ */
+
+typedef struct {
+	unsigned int dst_off_pitch;
+
+	unsigned int z_off_pitch;
+	unsigned int z_cntl;
+	unsigned int alpha_tst_cntl;
+
+	unsigned int scale_3d_cntl;
+
+	unsigned int sc_left_right;
+	unsigned int sc_top_bottom;
+
+	unsigned int dp_fog_clr;
+	unsigned int dp_write_mask;
+	unsigned int dp_pix_width;
+	unsigned int dp_mix;
+	unsigned int dp_src;
+
+	unsigned int clr_cmp_cntl;
+	unsigned int gui_traj_cntl;
+
+	unsigned int setup_cntl;
+
+	unsigned int tex_size_pitch;
+	unsigned int tex_cntl;
+	unsigned int secondary_tex_off;
+	unsigned int tex_offset;
+} drm_mach64_context_regs_t;
+
+typedef struct drm_mach64_tex_region {
+	unsigned char next, prev;
+	unsigned char in_use;
+	int age;
+} drm_mach64_tex_region_t;
+
+typedef struct drm_mach64_sarea {
+	/* The channel for communication of state information to the kernel
+	 * on firing a vertex dma buffer.
+	 */
+	drm_mach64_context_regs_t context_state;
+	unsigned int dirty;
+	unsigned int vertsize;
+
+	/* The current cliprects, or a subset thereof.
+	 */
+	drm_clip_rect_t boxes[MACH64_NR_SAREA_CLIPRECTS];
+	unsigned int nbox;
+
+	/* Counters for client-side throttling of rendering clients.
+	 */
+	unsigned int last_frame;
+	unsigned int last_dispatch;
+
+	/* Texture memory LRU.
+	 */
+	drm_mach64_tex_region_t tex_list[MACH64_NR_TEX_HEAPS]
+					[MACH64_NR_TEX_REGIONS+1];
+	int tex_age[MACH64_NR_TEX_HEAPS];
+	int ctx_owner;
+} drm_mach64_sarea_t;
+
+
 
 typedef struct drm_mach64_init {
 	enum {
@@ -89,38 +160,6 @@ typedef struct drm_mach64_init {
 	unsigned int fb_offset;
 	unsigned int mmio_offset;
 } drm_mach64_init_t;
-
-
-typedef struct drm_mach64_tex_region {
-	unsigned char next, prev;
-	unsigned char in_use;
-	int age;
-} drm_mach64_tex_region_t;
-
-typedef struct drm_mach64_sarea {
-	/* The channel for communication of state information to the kernel
-	 * on firing a vertex dma buffer.
-	 */
-
-	/* FIXME: fill this in... */
-
-	/* The current cliprects, or a subset thereof.
-	 */
-	drm_clip_rect_t boxes[MACH64_NR_SAREA_CLIPRECTS];
-	unsigned int nbox;
-
-	/* Counters for client-side throttling of rendering clients.
-	 */
-	unsigned int last_frame;
-	unsigned int last_dispatch;
-
-	/* Texture memory LRU.
-	 */
-	drm_mach64_tex_region_t tex_list[MACH64_NR_TEX_HEAPS]
-					[MACH64_NR_TEX_REGIONS+1];
-	int tex_age[MACH64_NR_TEX_HEAPS];
-	int ctx_owner;
-} drm_mach64_sarea_t;
 
 typedef struct drm_mach64_clear {
 	unsigned int flags;
