@@ -158,6 +158,8 @@ find_first_zero_bit(volatile unsigned long *p, int max)
 
 #define memset(p, v, s)		bzero(p, s)
 
+#define virt_to_bus(va)		vtophys(va)
+
 /*
  * Fake out the module macros for versions of FreeBSD where they don't
  * exist.

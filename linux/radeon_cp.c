@@ -37,6 +37,10 @@
 #include <linux/interrupt.h>	/* For task queue support */
 #include <linux/delay.h>
 #endif
+#ifdef __FreeBSD__
+#include <vm/vm.h>
+#include <vm/pmap.h>
+#endif
 
 #define RADEON_FIFO_DEBUG	0
 

@@ -34,7 +34,9 @@
 #include "i810.h"
 #include "drmP.h"
 #include "i810_drv.h"
+#ifdef __linux__
 #include <linux/interrupt.h>	/* For task queue support */
+#endif
 
 /* in case we don't have a 2.3.99-pre6 kernel or later: */
 #ifndef VM_DONTCOPY
@@ -75,7 +77,7 @@
 	outring &= ringmask;						\
 } while (0);
 
-static inline void i810_print_status_page(drm_device_t *dev)
+static __inline__ void i810_print_status_page(drm_device_t *dev)
 {
    	drm_device_dma_t *dma = dev->dma;
       	drm_i810_private_t *dev_priv = dev->dev_private;
