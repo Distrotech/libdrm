@@ -121,12 +121,32 @@ int DRM(addmap)( DRM_OS_IOCTL )
 	}
 	DRM_DEBUG( "offset = 0x%08lx, size = 0x%08lx, type = %d\n",
 		   map->offset, map->size, map->type );
+#ifdef __linux__
 	if ( (map->offset & (~PAGE_MASK)) || (map->size & (~PAGE_MASK)) ) {
+#endif
+#ifdef __FreeBSD__
+	if ( (map->offset & PAGE_MASK) || (map->size & PAGE_MASK) ) {
+#endif
 		DRM(free)( map, sizeof(*map), DRM_MEM_MAPS );
 		DRM_OS_RETURN(EINVAL);
 	}
 	map->mtrr   = -1;
 	map->handle = 0;
+
+#ifdef __FreeBSD__
+	TAILQ_FOREACH(list, dev->maplist, link) {
+		drm_map_t *entry = list->map;
+		if (        (entry->offset >= map->offset
+			    && (entry->offset) < (map->offset + map->size) )
+			|| ((entry->offset + entry->size) >= map->offset
+			    && (entry->offset + entry->size) < (map->offset + map->size) ) 
+			|| ((entry->offset < map->offset)
+			    && (entry->offset + entry->size) >= (map->offset + map->size) ) )
+			DRM_DEBUG("map collission: add(0x%x-0x%x), current(0x%x-0x%x)\n", 
+				entry->offset, entry->offset + entry->size - 1,
+				map->offset,        map->offset        + map->size - 1);
+	}
+#endif
 
 	switch ( map->type ) {
 	case _DRM_REGISTERS:
