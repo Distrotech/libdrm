@@ -162,7 +162,7 @@ typedef enum drm_map_type {
 	_DRM_SHM	    = 2,  /* shared, cached			    */
 	_DRM_AGP            = 3,  /* AGP/GART                               */
 	_DRM_SCATTER_GATHER = 4,  /* Scatter/gather memory for PCI DMA      */
-	_DRM_AGP_MEM        = 5,  /* AGP/GART memory block		    */
+	_DRM_AGP_MEM        = 5   /* AGP/GART memory block		    */
 } drm_map_type_t;
 
 typedef enum drm_map_flags {

@@ -26,6 +26,9 @@ typedef struct {
 	unsigned long		(*usermap)(int, struct file *, agp_memory *,
 					   unsigned long, unsigned long,
 					   unsigned long, unsigned long);
+	void 			(*userunmap)(int, agp_memory *, void *);
+	void			(*kunmap)(int, agp_memory *, void *);
+
 } drm_agp_3_0_t;
 
 /* No longer report the chipset_type enum, pass a char *driver_name back

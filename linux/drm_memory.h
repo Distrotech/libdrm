@@ -372,7 +372,7 @@ agp_memory *DRM(alloc_agp)(drm_device_t *dev, int pages, u32 type)
 	}
 
 	if ((handle = DRM(agp_allocate_memory)(dev, pages, type))) {
-		printk("Returning handle : %p\n", handle);
+		DRM_DEBUG("Returning handle : %p\n", handle);
 		spin_lock(&DRM(mem_lock));
 		++DRM(mem_stats)[DRM_MEM_TOTALAGP].succeed_count;
 		DRM(mem_stats)[DRM_MEM_TOTALAGP].bytes_allocated
@@ -419,7 +419,7 @@ int DRM(bind_agp)(drm_device_t *dev, agp_memory *handle, unsigned int start)
 {
 	int retcode = -EINVAL;
 
-	printk("%s\n", __func__);
+	DRM_DEBUG("%s\n", __func__);
 	if (!handle) {
 		DRM_MEM_ERROR(DRM_MEM_BOUNDAGP,
 			      "Attempt to bind NULL AGP handle\n");

@@ -1077,6 +1077,53 @@ unsigned int drmAgpDeviceId(int fd)
     return i.id_device;
 }
 
+unsigned long drmAgpQueryHandleSize(int fd, unsigned long handle)
+{
+    drm_agp_buffer_info_t i;
+    i.handle = handle;
+    if (ioctl(fd, DRM_IOCTL_AGP_GETMAP, &i)) return (unsigned long)-1;
+    return i.size;
+}
+
+unsigned long drmAgpQueryHandleType(int fd, unsigned long handle)
+{
+    drm_agp_buffer_info_t i;
+    i.handle = handle;
+    if (ioctl(fd, DRM_IOCTL_AGP_GETMAP, &i)) return (unsigned long)-1;
+    return i.type;
+}
+
+unsigned long drmAgpQueryHandlePhysical(int fd, unsigned long handle)
+{
+    drm_agp_buffer_info_t i;
+    i.handle = handle;
+    if (ioctl(fd, DRM_IOCTL_AGP_GETMAP, &i)) return 0;
+    return i.physical;
+}
+
+unsigned long drmAgpQueryHandleBoundOffset(int fd, unsigned long handle)
+{
+    drm_agp_buffer_info_t i;
+    i.handle = handle;
+    if (ioctl(fd, DRM_IOCTL_AGP_GETMAP, &i)) return (unsigned long)-1;
+    return i.offset;
+}
+
+int drmAgpGetNumContexts(int fd)
+{
+    int ret_val;
+
+    ret_val = ioctl(fd, DRM_IOCTL_AGP_NUM_CTX);
+    if(ret_val == -1) return -errno;
+    return ret_val;
+}
+
+int drmAgpChangeContext(int fd, int context)
+{
+    if(ioctl(fd, DRM_IOCTL_AGP_CHG_CTX, context)) return -errno;
+    return 0;
+}
+
 int drmScatterGatherAlloc(int fd, unsigned long size, unsigned long *handle)
 {
     drm_scatter_gather_t sg;

@@ -173,8 +173,8 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
 				DRM(free)(map, sizeof(*map), DRM_MEM_MAPS);
 				return -EINVAL;
 			}
+			map->handle = (unsigned long)entry;
 			map->offset = 0;
-			map->handle = entry;
 		}
 		break;
 #endif
@@ -203,6 +203,7 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
 				   sizeof(map->offset) ) )
 			return -EFAULT;
 	}
+	DRM_DEBUG("Add map exited successfully.\n");
 	return 0;
 }
 

@@ -37,6 +37,7 @@
 
 /* General customization:
  */
+#define __TRY_AGP_3_0		1
 #define __HAVE_AGP		1
 #define __MUST_HAVE_AGP		0
 #define __HAVE_MTRR		1

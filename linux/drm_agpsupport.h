@@ -62,6 +62,8 @@ int DRM(agp_usermap)(drm_device_t *dev, drm_map_t *map,
 		     struct vm_area_struct *vma)
 {
 	drm_agp_mem_t *entry = (drm_agp_mem_t *)map->handle;
+	DRM_DEBUG("%s : handle : 0x%p key : %d\n", __func__, map->handle,
+	       entry->memory ? entry->memory->key : 0);
 
 	return drm_agp_3_0->vma_map_memory(dev->agp->context,
 					   vma,
@@ -69,9 +71,17 @@ int DRM(agp_usermap)(drm_device_t *dev, drm_map_t *map,
 					   0);
 }
 
+static int DRM(agp_has_bind)(void)
+{
+	DRM_DEBUG("%s\n", __func__);
+	if(drm_agp && drm_agp->bind_memory) return 1;
+	if(drm_agp_3_0 && drm_agp_3_0->bind_memory) return 1;
+	return 0;
+}
+
 static int DRM(agp_has_copy)(void)
 {
-	printk("%s\n", __func__);
+	DRM_DEBUG("%s\n", __func__);
 	if(drm_agp && drm_agp->copy_info) return 1;
 	if(drm_agp_3_0 && drm_agp_3_0->copy_info) return 1;
 	return 0;
@@ -79,7 +89,7 @@ static int DRM(agp_has_copy)(void)
 
 static int DRM(agp_has_enable)(void)
 {
-	printk("%s\n", __func__);
+	DRM_DEBUG("%s\n", __func__);
 	if(drm_agp && drm_agp->enable) return 1;
 	if(drm_agp_3_0 && drm_agp_3_0->enable) return 1;
 	return 0;
@@ -87,7 +97,7 @@ static int DRM(agp_has_enable)(void)
 
 static int DRM(agp_has_acquire)(void)
 {
-	printk("%s\n", __func__);
+	DRM_DEBUG("%s\n", __func__);
 	if(drm_agp && drm_agp->acquire) return 1;
 	if(drm_agp_3_0 && drm_agp_3_0->acquire) return 1;
 	return 0;
@@ -95,7 +105,7 @@ static int DRM(agp_has_acquire)(void)
 
 static int DRM(agp_has_release)(void)
 {
-	printk("%s\n", __func__);
+	DRM_DEBUG("%s\n", __func__);
 	if(drm_agp && drm_agp->release) return 1;
 	if(drm_agp_3_0 && drm_agp_3_0->release) return 1;
 	return 0;
@@ -103,21 +113,21 @@ static int DRM(agp_has_release)(void)
 
 static void DRM(agp_call_release)(drm_device_t *dev)
 {
-	printk("%s\n", __func__);
+	DRM_DEBUG("%s\n", __func__);
 	if(drm_agp) drm_agp->release();
 	else if (drm_agp_3_0) drm_agp_3_0->release(dev->agp->context);
 }
 
 static void DRM(agp_call_enable)(drm_device_t *dev, drm_agp_mode_t *mode)
 {
-	printk("%s\n", __func__);
+	DRM_DEBUG("%s\n", __func__);
 	if(drm_agp) drm_agp->enable(mode->mode);
 	else if(drm_agp_3_0) drm_agp_3_0->enable(dev->agp->context, mode->mode);
 }
 
 static int DRM(agp_call_acquire)(drm_device_t *dev)
 {
-	printk("%s\n", __func__);
+	DRM_DEBUG("%s\n", __func__);
 	if(drm_agp) return drm_agp->acquire();
 	else if(drm_agp_3_0) return drm_agp_3_0->acquire(dev->agp->context);
 	return -EINVAL;
@@ -126,28 +136,28 @@ static int DRM(agp_call_acquire)(drm_device_t *dev)
 /* Revisit when we support more then one agp context. */
 void DRM(agp_do_release)(void)
 {
-	printk("%s\n", __func__);
+	DRM_DEBUG("%s\n", __func__);
 	if(drm_agp && drm_agp->release) drm_agp->release();
 	else if(drm_agp_3_0 && drm_agp_3_0->release) drm_agp_3_0->release(0);
 }
 
 agp_memory *DRM(agp_allocate_memory)(drm_device_t *dev, size_t pages, u32 type)
 {
-	printk("%s 0\n", __func__);
+	DRM_DEBUG("%s 0\n", __func__);
 	if(drm_agp) {
-		printk("%s 0\n", __func__);
+		DRM_DEBUG("%s 0\n", __func__);
 		if (!drm_agp->allocate_memory) return NULL;
-		printk("%s 0\n", __func__);
+		DRM_DEBUG("%s 0\n", __func__);
 		return drm_agp->allocate_memory(pages, type);
 	} else if (drm_agp_3_0) {
 		agp_memory *mem;
 
-		printk("%s 1\n", __func__);
+		DRM_DEBUG("%s 1\n", __func__);
 		if (!drm_agp_3_0->allocate_memory) return NULL;
-		printk("%s 2\n", __func__);
+		DRM_DEBUG("%s 2\n", __func__);
 		mem = drm_agp_3_0->allocate_memory(dev->agp->context,
 						   pages, type);
-		printk("drm_agp_3_0 : %p, mem : %p\n", drm_agp_3_0, mem);
+		DRM_DEBUG("drm_agp_3_0 : %p, mem : %p\n", drm_agp_3_0, mem);
 		return mem;
 	}
 	return NULL;
@@ -155,7 +165,7 @@ agp_memory *DRM(agp_allocate_memory)(drm_device_t *dev, size_t pages, u32 type)
 
 int DRM(agp_free_memory)(drm_device_t *dev, agp_memory *handle)
 {
-	printk("%s\n", __func__);
+	DRM_DEBUG("%s\n", __func__);
 	if(drm_agp) {
 		if (!handle || !drm_agp->free_memory) return 0;
 		drm_agp->free_memory(handle);
@@ -170,7 +180,7 @@ int DRM(agp_free_memory)(drm_device_t *dev, agp_memory *handle)
 
 int DRM(agp_bind_memory)(drm_device_t *dev, agp_memory *handle, off_t start)
 {
-	printk("%s\n", __func__);
+	DRM_DEBUG("%s\n", __func__);
 	if(drm_agp) {
 		if (!handle || !drm_agp->bind_memory) return -EINVAL;
 		return drm_agp->bind_memory(handle, start);
@@ -183,7 +193,7 @@ int DRM(agp_bind_memory)(drm_device_t *dev, agp_memory *handle, off_t start)
 
 int DRM(agp_unbind_memory)(drm_device_t *dev, agp_memory *handle)
 {
-	printk("%s\n", __func__);
+	DRM_DEBUG("%s\n", __func__);
 	if(drm_agp) {
 		if (!handle || !drm_agp->unbind_memory) return -EINVAL;
 		return drm_agp->unbind_memory(handle);
@@ -199,12 +209,13 @@ drm_agp_mem_t *DRM(agp_lookup_entry)(drm_device_t *dev,
 {
 	drm_agp_mem_t *entry;
 
-	printk("%s\n", __func__);
+	DRM_DEBUG("%s\n", __func__);
 
 	if(!dev->agp) return NULL;
 	for(entry = dev->agp->memory; entry; entry = entry->next) {
 		if (entry->handle == handle) return entry;
 	}
+	DRM_DEBUG("%s : Returning null\n", __func__);
 	return NULL;
 }
 
@@ -520,6 +531,9 @@ int DRM(agp_info)(struct inode *inode, struct file *filp,
 	if (!dev->agp || !dev->agp->acquired || !DRM(agp_has_copy)())
 		return -EINVAL;
 
+	if(drm_agp) drm_agp->copy_info(&dev->agp->agp_info);
+	if(drm_agp_3_0) drm_agp_3_0->copy_info(dev->agp->context, 
+					       &dev->agp->agp_info);
 	kern                   = &dev->agp->agp_info;
 	info.agp_version_major = kern->version.major;
 	info.agp_version_minor = kern->version.minor;
@@ -647,6 +661,7 @@ int DRM(agp_unbind)(struct inode *inode, struct file *filp,
 	if (!(entry = DRM(agp_lookup_entry)(dev, request.handle)))
 		return -EINVAL;
 	if (!entry->bound) return -EINVAL;
+	entry->bound = 0;
 	return DRM(unbind_agp)(dev, entry->memory);
 }
 
@@ -660,7 +675,7 @@ int DRM(agp_bind)(struct inode *inode, struct file *filp,
 	int               retcode;
 	int               page;
 
-	if (!dev->agp || !dev->agp->acquired || !drm_agp->bind_memory)
+	if (!dev->agp || !dev->agp->acquired || !DRM(agp_has_bind)())
 		return -EINVAL;
 	if (copy_from_user(&request, (drm_agp_binding_t *)arg, sizeof(request)))
 		return -EFAULT;
