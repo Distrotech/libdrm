@@ -1,0 +1,78 @@
+/* savage_drv.c -- savage driver -*- linux-c -*-
+ * Created: Thu Oct  7 10:38:32 1999 by faith@precisioninsight.com
+ *
+ * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
+ * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
+ * All Rights Reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *
+ * Authors of the original tdfx driver:
+ *    Rickard E. (Rik) Faith <faith@valinux.com>
+ *    Daryll Strauss <daryll@valinux.com>
+ *    Gareth Hughes <gareth@valinux.com>
+ * Modified for Savage by:
+ *    Andreas Karrenbauer <A.Karrenbauer@gmx.de>
+ */
+
+#include <linux/config.h>
+#include "savage.h"
+#include "drmP.h"
+
+#define DRIVER_AUTHOR		"bootstraped by Andreas Karrenbauer"
+
+#define DRIVER_NAME		"savage"
+#define DRIVER_DESC		"alpha savage dr"
+#define DRIVER_DATE		"20030226"
+
+#define DRIVER_MAJOR		1
+#define DRIVER_MINOR		0
+#define DRIVER_PATCHLEVEL	0
+
+#ifndef PCI_VENDOR_ID_SAVAGE
+#define PCI_VENDOR_ID_SAVAGE 0x5333 
+#endif
+#ifndef PCI_DEVICE_ID_SAVAGE_VT8751
+#define PCI_DEVICE_ID_SAVAGE_VT8751 0x8d03
+#endif
+
+static drm_pci_list_t DRM(idlist)[] = {
+	{ PCI_VENDOR_ID_SAVAGE, PCI_DEVICE_ID_SAVAGE_VT8751 },
+	{ 0, 0 }
+};
+
+#define DRIVER_CARD_LIST DRM(idlist)
+
+
+#include "drm_auth.h"
+#include "drm_bufs.h"
+#include "drm_context.h"
+#include "drm_dma.h"
+#include "drm_drawable.h"
+#include "drm_drv.h"
+
+#include "drm_fops.h"
+#include "drm_init.h"
+#include "drm_ioctl.h"
+#include "drm_lock.h"
+#include "drm_memory.h"
+#include "drm_proc.h"
+#include "drm_vm.h"
+#include "drm_stub.h"

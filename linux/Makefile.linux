@@ -38,7 +38,7 @@
 
 # **** End of SMP/MODVERSIONS detection
 
-MODS =		gamma.o tdfx.o r128.o radeon.o
+MODS =		gamma.o tdfx.o r128.o radeon.o savage.o
 LIBS =
 
 DRMTEMPLATES =	drm_auth.h drm_bufs.h drm_context.h drm_dma.h drm_drawable.h \
@@ -51,6 +51,9 @@ GAMMAHEADERS =	gamma_drv.h $(DRMHEADERS) $(DRMTEMPLATES)
 
 TDFXOBJS =	tdfx_drv.o
 TDFXHEADERS =	tdfx.h $(DRMHEADERS) $(DRMTEMPLATES)
+
+SAVAGEOBJS =    savage_drv.o
+SAVAGEHEADERS = savage.h $(DRMHEADERS) $(DRMTEMPLATES)
 
 R128OBJS =	r128_drv.o r128_cce.o r128_state.o
 R128HEADERS =	r128.h r128_drv.h r128_drm.h $(DRMHEADERS) $(DRMTEMPLATES)
@@ -224,6 +227,11 @@ tdfx_drv.o: tdfx_drv.c
 tdfx.o: $(TDFXOBJS) $(LIBS)
 	$(LD) -r $^ -o $@
 
+savage_drv.o: savage_drv.c
+       $(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
+savage.o: $(SAVAGEOBJS) $(LIBS)
+       $(LD) -r $^ -o $@
+
 sis.o: $(SISOBJS) $(LIBS)
 	$(LD) -r $^ -o $@
 
@@ -270,6 +278,7 @@ ChangeLog:
 
 $(GAMMAOBJS): $(GAMMAHEADERS)
 $(TDFXOBJS): $(TDFXHEADERS)
+$(SAVAGEOBJS): $(SAVAGEHEADERS)
 $(R128OBJS): $(R128HEADERS)
 $(RADEONOBJS): $(RADEONHEADERS)
 ifeq ($(AGP),1)
