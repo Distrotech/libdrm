@@ -115,29 +115,21 @@ typedef struct drm_r128_buf_priv {
 } drm_r128_buf_priv_t;
 
 				/* r128_cce.c */
-extern int r128_cce_init( struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg );
-extern int r128_cce_start( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int r128_cce_stop( struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg );
-extern int r128_cce_reset( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int r128_cce_idle( struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg );
-extern int r128_engine_reset( struct inode *inode, struct file *filp,
-			      unsigned int cmd, unsigned long arg );
-extern int r128_fullscreen( struct inode *inode, struct file *filp,
-			    unsigned int cmd, unsigned long arg );
-extern int r128_cce_buffers( struct inode *inode, struct file *filp,
-			     unsigned int cmd, unsigned long arg );
+extern int r128_cce_init( DRM_OS_IOCTL );
+extern int r128_cce_start( DRM_OS_IOCTL );
+extern int r128_cce_stop( DRM_OS_IOCTL );
+extern int r128_cce_reset( DRM_OS_IOCTL );
+extern int r128_cce_idle( DRM_OS_IOCTL );
+extern int r128_engine_reset( DRM_OS_IOCTL );
+extern int r128_fullscreen( DRM_OS_IOCTL );
+extern int r128_cce_buffers( DRM_OS_IOCTL );
 
 extern void r128_freelist_reset( drm_device_t *dev );
 extern drm_buf_t *r128_freelist_get( drm_device_t *dev );
 
 extern int r128_wait_ring( drm_r128_private_t *dev_priv, int n );
 
-static inline void
+static __inline__ void
 r128_update_ring_snapshot( drm_r128_ring_buffer_t *ring )
 {
 	ring->space = (GET_RING_HEAD( ring ) - ring->tail) * sizeof(u32);
@@ -150,22 +142,14 @@ extern int r128_do_cleanup_cce( drm_device_t *dev );
 extern int r128_do_cleanup_pageflip( drm_device_t *dev );
 
 				/* r128_state.c */
-extern int r128_cce_clear( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int r128_cce_swap( struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg );
-extern int r128_cce_vertex( struct inode *inode, struct file *filp,
-			    unsigned int cmd, unsigned long arg );
-extern int r128_cce_indices( struct inode *inode, struct file *filp,
-			     unsigned int cmd, unsigned long arg );
-extern int r128_cce_blit( struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg );
-extern int r128_cce_depth( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int r128_cce_stipple( struct inode *inode, struct file *filp,
-			     unsigned int cmd, unsigned long arg );
-extern int r128_cce_indirect( struct inode *inode, struct file *filp,
-			      unsigned int cmd, unsigned long arg );
+extern int r128_cce_clear( DRM_OS_IOCTL );
+extern int r128_cce_swap( DRM_OS_IOCTL );
+extern int r128_cce_vertex( DRM_OS_IOCTL );
+extern int r128_cce_indices( DRM_OS_IOCTL );
+extern int r128_cce_blit( DRM_OS_IOCTL );
+extern int r128_cce_depth( DRM_OS_IOCTL );
+extern int r128_cce_stipple( DRM_OS_IOCTL );
+extern int r128_cce_indirect( DRM_OS_IOCTL );
 
 
 /* Register definitions, register access macros and drmAddMap constants

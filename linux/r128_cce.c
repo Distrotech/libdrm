@@ -33,8 +33,10 @@
 #include "drmP.h"
 #include "r128_drv.h"
 
+#ifdef __linux__
 #include <linux/interrupt.h>	/* For task queue support */
 #include <linux/delay.h>
+#endif
 
 #define R128_FIFO_DEBUG		0
 
@@ -128,7 +130,7 @@ static int r128_do_pixcache_flush( drm_r128_private_t *dev_priv )
 		if ( !(R128_READ( R128_PC_NGUI_CTLSTAT ) & R128_PC_BUSY) ) {
 			return 0;
 		}
-		udelay( 1 );
+		DRM_OS_DELAY( 1 );
 	}
 
 	DRM_ERROR( "%s failed!\n", __FUNCTION__ );
@@ -142,7 +144,7 @@ static int r128_do_wait_for_fifo( drm_r128_private_t *dev_priv, int entries )
 	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
 		int slots = R128_READ( R128_GUI_STAT ) & R128_GUI_FIFOCNT_MASK;
 		if ( slots >= entries ) return 0;
-		udelay( 1 );
+		DRM_OS_DELAY( 1 );
 	}
 
 	DRM_ERROR( "%s failed!\n", __FUNCTION__ );
@@ -161,7 +163,7 @@ int r128_do_wait_for_idle( drm_r128_private_t *dev_priv )
 			r128_do_pixcache_flush( dev_priv );
 			return 0;
 		}
-		udelay( 1 );
+		DRM_OS_DELAY( 1 );
 	}
 
 	DRM_ERROR( "%s failed!\n", __FUNCTION__ );
@@ -219,7 +221,7 @@ int r128_do_cce_idle( drm_r128_private_t *dev_priv )
 				return r128_do_pixcache_flush( dev_priv );
 			}
 		}
-		udelay( 1 );
+		DRM_OS_DELAY( 1 );
 	}
 
 #if R128_FIFO_DEBUG
@@ -870,7 +872,7 @@ drm_buf_t *r128_freelist_get( drm_device_t *dev )
 				return buf;
 			}
 		}
-		udelay( 1 );
+		DRM_OS_DELAY( 1 );
 	}
 
 	DRM_ERROR( "returning NULL!\n" );
@@ -903,7 +905,7 @@ int r128_wait_ring( drm_r128_private_t *dev_priv, int n )
 		r128_update_ring_snapshot( ring );
 		if ( ring->space >= n )
 			return 0;
-		udelay( 1 );
+		DRM_OS_DELAY( 1 );
 	}
 
 	/* FIXME: This is being ignored... */

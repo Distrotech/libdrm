@@ -79,35 +79,22 @@ typedef struct drm_i810_private {
 
 				/* i810_dma.c */
 extern int  i810_dma_schedule(drm_device_t *dev, int locked);
-extern int  i810_getbuf(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
-extern int  i810_dma_init(struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg);
-extern int  i810_flush_ioctl(struct inode *inode, struct file *filp,
-			     unsigned int cmd, unsigned long arg);
-extern void i810_reclaim_buffers(drm_device_t *dev, pid_t pid);
-extern int  i810_getage(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
+extern int  i810_getbuf( DRM_OS_IOCTL );
+extern int  i810_dma_init( DRM_OS_IOCTL );
+extern int  i810_flush_ioctl( DRM_OS_IOCTL );
+extern int  i810_getage( DRM_OS_IOCTL );
 extern int i810_mmap_buffers(struct file *filp, struct vm_area_struct *vma);
-extern int i810_copybuf(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
-extern int i810_docopy(struct inode *inode, struct file *filp,
-		       unsigned int cmd, unsigned long arg);
+extern int i810_copybuf( DRM_OS_IOCTL );
+extern int i810_docopy( DRM_OS_IOCTL );
 
 extern void i810_dma_quiescent(drm_device_t *dev);
 
 #define I810_VERBOSE 0
 
 
-int i810_dma_vertex(struct inode *inode, struct file *filp,
-		    unsigned int cmd, unsigned long arg);
-
-int i810_swap_bufs(struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg);
-
-int i810_clear_bufs(struct inode *inode, struct file *filp,
-		    unsigned int cmd, unsigned long arg);
-
+int i810_dma_vertex( DRM_OS_IOCTL );
+int i810_swap_bufs( DRM_OS_IOCTL );
+int i810_clear_bufs( DRM_OS_IOCTL );
 
 #define I810_BASE(reg)		((unsigned long) \
 				dev_priv->mmio_map->handle)
