@@ -49,7 +49,7 @@
 #include "drm_init.h"
 #include "drm_ioctl.h"
 #include "gamma_lists.h"        /* NOTE */
-#include "drm_lock.h"
+#include "drm_lock_tmp.h"
 #include "gamma_lock.h"		/* NOTE */
 #include "drm_memory.h"
 #include "drm_proc.h"

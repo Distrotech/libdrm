@@ -85,7 +85,7 @@ static drm_pci_list_t DRM(idlist)[] = {
 #include "drm_fops.h"
 #include "drm_init.h"
 #include "drm_ioctl.h"
-#include "drm_lock.h"
+#include "drm_lock_tmp.h"
 #include "drm_memory.h"
 #include "drm_proc.h"
 #include "drm_vm.h"

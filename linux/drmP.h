@@ -116,6 +116,7 @@ typedef struct drm_device drm_device_t;
 #include "drm_agp.h"
 #include "drm_sg.h"
 #include "drm_bufs.h"
+#include "drm_lock.h"
 
 
 /***********************************************************************/
@@ -421,19 +422,6 @@ typedef struct drm_vma_entry {
 	pid_t		      pid;
 } drm_vma_entry_t;
 
-
-/**
- * Hardware lock.
- *
- * The lock structure is a simple cache-line aligned integer.  To avoid
- * processor bus contention on a multiprocessor system, there should not be any
- * other data stored in the same cache line.
- */
-typedef struct drm_hw_lock {
-	__volatile__ unsigned int lock;		/**< lock variable */
-	char			  padding[60];	/**< Pad to cache line */
-} drm_hw_lock_t;
-
 /** File private data */
 typedef struct drm_file {
 	int		  authenticated;
@@ -467,16 +455,6 @@ typedef struct drm_queue {
 	drm_waitlist_t	  waitlist;	/**< Pending buffers */
 	wait_queue_head_t flush_queue;	/**< Processes waiting until flush */
 } drm_queue_t;
-
-/**
- * Lock data.
- */
-typedef struct drm_lock_data {
-	drm_hw_lock_t	  *hw_lock;	/**< Hardware lock */
-	struct file       *filp;	/**< File descr of lock holder (0=kernel) */
-	wait_queue_head_t lock_queue;	/**< Queue of blocked processes */
-	unsigned long	  lock_time;	/**< Time of last lock in jiffies */
-} drm_lock_data_t;
 
 /**
  * DMA data.
@@ -668,10 +646,6 @@ extern int           DRM(open)(struct inode *inode, struct file *filp);
 extern int           DRM(release)(struct inode *inode, struct file *filp);
 extern int           DRM(ioctl)(struct inode *inode, struct file *filp,
 				unsigned int cmd, unsigned long arg);
-extern int           DRM(lock)(struct inode *inode, struct file *filp,
-			       unsigned int cmd, unsigned long arg);
-extern int           DRM(unlock)(struct inode *inode, struct file *filp,
-				 unsigned int cmd, unsigned long arg);
 
 				/* Device support (drm_fops.h) */
 extern int	     DRM(open_helper)(struct inode *inode, struct file *filp,
@@ -786,17 +760,6 @@ extern int	     DRM(authmagic)(struct inode *inode, struct file *filp,
                                 /* Placeholder for ioctls past */
 extern int	     DRM(noop)(struct inode *inode, struct file *filp,
 				  unsigned int cmd, unsigned long arg);
-
-				/* Locking IOCTL support (drm_lock.h) */
-extern int	     DRM(lock_take)(__volatile__ unsigned int *lock,
-				    unsigned int context);
-extern int	     DRM(lock_transfer)(drm_device_t *dev,
-					__volatile__ unsigned int *lock,
-					unsigned int context);
-extern int	     DRM(lock_free)(drm_device_t *dev,
-				    __volatile__ unsigned int *lock,
-				    unsigned int context);
-extern int           DRM(notifier)(void *priv);
 
 				/* DMA support (drm_dma.h) */
 #if __HAVE_DMA
