@@ -732,7 +732,12 @@ int mga_dma_flush( DRM_OS_IOCTL )
 	if ( lock.flags & _DRM_LOCK_QUIESCENT ) {
 #if MGA_DMA_DEBUG
 		int ret = mga_do_wait_for_idle( dev_priv );
+#ifdef __linux
+		if ( ret < 0 )
+#endif
+#ifdef __FreeBSD__
 		if ( ret )
+#endif
 			DRM_INFO( __FUNCTION__": -EBUSY\n" );
 		return ret;
 #else

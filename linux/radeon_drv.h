@@ -649,6 +649,19 @@ do {									\
  __ring_space_done:							\
 } while (0)
 
+#ifdef __linux__
+#define VB_AGE_TEST_WITH_RETURN( dev_priv )				\
+do {									\
+	drm_radeon_sarea_t *sarea_priv = dev_priv->sarea_priv;		\
+	if ( sarea_priv->last_dispatch >= RADEON_MAX_VB_AGE ) {		\
+		int __ret = radeon_do_cp_idle( dev_priv );		\
+		if ( __ret < 0 ) return __ret;				\
+		sarea_priv->last_dispatch = 0;				\
+		radeon_freelist_reset( dev );				\
+	}								\
+} while (0)
+#endif
+#ifdef __FreeBSD__
 #define VB_AGE_TEST_WITH_RETURN( dev_priv )				\
 do {									\
 	drm_radeon_sarea_t *sarea_priv = dev_priv->sarea_priv;		\
@@ -659,6 +672,7 @@ do {									\
 		radeon_freelist_reset( dev );				\
 	}								\
 } while (0)
+#endif
 
 #define RADEON_DISPATCH_AGE( age ) do {					\
 	OUT_RING( CP_PACKET0( RADEON_LAST_DISPATCH_REG, 0 ) );		\

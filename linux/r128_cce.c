@@ -161,7 +161,12 @@ int r128_do_wait_for_idle( drm_r128_private_t *dev_priv )
 	int i, ret;
 
 	ret = r128_do_wait_for_fifo( dev_priv, 64 );
+#ifdef __linux__
+	if ( ret < 0 ) return ret;
+#endif
+#ifdef __FreeBSD__
 	if ( ret ) return ret;
+#endif
 
 	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
 		if ( !(R128_READ( R128_GUI_STAT ) & R128_GUI_ACTIVE) ) {
@@ -746,7 +751,12 @@ int r128_cce_stop( DRM_OS_IOCTL )
 	 */
 	if ( stop.idle ) {
 		ret = r128_do_cce_idle( dev_priv );
+#ifdef __linux__
+		if ( ret < 0 ) return ret;
+#endif
+#ifdef __FreeBSD__
 		if ( ret ) return ret;
+#endif
 	}
 
 	/* Finally, we can turn off the CCE.  If the engine isn't idle,
