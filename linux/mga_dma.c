@@ -516,8 +516,6 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 		}
 	}
 #else
-#error
-#endif
 
 	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
 	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
