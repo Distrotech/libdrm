@@ -112,7 +112,7 @@ do {										\
         	DRM_DEBUG("Before UNINSTALL: CRTC_INT_CNTL = 0x%08x\n", tmp);	\
 		/* clear active interrupts */					\
 		if ( tmp & (MACH64_CRTC_VBLANK_INT 				\
-			    | MACH64__CRTCBUSMASTER_EOL_INT) ) {		\
+			    | MACH64_CRTC_BUSMASTER_EOL_INT) ) {		\
 			/* ack bits are the same as active interrupt bits, */	\
 			/* so write back tmp to clear active interrupts */	\
 			MACH64_WRITE( MACH64_CRTC_INT_CNTL, tmp );		\
