@@ -448,23 +448,14 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 					reg = MMSELECT( reg );
 
 					while ( count && used ) {
-#if 0
-						/* FIXME: this lowers significantly the frame rate */
 						if ( !fifo ) {
-							u32 t = 0;
-
-							while ( MACH64_READ( MACH64_GUI_STAT ) & MACH64_GUI_ACTIVE ) {
-								if ( ++t > 1000000 ) {
-									DRM_ERROR( "timeout writing register\n" );
-									return;
-								}
-							}	
+							if ( mach64_do_wait_for_fifo( dev_priv, 16 ) < 0 )
+								return;
 							
 							fifo = 16;
 						}
 						else
 							--fifo;
-#endif
 						
 						MACH64_WRITE( reg, *p++ );
 						used--;
