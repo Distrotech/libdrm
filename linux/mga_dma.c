@@ -530,12 +530,15 @@ int mga_advance_primary(drm_device_t *dev)
    	/* This needs to reset the primary buffer if available,
 	 * we should collect stats on how many times it bites
 	 * it's tail */
+   
    	next_prim_idx = dev_priv->current_prim_idx + 1;
    	if(next_prim_idx >= MGA_NUM_PRIM_BUFS)
      		next_prim_idx = 0;
    	prim_buffer = dev_priv->prim_bufs[next_prim_idx];
-   	/* In use is cleared in interrupt handler */
    	atomic_set(&dev_priv->in_wait, 1);
+   
+      	/* In use is cleared in interrupt handler */
+   
    	if(test_and_set_bit(0, &prim_buffer->in_use)) {
 	   	add_wait_queue(&dev_priv->wait_queue, &entry);
 	   	for (;;) {
@@ -546,7 +549,8 @@ int mga_advance_primary(drm_device_t *dev)
 		   	atomic_inc(&dma->total_missed_sched);
 		   	mga_print_all_primary(dev);
 		   	DRM_DEBUG("Schedule in advance\n");
-		   	schedule_timeout(HZ*1);
+		   	/* Three second delay */
+		   	schedule_timeout(HZ*3);
 		   	if (signal_pending(current)) {
 			   	ret = -ERESTARTSYS;
 			   	break;
@@ -660,8 +664,8 @@ int mga_dma_schedule(drm_device_t *dev, int locked)
 	}
 
    	clear_bit(0, &dev->dma_flag);
-   	wake_up_interruptible(&dev_priv->wait_queue);
-   	if(atomic_read(&dev_priv->in_flush) == 1 &&
+   
+      	if(atomic_read(&dev_priv->in_flush) == 1 &&
 	   dev_priv->next_prim->num_dwords == 0) {
 	   	/* Everything is on the hardware */
 	   	DRM_DEBUG("Primarys at Flush\n");
@@ -669,6 +673,7 @@ int mga_dma_schedule(drm_device_t *dev, int locked)
 	   	atomic_set(&dev_priv->in_flush, 0);
 	   	wake_up_interruptible(&dev_priv->flush_queue);
 	}
+
 	return 0;
 }
 
@@ -700,6 +705,7 @@ static void mga_dma_task_queue(void *device)
    	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
 
 	mga_dma_schedule(dev, 0);
+      	wake_up_interruptible(&dev_priv->wait_queue);
 }
 
 int mga_dma_cleanup(drm_device_t *dev)
@@ -855,9 +861,6 @@ static int mga_dma_initialize(drm_device_t *dev, drm_mga_init_t *init) {
 		PRIMOUTREG(MGAREG_DMAPAD, 0);
 		PRIMOUTREG(MGAREG_DWGSYNC, dev_priv->last_sync_tag);
 		PRIMOUTREG(MGAREG_SOFTRAP, 0);
-/*
-		PRIMADVANCE( dev_priv );
-*/
 		/* Poll for the first buffer to insure that
 		 * the status register will be correct
 		 */
@@ -873,8 +876,6 @@ static int mga_dma_initialize(drm_device_t *dev, drm_mga_init_t *init) {
 	   	while(MGA_READ(MGAREG_DWGSYNC) != dev_priv->last_sync_tag) ;
 	   	DRM_DEBUG("status[0] after initialization : %x\n", status[0]);
 	   	DRM_DEBUG("status[1] after initialization : %x\n", status[1]);
-	   	/* Reset the buffer structure */
-	   
 	}
 
 	if(mga_freelist_init(dev) != 0) {
