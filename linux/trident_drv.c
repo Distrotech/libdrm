@@ -1,5 +1,5 @@
-/* mga_drv.c -- Matrox G200/G400 driver -*- linux-c -*-
- * Created: Mon Dec 13 01:56:22 1999 by jhartmann@precisioninsight.com
+/* trident_drv.c -- trident driver -*- linux-c -*-
+ * Created: Thu Oct  7 10:38:32 1999 by faith@precisioninsight.com
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
@@ -19,52 +19,59 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * VA LINUX SYSTEMS AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- * OTHER DEALINGS IN THE SOFTWARE.
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
  *
- * Authors:
- *    Rickard E. (Rik) Faith <faith@valinux.com>
- *    Gareth Hughes <gareth@valinux.com>
- *
- * $FreeBSD: src/sys/dev/drm/mga_drv.c,v 1.4 2003/03/09 02:08:28 anholt Exp $
  */
 
-#include "mga.h"
+#include <linux/config.h>
+#include "trident.h"
 #include "drmP.h"
-#include "drm.h"
-#include "mga_drm.h"
-#include "mga_drv.h"
 
-/* List acquired from http://www.yourvote.com/pci/pcihdr.h and xc/xc/programs/Xserver/hw/xfree86/common/xf86PciInfo.h
- * Please report to anholt@teleport.com inaccuracies or if a chip you have works that is marked unsupported here.
- */
-drm_chipinfo_t DRM(devicelist)[] = {
-	{0x102b, 0x0520, 0, "Matrox G200 (PCI)"},
-	{0x102b, 0x0521, 1, "Matrox G200 (AGP)"},
-	{0x102b, 0x0525, 1, "Matrox G400/G450 (AGP)"},
-	{0x102b, 0x2527, 1, "Matrox G550 (AGP)"},
-	{0, 0, 0, NULL}
-};
+#define DRIVER_AUTHOR		"Alan Hourihane"
 
-#include "drm_agpsupport.h"
+#define DRIVER_NAME		"trident_dri"
+#define DRIVER_DESC		"Trident CyberBladeXP"
+#define DRIVER_DATE		"20010216"
+
+#define DRIVER_MAJOR		1
+#define DRIVER_MINOR		0
+#define DRIVER_PATCHLEVEL	0
+
 #include "drm_auth.h"
+#include "drm_agpsupport.h"
 #include "drm_bufs.h"
 #include "drm_context.h"
 #include "drm_dma.h"
 #include "drm_drawable.h"
 #include "drm_drv.h"
+
+#ifndef MODULE
+/* DRM(options) is called by the kernel to parse command-line options
+ * passed via the boot-loader (e.g., LILO).  It calls the insmod option
+ * routine, drm_parse_drm.
+ */
+
+/* JH- We have to hand expand the string ourselves because of the cpp.  If
+ * anyone can think of a way that we can fit into the __setup macro without
+ * changing it, then please send the solution my way.
+ */
+static int __init trident_options( char *str )
+{
+	DRM(parse_options)( str );
+	return 1;
+}
+
+__setup( DRIVER_NAME "=", trident_options );
+#endif
+
 #include "drm_fops.h"
 #include "drm_init.h"
 #include "drm_ioctl.h"
 #include "drm_lock.h"
 #include "drm_memory.h"
+#include "drm_proc.h"
 #include "drm_vm.h"
-#include "drm_sysctl.h"
-
-#ifdef __FreeBSD__
-DRIVER_MODULE(mga, pci, mga_driver, mga_devclass, 0, 0);
-#elif defined(__NetBSD__)
-CFDRIVER_DECL(mga, DV_TTY, NULL);
-#endif
+#include "drm_stub.h"
