@@ -446,7 +446,7 @@ static inline void i810_dma_dispatch_vertex(drm_device_t *dev, drm_buf_t *buf)
 					  SC_ENABLE );
 				OUT_RING( GFX_OP_SCISSOR_INFO );
 				OUT_RING( box[i].x1 | (box[i].y1 << 16) );
-				OUT_RING( box[i].x2 | (box[i].y2 << 16) );
+				OUT_RING( (box[i].x2-1) | ((box[i].y2-1) << 16) );
 				ADVANCE_LP_RING();
 			}
 			
