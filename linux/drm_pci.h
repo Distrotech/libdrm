@@ -141,9 +141,9 @@ DRM(pci_free)(drm_device_t *dev, size_t size, void *vaddr, dma_addr_t busaddr)
 		     addr += PAGE_SIZE, sz -= PAGE_SIZE) {
 			ClearPageReserved(virt_to_page(addr));
 		}
+#endif
 		pci_free_consistent( dev->pdev, size, vaddr, busaddr );
 	}
-#endif
 
 #if DEBUG_MEMORY
 	spin_lock(&DRM(mem_lock));
