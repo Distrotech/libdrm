@@ -101,6 +101,9 @@ do {								\
 
 #define DRM_OS_WRITEMEMORYBARRIER DRM_OS_READMEMORYBARRIER
 
+#define DRM_OS_WAKEUP(w) wakeup(w)
+#define DRM_OS_WAKEUP_INT(w) wakeup(w)
+
 #define PAGE_ALIGN(addr) (((addr)+PAGE_SIZE-1)&PAGE_MASK)
 
 #define malloctype DRM(M_DRM)
@@ -272,6 +275,10 @@ extern d_read_t		DRM(read);
 extern d_write_t	DRM(write);
 extern d_poll_t		DRM(poll);
 extern d_mmap_t		DRM(mmap);
+extern int		DRM(open_helper)(dev_t kdev, int flags, int fmt, 
+					struct proc *p, drm_device_t *dev);
+extern drm_file_t	*DRM(find_file_by_proc)(drm_device_t *dev, 
+					struct proc *p);
 
 /* Misc. IOCTL support (drm_ioctl.h) */
 extern d_ioctl_t	DRM(irq_busid);
@@ -344,3 +351,7 @@ extern d_ioctl_t	DRM(agp_bind);
 extern d_ioctl_t	DRM(sg_alloc);
 extern d_ioctl_t	DRM(sg_free);
 #endif
+
+/* SysCtl Support (drm_sysctl.h) */
+extern int		DRM(sysctl_init)(drm_device_t *dev);
+extern int		DRM(sysctl_cleanup)(drm_device_t *dev);

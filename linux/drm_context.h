@@ -277,12 +277,7 @@ int DRM(context_switch_complete)( drm_device_t *dev, int new )
 
 #endif
         clear_bit( 0, &dev->context_flag );
-#ifdef __linux__
-        wake_up( &dev->context_wait );
-#endif
-#ifdef __FreeBSD__
-	wakeup( &dev->context_wait );
-#endif
+        DRM_OS_WAKEUP( &dev->context_wait );
 
         return 0;
 }
@@ -481,12 +476,7 @@ int DRM(context_switch_complete)(drm_device_t *dev, int new)
 
 #endif
 	clear_bit(0, &dev->context_flag);
-#ifdef __linux__
-	wake_up_interruptible(&dev->context_wait);
-#endif
-#ifdef __FreeBSD__
-	wakeup( &dev->context_wait );
-#endif
+	DRM_OS_WAKEUP_INT(&dev->context_wait);
 
 	return 0;
 }
@@ -770,13 +760,12 @@ int DRM(rmctx)( DRM_OS_IOCTL )
 #ifdef __linux__
 	wake_up_interruptible(&q->read_queue);
 	wake_up_interruptible(&q->write_queue);
-	wake_up_interruptible(&q->flush_queue);
 #endif
 #ifdef __FreeBSD__
 	wakeup( &q->block_read );
 	wakeup( &q->block_write );
-	wakeup( &q->flush_queue );
 #endif
+	DRM_OS_WAKEUP_INT( &q->flush_queue );
 				/* Finalization over.  Queue is made
 				   available when both use_count and
 				   finalization become 0, which won't

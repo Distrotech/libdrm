@@ -653,12 +653,7 @@ static int DRM(takedown)( drm_device_t *dev )
 	if ( dev->lock.hw_lock ) {
 		dev->lock.hw_lock = NULL; /* SHM removed */
 		dev->lock.pid = 0;
-#ifdef __linux__
-		wake_up_interruptible( &dev->lock.lock_queue );
-#endif
-#ifdef __FreeBSD__
-		wakeup( &dev->lock.lock_queue );
-#endif
+		DRM_OS_WAKEUP_INT(&dev->lock.lock_queue);
 	}
 	DRM_OS_UNLOCK;
 

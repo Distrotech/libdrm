@@ -582,21 +582,7 @@ extern int           DRM(remove_magic)(drm_device_t *dev, drm_magic_t magic);
 
 				/* Driver support (drm_drv.h) */
 extern int           DRM(version)( DRM_OS_IOCTL );
-#ifdef __linux__
-extern int           DRM(open)(struct inode *inode, struct file *filp);
-extern int           DRM(release)(struct inode *inode, struct file *filp);
-#endif
-
 extern int	     DRM(write_string)(drm_device_t *dev, const char *s);
-#ifdef __linux__
-extern int	     DRM(open_helper)(struct inode *inode, struct file *filp,
-				      drm_device_t *dev);
-#endif
-#ifdef __FreeBSD__
-extern int           DRM(open_helper)(dev_t kdev, int flags, int fmt, 
-					struct proc *p, drm_device_t *dev);
-extern drm_file_t    *DRM(find_file_by_proc)(drm_device_t *dev, struct proc *p);
-#endif
 
 				/* Memory management support (drm_memory.h) */
 extern void	     DRM(mem_init)(void);
@@ -714,19 +700,6 @@ extern int            DRM(proc_cleanup)(int minor,
 #if __HAVE_SG
 				/* Scatter Gather Support (drm_scatter.h) */
 extern void           DRM(sg_cleanup)(drm_sg_mem_t *entry);
-#endif
-
-#ifdef __linux__
-/* Stub support (drm_stub.h) */
-extern int	DRM(stub_register)(const char *name,
-				 struct file_operations *fops,
-				 drm_device_t *dev);
-extern int	DRM(stub_unregister)(int minor);
-#endif
-
-#ifdef __FreeBSD__
-extern int	DRM(sysctl_init)(drm_device_t *dev);
-extern int	DRM(sysctl_cleanup)(drm_device_t *dev);
 #endif
 
 #if __REALLY_HAVE_SG

@@ -220,12 +220,7 @@ int DRM(freelist_put)(drm_device_t *dev, drm_freelist_t *bl, drm_buf_t *buf)
 				/* Check for high water mark */
 	if (atomic_read(&bl->wfh) && atomic_read(&bl->count)>=bl->high_mark) {
 		atomic_set(&bl->wfh, 0);
-#ifdef __linux__
-		wake_up_interruptible(&bl->waiting);
-#endif
-#ifdef __FreeBSD__
-		wakeup(&bl->waiting);
-#endif
+		DRM_OS_WAKEUP_INT(&bl->waiting);
 	}
 	return 0;
 }

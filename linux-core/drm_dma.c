@@ -261,12 +261,7 @@ void DRM(clear_next_buffer)(drm_device_t *dev)
 
 	dma->next_buffer = NULL;
 	if (dma->next_queue && !DRM_BUFCOUNT(&dma->next_queue->waitlist)) {
-#ifdef __linux
-		wake_up_interruptible(&dma->next_queue->flush_queue);
-#endif
-#ifdef __FreeBSD__
-		wakeup(&dma->next_queue->flush_queue);
-#endif
+		DRM_OS_WAKEUP_INT(&dma->next_queue->flush_queue);
 	}
 	dma->next_queue	 = NULL;
 }

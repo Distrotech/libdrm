@@ -142,12 +142,7 @@ int DRM(lock_free)(drm_device_t *dev,
 			  pid);
 		return 1;
 	}
-#ifdef __linux__
-	wake_up_interruptible(&dev->lock.lock_queue);
-#endif
-#ifdef __FreeBSD__
-	wakeup( &dev->lock.lock_queue );
-#endif
+	DRM_OS_WAKEUP_INT(&dev->lock.lock_queue);
 	return 0;
 }
 
@@ -209,12 +204,7 @@ static int DRM(flush_unblock_queue)(drm_device_t *dev, int context)
 	if (atomic_read(&q->use_count) > 1) {
 		if (atomic_read(&q->block_write)) {
 			atomic_dec(&q->block_write);
-#ifdef __linux__
-			wake_up_interruptible(&q->write_queue);
-#endif
-#ifdef __FreeBSD__
-			wakeup(&q->write_queue);
-#endif
+			DRM_OS_WAKEUP_INT(&q->write_queue);
 		}
 	}
 	atomic_dec(&q->use_count);

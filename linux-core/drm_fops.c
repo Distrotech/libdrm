@@ -261,7 +261,7 @@ ssize_t DRM(read)(dev_t kdev, struct uio *uio, int ioflag)
 
 #ifdef __linux__
 	wake_up_interruptible(&dev->buf_writers);
-	return DRM_MIN(avail, count);;
+	return DRM_MIN(avail, count);
 #endif
 #ifdef __FreeBSD__
 	wakeup(&dev->buf_wp);
