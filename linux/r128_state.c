@@ -1533,9 +1533,9 @@ int r128_cce_indirect( DRM_OS_IOCTL )
 	buf = dma->buflist[indirect.idx];
 	buf_priv = buf->dev_private;
 
-	if ( buf->pid != current->pid ) {
+	if ( buf->pid != DRM_OS_CURRENTPID ) {
 		DRM_ERROR( "process %d using buffer owned by %d\n",
-			   current->pid, buf->pid );
+			   DRM_OS_CURRENTPID, buf->pid );
 		return -EINVAL;
 	}
 	if ( buf->pending ) {
