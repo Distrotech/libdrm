@@ -154,7 +154,13 @@ int DRM(getmagic)(DRM_OS_IOCTL)
 	}
 
 	DRM_DEBUG("%u\n", auth.magic);
-	DRM_OS_COPYTO((drm_auth_t *)data, &auth, sizeof(auth));
+#ifdef __linux__
+	if (copy_to_user((drm_auth_t *)arg, &auth, sizeof(auth)))
+		return -EFAULT;
+#endif
+#ifdef __FreeBSD__
+	*(drm_auth_t *) data = auth;
+#endif
 	return 0;
 }
 
@@ -164,7 +170,13 @@ int DRM(authmagic)(DRM_OS_IOCTL)
 	drm_file_t	   *file;
 	DRM_OS_DEVICE;
 
-	DRM_OS_COPYFROM(&auth, (drm_auth_t *)data, sizeof(auth));
+#ifdef __linux__
+	if (copy_from_user(&auth, (drm_auth_t *)arg, sizeof(auth)))
+		return -EFAULT;
+#endif
+#ifdef __FreeBSD__
+	auth = *(drm_auth_t *) data;
+#endif
 
 	DRM_DEBUG("%u\n", auth.magic);
 	if ((file = DRM(find_file)(dev, auth.magic))) {

@@ -93,7 +93,7 @@ int DRM(addmap)( DRM_OS_IOCTL )
 	if ( !map )
 		DRM_OS_RETURN(ENOMEM);
 
-	if ( copy_from_user( map, (drm_map_t *)arg, sizeof(*map) ) ) {
+	if ( copy_from_user( &map, (drm_map_t *)data, sizeof(map) ) ) {
 		DRM(free)( map, sizeof(*map), DRM_MEM_MAPS );
 		DRM_OS_RETURN(EFAULT);
 	}
@@ -193,8 +193,9 @@ int DRM(addmap)( DRM_OS_IOCTL )
 #endif
 	DRM_OS_UNLOCK;
 
-	if ( copy_to_user( (drm_map_t *)arg, map, sizeof(*map) ) )
+	if ( copy_to_user( (drm_map_t *)data, &map, sizeof(map) ) )
 		DRM_OS_RETURN(EFAULT);
+
 	if ( map->type != _DRM_SHM ) {
 		if ( copy_to_user( &((drm_map_t *)arg)->handle,
 				   &map->offset,

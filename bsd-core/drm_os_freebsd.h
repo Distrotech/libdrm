@@ -35,17 +35,9 @@
 #define DRM_OS_LOCK	lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, curproc)
 #define DRM_OS_UNLOCK 	lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc)
 #define DRM_OS_IOCTL	dev_t kdev, u_long cmd, caddr_t data, int flags, struct proc *p
-#define DRM_OS_OPEN	/*dev_t kdev, int flags, int fmt, struct proc *p*/
 #define DRM_OS_DEVICE	drm_file_t	*priv; \
 			drm_device_t	*dev	= kdev->si_drv1
 #define DRM_OS_RETURN(v)	return v;
-/* NOTE: To keep the same format as linux, we reverse arg1 and arg2 */
-#define DRM_OS_COPYTO(arg1, arg2, arg3) \
-	copyout( arg2, arg1, arg3 )
-#define DRM_OS_COPYFROM(arg1, arg2, arg3) \
-	copyin( arg2, arg1, arg3 )
-
-#define DRM_PROT_IOCTL	d_ioctl_t
 
 typedef u_int32_t atomic_t;
 typedef u_int32_t cycles_t;
@@ -187,6 +179,11 @@ find_first_zero_bit(volatile unsigned long *p, int max)
 extern d_ioctl_t	DRM(ioctl);
 extern d_ioctl_t	DRM(lock);
 extern d_ioctl_t	DRM(unlock);
+extern d_open_t		DRM(open);
+extern d_close_t	DRM(close);
+extern d_read_t		DRM(read);
+extern d_write_t	DRM(write);
+extern d_poll_t		DRM(poll);
 
 /* Misc. IOCTL support (drm_ioctl.h) */
 extern d_ioctl_t	DRM(irq_busid);
