@@ -118,36 +118,6 @@
 #define _PAGE_PWT _PAGE_WT
 #endif
 
-				/* Macros to make printk easier */
-#define DRM_ERROR(fmt, arg...) \
-	printk(KERN_ERR "[" DRM_NAME ":" __FUNCTION__ "] *ERROR* " fmt , ##arg)
-#define DRM_MEM_ERROR(area, fmt, arg...) \
-	printk(KERN_ERR "[" DRM_NAME ":" __FUNCTION__ ":%s] *ERROR* " fmt , \
-	       DRM(mem_stats)[area].name , ##arg)
-#define DRM_INFO(fmt, arg...)  printk(KERN_INFO "[" DRM_NAME "] " fmt , ##arg)
-
-#if DRM_DEBUG_CODE
-#define DRM_DEBUG(fmt, arg...)						\
-	do {								\
-		if ( DRM(flags) & DRM_FLAG_DEBUG )			\
-			printk(KERN_DEBUG				\
-			       "[" DRM_NAME ":" __FUNCTION__ "] " fmt ,	\
-			       ##arg);					\
-	} while (0)
-#else
-#define DRM_DEBUG(fmt, arg...)		 do { } while (0)
-#endif
-
-#define DRM_PROC_LIMIT (PAGE_SIZE-80)
-
-#define DRM_PROC_PRINT(fmt, arg...)					\
-   len += sprintf(&buf[len], fmt , ##arg);				\
-   if (len > DRM_PROC_LIMIT) { *eof = 1; return len - offset; }
-
-#define DRM_PROC_PRINT_RET(ret, fmt, arg...)				\
-   len += sprintf(&buf[len], fmt , ##arg);				\
-   if (len > DRM_PROC_LIMIT) { ret; *eof = 1; return len - offset; }
-
 				/* Mapping helper macros */
 #define DRM_IOREMAP(map)						\
 	(map)->handle = DRM(ioremap)( (map)->offset, (map)->size )
@@ -442,10 +412,20 @@ typedef struct drm_device {
 	const char	  *name;	/* Simple driver name		   */
 	char		  *unique;	/* Unique identifier: e.g., busid  */
 	int		  unique_len;	/* Length of unique field	   */
+#ifdef __linux__
 	dev_t		  device;	/* Device number for mknod	   */
+#endif
+#ifdef __FreeBSD__
+	device_t	  device;	/* Device instance from newbus     */
+	dev_t		  devnode;	/* Device number for mknod	   */
+#endif
 	char		  *devname;	/* For /proc/interrupts		   */
 
 	int		  blocked;	/* Blocked due to VC switch?	   */
+#ifdef __FreeBSD__
+	int		  flags;	/* Flags to open(2)		   */
+	int		  writable;	/* Opened with FWRITE		   */
+#endif
 	struct proc_dir_entry *root;	/* Root for this device's entries  */
 
 				/* Locks */

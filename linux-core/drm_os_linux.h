@@ -210,6 +210,36 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 
 #endif /* !__HAVE_ARCH_CMPXCHG */
 
+				/* Macros to make printk easier */
+#define DRM_ERROR(fmt, arg...) \
+	printk(KERN_ERR "[" DRM_NAME ":" __FUNCTION__ "] *ERROR* " fmt , ##arg)
+#define DRM_MEM_ERROR(area, fmt, arg...) \
+	printk(KERN_ERR "[" DRM_NAME ":" __FUNCTION__ ":%s] *ERROR* " fmt , \
+	       DRM(mem_stats)[area].name , ##arg)
+#define DRM_INFO(fmt, arg...)  printk(KERN_INFO "[" DRM_NAME "] " fmt , ##arg)
+
+#if DRM_DEBUG_CODE
+#define DRM_DEBUG(fmt, arg...)						\
+	do {								\
+		if ( DRM(flags) & DRM_FLAG_DEBUG )			\
+			printk(KERN_DEBUG				\
+			       "[" DRM_NAME ":" __FUNCTION__ "] " fmt ,	\
+			       ##arg);					\
+	} while (0)
+#else
+#define DRM_DEBUG(fmt, arg...)		 do { } while (0)
+#endif
+
+#define DRM_PROC_LIMIT (PAGE_SIZE-80)
+
+#define DRM_PROC_PRINT(fmt, arg...)					\
+   len += sprintf(&buf[len], fmt , ##arg);				\
+   if (len > DRM_PROC_LIMIT) { *eof = 1; return len - offset; }
+
+#define DRM_PROC_PRINT_RET(ret, fmt, arg...)				\
+   len += sprintf(&buf[len], fmt , ##arg);				\
+   if (len > DRM_PROC_LIMIT) { ret; *eof = 1; return len - offset; }
+
 #define DRM_FIND_MAP(_map, _o)						\
 do {									\
 	struct list_head *_list;					\

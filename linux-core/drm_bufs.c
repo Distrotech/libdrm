@@ -70,17 +70,26 @@ int DRM(order)( unsigned long size )
 	return order;
 }
 
-int DRM(addmap)( struct inode *inode, struct file *filp,
-		 unsigned int cmd, unsigned long arg )
+int DRM(addmap)( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_map_t *map;
+#ifdef __linux__
 	drm_map_list_t *list;
+#endif
+#ifdef __FreeBSD__
+	drm_map_list_entry_t *list;
+#endif
 
+#ifdef __linux__
 	if ( !(filp->f_mode & 3) ) return -EACCES; /* Require read/write */
+#endif
+#ifdef __FreeBSD__
+	if (!(dev->flags & (FREAD|FWRITE)))
+		return EACCES; /* Require read/write */
+#endif
 
-	map = DRM(alloc)( sizeof(*map), DRM_MEM_MAPS );
+	map = (drm_map_t *) DRM(alloc)( sizeof(*map), DRM_MEM_MAPS );
 	if ( !map )
 		return -ENOMEM;
 
@@ -110,8 +119,11 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
 	case _DRM_REGISTERS:
 	case _DRM_FRAME_BUFFER:
 #if !defined(__sparc__) && !defined(__alpha__)
-		if ( map->offset + map->size < map->offset ||
-		     map->offset < virt_to_phys(high_memory) ) {
+		if ( map->offset + map->size < map->offset
+#ifdef __linux__
+		     || map->offset < virt_to_phys(high_memory) 
+#endif
+		) {
 			DRM(free)( map, sizeof(*map), DRM_MEM_MAPS );
 			return -EINVAL;
 		}
@@ -172,9 +184,14 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
 	memset(list, 0, sizeof(*list));
 	list->map = map;
 
-	down(&dev->struct_sem);
+	DRM_OS_LOCK;
+#ifdef __linux__
 	list_add(&list->head, &dev->maplist->head);
- 	up(&dev->struct_sem);
+#endif
+#ifdef __FreeBSD__
+	TAILQ_INSERT_TAIL(dev->maplist, list, link);
+#endif
+	DRM_OS_UNLOCK;
 
 	if ( copy_to_user( (drm_map_t *)arg, map, sizeof(*map) ) )
 		return -EFAULT;
@@ -192,11 +209,9 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
  * isn't in use.
  */
 
-int DRM(rmmap)(struct inode *inode, struct file *filp,
-	       unsigned int cmd, unsigned long arg)
+int DRM(rmmap)( DRM_OS_IOCTL )
 {
-	drm_file_t	*priv	= filp->private_data;
-	drm_device_t	*dev	= priv->dev;
+	DRM_OS_DEVICE;
 	struct list_head *list;
 	drm_map_list_t *r_list;
 	drm_vma_entry_t *pt, *prev;
@@ -209,7 +224,7 @@ int DRM(rmmap)(struct inode *inode, struct file *filp,
 		return -EFAULT;
 	}
 
-	down(&dev->struct_sem);
+	DRM_OS_LOCK;
 	list = &dev->maplist->head;
 	list_for_each(list, &dev->maplist->head) {
 		r_list = (drm_map_list_t *) list;
@@ -223,7 +238,7 @@ int DRM(rmmap)(struct inode *inode, struct file *filp,
 	 * find anything.
 	 */
 	if(list == (&dev->maplist->head)) {
-		up(&dev->struct_sem);
+		DRM_OS_UNLOCK;
 		return -EINVAL;
 	}
 	map = r_list->map;
@@ -262,18 +277,16 @@ int DRM(rmmap)(struct inode *inode, struct file *filp,
 		}
 		DRM(free)(map, sizeof(*map), DRM_MEM_MAPS);
 	}
-	up(&dev->struct_sem);
+	DRM_OS_UNLOCK;
 	return 0;
 }
 
 #if __HAVE_DMA
 
 #if __REALLY_HAVE_AGP
-int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
-		      unsigned int cmd, unsigned long arg )
+int DRM(addbufs_agp)( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_desc_t request;
 	drm_buf_entry_t *entry;
@@ -326,10 +339,10 @@ int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
 	atomic_inc( &dev->buf_alloc );
 	spin_unlock( &dev->count_lock );
 
-	down( &dev->struct_sem );
+	DRM_OS_LOCK;
 	entry = &dma->bufs[order];
 	if ( entry->buf_count ) {
-		up( &dev->struct_sem );
+		DRM_OS_UNLOCK;
 		atomic_dec( &dev->buf_alloc );
 		return -ENOMEM; /* May only call once for each order */
 	}
@@ -337,7 +350,7 @@ int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
 	entry->buflist = DRM(alloc)( count * sizeof(*entry->buflist),
 				    DRM_MEM_BUFS );
 	if ( !entry->buflist ) {
-		up( &dev->struct_sem );
+		DRM_OS_UNLOCK;
 		atomic_dec( &dev->buf_alloc );
 		return -ENOMEM;
 	}
@@ -406,7 +419,7 @@ int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
 		DRM(freelist_put)( dev, &entry->freelist, &entry->buflist[i] );
 	}
 #endif
-	up( &dev->struct_sem );
+	DRM_OS_UNLOCK;
 
 	request.count = entry->buf_count;
 	request.size = size;
@@ -422,11 +435,9 @@ int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
 #endif /* __REALLY_HAVE_AGP */
 
 #if __HAVE_PCI_DMA
-int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
-		      unsigned int cmd, unsigned long arg )
+int DRM(addbufs_pci)( DRM_OS_IOCTL )
 {
-   	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_desc_t request;
 	int count;
@@ -473,10 +484,10 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 	atomic_inc( &dev->buf_alloc );
 	spin_unlock( &dev->count_lock );
 
-	down( &dev->struct_sem );
+	DRM_OS_LOCK;
 	entry = &dma->bufs[order];
 	if ( entry->buf_count ) {
-		up( &dev->struct_sem );
+		DRM_OS_UNLOCK;
 		atomic_dec( &dev->buf_alloc );
 		return -ENOMEM;	/* May only call once for each order */
 	}
@@ -484,7 +495,7 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 	entry->buflist = DRM(alloc)( count * sizeof(*entry->buflist),
 				    DRM_MEM_BUFS );
 	if ( !entry->buflist ) {
-		up( &dev->struct_sem );
+		DRM_OS_UNLOCK;
 		atomic_dec( &dev->buf_alloc );
 		return -ENOMEM;
 	}
@@ -496,7 +507,7 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 		DRM(free)( entry->buflist,
 			  count * sizeof(*entry->buflist),
 			  DRM_MEM_BUFS );
-		up( &dev->struct_sem );
+		DRM_OS_UNLOCK;
 		atomic_dec( &dev->buf_alloc );
 		return -ENOMEM;
 	}
@@ -573,7 +584,7 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 		DRM(freelist_put)( dev, &entry->freelist, &entry->buflist[i] );
 	}
 #endif
-	up( &dev->struct_sem );
+	DRM_OS_UNLOCK;
 
 	request.count = entry->buf_count;
 	request.size = size;
@@ -587,11 +598,9 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 #endif /* __HAVE_PCI_DMA */
 
 #ifdef __HAVE_SG
-int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
-                     unsigned int cmd, unsigned long arg )
+int DRM(addbufs_sg)( DRM_OS_IOCTL )
 {
-       drm_file_t *priv = filp->private_data;
-       drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
        drm_device_dma_t *dma = dev->dma;
        drm_buf_desc_t request;
        drm_buf_entry_t *entry;
@@ -644,10 +653,10 @@ int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
        atomic_inc( &dev->buf_alloc );
        spin_unlock( &dev->count_lock );
 
-       down( &dev->struct_sem );
+	DRM_OS_LOCK;
        entry = &dma->bufs[order];
        if ( entry->buf_count ) {
-               up( &dev->struct_sem );
+		DRM_OS_UNLOCK;
                atomic_dec( &dev->buf_alloc );
                return -ENOMEM; /* May only call once for each order */
        }
@@ -655,7 +664,7 @@ int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
        entry->buflist = DRM(alloc)( count * sizeof(*entry->buflist),
                                    DRM_MEM_BUFS );
        if ( !entry->buflist ) {
-               up( &dev->struct_sem );
+		DRM_OS_UNLOCK;
                atomic_dec( &dev->buf_alloc );
                return -ENOMEM;
        }
@@ -724,7 +733,7 @@ int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
                DRM(freelist_put)( dev, &entry->freelist, &entry->buflist[i] );
        }
 #endif
-       up( &dev->struct_sem );
+	DRM_OS_UNLOCK;
 
        request.count = entry->buf_count;
        request.size = size;
@@ -739,8 +748,7 @@ int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
 }
 #endif /* __HAVE_SG */
 
-int DRM(addbufs)( struct inode *inode, struct file *filp,
-		  unsigned int cmd, unsigned long arg )
+int DRM(addbufs)( DRM_OS_IOCTL )
 {
 	drm_buf_desc_t request;
 
@@ -765,11 +773,9 @@ int DRM(addbufs)( struct inode *inode, struct file *filp,
 #endif
 }
 
-int DRM(infobufs)( struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg )
+int DRM(infobufs)( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_info_t request;
 	int i;
@@ -836,11 +842,9 @@ int DRM(infobufs)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
-int DRM(markbufs)( struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg )
+int DRM(markbufs)( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_desc_t request;
 	int order;
@@ -870,11 +874,9 @@ int DRM(markbufs)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
-int DRM(freebufs)( struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg )
+int DRM(freebufs)( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_free_t request;
 	int i;
@@ -911,11 +913,9 @@ int DRM(freebufs)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
-int DRM(mapbufs)( struct inode *inode, struct file *filp,
-		  unsigned int cmd, unsigned long arg )
+int DRM(mapbufs)( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_device_dma_t *dma = dev->dma;
 	int retcode = 0;
 	const int zero = 0;
@@ -948,33 +948,43 @@ int DRM(mapbufs)( struct inode *inode, struct file *filp,
 				goto done;
 			}
 
+#ifdef __linux__
 #if LINUX_VERSION_CODE <= 0x020402
 			down( &current->mm->mmap_sem );
 #else
 			down_write( &current->mm->mmap_sem );
 #endif
+#endif
+
 			virtual = do_mmap( filp, 0, map->size,
 					   PROT_READ | PROT_WRITE,
 					   MAP_SHARED,
 					   (unsigned long)map->offset );
+#ifdef __linux__
 #if LINUX_VERSION_CODE <= 0x020402
 			up( &current->mm->mmap_sem );
 #else
 			up_write( &current->mm->mmap_sem );
 #endif
+#endif
 		} else {
+#ifdef __linux__
 #if LINUX_VERSION_CODE <= 0x020402
 			down( &current->mm->mmap_sem );
 #else
 			down_write( &current->mm->mmap_sem );
 #endif
+#endif
+
 			virtual = do_mmap( filp, 0, dma->byte_count,
 					   PROT_READ | PROT_WRITE,
 					   MAP_SHARED, 0 );
+#ifdef __linux__
 #if LINUX_VERSION_CODE <= 0x020402
 			up( &current->mm->mmap_sem );
 #else
 			up_write( &current->mm->mmap_sem );
+#endif
 #endif
 		}
 		if ( virtual > -1024UL ) {

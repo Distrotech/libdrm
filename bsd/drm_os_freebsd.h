@@ -130,6 +130,39 @@ find_first_zero_bit(volatile u_int32_t *p, int max)
 #define wait_queue_head_t	int
 #define cycles_t		struct timespec
 
+
+				/* Macros to make printf easier */
+#define DRM_ERROR(fmt, arg...) \
+	printf("error: " "[" DRM_NAME ":" __FUNCTION__ "] *ERROR* " fmt , ##arg)
+#define DRM_MEM_ERROR(area, fmt, arg...) \
+	printf("error: " "[" DRM_NAME ":" __FUNCTION__ ":%s] *ERROR* " fmt , \
+	       DRM(mem_stats)[area].name , ##arg)
+#define DRM_INFO(fmt, arg...)  printf("info: " "[" DRM_NAME "] " fmt , ##arg)
+
+#if DRM_DEBUG_CODE
+#define DRM_DEBUG(fmt, arg...)						  \
+	do {								  \
+		if (DRM(flags) & DRM_FLAG_DEBUG)				  \
+			printf("[" DRM_NAME ":" __FUNCTION__ "] " fmt ,	  \
+			       ##arg);					  \
+	} while (0)
+#else
+#define DRM_DEBUG(fmt, arg...)		 do { } while (0)
+#endif
+
+#define DRM_PROC_LIMIT (PAGE_SIZE-80)
+
+#define DRM_SYSCTL_PRINT(fmt, arg...)		\
+  snprintf(buf, sizeof(buf), fmt, ##arg);	\
+  error = SYSCTL_OUT(req, buf, strlen(buf));	\
+  if (error) return error;
+
+#define DRM_SYSCTL_PRINT_RET(ret, fmt, arg...)	\
+  snprintf(buf, sizeof(buf), fmt, ##arg);	\
+  error = SYSCTL_OUT(req, buf, strlen(buf));	\
+  if (error) { ret; return error; }
+
+
 #define DRM_FIND_MAP(dest, o)						\
 	do {								\
 		drm_map_list_entry_t *listentry;			\
