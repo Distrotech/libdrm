@@ -34,7 +34,7 @@
 
 
 /* ================================================================
- * CCE command dispatch functions
+ * DMA command dispatch functions
  */
 
 static void mach64_print_dirty( const char *msg, unsigned int flags )
