@@ -407,7 +407,7 @@ do {									\
  * DMA macros
  */
 
-#define MACH64_USE_DMA		0
+#define MACH64_USE_DMA		1
 
 #define DMA_FRAME_BUF_OFFSET	0
 #define DMA_SYS_MEM_ADDR	1
