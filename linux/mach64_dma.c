@@ -421,7 +421,7 @@ static void mach64_dump_buf_info( drm_mach64_private_t *dev_priv, drm_buf_t *buf
 	
 	DRM_INFO( "\n" );
 }
-	
+
 void mach64_dump_ring_info( drm_mach64_private_t *dev_priv )
 {
 	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring;
@@ -430,7 +430,8 @@ void mach64_dump_ring_info( drm_mach64_private_t *dev_priv )
 	DRM_INFO( "\n" );
 	
 	DRM_INFO("ring contents:\n");
-	DRM_INFO("\thead_addr: 0x%08x head: %d tail: %d\n\n", ring->head_addr, ring->head, ring->tail );
+	DRM_INFO("  head_addr: 0x%08x head: %d tail: %d\n\n", 
+		 ring->head_addr, ring->head, ring->tail );
 	
 	skipped = 0;
 	for ( i = 0; i < ring->size / sizeof(u32); i += 4) {
@@ -462,12 +463,13 @@ void mach64_dump_ring_info( drm_mach64_private_t *dev_priv )
 	
 	if( ring->head >= 0 && ring->head < ring->size / sizeof(u32) ) {
 		struct list_head *ptr;
-		struct list_head *tmp;
 		u32 addr = le32_to_cpu(((u32 *)ring->start)[ring->head + 1]);
 
-		list_for_each_safe(ptr, tmp, &dev_priv->pending) {
-			drm_mach64_freelist_t *entry = list_entry(ptr, drm_mach64_freelist_t, list);
+		list_for_each(ptr, &dev_priv->pending) {
+			drm_mach64_freelist_t *entry = 
+				list_entry(ptr, drm_mach64_freelist_t, list);
 			drm_buf_t *buf = entry->buf;
+
 			u32 buf_addr = GETBUFADDR( buf );
 			
 			if ( buf_addr <= addr && addr < buf_addr + buf->used ) {
@@ -503,6 +505,7 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 	u32 data_addr;
 	u32 *table, *data;
 	u32 regs[3], expected[3];
+	u32 saved_src_cntl;
 	int i, count;
 
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
@@ -519,6 +522,12 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 		data = (u32 *) cpu_addr_data;
 		data_addr = (u32) data_handle;
 	}
+
+	/* Save the X server's value for SRC_CNTL and restore it
+	 * in case our test fails.  This prevents the X server
+	 * from disabling it's cache for this register
+	 */
+	saved_src_cntl = MACH64_READ( MACH64_SRC_CNTL );
 
 	mach64_do_wait_for_fifo( dev_priv, 4 );
 			
@@ -575,6 +584,8 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 		DRM_INFO( "mach64_do_wait_for_idle failed (result=%d)\n", i);
 		DRM_INFO( "resetting engine ...\n");
 		mach64_do_engine_reset( dev_priv );
+		mach64_do_wait_for_fifo( dev_priv, 1 );
+		MACH64_WRITE( MACH64_SRC_CNTL, saved_src_cntl );
 		DRM_INFO( "freeing data buffer memory.\n" );
 		pci_pool_free( dev_priv->pool, cpu_addr_data, data_handle );
 		DRM_INFO( "returning ...\n" );
@@ -609,6 +620,8 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 		mach64_dump_engine_info( dev_priv );
 		DRM_INFO( "resetting engine ...\n");
 		mach64_do_engine_reset( dev_priv );
+		mach64_do_wait_for_fifo( dev_priv, 1 );
+		MACH64_WRITE( MACH64_SRC_CNTL, saved_src_cntl );
 		DRM_INFO( "freeing data buffer memory.\n" );
 		pci_pool_free( dev_priv->pool, cpu_addr_data, data_handle );
 		DRM_INFO( "returning ...\n" );
@@ -616,6 +629,9 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 	}
 
 	DRM_INFO( "waiting for idle...done\n" );
+
+	mach64_do_wait_for_fifo( dev_priv, 1 );
+	MACH64_WRITE( MACH64_SRC_CNTL, saved_src_cntl );
 	
 	/* Check register values to see if the GUI master operation succeeded */
 	for ( i = 0; i < 3; i++ ) {
@@ -1209,10 +1225,12 @@ int mach64_do_release_used_buffers( drm_mach64_private_t *dev_priv )
 	list_for_each_safe(ptr, tmp, &dev_priv->pending)
 	{
 		entry = list_entry(ptr, drm_mach64_freelist_t, list);
-		entry->buf->pending = 0;
-		list_del(ptr);
-		list_add_tail(ptr, &dev_priv->free_list);
-		i++;
+		if (entry->discard) {
+			entry->buf->pending = 0;
+			list_del(ptr);
+			list_add_tail(ptr, &dev_priv->free_list);
+			i++;
+		}
 	}
 
 	DRM_DEBUG( "%s: released %d buffers from pending list\n", __FUNCTION__, i );
@@ -1445,6 +1463,10 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 				/* last pass is complete, so release everything */
 				mach64_do_release_used_buffers( dev_priv );
 				DRM_DEBUG( "%s: idle engine, freed all buffers.\n", __FUNCTION__ );
+				if ( list_empty(&dev_priv->free_list) ) {
+					DRM_ERROR( "Freelist empty with idle engine\n" );
+					return NULL;
+				}
 				goto _freelist_entry_found;
 			}
 			/* Look for a completed buffer and bail out of the loop 
@@ -1454,8 +1476,9 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 			list_for_each_safe(ptr, tmp, &dev_priv->pending) {
 				entry = list_entry(ptr, drm_mach64_freelist_t, list);
 				ofs = entry->ring_ofs;
-				if ( (head < tail && (ofs < head || ofs >= tail)) ||
-				     (head > tail && (ofs < head && ofs >= tail)) ) {
+				if ( entry->discard &&
+				     ((head < tail && (ofs < head || ofs >= tail)) ||
+				      (head > tail && (ofs < head && ofs >= tail))) ) {
 #if MACH64_EXTRA_CHECKING
 					int i;
 					

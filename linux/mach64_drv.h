@@ -51,12 +51,13 @@
 
 
 typedef struct drm_mach64_freelist {
-	struct list_head  list;			/* Linux LIST structure... */
+	struct list_head  list;  /* Linux LIST structure... */
    	drm_buf_t *buf;
+	int discard;             /* This flag is set when we're done (re)using a buffer */
 #if MACH64_USE_BUFFER_AGING
 	unsigned int age;
 #else
-	u32 ring_ofs;     /* dword offset in ring of last descriptor for this buffer */
+	u32 ring_ofs;            /* dword offset in ring of last descriptor for this buffer */
 #endif
 } drm_mach64_freelist_t;
 
@@ -99,10 +100,10 @@ typedef struct drm_mach64_private {
 	struct pci_pool *pool;   /* DMA memory pool */
 	drm_mach64_descriptor_ring_t ring;
 
-	struct list_head free_list;     /* Free-list head  */
-	struct list_head placeholders;  /* Free-list placeholder list  */
-	struct list_head pending;    	/* Pending submission placeholder  */
-	struct list_head dma_queue;     /* Submission queue head  */
+	struct list_head free_list;     /* Free-list head */
+	struct list_head placeholders;  /* Placeholder list for buffers held by clients */
+	struct list_head pending;    	/* Buffers pending completion */
+	struct list_head dma_queue;     /* Submission queue head -- only used in old path */
 
 	unsigned int fb_bpp;
 	unsigned int front_offset, front_pitch;
@@ -493,7 +494,7 @@ static inline void mach64_ring_resume( drm_mach64_private_t *dev_priv,
 	/* reset descriptor table ring head */
 	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, 
 		      ring->head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB );
-	
+
 	/* enable GUI bus mastering, and sync the bus master to the GUI */
 	MACH64_WRITE( MACH64_SRC_CNTL, 
 		      MACH64_SRC_BM_ENABLE | MACH64_SRC_BM_SYNC |
@@ -769,6 +770,11 @@ do {									\
 			   __FUNCTION__ );				\
 		return -EAGAIN;						\
 	}								\
+	if (buf->pending) {						\
+	        DRM_ERROR("%s: pending buf in DMAGETPTR\n",		\
+			   __FUNCTION__ );				\
+		return -EFAULT;						\
+	}								\
 	buf->pid = current->pid;					\
 	outcount = 0;							\
 									\
@@ -786,30 +792,54 @@ do {								\
 	buf->used += 8;						\
 } while (0)
 
-#define DMAADVANCE( dev_priv )								\
-do {											\
-	struct list_head *ptr;								\
-	drm_mach64_freelist_t *entry;							\
-	RING_LOCALS;									\
-											\
-	if ( MACH64_VERBOSE ) {								\
-		DRM_INFO( "DMAADVANCE() in %s\n", __FUNCTION__ );			\
-	}										\
-											\
-	if (list_empty(&dev_priv->placeholders)) {					\
-		DRM_ERROR( "%s: empty placeholder list in DMAADVANCE()\n",		\
-			   __FUNCTION__ );						\
-		return -EFAULT;								\
-	}										\
-											\
-        ptr = dev_priv->placeholders.next;						\
-	list_del(ptr);									\
-	entry = list_entry(ptr, drm_mach64_freelist_t, list);				\
-	entry->buf = buf;								\
-	entry->buf->pending = 1;							\
-	list_add_tail(ptr, &dev_priv->pending);						\
-											\
-	ADD_BUF_TO_RING( dev_priv, entry );						\
+#define DMAADVANCE( dev_priv, _discard )						      \
+do {											      \
+	struct list_head *ptr;								      \
+	drm_mach64_freelist_t *entry;							      \
+	RING_LOCALS;									      \
+											      \
+	if ( MACH64_VERBOSE ) {								      \
+		DRM_INFO( "DMAADVANCE() in %s\n", __FUNCTION__ );			      \
+	}										      \
+											      \
+	if (buf->used <= 0) {								      \
+		DRM_ERROR( "DMAADVANCE() in %s: sending empty buf %d\n",		      \
+				   __FUNCTION__, buf->idx );				      \
+		return -EFAULT;								      \
+	}										      \
+	if (buf->pending) {								      \
+                /* This is a resued buffer, so we need to find it in the pending list */      \
+		ptr = dev_priv->pending.prev;						      \
+		entry = list_entry(ptr, drm_mach64_freelist_t, list);			      \
+		while (entry->buf != buf) {						      \
+			if (ptr == &dev_priv->pending) {				      \
+				DRM_ERROR( "DMAADVANCE() in %s: couldn't find pending buf\n", \
+				  	 __FUNCTION__ );				      \
+				return -EFAULT;						      \
+			}								      \
+			ptr = ptr->prev;						      \
+			entry = list_entry(ptr, drm_mach64_freelist_t, list);		      \
+		}									      \
+		if (entry->discard) {							      \
+			DRM_ERROR( "DMAADVANCE() in %s: sending discarded pending buf %d\n",  \
+				   __FUNCTION__, buf->idx );				      \
+			return -EFAULT;							      \
+		}									      \
+     	} else {									      \
+		if (list_empty(&dev_priv->placeholders)) {				      \
+			DRM_ERROR( "DMAADVANCE() in %s: empty placeholder list\n",	      \
+			   	__FUNCTION__ );						      \
+			return -EFAULT;							      \
+		}									      \
+		ptr = dev_priv->placeholders.next;					      \
+		list_del(ptr);								      \
+		entry = list_entry(ptr, drm_mach64_freelist_t, list);			      \
+		buf->pending = 1;							      \
+		entry->buf = buf;							      \
+		list_add_tail(ptr, &dev_priv->pending);					      \
+	}										      \
+	entry->discard = (_discard);							      \
+	ADD_BUF_TO_RING( dev_priv, entry );						      \
 } while (0)
 
 #define ADD_BUF_TO_RING( dev_priv, entry )						\
@@ -858,11 +888,16 @@ do {											\
 	RING_LOCALS;									\
 											\
 	if ( MACH64_VERBOSE ) {								\
-		DRM_INFO( "DMAADVANCE() in %s\n", __FUNCTION__ );			\
+		DRM_INFO( "DMAADVANCEHOSTDATA() in %s\n", __FUNCTION__ );		\
 	}										\
 											\
+	if (buf->used <= 0) {								\
+		DRM_ERROR( "DMAADVANCEHOSTDATA() in %s: sending empty buf %d\n",	\
+				   __FUNCTION__, buf->idx );				\
+		return -EFAULT;								\
+	}										\
 	if (list_empty(&dev_priv->placeholders)) {					\
-		DRM_ERROR( "%s: empty placeholder list in DMAADVANCE()\n",		\
+		DRM_ERROR( "%s: empty placeholder list in DMAADVANCEHOSTDATA()\n",	\
 			   __FUNCTION__ );						\
 		return -EFAULT;								\
 	}										\
@@ -873,7 +908,7 @@ do {											\
 	entry->buf = buf;								\
 	entry->buf->pending = 1;							\
 	list_add_tail(ptr, &dev_priv->pending);						\
-											\
+	entry->discard = 1;								\
 	ADD_HOSTDATA_BUF_TO_RING( dev_priv, entry );					\
 } while (0)
 

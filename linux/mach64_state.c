@@ -58,6 +58,49 @@ static void mach64_print_dirty( const char *msg, unsigned int flags )
 		(flags & MACH64_UPLOAD_CLIPRECTS)     ? "cliprects, " : "" );
 }
 
+/* Mach64 doesn't have hardware cliprects, just one hardware scissor,
+ * so the GL scissor is intersected with each cliprect here
+ */
+/* This function returns 0 on success, 1 for no intersection, and
+ * negative for an error
+ */
+static int mach64_emit_cliprect( drm_mach64_private_t *dev_priv,
+					drm_clip_rect_t *box )
+{
+	u32 sc_left_right, sc_top_bottom;
+	drm_clip_rect_t scissor;
+	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
+	drm_mach64_context_regs_t *regs = &sarea_priv->context_state;
+	DMALOCALS;
+
+	/* Get GL scissor */
+	scissor.x1 = regs->sc_left_right & 0xffff;
+	scissor.x2 = (regs->sc_left_right & 0xffff0000) >> 16;
+	scissor.y1 = regs->sc_top_bottom & 0xffff;
+	scissor.y2 = (regs->sc_top_bottom & 0xffff0000) >> 16;
+
+	/* Intersect GL scissor with cliprect */
+	if ( box->x1 > scissor.x1 ) scissor.x1 = box->x1;
+	if ( box->y1 > scissor.y1 ) scissor.y1 = box->y1;
+	if ( box->x2 < scissor.x2 ) scissor.x2 = box->x2;
+	if ( box->y2 < scissor.y2 ) scissor.y2 = box->y2;
+	 /* positive return means skip */
+	if ( scissor.x1 >= scissor.x2 ) return 1;
+	if ( scissor.y1 >= scissor.y2 ) return 1;
+
+	DMAGETPTR( dev_priv, 2 ); /* returns on failure to get buffer */
+
+	sc_left_right = ( (scissor.x1 << 0) | (scissor.x2 << 16) );
+	sc_top_bottom = ( (scissor.y1 << 0) | (scissor.y2 << 16) );
+
+	DMAOUTREG( MACH64_SC_LEFT_RIGHT, sc_left_right );
+	DMAOUTREG( MACH64_SC_TOP_BOTTOM, sc_top_bottom );
+
+	DMAADVANCE( dev_priv, 1 );
+
+	return 0;
+}
+
 static inline int mach64_emit_state( drm_mach64_private_t *dev_priv )
 {
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
@@ -72,15 +115,13 @@ static inline int mach64_emit_state( drm_mach64_private_t *dev_priv )
 		DRM_DEBUG( "%s: dirty=0x%08x\n", __FUNCTION__, dirty );
 	}
 
-	DMAGETPTR( dev_priv, 19 ); /* returns on failure to get buffer */
+	DMAGETPTR( dev_priv, 17 ); /* returns on failure to get buffer */
 
 	if ( dirty & MACH64_UPLOAD_MISC ) {
 		DMAOUTREG( MACH64_DP_MIX, regs->dp_mix );
 		DMAOUTREG( MACH64_DP_SRC, regs->dp_src );
 		DMAOUTREG( MACH64_CLR_CMP_CNTL, regs->clr_cmp_cntl );
 		DMAOUTREG( MACH64_GUI_TRAJ_CNTL, regs->gui_traj_cntl );
-		DMAOUTREG( MACH64_SC_LEFT_RIGHT, regs->sc_left_right );
-		DMAOUTREG( MACH64_SC_TOP_BOTTOM, regs->sc_top_bottom );
 		sarea_priv->dirty &= ~MACH64_UPLOAD_MISC;
 	}
 
@@ -126,20 +167,9 @@ static inline int mach64_emit_state( drm_mach64_private_t *dev_priv )
 		sarea_priv->dirty &= ~MACH64_UPLOAD_TEXTURE;
 	}
 
-#if 0
-	/* FIXME: move to emit_cliprects and use hardware scissors for cliprects with
-	 * vertex dispatches? 
-	 */
-	if ( dirty & MACH64_UPLOAD_CLIPRECTS ) {
-		DMAOUTREG( MACH64_SC_LEFT_RIGHT, regs->sc_left_right );
-		DMAOUTREG( MACH64_SC_TOP_BOTTOM, regs->sc_top_bottom );
-		sarea_priv->dirty &= ~MACH64_UPLOAD_CLIPRECTS;
-	}
-#endif
+	DMAADVANCE( dev_priv, 1 );
 
-	DMAADVANCE( dev_priv );
-	
-	sarea_priv->dirty = 0;
+	sarea_priv->dirty &= MACH64_UPLOAD_CLIPRECTS;
 
 	return 0;
 
@@ -295,7 +325,7 @@ static int mach64_dma_dispatch_clear( drm_device_t *dev,
 		}
 	}
 
-	DMAADVANCE( dev_priv );
+	DMAADVANCE( dev_priv, 1 );
 
 	return 0;
 }
@@ -379,9 +409,8 @@ static int mach64_dma_dispatch_swap( drm_device_t *dev )
 
 	DMAOUTREG( MACH64_LAST_FRAME_REG, dev_priv->sarea_priv->last_frame );
 #endif
-	DMAADVANCE( dev_priv );
+	DMAADVANCE( dev_priv, 1 );
 
-	/*  DMAFLUSH( dev_priv ); */
 	return 0;
 }
 
@@ -390,33 +419,85 @@ static int mach64_dma_dispatch_vertex( drm_device_t *dev, drm_buf_t *buf,
 {
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
+	int done = 0;
 	/* Don't need DMALOCALS, since buf is a parameter */
 
 	DRM_DEBUG( "%s: buf=%d nbox=%d\n",
 		   __FUNCTION__, buf->idx, sarea_priv->nbox );
 
 	if ( buf->used ) {
+		int ret = 0;
+		int i = 0;
 		if ( sarea_priv->dirty & ~MACH64_UPLOAD_CLIPRECTS ) {
-			int ret = 0;
 			ret = mach64_emit_state( dev_priv );
 			if (ret < 0) return ret;
 		}
-		/* FIXME: deal with cliprects, at least for drawing on the front buffer */
-		/* Mach64 doesn't have hardware cliprects, just one hardware scissor */
-#if 0
+		
 		do {
-			int i = 0;
-			/* Emit the next set of up to three cliprects */
+			/* Emit the next cliprect */
 			if ( i < sarea_priv->nbox ) {
-				mach64_emit_clip_rects( dev_priv,
-							&sarea_priv->boxes[i]);
+				ret = mach64_emit_cliprect(dev_priv, &sarea_priv->boxes[i]);
+				if ( ret < 0 ) {
+					/* failed to get buffer */
+					return ret;
+				} else if ( ret != 0 ) {
+					/* null intersection with scissor */
+					continue;
+				}
 			}
-#endif
+			if ((i >= sarea_priv->nbox - 1) && discard)
+				done = 1;
+
 			/* Add the buffer to the DMA queue */
-			DMAADVANCE( dev_priv );
-#if 0
+			DMAADVANCE( dev_priv, done );
+
 		} while ( ++i < sarea_priv->nbox );
+	}
+
+	/* If this is a reused buffer and we're discarding it,
+	 * make sure the discard flag gets set so the buffer
+	 * is reclaimed when it finishes processing
+	 */
+	if (buf->pending && discard && !done) {
+		struct list_head *ptr;
+		drm_mach64_freelist_t *entry;
+
+		ptr = dev_priv->pending.prev;
+		entry = list_entry(ptr, drm_mach64_freelist_t, list);
+		while (entry->buf != buf) {
+			if (ptr == &dev_priv->pending) {
+				DRM_ERROR( "%s: couldn't find pending buf\n",
+				  	 __FUNCTION__ );
+				return -EFAULT;
+			}
+			ptr = ptr->prev;
+			entry = list_entry(ptr, drm_mach64_freelist_t, list);
+		}
+		entry->discard = 1;
+	} else if (discard && !done) {
+	        /* This buffer wasn't used (no cliprects), so place it back
+		 * on the free list
+		 */
+		struct list_head *ptr;
+		drm_mach64_freelist_t *entry;
+#if MACH64_EXTRA_CHECKING
+		list_for_each(ptr, &dev_priv->pending) {
+			entry = list_entry(ptr, drm_mach64_freelist_t, list);
+			if (buf == entry->buf) {
+				DRM_ERROR( "%s: Trying to release a pending buf\n",
+				  	 __FUNCTION__ );
+				return -EFAULT;
+			}
+		}
 #endif
+		ptr = dev_priv->placeholders.next;
+		entry = list_entry(ptr, drm_mach64_freelist_t, list);
+		buf->pending = 0;
+		buf->used = 0;
+		entry->buf = buf;
+		entry->discard = 1;
+		list_del(ptr);
+		list_add_tail(ptr, &dev_priv->free_list);
 	}
 
 	sarea_priv->dirty &= ~MACH64_UPLOAD_CLIPRECTS;
@@ -527,7 +608,8 @@ static int mach64_dma_dispatch_blit( drm_device_t *dev,
 	DMAADVANCEHOSTDATA( dev_priv );
 
 	dev_priv->sarea_priv->dirty |= (MACH64_UPLOAD_CONTEXT |
-					MACH64_UPLOAD_MISC);
+					MACH64_UPLOAD_MISC | 
+					MACH64_UPLOAD_CLIPRECTS);
 
 	return 0;
 }
@@ -605,6 +687,7 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 	drm_file_t *priv = filp->private_data;
 	drm_device_t *dev = priv->dev;
 	drm_mach64_private_t *dev_priv = dev->dev_private;
+	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_t *buf;
 	drm_mach64_vertex_t vertex;
@@ -638,16 +721,15 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 #endif
 	VB_AGE_TEST_WITH_RETURN( dev_priv );
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );
-		
+
+	if ( sarea_priv->nbox > MACH64_NR_SAREA_CLIPRECTS )
+		sarea_priv->nbox = MACH64_NR_SAREA_CLIPRECTS;
+
 	buf = dma->buflist[vertex.idx];
-	
+
 	if ( buf->pid != current->pid ) {
 		DRM_ERROR( "process %d using buffer owned by %d\n",
 			   current->pid, buf->pid );
-		return -EINVAL;
-	}
-	if ( buf->pending ) {
-		DRM_ERROR( "sending pending buffer %d\n", vertex.idx );
 		return -EINVAL;
 	}
 
