@@ -34,6 +34,8 @@
 
 
 typedef struct drm_gamma_private {
+	drm_gamma_sarea_t *sarea_priv;
+	drm_map_t *sarea;
 	drm_map_t *buffers;
 } drm_gamma_private_t;
 
@@ -47,6 +49,9 @@ do {									\
 	}								\
 } while (0)
 
+				/* gamma_dma.c */
+extern int gamma_dma_init( struct inode *inode, struct file *filp,
+			 unsigned int cmd, unsigned long arg );
 
 extern void gamma_dma_ready(drm_device_t *dev);
 extern void gamma_dma_quiescent_single(drm_device_t *dev);
@@ -102,5 +107,8 @@ extern int  gamma_found(void);
 #define GAMMA_OUTPUTFIFO       0x2000
 #define GAMMA_SYNC	       0x8c40
 #define GAMMA_SYNC_TAG	       0x0188
+
+#define GAMMA_DMAADDRTAG	0x530
+#define GAMMA_DMACOUNTTAG	0x531
 
 #endif

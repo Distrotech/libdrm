@@ -37,45 +37,32 @@
 #include <linux/interrupt.h>	/* For task queue support */
 #include <linux/delay.h>
 
-#if 0
-#define DO_IOREMAP( _map )						\
-do {									\
-	(_map)->handle = DRM(ioremap)( (_map)->offset, (_map)->size );	\
-} while (0)
-
-#define DO_IOREMAPFREE( _map )						\
-do {									\
-	if ( (_map)->handle && (_map)->size )				\
-		DRM(ioremapfree)( (_map)->handle, (_map)->size );	\
-} while (0)
-
-#define DO_FIND_MAP( _map, _offset )					\
-do {									\
-	int _i;								\
-	for ( _i = 0 ; _i < dev->map_count ; _i++ ) {			\
-		if ( dev->maplist[_i]->offset == _offset ) {		\
-			_map = dev->maplist[_i];			\
-			break;						\
-		}							\
-	}								\
-} while (0)
-#endif
+#define OLDDMA 	1
 
 static inline void gamma_dma_dispatch(drm_device_t *dev, unsigned long address,
 				      unsigned long length)
 {
+#if OLDDMA
 	GAMMA_WRITE(GAMMA_DMAADDRESS, virt_to_phys((void *)address));
-	while (GAMMA_READ(GAMMA_GCOMMANDSTATUS) != 4)
-		;
+
+	while (GAMMA_READ(GAMMA_GCOMMANDSTATUS) != 4);
+
 	GAMMA_WRITE(GAMMA_DMACOUNT, length / 4);
+#else
+	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 4);
+
+	GAMMA_WRITE(GAMMA_OUTPUTFIFO, GAMMA_DMAADDRTAG);
+	GAMMA_WRITE(GAMMA_OUTPUTFIFO, virt_to_phys((void *)address));
+	GAMMA_WRITE(GAMMA_OUTPUTFIFO, GAMMA_DMACOUNTTAG);
+	GAMMA_WRITE(GAMMA_OUTPUTFIFO, length / 4);
+#endif
 }
 
 void gamma_dma_quiescent_single(drm_device_t *dev)
 {
-	while (GAMMA_READ(GAMMA_DMACOUNT))
-		;
-	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 3)
-		;
+	while (GAMMA_READ(GAMMA_DMACOUNT));
+
+	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 2);
 
 	GAMMA_WRITE(GAMMA_FILTERMODE, 1 << 10);
 	GAMMA_WRITE(GAMMA_SYNC, 0);
@@ -88,39 +75,37 @@ void gamma_dma_quiescent_single(drm_device_t *dev)
 
 void gamma_dma_quiescent_dual(drm_device_t *dev)
 {
-	while (GAMMA_READ(GAMMA_DMACOUNT))
-		;
-	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 3)
-		;
+	while (GAMMA_READ(GAMMA_DMACOUNT));
+
+	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 3);
 
 	GAMMA_WRITE(GAMMA_BROADCASTMASK, 3);
 
 	GAMMA_WRITE(GAMMA_FILTERMODE, 1 << 10);
 	GAMMA_WRITE(GAMMA_SYNC, 0);
 
-				/* Read from first MX */
+	/* Read from first MX */
 	do {
-		while (!GAMMA_READ(GAMMA_OUTFIFOWORDS))
-			;
+		while (!GAMMA_READ(GAMMA_OUTFIFOWORDS));
 	} while (GAMMA_READ(GAMMA_OUTPUTFIFO) != GAMMA_SYNC_TAG);
 
-				/* Read from second MX */
+	/* Read from second MX */
 	do {
-		while (!GAMMA_READ(GAMMA_OUTFIFOWORDS + 0x10000))
-			;
+		while (!GAMMA_READ(GAMMA_OUTFIFOWORDS + 0x10000));
 	} while (GAMMA_READ(GAMMA_OUTPUTFIFO + 0x10000) != GAMMA_SYNC_TAG);
 }
 
+#if OLDDMA
 void gamma_dma_ready(drm_device_t *dev)
 {
-	while (GAMMA_READ(GAMMA_DMACOUNT))
-		;
+	while (GAMMA_READ(GAMMA_DMACOUNT));
 }
 
 static inline int gamma_dma_is_ready(drm_device_t *dev)
 {
 	return !GAMMA_READ(GAMMA_DMACOUNT);
 }
+#endif
 
 void gamma_dma_service(int irq, void *device, struct pt_regs *regs)
 {
@@ -128,6 +113,8 @@ void gamma_dma_service(int irq, void *device, struct pt_regs *regs)
 	drm_device_dma_t *dma = dev->dma;
 
 	atomic_inc(&dev->counts[6]); /* _DRM_STAT_IRQ */
+
+#if OLDDMA
 	GAMMA_WRITE(GAMMA_GDELAYTIMER, 0xc350/2); /* 0x05S */
 	GAMMA_WRITE(GAMMA_GCOMMANDINTFLAGS, 8);
 	GAMMA_WRITE(GAMMA_GINTFLAGS, 0x2001);
@@ -144,6 +131,7 @@ void gamma_dma_service(int irq, void *device, struct pt_regs *regs)
 		queue_task(&dev->tq, &tq_immediate);
 		mark_bh(IMMEDIATE_BH);
 	}
+#endif
 }
 
 /* Only called by gamma_dma_schedule. */
@@ -287,12 +275,14 @@ int gamma_dma_schedule(drm_device_t *dev, int locked)
 	cycles_t	 schedule_start;
 #endif
 
+#if OLDDMA
 	if (test_and_set_bit(0, &dev->interrupt_flag)) {
 				/* Not reentrant */
 		atomic_inc(&dev->counts[10]); /* _DRM_STAT_MISSED */
 		return -EBUSY;
 	}
 	missed = atomic_read(&dev->counts[10]);
+#endif
 
 #if DRM_DMA_HISTOGRAM
 	schedule_start = get_cycles();
@@ -350,6 +340,7 @@ again:
 	return retcode;
 }
 
+#if OLDDMA
 static int gamma_dma_priority(drm_device_t *dev, drm_dma_t *d)
 {
 	unsigned long	  address;
@@ -487,6 +478,7 @@ cleanup:
 	clear_bit(0, &dev->interrupt_flag);
 	return retcode;
 }
+#endif
 
 static int gamma_dma_send_buffers(drm_device_t *dev, drm_dma_t *d)
 {
@@ -495,6 +487,7 @@ static int gamma_dma_send_buffers(drm_device_t *dev, drm_dma_t *d)
 	int		  retcode   = 0;
 	drm_device_dma_t  *dma	    = dev->dma;
 
+#if OLDDMA
 	if (d->flags & _DRM_DMA_BLOCK) {
 		last_buf = dma->buflist[d->send_indices[d->send_count-1]];
 		add_wait_queue(&last_buf->dma_wait, &entry);
@@ -541,6 +534,7 @@ static int gamma_dma_send_buffers(drm_device_t *dev, drm_dma_t *d)
 				  current->pid);
 		}
 	}
+#endif
 	return retcode;
 }
 
@@ -552,10 +546,6 @@ int gamma_dma(struct inode *inode, struct file *filp, unsigned int cmd,
 	drm_device_dma_t  *dma	    = dev->dma;
 	int		  retcode   = 0;
 	drm_dma_t	  d;
-
-#if 0
-	LOCK_TEST_WITH_RETURN( dev );
-#endif
 
 	if (copy_from_user(&d, (drm_dma_t *)arg, sizeof(d)))
 		return -EFAULT;
@@ -573,9 +563,11 @@ int gamma_dma(struct inode *inode, struct file *filp, unsigned int cmd,
 	}
 
 	if (d.send_count) {
+#if OLDDMA 
 		if (d.flags & _DRM_DMA_PRIORITY)
 			retcode = gamma_dma_priority(dev, &d);
 		else
+#endif
 			retcode = gamma_dma_send_buffers(dev, &d);
 	}
 
@@ -591,4 +583,161 @@ int gamma_dma(struct inode *inode, struct file *filp, unsigned int cmd,
 		return -EFAULT;
 
 	return retcode;
+}
+
+/* ================================================================
+ * DMA initialization, cleanup
+ */
+
+static int gamma_do_init_dma( drm_device_t *dev, drm_gamma_init_t *init )
+{
+	drm_gamma_private_t *dev_priv;
+	int ret;
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
+
+	dev_priv = DRM(alloc)( sizeof(drm_gamma_private_t), DRM_MEM_DRIVER );
+	if ( !dev_priv )
+		return -ENOMEM;
+	dev->dev_private = (void *)dev_priv;
+
+	memset( dev_priv, 0, sizeof(drm_gamma_private_t) );
+
+#if 0
+	dev_priv->chipset = init->chipset;
+
+	dev_priv->usec_timeout = MGA_DEFAULT_USEC_TIMEOUT;
+
+	if ( init->sgram ) {
+		dev_priv->clear_cmd = MGA_DWGCTL_CLEAR | MGA_ATYPE_BLK;
+	} else {
+		dev_priv->clear_cmd = MGA_DWGCTL_CLEAR | MGA_ATYPE_RSTR;
+	}
+	dev_priv->maccess	= init->maccess;
+
+	dev_priv->fb_cpp	= init->fb_cpp;
+	dev_priv->front_offset	= init->front_offset;
+	dev_priv->front_pitch	= init->front_pitch;
+	dev_priv->back_offset	= init->back_offset;
+	dev_priv->back_pitch	= init->back_pitch;
+
+	dev_priv->depth_cpp	= init->depth_cpp;
+	dev_priv->depth_offset	= init->depth_offset;
+	dev_priv->depth_pitch	= init->depth_pitch;
+#endif
+
+	dev_priv->sarea = dev->maplist[0];
+
+#if 0
+	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
+	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
+	DRM_FIND_MAP( dev_priv->status, init->status_offset );
+
+	DRM_FIND_MAP( dev_priv->warp, init->warp_offset );
+	DRM_FIND_MAP( dev_priv->primary, init->primary_offset );
+#endif
+	DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
+
+	dev_priv->sarea_priv =
+		(drm_gamma_sarea_t *)((u8 *)dev_priv->sarea->handle +
+				    init->sarea_priv_offset);
+
+#if 0
+	DRM_IOREMAP( dev_priv->warp );
+	DRM_IOREMAP( dev_priv->primary );
+#endif
+	DRM_IOREMAP( dev_priv->buffers );
+
+#if 0
+	dev_priv->prim.status = (u32 *)dev_priv->status->handle;
+
+	mga_do_wait_for_idle( dev_priv );
+
+	/* Init the primary DMA registers.
+	 */
+	MGA_WRITE( MGA_PRIMADDRESS,
+		   dev_priv->primary->offset | MGA_DMA_GENERAL );
+
+	MGA_WRITE( MGA_PRIMPTR,
+		   virt_to_bus((void *)dev_priv->prim.status) |
+		   MGA_PRIMPTREN0 |	/* Soft trap, SECEND, SETUPEND */
+		   MGA_PRIMPTREN1 );	/* DWGSYNC */
+
+	dev_priv->prim.start = (u8 *)dev_priv->primary->handle;
+	dev_priv->prim.end = ((u8 *)dev_priv->primary->handle
+			      + dev_priv->primary->size);
+	dev_priv->prim.size = dev_priv->primary->size;
+
+	dev_priv->prim.head = &dev_priv->prim.status[0];
+	dev_priv->prim.tail = 0;
+	dev_priv->prim.space = dev_priv->prim.size;
+
+	dev_priv->prim.last_flush = 0;
+	dev_priv->prim.last_wrap = 0;
+
+	dev_priv->prim.high_mark = 256 * DMA_BLOCK_SIZE;
+
+	spin_lock_init( &dev_priv->prim.list_lock );
+
+	dev_priv->prim.status[0] = dev_priv->primary->offset;
+	dev_priv->prim.status[1] = 0;
+
+	dev_priv->sarea_priv->last_wrap = 0;
+	dev_priv->sarea_priv->last_frame.head = 0;
+	dev_priv->sarea_priv->last_frame.wrap = 0;
+
+	if ( mga_freelist_init( dev ) < 0 ) {
+		DRM_ERROR( "could not initialize freelist\n" );
+		mga_do_cleanup_dma( dev );
+		return -ENOMEM;
+	}
+#endif
+
+	return 0;
+}
+
+int gamma_do_cleanup_dma( drm_device_t *dev )
+{
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
+
+	if ( dev->dev_private ) {
+		drm_gamma_private_t *dev_priv = dev->dev_private;
+
+#if 0
+		DRM_IOREMAPFREE( dev_priv->warp );
+		DRM_IOREMAPFREE( dev_priv->primary );
+#endif
+		DRM_IOREMAPFREE( dev_priv->buffers );
+
+#if 0
+		if ( dev_priv->head != NULL ) {
+			mga_freelist_cleanup( dev );
+		}
+#endif
+
+		DRM(free)( dev->dev_private, sizeof(drm_gamma_private_t),
+			   DRM_MEM_DRIVER );
+		dev->dev_private = NULL;
+	}
+
+	return 0;
+}
+
+int gamma_dma_init( struct inode *inode, struct file *filp,
+		  unsigned int cmd, unsigned long arg )
+{
+	drm_file_t *priv = filp->private_data;
+	drm_device_t *dev = priv->dev;
+	drm_gamma_init_t init;
+
+	if ( copy_from_user( &init, (drm_gamma_init_t *)arg, sizeof(init) ) )
+		return -EFAULT;
+
+	switch ( init.func ) {
+	case GAMMA_INIT_DMA:
+		return gamma_do_init_dma( dev, &init );
+	case GAMMA_CLEANUP_DMA:
+		return gamma_do_cleanup_dma( dev );
+	}
+
+	return -EINVAL;
 }

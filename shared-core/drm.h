@@ -85,6 +85,7 @@ typedef struct drm_tex_region {
 #include "i810_drm.h"
 #include "r128_drm.h"
 #include "radeon_drm.h"
+#include "gamma_drm.h"
 #ifdef CONFIG_DRM_SIS
 #include "sis_drm.h"
 #endif
@@ -442,6 +443,9 @@ typedef struct drm_agp_info {
 #define DRM_IOCTL_RADEON_BLIT		DRM_IOW( 0x4b, drm_radeon_blit_t)
 #define DRM_IOCTL_RADEON_STIPPLE	DRM_IOW( 0x4c, drm_radeon_stipple_t)
 #define DRM_IOCTL_RADEON_INDIRECT	DRM_IOWR(0x4d, drm_radeon_indirect_t)
+
+/* GAMMA specific ioctls */
+#define DRM_IOCTL_GAMMA_INIT		DRM_IOW( 0x40, drm_gamma_init_t)
 
 #ifdef CONFIG_DRM_SIS
 /* SiS specific ioctls */

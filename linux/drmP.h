@@ -300,7 +300,7 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 #if DRM_DEBUG_CODE
 #define DRM_DEBUG(fmt, arg...)						\
 	do {								\
-		if ( DRM(flags) & DRM_FLAG_DEBUG )			\
+		if (1 /* DRM(flags) & DRM_FLAG_DEBUG*/ )			\
 			printk(KERN_DEBUG				\
 			       "[" DRM_NAME ":" __FUNCTION__ "] " fmt ,	\
 			       ##arg);					\

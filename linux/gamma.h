@@ -41,8 +41,10 @@
 /* DMA customization:
  */
 #define __HAVE_DMA			1
+#define __HAVE_AGP			1
+#define __MUST_HAVE_AGP			1
 #define __HAVE_OLD_DMA			1
-#define __HAVE_PCI_DMA			1
+#define __HAVE_PCI_DMA			0
 
 #define __HAVE_MULTIPLE_DMA_QUEUES	1
 #define __HAVE_DMA_WAITQUEUE		1
@@ -83,5 +85,8 @@
 	GAMMA_WRITE( GAMMA_COMMANDINTENABLE,	0x00000000 );		\
 	GAMMA_WRITE( GAMMA_GINTENABLE,		0x00000000 );		\
 } while (0)
+
+#define DRIVER_AGP_BUFFERS_MAP( dev )					\
+	((drm_gamma_private_t *)((dev)->dev_private))->buffers
 
 #endif /* __GAMMA_H__ */
