@@ -761,19 +761,24 @@ do {									\
 #define GETRINGOFFSET() (_entry->ring_ofs)
 
 static inline int mach64_find_pending_buf_entry ( drm_mach64_private_t *dev_priv, 
-						  drm_mach64_freelist_t *entry, 
+						  drm_mach64_freelist_t **entry, 
 						  drm_buf_t *buf )
 {
 	struct list_head *ptr;
-
+#if MACH64_EXTRA_CHECKING
+	if (list_empty(&dev_priv->pending)) {
+		DRM_ERROR("Empty pending list in %s\n", __FUNCTION__);
+		return -EINVAL;
+	}
+#endif
 	ptr = dev_priv->pending.prev;
-	entry = list_entry(ptr, drm_mach64_freelist_t, list);
-	while (entry->buf != buf) {
+	*entry = list_entry(ptr, drm_mach64_freelist_t, list);
+	while ((*entry)->buf != buf) {
 		if (ptr == &dev_priv->pending) {
 			return -EFAULT;
 		}
 		ptr = ptr->prev;
-		entry = list_entry(ptr, drm_mach64_freelist_t, list);
+		*entry = list_entry(ptr, drm_mach64_freelist_t, list);
 	}
 	return 0;
 }
@@ -837,7 +842,7 @@ do {											     \
 	if (_buf->pending) {								     \
                 /* This is a resued buffer, so we need to find it in the pending list */     \
 		int ret;								     \
-		if ( (ret=mach64_find_pending_buf_entry(dev_priv, _entry, _buf)) ) {	     \
+		if ( (ret=mach64_find_pending_buf_entry(dev_priv, &_entry, _buf)) ) {	     \
 			DRM_ERROR( "DMAADVANCE() in %s: couldn't find pending buf %d\n",     \
 				   __FUNCTION__, _buf->idx );				     \
 			return ret;							     \
@@ -868,7 +873,7 @@ do {											     \
 do {											\
 	if (_entry == NULL) {								\
 		int ret;								\
-		if ( (ret=mach64_find_pending_buf_entry(dev_priv, _entry, _buf)) ) {	\
+		if ( (ret=mach64_find_pending_buf_entry(dev_priv, &_entry, _buf)) ) {	\
 			DRM_ERROR( "%s: couldn't find pending buf %d\n",		\
 				   __FUNCTION__, _buf->idx );				\
 			return ret;							\
