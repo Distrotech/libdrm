@@ -402,7 +402,6 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 	drm_mach64_private_t *dev_priv = dev->dev_private;
 	drm_mach64_buf_priv_t *buf_priv = buf->dev_private;
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
-	int offset = buf->bus_address;
 	int size = buf->used;
 	int i = 0;
 	DRM_DEBUG( "%s: buf=%d nbox=%d\n",
@@ -431,11 +430,99 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 			}
 #endif
 
+#if MACH64_USE_DMA
+			{
+				int i, pages, remainder, tableDwords;
+				u32 address, page;
+				u32 *table_ptr = (u32 *) dev_priv->cpu_addr_table;
+				u32 *p;
+
+				if (dev_priv->is_pci) {
+					address = (u32) virt_to_phys((void *)buf->address);
+					p = (u32 *) buf->address;
+				} else {
+					address = (u32) buf->bus_address;
+					p = (u32 *)((char *)dev_priv->buffers->handle + 
+						    buf->offset);
+				}
+
+				/* SRC_CNTL */
+				p[(size/4)  ] = 0x0000006d;
+				p[(size/4)+1] = 0x00000000;
+				size += 8;
+				pages = (size + DMA_CHUNKSIZE - 1) / DMA_CHUNKSIZE;
+				tableDwords = 0;
+				for ( i = 0 ; i < pages-1 ; i++ ) {
+					page = address + i * DMA_CHUNKSIZE;
+
+					table_ptr[DMA_FRAME_BUF_OFFSET] = MACH64_BM_ADDR + APERTURE_OFFSET;
+					table_ptr[DMA_SYS_MEM_ADDR] = page;
+					table_ptr[DMA_COMMAND] = DMA_CHUNKSIZE | 0x40000000;
+					table_ptr[DMA_RESERVED] = 0;
+
+					tableDwords += 4;
+					table_ptr += 4;
+				}
+
+				/* generate the final descriptor for any remaining commands */
+				page = address + i * DMA_CHUNKSIZE;
+				remainder = size - i * DMA_CHUNKSIZE;
+				table_ptr[DMA_FRAME_BUF_OFFSET] = MACH64_BM_ADDR + APERTURE_OFFSET;
+				table_ptr[DMA_SYS_MEM_ADDR] = page;
+				table_ptr[DMA_COMMAND] = remainder | 0x80000000 | 0x40000000;
+				table_ptr[DMA_RESERVED] = 0;
+
+				tableDwords += 4;
+#if MACH64_VERBOSE
+				DRM_INFO( "%s: %d bytes, buffer addr: 0x%08x\n", __FUNCTION__, size, address);
+				table_ptr = (u32 *) dev_priv->cpu_addr_table;
+				for ( i = 0 ; i < tableDwords / 4 ; i++ ) {
+					DRM_INFO( "    entry: %x addr: %p cmd: 0x%x\n", i, 
+						  table_ptr[4*i+1], table_ptr[4*i+2] );
+				  
+					/* dump the contents of the buffers */
+					if (1) {
+						int entries = (table_ptr[4*i+2] & 0xffff) / 4, j;
+					  
+						for ( j = 0 ; j < entries ; j++ ) {
+							DRM_INFO( "        [0x%03x]: 0x%08x\n", j, p[1024*i+j] );
+						}
+					}
+				}
+#endif /* MACH64_VERBOSE */
+				/* flush write combining */
+				mach64_flush_write_combine();
+				mach64_do_wait_for_idle( dev_priv );
+
+				MACH64_WRITE( MACH64_BUS_CNTL, 
+					      ( MACH64_READ(MACH64_BUS_CNTL) 
+						& ~MACH64_BUS_MASTER_DIS ) );
+				MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, ( dev_priv->table_addr 
+					      | MACH64_CIRCULAR_BUF_SIZE_16KB ) );
+				MACH64_WRITE( MACH64_SRC_CNTL, 
+					      MACH64_SRC_BM_ENABLE | MACH64_SRC_BM_SYNC |
+					      MACH64_SRC_BM_OP_SYSTEM_TO_REG );
+				MACH64_WRITE( MACH64_DST_HEIGHT_WIDTH, 0 );
+				
+				if (mach64_do_wait_for_idle( dev_priv )) {
+					DRM_INFO( "mach64_do_wait_for_idle failed\n" );
+					DRM_INFO( "resetting engine ...\n" );
+					mach64_do_engine_reset( dev );
+					mach64_dump_engine_info( dev_priv );
+				}
+			}
+#else
 			/* Emit the vertex buffer rendering commands */
 			{
-				u32 *p = (u32 *)((char *)dev_priv->buffers->handle + buf->offset);
+				u32 *p;
 				u32 used = buf->used >> 2;
 				u32 fifo = 0;
+
+				if (dev_priv->is_pci) {
+					p = (u32 *) buf->address;
+				} else {
+					p = (u32 *)((char *)dev_priv->buffers->handle + buf->offset);
+				}
 
 				while ( used ) {
 					u32 reg, count;
@@ -465,6 +552,7 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 					}
 				}
 			}
+#endif /* MACH64_USE_DMA */
 		} while ( ++i < sarea_priv->nbox );
 	}
 

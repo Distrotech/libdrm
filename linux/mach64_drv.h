@@ -45,6 +45,11 @@ typedef struct drm_mach64_private {
 	int usec_timeout;
 	int is_pci;
 
+	struct pci_pool *pool;
+	dma_addr_t table_handle;
+	void *cpu_addr_table;
+	u32 table_addr;
+
 	unsigned int fb_bpp;
 	unsigned int front_offset, front_pitch;
 	unsigned int back_offset, back_pitch;
@@ -87,6 +92,8 @@ extern drm_buf_t *mach64_freelist_get( drm_device_t *dev );
 extern int mach64_do_wait_for_fifo( drm_mach64_private_t *dev_priv,
 				    int entries );
 extern int mach64_do_wait_for_idle( drm_mach64_private_t *dev_priv );
+extern int mach64_do_wait_for_idle( drm_mach64_private_t *dev_priv );
+extern void mach64_dump_engine_info( drm_mach64_private_t *dev_priv );
 extern int mach64_do_engine_reset( drm_device_t *dev );
 extern int mach64_do_cleanup_dma( drm_device_t *dev );
 
@@ -400,6 +407,8 @@ do {									\
  * DMA macros
  */
 
+#define MACH64_USE_DMA		0
+
 #define DMA_FRAME_BUF_OFFSET	0
 #define DMA_SYS_MEM_ADDR	1
 #define DMA_COMMAND		2
@@ -410,6 +419,8 @@ do {									\
 
 
 #define MACH64_VERBOSE		0
+
+#define mach64_flush_write_combine()	mb()
 
 #define DMALOCALS
 
