@@ -468,6 +468,10 @@ static int mach64_dma_dispatch_blit( drm_device_t *dev,
 
 	dwords =  (blit->width * blit->height) >> dword_shift;
 	buf->used = dwords << 2;
+	if ( buf->used <= 0 || buf->used > MACH64_BUFFER_SIZE ) {
+		DRM_ERROR( "Invalid blit size: %d bytes\n", buf->used );
+		return -EINVAL;
+	}
 
 	/* FIXME: Use a last buffer flag and reduce the state emitted for subsequent,
 	 * continuation buffers? 
