@@ -447,7 +447,7 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 
 	/* FIXME: get a dma buffer from the freelist here */
 	DRM_DEBUG( "Allocating data memory ...\n" );
-	cpu_addr_data = pci_alloc_consistent( dev->pdev, 0x1000, &data_handle );
+	cpu_addr_data = DRM(pci_alloc)( dev, 0x1000, 0x1000, 0xfffffffful, &data_handle );
 	if (!cpu_addr_data || !data_handle) {
 		DRM_INFO( "data-memory allocation failed!\n" );
 		return DRM_ERR(ENOMEM);
@@ -481,8 +481,7 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 			DRM_INFO( "resetting engine ...\n");
 			mach64_do_engine_reset( dev_priv );
 			DRM_INFO( "freeing data buffer memory.\n" );
-			pci_free_consistent( dev->pdev, 0x1000, 
-					     cpu_addr_data, data_handle );
+			DRM(pci_free)( dev, 0x1000, cpu_addr_data, data_handle );
 			return DRM_ERR(EIO);
 		}
 	}
@@ -536,7 +535,7 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 		MACH64_WRITE( MACH64_PAT_REG0, pat_reg0 );
 		MACH64_WRITE( MACH64_PAT_REG1, pat_reg1 );
 		DRM_INFO( "freeing data buffer memory.\n" );
-		pci_free_consistent( dev->pdev, 0x1000, cpu_addr_data, data_handle );
+		DRM(pci_free)( dev, 0x1000, cpu_addr_data, data_handle );
 		return i;
 	}
 	DRM_DEBUG( "waiting for idle...done\n" );
@@ -573,7 +572,7 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 		MACH64_WRITE( MACH64_PAT_REG0, pat_reg0 );
 		MACH64_WRITE( MACH64_PAT_REG1, pat_reg1 );
 		DRM_INFO( "freeing data buffer memory.\n" );
-		pci_free_consistent( dev->pdev, 0x1000, cpu_addr_data, data_handle );
+		DRM(pci_free)( dev, 0x1000, cpu_addr_data, data_handle );
 		return i;
 	}
 
@@ -601,7 +600,7 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 	MACH64_WRITE( MACH64_PAT_REG1, pat_reg1 );
 
 	DRM_DEBUG( "freeing data buffer memory.\n" );
-	pci_free_consistent( dev->pdev, 0x1000, cpu_addr_data, data_handle );
+	DRM(pci_free)( dev, 0x1000, cpu_addr_data, data_handle );
 	DRM_DEBUG( "returning ...\n" );
 
 	return failed;
@@ -740,21 +739,14 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 		}
 	}
 
-	/* check DMA addressing limitations */
-	DRM_DEBUG( "Setting 32-bit pci dma mask\n" );
-	if ((ret=pci_set_dma_mask( dev->pdev, 0xffffffff ))) {
-		DRM_ERROR( "Setting 32-bit pci dma mask failed\n" );
-		mach64_do_cleanup_dma( dev );
-		return ret;
-	}
-
 	/* allocate descriptor memory from pci pool */
 	DRM_DEBUG( "Allocating dma descriptor ring\n" );
 	dev_priv->ring.size = 0x4000; /* 16KB */
 
 	if ( dev_priv->is_pci ) {
-		dev_priv->ring.start = pci_alloc_consistent( dev->pdev, dev_priv->ring.size, 
-							     &dev_priv->ring.handle );
+		dev_priv->ring.start = DRM(pci_alloc)( dev, dev_priv->ring.size, 
+						       dev_priv->ring.size, 0xfffffffful,
+						       &dev_priv->ring.handle );
 
 		if (!dev_priv->ring.start || !dev_priv->ring.handle) {
 			DRM_ERROR( "Allocating dma descriptor ring failed\n");
@@ -990,8 +982,8 @@ int mach64_do_cleanup_dma( drm_device_t *dev )
 
 		if ( dev_priv->is_pci ) {
 			if ( (dev_priv->ring.start != NULL) && dev_priv->ring.handle ) {
-				pci_free_consistent( dev->pdev, dev_priv->ring.size, 
-						     dev_priv->ring.start, dev_priv->ring.handle );
+				DRM(pci_free)( dev, dev_priv->ring.size, 
+					       dev_priv->ring.start, dev_priv->ring.handle );
 			}
 		} else {
 			if ( dev_priv->ring_map )

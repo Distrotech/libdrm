@@ -46,6 +46,7 @@
 #include "drm_ioctl.h"
 #include "drm_lock.h"
 #include "drm_memory.h"
+#include "drm_pci.h"
 #include "drm_proc.h"
 #include "drm_vm.h"
 #include "drm_stub.h"
