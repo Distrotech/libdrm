@@ -486,7 +486,12 @@ agp_memory *DRM(alloc_agp)(int pages, u32 type)
 		return NULL;
 	}
 
+#ifdef __linux__
 	if ((handle = DRM(agp_allocate_memory)(pages, type))) {
+#endif
+#ifdef __FreeBSD__
+	if ((handle = agp_alloc_memory(dev, type, pages << AGP_PAGE_SHIFT))) {
+#endif
 		DRM_OS_SPINLOCK(&DRM(mem_lock));
 		++DRM(mem_stats)[DRM_MEM_TOTALAGP].succeed_count;
 		DRM(mem_stats)[DRM_MEM_TOTALAGP].bytes_allocated
@@ -518,7 +523,13 @@ int DRM(free_agp)(agp_memory *handle, int pages)
 		return retval;
 	}
 
+#ifdef __FreeBSD__
+	agp_free_memory(dev, handle);
+#endif
+
+#ifdef __linux__
 	if (DRM(agp_free_memory)(handle)) {
+#endif
 		DRM_OS_SPINLOCK(&DRM(mem_lock));
 		free_count  = ++DRM(mem_stats)[DRM_MEM_TOTALAGP].free_count;
 		alloc_count =   DRM(mem_stats)[DRM_MEM_TOTALAGP].succeed_count;
@@ -531,28 +542,35 @@ int DRM(free_agp)(agp_memory *handle, int pages)
 				      free_count, alloc_count);
 		}
 		return 0;
+#ifdef __linux__
 	}
+#endif
 	return retval;
 }
 
 int DRM(bind_agp)(agp_memory *handle, unsigned int start)
 {
-	int retcode = -EINVAL;
+	int retcode = EINVAL;
 #ifdef __FreeBSD__
 	device_t dev = agp_find_device();
 	struct agp_memory_info info;
 
 	if (!dev)
-		return NULL;
+		return EINVAL;
 #endif
 
 	if (!handle) {
 		DRM_MEM_ERROR(DRM_MEM_BOUNDAGP,
 			      "Attempt to bind NULL AGP handle\n");
-		return retcode;
+		DRM_OS_RETURN(retcode);
 	}
 
+#ifdef __linux__
 	if (!(retcode = DRM(agp_bind_memory)(handle, start))) {
+#endif
+#ifdef __FreeBSD__
+	if (!(retcode = agp_bind_memory(dev, handle,start << AGP_PAGE_SHIFT))) {
+#endif
 		DRM_OS_SPINLOCK(&DRM(mem_lock));
 		++DRM(mem_stats)[DRM_MEM_BOUNDAGP].succeed_count;
 #ifdef __linux__
@@ -565,40 +583,41 @@ int DRM(bind_agp)(agp_memory *handle, unsigned int start)
 			+= info.ami_size;
 #endif
 		DRM_OS_SPINUNLOCK(&DRM(mem_lock));
-		return retcode;
+		DRM_OS_RETURN(retcode);
 	}
 	DRM_OS_SPINLOCK(&DRM(mem_lock));
 	++DRM(mem_stats)[DRM_MEM_BOUNDAGP].fail_count;
 	DRM_OS_SPINUNLOCK(&DRM(mem_lock));
-	return retcode;
+	DRM_OS_RETURN(retcode);
 }
 
 int DRM(unbind_agp)(agp_memory *handle)
 {
 	int alloc_count;
 	int free_count;
-	int retcode = -EINVAL;
+	int retcode = EINVAL;
 #ifdef __FreeBSD__
 	device_t dev = agp_find_device();
 	struct agp_memory_info info;
 
 	if (!dev)
-		return NULL;
+		return EINVAL;
 #endif
 
 	if (!handle) {
 		DRM_MEM_ERROR(DRM_MEM_BOUNDAGP,
 			      "Attempt to unbind NULL AGP handle\n");
-		return retcode;
+		DRM_OS_RETURN(retcode);
 	}
 
+#ifdef __linux__
+	if ((retcode = DRM(agp_unbind_memory)(handle))) 
+#endif
 #ifdef __FreeBSD__
 	agp_memory_info(dev, handle, &info);
 	if ((retcode = agp_unbind_memory(dev, handle)))
-		return retcode;
 #endif
-
-	if ((retcode = DRM(agp_unbind_memory)(handle))) return retcode;
+		DRM_OS_RETURN(retcode);
 	DRM_OS_SPINLOCK(&DRM(mem_lock));
 	free_count  = ++DRM(mem_stats)[DRM_MEM_BOUNDAGP].free_count;
 	alloc_count = DRM(mem_stats)[DRM_MEM_BOUNDAGP].succeed_count;
@@ -615,6 +634,6 @@ int DRM(unbind_agp)(agp_memory *handle)
 			      "Excess frees: %d frees, %d allocs\n",
 			      free_count, alloc_count);
 	}
-	return retcode;
+	DRM_OS_RETURN(retcode);
 }
 #endif

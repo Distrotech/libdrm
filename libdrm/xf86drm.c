@@ -611,8 +611,11 @@ int drmMap(int fd,
 	pagesize_mask = getpagesize() - 1;
 
     size = (size + pagesize_mask) & ~pagesize_mask;
+ErrorF("fd 0x%x, handle 0x%x, size 0x%x, address 0x%x\n",
+	fd,handle,size,address);
 
     *address = mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, handle);
+ErrorF("FAILED 0x%x\n",*address);
     if (*address == MAP_FAILED) return -errno;
     return 0;
 }

@@ -501,7 +501,12 @@ static int DRM(takedown)( drm_device_t *dev )
 		}
 		dev->agp->memory = NULL;
 
+#ifdef __linux__
 		if ( dev->agp->acquired ) DRM(agp_do_release)();
+#endif
+#ifdef __FreeBSD__
+		if ( dev->agp->acquired ) agp_release(dev->agp->agpdev);
+#endif
 
 		dev->agp->acquired = 0;
 		dev->agp->enabled  = 0;
