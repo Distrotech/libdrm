@@ -239,7 +239,7 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 	DRM_DEBUG( "Preparing table ...\n" );
 	table[0] = cpu_to_le32(MACH64_BM_ADDR + APERTURE_OFFSET);
 	table[1] = cpu_to_le32(data_addr);
-	table[2] = cpu_to_le32(10 * sizeof( u32 ) | 0x80000000 | 0x40000000);
+	table[2] = cpu_to_le32(6 * sizeof( u32 ) | 0x80000000 | 0x40000000);
 	table[3] = 0;
 
 	DRM_DEBUG( "table[0] = 0x%08x\n", table[0] );
