@@ -546,7 +546,7 @@ int mga_mapbufs(struct inode *inode, struct file *filp, unsigned int cmd,
 	spin_lock(&dev->count_lock);
 	if (atomic_read(&dev->buf_alloc)) {
 		spin_unlock(&dev->count_lock);
-	   DRM_DEBUG("Buzy\n");
+	   DRM_DEBUG("Busy\n");
 		return -EBUSY;
 	}
 	++dev->buf_use;		/* Can't allocate more after this call */
@@ -578,12 +578,15 @@ int mga_mapbufs(struct inode *inode, struct file *filp, unsigned int cmd,
 	 DRM_DEBUG("map->flags : %x\n", map->flags);
 	 DRM_DEBUG("map->handle : %p\n", map->handle);
 	 DRM_DEBUG("map->mtrr : %d\n", map->mtrr);
-
+	 down(&current->mm->mmap_sem);
 	 virtual = do_mmap(filp, 0, map->size, PROT_READ|PROT_WRITE,
 			   MAP_SHARED, (unsigned long)map->offset);
+	 up(&current->mm->mmap_sem);
       } else {
-	      virtual = do_mmap(filp, 0, dma->byte_count,
-				PROT_READ|PROT_WRITE, MAP_SHARED, 0);
+	 down(&current->mm->mmap_sem);
+	 virtual = do_mmap(filp, 0, dma->byte_count,
+			   PROT_READ|PROT_WRITE, MAP_SHARED, 0);
+	 up(&current->mm->mmap_sem);
       }
       if (virtual > -1024UL) {
 	 /* Real error */
