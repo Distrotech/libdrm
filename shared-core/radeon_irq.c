@@ -119,8 +119,8 @@ int radeon_wait_irq(drm_device_t *dev, int irq_nr)
 #endif /* __linux__ */
 	int ret = 0;
 
-/* 	if (atomic_read(&dev_priv->irq_received) >= irq_nr)  */
-/* 		return 0; */
+ 	if (atomic_read(&dev_priv->irq_received) >= irq_nr)  
+ 		return 0; 
 
 	dev_priv->stats.boxes |= RADEON_BOX_WAIT_IDLE;
 
@@ -175,7 +175,7 @@ int radeon_irq_emit( DRM_IOCTL_ARGS )
 	LOCK_TEST_WITH_RETURN( dev );
 
 	if ( !dev_priv ) {
-		DRM_ERROR( "%s called with no initialization\n", __func__ );
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
 		return DRM_ERR(EINVAL);
 	}
 
@@ -202,7 +202,7 @@ int radeon_irq_wait( DRM_IOCTL_ARGS )
 	drm_radeon_irq_wait_t irqwait;
 
 	if ( !dev_priv ) {
-		DRM_ERROR( "%s called with no initialization\n", __func__ );
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
 		return DRM_ERR(EINVAL);
 	}
 
