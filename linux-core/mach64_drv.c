@@ -51,9 +51,12 @@ static drm_ioctl_desc_t		mach64_ioctls[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_SET_UNIQUE)]    = { drm_setunique,     1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_BLOCK)]	        = { drm_block,         1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_UNBLOCK)]       = { drm_unblock,       1, 1 },
+#if 0
 	[DRM_IOCTL_NR(DRM_IOCTL_CONTROL)]       = { drm_control,       1, 1 },
+#endif
 	[DRM_IOCTL_NR(DRM_IOCTL_AUTH_MAGIC)]    = { drm_authmagic,     1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_ADD_MAP)]       = { drm_addmap,        1, 1 },
+
 	[DRM_IOCTL_NR(DRM_IOCTL_ADD_BUFS)]      = { drm_addbufs,       1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_MARK_BUFS)]     = { drm_markbufs,      1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_INFO_BUFS)]     = { drm_infobufs,      1, 0 },
@@ -69,7 +72,9 @@ static drm_ioctl_desc_t		mach64_ioctls[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_RES_CTX)]       = { mach64_resctx,     1, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_ADD_DRAW)]      = { drm_adddraw,       1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_RM_DRAW)]       = { drm_rmdraw,        1, 1 },
+#if 0
 	[DRM_IOCTL_NR(DRM_IOCTL_DMA)]	        = { mach64_dma,        1, 0 },
+#endif
 	[DRM_IOCTL_NR(DRM_IOCTL_LOCK)]	        = { mach64_lock,       1, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_UNLOCK)]        = { mach64_unlock,     1, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_FINISH)]        = { drm_finish,        1, 0 },
@@ -97,6 +102,8 @@ static drm_ioctl_desc_t		mach64_ioctls[] = {
 
 #define DRIVER_IOCTL_COUNT	DRM_ARRAY_SIZE( mach64_ioctls )
 
+#define HAVE_CTX_BITMAP		1
+
+
 #define TAG(x) mach64_##x
 #include "driver_tmp.h"
-#include "context_tmp.h"

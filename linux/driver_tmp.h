@@ -124,12 +124,12 @@ static struct miscdevice	TAG(misc) = {
 };
 
 #ifdef MODULE
-static char *TAG(opts) = NULL;
+static char *drm_opts = NULL;
 #endif
 
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
-MODULE_PARM( TAG(opts), "s" );
+MODULE_PARM( drm_opts, "s" );
 
 #ifndef MODULE
 /* r128_options is called by the kernel to parse command-line options
@@ -358,10 +358,10 @@ static int TAG(takedown)( drm_device_t *dev )
 	return 0;
 }
 
-/* r128_init is called via init_module at module load time, or via
- * linux/init/main.c (this is not currently supported). */
-
-static int __init TAG(init)( void )
+/* drm_init is called via init_module at module load time, or via
+ * linux/init/main.c (this is not currently supported).
+ */
+static int __init drm_init( void )
 {
 	int retcode;
 	drm_device_t *dev = &TAG(device);
@@ -373,7 +373,7 @@ static int __init TAG(init)( void )
 	sema_init( &dev->struct_sem, 1 );
 
 #ifdef MODULE
-	drm_parse_options( TAG(opts) );
+	drm_parse_options( drm_opts );
 #endif
 	DRIVER_PREINIT();
 
@@ -392,10 +392,7 @@ static int __init TAG(init)( void )
 	dev->agp = drm_agp_init();
 #if MUST_HAVE_AGP
 	if ( dev->agp == NULL ) {
-		DRM_INFO("The mga drm module requires the agpgart module"
-		         " to function correctly\nPlease load the agpgart"
-		         " module before you load the mga module\n");
-		DRM_ERROR( "Cannot initialize agpgart module.\n" );
+		DRM_ERROR( "Cannot initialize the agpgart module.\n" );
 		drm_proc_cleanup();
 		misc_deregister( &TAG(misc) );
 		TAG(takedown)( dev );
@@ -435,9 +432,9 @@ static int __init TAG(init)( void )
 	return 0;
 }
 
-/* r128_cleanup is called via cleanup_module at module unload time. */
-
-static void __exit TAG(cleanup)( void )
+/* drm_cleanup is called via cleanup_module at module unload time.
+ */
+static void __exit drm_cleanup( void )
 {
 	drm_device_t *dev = &TAG(device);
 
@@ -474,8 +471,8 @@ static void __exit TAG(cleanup)( void )
 #endif
 }
 
-module_init( TAG(init) );
-module_exit( TAG(cleanup) );
+module_init( drm_init );
+module_exit( drm_cleanup );
 
 
 int TAG(version)( struct inode *inode, struct file *filp,
@@ -736,7 +733,7 @@ int TAG(lock)( struct inode *inode, struct file *filp,
 #if HAVE_DMA_QUEUE
         if ( lock.context < 0 )
                 return -EINVAL;
-#elsif HAVE_MULTIPLE_DMA_QUEUES
+#elif HAVE_MULTIPLE_DMA_QUEUES
         if ( lock.context < 0 || lock.context >= dev->queue_count )
                 return -EINVAL;
 	q = dev->queuelist[lock.context];
