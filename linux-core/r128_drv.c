@@ -32,8 +32,6 @@
 #include <linux/config.h>
 #include "r128.h"
 #include "drmP.h"
-#include "drm.h"
-#include "r128_drm.h"
 #include "r128_drv.h"
 #include "ati_pcigart.h"
 

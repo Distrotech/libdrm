@@ -38,8 +38,6 @@
 
 #include "i810.h"
 #include "drmP.h"
-#include "drm.h"
-#include "i810_drm.h"
 #include "i810_drv.h"
 
 #define DRIVER_AUTHOR		"VA Linux Systems Inc."

@@ -34,8 +34,6 @@
 #include <linux/config.h>
 #include "i830.h"
 #include "drmP.h"
-#include "drm.h"
-#include "i830_drm.h"
 #include "i830_drv.h"
 
 #define DRIVER_AUTHOR		"VA Linux Systems Inc."

@@ -30,8 +30,6 @@
 
 #include "radeon.h"
 #include "drmP.h"
-#include "drm.h"
-#include "radeon_drm.h"
 #include "radeon_drv.h"
 
 #include <vm/vm.h>
@@ -626,7 +624,7 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev,
 
 		RADEON_WRITE( RADEON_CP_RB_RPTR_ADDR,
 			     entry->busaddr[page_ofs]);
-		DRM_DEBUG( "ring rptr: offset=0x%08x handle=0x%08x\n",
+		DRM_DEBUG( "ring rptr: offset=0x%08x handle=0x%08lx\n",
 			   entry->busaddr[page_ofs],
 			   entry->handle + tmp_ofs );
 	}

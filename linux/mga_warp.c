@@ -30,8 +30,6 @@
 #define __NO_VERSION__
 #include "mga.h"
 #include "drmP.h"
-#include "drm.h"
-#include "mga_drm.h"
 #include "mga_drv.h"
 #include "mga_ucode.h"
 
