@@ -54,6 +54,7 @@ static struct file_operations mga_fops = {
 	mmap:	 drm_mmap,
 	read:	 drm_read,
 	fasync:	 drm_fasync,
+   	poll:	 drm_poll,
 };
 
 static struct miscdevice      mga_misc = {

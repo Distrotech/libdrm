@@ -57,6 +57,7 @@ static struct file_operations i810_fops = {
 	mmap:	 drm_mmap,
 	read:	 drm_read,
 	fasync:	 drm_fasync,
+      	poll:	 drm_poll,
 };
 
 static struct miscdevice      i810_misc = {
