@@ -67,11 +67,11 @@
 /* There's undoubtably more of this file to go into these OS dependent ones. */
 #ifdef __linux__
 #include "drm_os_linux.h"
-#endif
+#endif /* __linux__ */
 
 #ifdef __FreeBSD__
 #include "drm_os_freebsd.h"
-#endif
+#endif /* __FreeBSD__ */
 
 #include "drm.h"
 
@@ -152,10 +152,10 @@ typedef struct drm_pci_list {
 typedef struct drm_ioctl_desc {
 #ifdef __linux__
 	drm_ioctl_t	     *func;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	d_ioctl_t            *func;
-#endif
+#endif /* __FreeBSD__ */
 	int		     auth_needed;
 	int		     root_only;
 } drm_ioctl_desc_t;
@@ -291,7 +291,7 @@ typedef struct drm_file {
 	struct drm_device *dev;
 	int 		  remove_auth_on_close;
 } drm_file_t;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 typedef TAILQ_HEAD(drm_file_list, drm_file) drm_file_list_t;
 typedef struct drm_file {
@@ -305,7 +305,7 @@ typedef struct drm_file {
 	unsigned long	  ioctl_count;
 	struct drm_device *devXX;
 } drm_file_t;
-#endif
+#endif /* __FreeBSD__ */
 
 typedef struct drm_queue {
 	atomic_t	  use_count;	/* Outstanding uses (+1)	    */
@@ -373,10 +373,10 @@ typedef struct drm_agp_mem {
 #ifdef __linux__
 	unsigned long      handle;
 	agp_memory         *memory;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	void               *handle;
-#endif
+#endif /* __FreeBSD__ */
 	unsigned long      bound; /* address */
 	int                pages;
 	struct drm_agp_mem *prev;
@@ -386,11 +386,11 @@ typedef struct drm_agp_mem {
 typedef struct drm_agp_head {
 #ifdef __linux__
 	agp_kern_info      agp_info;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	device_t	   agpdev;
 	struct agp_info    info;
-#endif
+#endif /* __FreeBSD__ */
 	const char         *chipset;
 	drm_agp_mem_t      *memory;
 	unsigned long      mode;
@@ -421,14 +421,14 @@ typedef struct drm_map_list {
 	struct list_head	head;
 	drm_map_t		*map;
 } drm_map_list_t;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 typedef TAILQ_HEAD(drm_map_list, drm_map_list_entry) drm_map_list_t;
 typedef struct drm_map_list_entry {
 	TAILQ_ENTRY(drm_map_list_entry) link;
 	drm_map_t	*map;
 } drm_map_list_entry_t;
-#endif
+#endif /* __FreeBSD__ */
 
 typedef struct drm_device {
 	const char	  *name;	/* Simple driver name		   */
@@ -436,29 +436,29 @@ typedef struct drm_device {
 	int		  unique_len;	/* Length of unique field	   */
 #ifdef __linux__
 	dev_t		  device;	/* Device number for mknod	   */
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	device_t	  device;	/* Device instance from newbus     */
 	dev_t		  devnode;	/* Device number for mknod	   */
-#endif
+#endif /* __FreeBSD__ */
 	char		  *devname;	/* For /proc/interrupts		   */
 
 	int		  blocked;	/* Blocked due to VC switch?	   */
 #ifdef __FreeBSD__
 	int		  flags;	/* Flags to open(2)		   */
 	int		  writable;	/* Opened with FWRITE		   */
-#endif
+#endif /* __FreeBSD__ */
 	struct proc_dir_entry *root;	/* Root for this device's entries  */
 
 				/* Locks */
 #ifdef __linux__
 	spinlock_t	  count_lock;	/* For inuse, open_count, buf_use  */
 	struct semaphore  struct_sem;	/* For others			   */
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	DRM_OS_SPINTYPE	  count_lock;	/* For inuse, open_count, buf_use  */
 	struct lock       dev_lock;	/* For others			   */
-#endif
+#endif /* __FreeBSD__ */
 				/* Usage Counters */
 	int		  open_count;	/* Outstanding files open	   */
 	atomic_t	  ioctl_count;	/* Outstanding IOCTLs pending	   */
@@ -475,10 +475,10 @@ typedef struct drm_device {
 #ifdef __linux__
 	drm_file_t	  *file_first;
 	drm_file_t	  *file_last;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	drm_file_list_t   files;
-#endif
+#endif /* __FreeBSD__ */
 	drm_magic_head_t  magiclist[DRM_HASH_SIZE];
 
 				/* Memory management */
@@ -503,28 +503,28 @@ typedef struct drm_device {
 #ifdef __FreeBSD__
 	struct resource   *irqr;	/* Resource for interrupt used by board	   */
 	void		  *irqh;	/* Handle from bus_setup_intr      */
-#endif
+#endif /* __FreeBSD__ */
 	__volatile__ long context_flag;	/* Context swapping flag	   */
 	__volatile__ long interrupt_flag; /* Interruption handler flag	   */
 	__volatile__ long dma_flag;	/* DMA dispatch flag		   */
 #ifdef __linux__
 	struct timer_list timer;	/* Timer for delaying ctx switch   */
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	struct callout    timer;	/* Timer for delaying ctx switch   */
-#endif
+#endif /* __FreeBSD__ */
 	wait_queue_head_t context_wait; /* Processes waiting on ctx switch */
 	int		  last_checked;	/* Last context checked for DMA	   */
 	int		  last_context;	/* Last current context		   */
 	unsigned long	  last_switch;	/* jiffies at last context switch  */
 #ifdef __linux__
 	struct tq_struct  tq;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 #if __FreeBSD_version >= 400005
 	struct task       task;
 #endif
-#endif
+#endif /* __FreeBSD__ */
 	cycles_t	  ctx_start;
 	cycles_t	  lck_start;
 #if __HAVE_DMA_HISTOGRAM
@@ -539,19 +539,19 @@ typedef struct drm_device {
 	char		  *buf_end;	/* End pointer			   */
 #ifdef __linux__
 	struct fasync_struct *buf_async;/* Processes waiting for SIGIO	   */
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	struct sigio      *buf_sigio;	/* Processes waiting for SIGIO     */
 	struct selinfo    buf_sel;	/* Workspace for select/poll       */
 	int               buf_selecting;/* True if poll sleeper            */
-#endif
+#endif /* __FreeBSD__ */
 	wait_queue_head_t buf_readers;	/* Processes waiting to read	   */
 	wait_queue_head_t buf_writers;	/* Processes waiting to ctx switch */
 
 #ifdef __FreeBSD__
 				/* Sysctl support */
 	struct drm_sysctl_info *sysctl;
-#endif
+#endif /* __FreeBSD__ */
 
 #if __REALLY_HAVE_AGP
 	drm_agp_head_t    *agp;
@@ -583,6 +583,10 @@ extern int           DRM(remove_magic)(drm_device_t *dev, drm_magic_t magic);
 				/* Driver support (drm_drv.h) */
 extern int           DRM(version)( DRM_OS_IOCTL );
 extern int	     DRM(write_string)(drm_device_t *dev, const char *s);
+#ifdef __linux__ 
+extern int	DRM(open_helper)(struct inode *inode, struct file *filp,
+							drm_device_t *dev);
+#endif /* __linux__ */
 
 				/* Memory management support (drm_memory.h) */
 extern void	     DRM(mem_init)(void);
@@ -701,6 +705,13 @@ extern int            DRM(proc_cleanup)(int minor,
 				/* Scatter Gather Support (drm_scatter.h) */
 extern void           DRM(sg_cleanup)(drm_sg_mem_t *entry);
 #endif
+
+#ifdef __linux__
+/* Stub support (drm_stub.h) */
+extern int	DRM(stub_register)(const char *name,
+				 struct file_operations *fops,
+				 drm_device_t *dev);
+#endif /* __linux__ */
 
 #if __REALLY_HAVE_SG
                                /* ATI PCIGART support (ati_pcigart.h) */

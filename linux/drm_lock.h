@@ -49,11 +49,11 @@ int DRM(lock_take)(__volatile__ unsigned int *lock, unsigned int context)
 	unsigned int old, new;
 #ifdef __linux__
 	unsigned int prev;
-#endif
+#endif /* __linux__ */
 
 #ifdef __FreeBSD__
 	char failed;
-#endif
+#endif /* __FreeBSD__ */
 
 	do {
 		old = *lock;
@@ -62,11 +62,11 @@ int DRM(lock_take)(__volatile__ unsigned int *lock, unsigned int context)
 #ifdef __linux__
 		prev = cmpxchg(lock, old, new);
 	} while (prev != old);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		_DRM_CAS(lock, old, new, failed);
 	} while (failed);
-#endif
+#endif /* __FreeBSD__ */
 	if (_DRM_LOCKING_CONTEXT(old) == context) {
 		if (old & _DRM_LOCK_HELD) {
 			if (context != DRM_KERNEL_CONTEXT) {
@@ -91,10 +91,10 @@ int DRM(lock_transfer)(drm_device_t *dev,
 	unsigned int old, new;
 #ifdef __linux__
 	unsigned int prev;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	char failed;
-#endif
+#endif /* __FreeBSD__ */
 
 	dev->lock.pid = 0;
 	do {
@@ -103,11 +103,11 @@ int DRM(lock_transfer)(drm_device_t *dev,
 #ifdef __linux__
 		prev = cmpxchg(lock, old, new);
 	} while (prev != old);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		_DRM_CAS(lock, old, new, failed);
 	} while (failed);
-#endif
+#endif /* __FreeBSD__ */
 	return 1;
 }
 
@@ -117,11 +117,11 @@ int DRM(lock_free)(drm_device_t *dev,
 	unsigned int old, new;
 #ifdef __linux__
 	unsigned int prev;
-#endif
+#endif /* __linux__ */
 	pid_t        pid = dev->lock.pid;
 #ifdef __FreeBSD__
 	char failed;
-#endif
+#endif /* __FreeBSD__ */
 
 	dev->lock.pid = 0;
 	do {
@@ -130,11 +130,11 @@ int DRM(lock_free)(drm_device_t *dev,
 #ifdef __linux__
 		prev = cmpxchg(lock, old, new);
 	} while (prev != old);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		_DRM_CAS(lock, old, new, failed);
 	} while (failed);
-#endif
+#endif /* __FreeBSD__ */
 	if (_DRM_LOCK_IS_HELD(old) && _DRM_LOCKING_CONTEXT(old) != context) {
 		DRM_ERROR("%d freed heavyweight lock held by %d (pid %d)\n",
 			  context,
@@ -150,10 +150,10 @@ static int DRM(flush_queue)(drm_device_t *dev, int context)
 {
 #ifdef __linux__
 	DECLARE_WAITQUEUE(entry, current);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	int               error;
-#endif
+#endif /* __FreeBSD__ */
 	int		  ret	= 0;
 	drm_queue_t	  *q	= dev->queuelist[context];
 
@@ -174,18 +174,18 @@ static int DRM(flush_queue)(drm_device_t *dev, int context)
 				break;
 			}
 		}
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		atomic_inc(&q->block_count);
 		error = tsleep(&q->flush_queue, PZERO|PCATCH, "drmfq", 0);
 		if (error)
 			return error;
-#endif
+#endif /* __FreeBSD__ */
 		atomic_dec(&q->block_count);
 #ifdef __linux__
 		current->state = TASK_RUNNING;
 		remove_wait_queue(&q->flush_queue, &entry);
-#endif
+#endif /* __linux__ */
 	}
 	atomic_dec(&q->use_count);
 
@@ -284,10 +284,10 @@ int DRM(notifier)(void *priv)
 	unsigned int  old, new;
 #ifdef __linux__
 	unsigned int prev;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	char failed;
-#endif
+#endif /* __FreeBSD__ */
 
 
 				/* Allow signal delivery if lock isn't held */
@@ -302,11 +302,11 @@ int DRM(notifier)(void *priv)
 #ifdef __linux__
 		prev = cmpxchg(&s->lock->lock, old, new);
 	} while (prev != old);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		_DRM_CAS(&s->lock->lock, old, new, failed);
 	} while (failed);
-#endif
+#endif /* __FreeBSD__ */
 	return 0;
 }
 

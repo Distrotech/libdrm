@@ -163,10 +163,10 @@ int r128_do_wait_for_idle( drm_r128_private_t *dev_priv )
 	ret = r128_do_wait_for_fifo( dev_priv, 64 );
 #ifdef __linux__
 	if ( ret < 0 ) return ret;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	if ( ret ) return ret;
-#endif
+#endif /* __FreeBSD__ */
 
 	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
 		if ( !(R128_READ( R128_GUI_STAT ) & R128_GUI_ACTIVE) ) {
@@ -398,10 +398,10 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 	drm_r128_private_t *dev_priv;
 #ifdef __linux__
 	struct list_head *list;
-#endif
-#if defined( __FreeBSD__ )
+#endif /* __linux__ */
+#ifdef __FreeBSD__
 	drm_map_list_entry_t *listentry;
-#endif
+#endif /* __FreeBSD__ */
 
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
@@ -518,8 +518,8 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
  			break;
  		}
  	}
-#endif
-#if defined( __FreeBSD__ )
+#endif /* __linux__ */
+#ifdef __FreeBSD__
 	TAILQ_FOREACH(listentry, dev->maplist, link) {
 		drm_map_t *map = listentry->map;
 		if (map->type == _DRM_SHM &&
@@ -528,7 +528,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 			break;
 		}
 	}
-#endif
+#endif /* __FreeBSD__ */
 
 	if(!dev_priv->sarea) {
 		DRM_ERROR("could not find sarea!\n");
@@ -753,10 +753,10 @@ int r128_cce_stop( DRM_OS_IOCTL )
 		ret = r128_do_cce_idle( dev_priv );
 #ifdef __linux__
 		if ( ret < 0 ) return ret;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		if ( ret ) return ret;
-#endif
+#endif /* __FreeBSD__ */
 	}
 
 	/* Finally, we can turn off the CCE.  If the engine isn't idle,

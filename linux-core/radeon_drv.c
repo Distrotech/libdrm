@@ -30,14 +30,14 @@
 
 #ifdef __linux__
 #include <linux/config.h>
-#endif
+#endif /* __linux__ */
 
 #ifdef __FreeBSD__
 #include <sys/types.h>
 #include <sys/bus.h>
 #include <pci/pcivar.h>
 #include <opt_drm_linux.h>
-#endif
+#endif /* __FreeBSD__ */
 
 #include "radeon.h"
 #include "drmP.h"
@@ -68,7 +68,7 @@ drm_chipinfo_t DRM(devicelist)[] = {
 	{0x1002, 0x5159, 1, "ATI Radeon VE"},
 	{0, 0, 0, NULL}
 };
-#endif
+#endif /* __FreeBSD__ */
 
 #define DRIVER_IOCTLS							     \
  [DRM_IOCTL_NR(DRM_IOCTL_DMA)]               = { radeon_cp_buffers,  1, 0 }, \
@@ -125,7 +125,7 @@ static int __init radeon_options( char *str )
 
 __setup( DRIVER_NAME "=", radeon_options );
 #endif
-#endif
+#endif /* __linux__ */
 
 #include "drm_fops.h"
 #include "drm_init.h"
@@ -136,14 +136,14 @@ __setup( DRIVER_NAME "=", radeon_options );
 #ifdef __linux__
 #include "drm_proc.h"
 #include "drm_stub.h"
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 #include "drm_sysctl.h"
-#endif
+#endif /* __FreeBSD__ */
 #if __REALLY_HAVE_SG
 #include "drm_scatter.h"
 #endif
 
 #ifdef __FreeBSD__
 DRIVER_MODULE(radeon, pci, radeon_driver, radeon_devclass, 0, 0);
-#endif
+#endif /* __FreeBSD__ */

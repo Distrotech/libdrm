@@ -27,14 +27,14 @@
 
 #ifdef __linux__
 #include <linux/config.h>
-#endif
+#endif /* __linux__ */
 
 #ifdef __FreeBSD__
 #include <sys/types.h>
 #include <sys/bus.h>
 #include <pci/pcivar.h>
 #include <opt_drm_linux.h>
-#endif
+#endif /* __FreeBSD__ */
 
 #include "sis.h"
 #include "drmP.h"
@@ -59,7 +59,7 @@ drm_chipinfo_t DRM(devicelist)[] = {
 	{0x1039, 0x0630, 1, "SIS 630"},
 	{0, 0, 0, NULL}
 };
-#endif
+#endif /* __FreeBSD__ */
 
 #define DRIVER_IOCTLS \
         [DRM_IOCTL_NR(SIS_IOCTL_FB_ALLOC)]   = { sis_fb_alloc,	  1, 1 }, \
@@ -95,11 +95,9 @@ drm_chipinfo_t DRM(devicelist)[] = {
 #ifdef __linux__
 #include "drm_proc.h"
 #include "drm_stub.h"
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 #include "drm_sysctl.h"
-#endif
 
-#ifdef __FreeBSD__
 DRIVER_MODULE(sis, pci, sis_driver, sis_devclass, 0, 0);
-#endif
+#endif /* __FreeBSD__ */

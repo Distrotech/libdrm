@@ -32,7 +32,7 @@
 #define __NO_VERSION__
 #ifdef __linux__
 #include <linux/vmalloc.h>
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 #include <machine/param.h>
 #include <sys/mman.h>
@@ -41,7 +41,7 @@
 #include <vm/vm_extern.h>
 #include <vm/vm_map.h>
 #include <vm/vm_param.h>
-#endif
+#endif /* __FreeBSD__ */
 #include "drmP.h"
 
 #ifndef __HAVE_PCI_DMA
@@ -85,17 +85,17 @@ int DRM(addmap)( DRM_OS_IOCTL )
 	drm_map_t *map;
 #ifdef __linux__
 	drm_map_list_t *list;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	drm_map_list_entry_t *list;
-#endif
+#endif /* __FreeBSD__ */
 
 #ifdef __linux__
 	if ( !(filp->f_mode & 3) )
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	if (!(dev->flags & (FREAD|FWRITE)))
-#endif
+#endif /* __FreeBSD__ */
 		DRM_OS_RETURN(EACCES); /* Require read/write */
 
 	map = (drm_map_t *) DRM(alloc)( sizeof(*map), DRM_MEM_MAPS );
@@ -107,10 +107,10 @@ int DRM(addmap)( DRM_OS_IOCTL )
 		DRM(free)( map, sizeof(*map), DRM_MEM_MAPS );
 		DRM_OS_RETURN(EFAULT);
 	}
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	*map = *(drm_map_t *)data;
-#endif
+#endif /* __FreeBSD__ */
 
 	/* Only allow shared memory to be removable since we only keep enough
 	 * book keeping information about shared memory to allow for removal
@@ -124,10 +124,10 @@ int DRM(addmap)( DRM_OS_IOCTL )
 		   map->offset, map->size, map->type );
 #ifdef __linux__
 	if ( (map->offset & (~PAGE_MASK)) || (map->size & (~PAGE_MASK)) ) {
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	if ( (map->offset & PAGE_MASK) || (map->size & PAGE_MASK) ) {
-#endif
+#endif /* __FreeBSD__ */
 		DRM(free)( map, sizeof(*map), DRM_MEM_MAPS );
 		DRM_OS_RETURN(EINVAL);
 	}
@@ -147,7 +147,7 @@ int DRM(addmap)( DRM_OS_IOCTL )
 				entry->offset, entry->offset + entry->size - 1,
 				map->offset, map->offset + map->size - 1);
 	}
-#endif
+#endif /* __FreeBSD__ */
 
 	switch ( map->type ) {
 	case _DRM_REGISTERS:
@@ -156,7 +156,7 @@ int DRM(addmap)( DRM_OS_IOCTL )
 		if ( map->offset + map->size < map->offset
 #ifdef __linux__
 		     || map->offset < virt_to_phys(high_memory) 
-#endif
+#endif /* __linux__ */
 		) {
 			DRM(free)( map, sizeof(*map), DRM_MEM_MAPS );
 			DRM_OS_RETURN(EINVAL);
@@ -178,11 +178,11 @@ int DRM(addmap)( DRM_OS_IOCTL )
 	case _DRM_SHM:
 #ifdef __linux__
 		map->handle = vmalloc_32(map->size);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		map->handle = (void *)DRM(alloc_pages)
 			(DRM(order)(map->size) - PAGE_SHIFT, DRM_MEM_SAREA);
-#endif
+#endif /* __FreeBSD__ */
 		DRM_DEBUG( "%ld %d %p\n",
 			   map->size, DRM(order)( map->size ), map->handle );
 		if ( !map->handle ) {
@@ -227,19 +227,19 @@ int DRM(addmap)( DRM_OS_IOCTL )
 	DRM_OS_LOCK;
 #ifdef __linux__
 	list_add(&list->head, &dev->maplist->head);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	TAILQ_INSERT_TAIL(dev->maplist, list, link);
-#endif
+#endif /* __FreeBSD__ */
 	DRM_OS_UNLOCK;
 
 #ifdef __linux__
 	if ( copy_to_user( (drm_map_t *)data, map, sizeof(*map) ) )
 		DRM_OS_RETURN(EFAULT);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	*(drm_map_t *)data = *map;
-#endif
+#endif /* __FreeBSD__ */
 
 	if ( map->type != _DRM_SHM ) {
 #ifdef __linux__
@@ -247,10 +247,10 @@ int DRM(addmap)( DRM_OS_IOCTL )
 				   &map->offset,
 				   sizeof(map->offset) ) )
 			DRM_OS_RETURN(EFAULT);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		((drm_map_t *)data)->handle = (void *)map->offset;
-#endif
+#endif /* __FreeBSD__ */
 	}
 	return 0;
 }
@@ -267,10 +267,10 @@ int DRM(rmmap)( DRM_OS_IOCTL )
 	struct list_head *list;
 	drm_map_list_t *r_list = NULL;
 	drm_vma_entry_t *pt, *prev;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	drm_map_list_entry_t *list;
-#endif
+#endif /* __FreeBSD__ */
 	drm_map_t *map;
 	drm_map_t request;
 	int found_maps = 0;
@@ -297,7 +297,7 @@ int DRM(rmmap)( DRM_OS_IOCTL )
 	}
 	map = r_list->map;
 	list_del(list);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	TAILQ_FOREACH(list, dev->maplist, link) {
 		map = list->map;
@@ -313,14 +313,14 @@ int DRM(rmmap)( DRM_OS_IOCTL )
 		DRM_OS_RETURN(EINVAL);
 	}
 	TAILQ_REMOVE(dev->maplist, list, link);
-#endif
+#endif /* __FreeBSD__ */
 	DRM(free)(list, sizeof(*list), DRM_MEM_MAPS);
 
 #ifdef __linux__
 	for (pt = dev->vmalist, prev = NULL; pt; prev = pt, pt = pt->next) {
 		if (pt->vma->vm_private_data == map) found_maps++;
 	}
-#endif
+#endif /* __linux__ */
 
 	if(!found_maps) {
 		switch (map->type) {
@@ -340,10 +340,10 @@ int DRM(rmmap)( DRM_OS_IOCTL )
 		case _DRM_SHM:
 #ifdef __linux__
 			vfree(map->handle);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 			DRM(free_pages)( (unsigned long)map->handle, DRM(order)(map->size), DRM_MEM_SAREA );
-#endif
+#endif /* __FreeBSD__ */
 			break;
 		case _DRM_AGP:
 		case _DRM_SCATTER_GATHER:
@@ -428,10 +428,10 @@ int DRM(addbufs_agp)( DRM_OS_IOCTL )
 	alignment  = (request.flags & _DRM_PAGE_ALIGN)
 #ifdef __linux__
 		? PAGE_ALIGN(size) : size;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		? round_page(size) : size;
-#endif
+#endif /* __FreeBSD__ */
 	page_order = order - PAGE_SHIFT > 0 ? order - PAGE_SHIFT : 0;
 	total = PAGE_SIZE << page_order;
 
@@ -502,10 +502,10 @@ int DRM(addbufs_agp)( DRM_OS_IOCTL )
 		buf->pending = 0;
 #ifdef __linux__
 		init_waitqueue_head( &buf->dma_wait );
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		buf->dma_wait = 0;
-#endif
+#endif /* __FreeBSD__ */
 		buf->pid     = 0;
 
 		buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
@@ -618,10 +618,10 @@ int DRM(addbufs_pci)( DRM_OS_IOCTL )
 	alignment = (request.flags & _DRM_PAGE_ALIGN)
 #ifdef __linux__
 		? PAGE_ALIGN(size) : size;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		? round_page(size) : size;
-#endif
+#endif /* __FreeBSD__ */
 	page_order = order - PAGE_SHIFT > 0 ? order - PAGE_SHIFT : 0;
 	total = PAGE_SIZE << page_order;
 
@@ -720,10 +720,10 @@ int DRM(addbufs_pci)( DRM_OS_IOCTL )
 			buf->pending = 0;
 #ifdef __linux__
 			init_waitqueue_head( &buf->dma_wait );
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 			buf->dma_wait = 0;
-#endif
+#endif /* __FreeBSD__ */
 			buf->pid     = 0;
 #if __HAVE_DMA_HISTOGRAM
 			buf->time_queued     = 0;
@@ -810,10 +810,10 @@ int DRM(addbufs_sg)( DRM_OS_IOCTL )
 	alignment  = (request.flags & _DRM_PAGE_ALIGN)
 #ifdef __linux__
                ? PAGE_ALIGN(size) : size;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		? round_page(size) : size;
-#endif
+#endif /* __FreeBSD__ */
 	page_order = order - PAGE_SHIFT > 0 ? order - PAGE_SHIFT : 0;
 	total = PAGE_SIZE << page_order;
 
@@ -883,10 +883,10 @@ int DRM(addbufs_sg)( DRM_OS_IOCTL )
 		buf->pending = 0;
 #ifdef __linux__
 		init_waitqueue_head( &buf->dma_wait );
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		buf->dma_wait = 0;
-#endif
+#endif /* __FreeBSD__ */
 		buf->pid     = 0;
 
 		buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
@@ -973,29 +973,29 @@ int DRM(addbufs)( DRM_OS_IOCTL )
 	if ( request.flags & _DRM_AGP_BUFFER )
 #ifdef __linux__
 		return DRM(addbufs_agp)( inode, filp, cmd, data );
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		return DRM(addbufs_agp)( kdev, cmd, data, flags, p );
-#endif
+#endif /* __FreeBSD__ */
 	else
 #endif
 #if __REALLY_HAVE_SG
 	if ( request.flags & _DRM_SG_BUFFER )
 #ifdef __linux__
 		return DRM(addbufs_sg)( inode, filp, cmd, data );
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		return DRM(addbufs_sg)( kdev, cmd, data, flags, p );
-#endif
+#endif /* __FreeBSD__ */
 	else
 #endif
 #if __HAVE_PCI_DMA
 #ifdef __linux__
 		return DRM(addbufs_pci)( inode, filp, cmd, data );
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		return DRM(addbufs_pci)( kdev, cmd, data, flags, p );
-#endif
+#endif /* __FreeBSD__ */
 #else
 		DRM_OS_RETURN(EINVAL);
 #endif
@@ -1138,11 +1138,11 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 	const int zero = 0;
 #ifdef __linux__
 	unsigned long virtual, address;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	vm_offset_t virtual, address;
 	struct vmspace *vms = p->p_vmspace;
-#endif
+#endif /* __FreeBSD__ */
 	drm_buf_map_t request;
 	int i;
 
@@ -1184,8 +1184,7 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 #else
 			up_write( &current->mm->mmap_sem );
 #endif
-#endif
-
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 			virtual = round_page((vm_offset_t)vms->vm_daddr + MAXDSIZ);
 			retcode = vm_mmap(&vms->vm_map,
@@ -1195,7 +1194,7 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 					  MAP_SHARED,
 					  SLIST_FIRST(&kdev->si_hlist),
 					  (unsigned long)map->offset );
-#endif
+#endif /* __FreeBSD__ */
 		} else {
 #ifdef __linux__
 #if LINUX_VERSION_CODE <= 0x020402
@@ -1212,7 +1211,7 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 #else
 			up_write( &current->mm->mmap_sem );
 #endif
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 			virtual = round_page((vm_offset_t)vms->vm_daddr + MAXDSIZ);
 			retcode = vm_mmap(&vms->vm_map,
@@ -1222,7 +1221,7 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 					  MAP_SHARED,
 					  SLIST_FIRST(&kdev->si_hlist),
 					  0);
-#endif
+#endif /* __FreeBSD__ */
 		}
 #ifdef __linux__
 		if ( virtual > -1024UL ) {
@@ -1230,11 +1229,11 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 			retcode = (signed long)virtual;
 			goto done;
 		}
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		if (retcode)
 			goto done;
-#endif
+#endif /* __FreeBSD__ */
 		request.virtual = (void *)virtual;
 
 		for ( i = 0 ; i < dma->buf_count ; i++ ) {

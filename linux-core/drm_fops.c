@@ -35,7 +35,7 @@
 
 #ifdef __linux__
 #include <linux/poll.h>
-#endif
+#endif /* __linux__ */
 
 #ifdef __FreeBSD__
 #include <sys/signalvar.h>
@@ -56,7 +56,7 @@ drm_file_t *DRM(find_file_by_proc)(drm_device_t *dev, struct proc *p)
 			return priv;
 	return NULL;
 }
-#endif
+#endif /* __FreeBSD__ */
 
 /* DRM(open) is called whenever a process opens /dev/drm. */
 
@@ -64,23 +64,23 @@ drm_file_t *DRM(find_file_by_proc)(drm_device_t *dev, struct proc *p)
 int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 {
 	kdev_t	     m = MINOR(inode->i_rdev);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 int DRM(open_helper)(dev_t kdev, int flags, int fmt, struct proc *p,
 		    drm_device_t *dev)
 {
 	int	     m = minor(kdev);
-#endif
+#endif /* __FreeBSD__ */
 	drm_file_t   *priv;
 
 #ifdef __linux__
 	if (filp->f_flags & O_EXCL) return -EBUSY; /* No exclusive opens */
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	if (flags & O_EXCL)
 		return EBUSY; /* No exclusive opens */
 	dev->flags = flags;
-#endif
+#endif /* __FreeBSD__ */
 	if (!DRM(cpu_valid)())
 		DRM_OS_RETURN(EINVAL);
 
@@ -112,7 +112,7 @@ int DRM(open_helper)(dev_t kdev, int flags, int fmt, struct proc *p,
 		dev->file_last	     = priv;
 	}
 	up(&dev->struct_sem);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	/* FIXME: linux mallocs and bzeros here */
 	priv = (drm_file_t *) DRM(find_file_by_proc)(dev, p);
@@ -139,7 +139,7 @@ int DRM(open_helper)(dev_t kdev, int flags, int fmt, struct proc *p,
 	}
 
 	kdev->si_drv1 = dev;
-#endif
+#endif /* __FreeBSD__ */
 
 #ifdef __linux__
 #ifdef __alpha__
@@ -156,7 +156,7 @@ int DRM(open_helper)(dev_t kdev, int flags, int fmt, struct proc *p,
 		}
 	}
 #endif
-#endif
+#endif /* __linux__ */
 
 	return 0;
 }
@@ -183,7 +183,7 @@ int DRM(fasync)(int fd, struct file *filp, int on)
 	if (retcode < 0) return retcode;
 	return 0;
 }
-#endif
+#endif /* __linux__ */
 
 /* The drm_read and drm_write_string code (especially that which manages
    the circular buffer), is based on Alessandro Rubini's LINUX DEVICE
@@ -191,10 +191,10 @@ int DRM(fasync)(int fd, struct file *filp, int on)
 
 #ifdef __linux__
 ssize_t DRM(read)(struct file *filp, char *buf, size_t count, loff_t *off)
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 ssize_t DRM(read)(dev_t kdev, struct uio *uio, int ioflag)
-#endif
+#endif /* __FreeBSD__ */
 {
 	DRM_OS_DEVICE;
 	int	      left;
@@ -203,7 +203,7 @@ ssize_t DRM(read)(dev_t kdev, struct uio *uio, int ioflag)
 	int	      cur;
 #ifdef __FreeBSD__
 	int           error = 0;
-#endif
+#endif /* __FreeBSD__ */
 
 	DRM_DEBUG("%p, %p\n", dev->buf_rp, dev->buf_wp);
 
@@ -217,7 +217,7 @@ ssize_t DRM(read)(dev_t kdev, struct uio *uio, int ioflag)
 			DRM_DEBUG("  interrupted\n");
 			return -ERESTARTSYS;
 		}
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		if (dev->flags & FASYNC)
 			return EWOULDBLOCK;
@@ -226,7 +226,7 @@ ssize_t DRM(read)(dev_t kdev, struct uio *uio, int ioflag)
 			DRM_DEBUG("  interrupted\n");
 			return error;
 		}
-#endif
+#endif /* __FreeBSD__ */
 		DRM_DEBUG("  awake\n");
 	}
 
@@ -234,10 +234,10 @@ ssize_t DRM(read)(dev_t kdev, struct uio *uio, int ioflag)
 	avail = DRM_BSZ - left;
 #ifdef __linux__
 	send  = DRM_MIN(avail, count);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	send  = DRM_MIN(avail, uio->uio_resid);
-#endif
+#endif /* __FreeBSD__ */
 
 	while (send) {
 		if (dev->buf_wp > dev->buf_rp) {
@@ -248,12 +248,12 @@ ssize_t DRM(read)(dev_t kdev, struct uio *uio, int ioflag)
 #ifdef __linux__
 		if (copy_to_user(buf, dev->buf_rp, cur))
 			return -EFAULT;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		error = uiomove(dev->buf_rp, cur, uio);
 		if (error)
 			break;
-#endif
+#endif /* __FreeBSD__ */
 		dev->buf_rp += cur;
 		if (dev->buf_rp == dev->buf_end) dev->buf_rp = dev->buf;
 		send -= cur;
@@ -262,11 +262,11 @@ ssize_t DRM(read)(dev_t kdev, struct uio *uio, int ioflag)
 #ifdef __linux__
 	wake_up_interruptible(&dev->buf_writers);
 	return DRM_MIN(avail, count);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	wakeup(&dev->buf_wp);
 	return error;
-#endif
+#endif /* __FreeBSD__ */
 }
 
 int DRM(write_string)(drm_device_t *dev, const char *s)
@@ -302,7 +302,7 @@ int DRM(write_string)(drm_device_t *dev, const char *s)
 	if (dev->buf_async) kill_fasync(&dev->buf_async, SIGIO, POLL_IN);
 	DRM_DEBUG("waking\n");
 	wake_up_interruptible(&dev->buf_readers);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	if (dev->buf_selecting) {
 		dev->buf_selecting = 0;
@@ -316,7 +316,7 @@ int DRM(write_string)(drm_device_t *dev, const char *s)
 	}
 	DRM_DEBUG("waking\n");
 	wakeup(&dev->buf_rp);
-#endif
+#endif /* __FreeBSD__ */
 
 	return 0;
 }
@@ -330,7 +330,7 @@ unsigned int DRM(poll)(struct file *filp, struct poll_table_struct *wait)
 	if (dev->buf_wp != dev->buf_rp) return POLLIN | POLLRDNORM;
 	return 0;
 }
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 int DRM(poll)(dev_t kdev, int events, struct proc *p)
 {
@@ -357,4 +357,4 @@ int DRM(write)(dev_t kdev, struct uio *uio, int ioflag)
                   curproc->p_pid, ((drm_device_t *)kdev->si_drv1)->device, ((drm_device_t *)kdev->si_drv1)->open_count);
         return 0;
 }
-#endif
+#endif /* __FreeBSD__ */

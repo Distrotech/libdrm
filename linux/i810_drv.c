@@ -32,14 +32,14 @@
 
 #ifdef __linux__
 #include <linux/config.h>
-#endif
+#endif /* __linux__ */
 
 #ifdef __FreeBSD__
 #include <sys/types.h>
 #include <sys/bus.h>
 #include <pci/pcivar.h>
 #include <opt_drm_linux.h>
-#endif
+#endif /* __FreeBSD__ */
 
 #include "i810.h"
 #include "drmP.h"
@@ -60,7 +60,7 @@
 drm_chipinfo_t DRM(devicelist)[] = {
 	{0, 0, 0, NULL}
 };
-#endif
+#endif /* __FreeBSD__ */
 
 #define DRIVER_IOCTLS							    \
 	[DRM_IOCTL_NR(DRM_IOCTL_I810_INIT)]   = { i810_dma_init,    1, 1 }, \
@@ -108,7 +108,7 @@ static int __init i810_options( char *str )
 
 __setup( DRIVER_NAME "=", i810_options );
 #endif
-#endif
+#endif /* __linux__ */
 
 #include "drm_fops.h"
 #include "drm_init.h"
@@ -120,11 +120,9 @@ __setup( DRIVER_NAME "=", i810_options );
 #ifdef __linux__
 #include "drm_proc.h"
 #include "drm_stub.h"
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 #include "drm_sysctl.h"
-#endif
 
-#ifdef __FreeBSD__
 DRIVER_MODULE(i810, pci, i810_driver, i810_devclass, 0, 0);
-#endif
+#endif /* __FreeBSD__ */

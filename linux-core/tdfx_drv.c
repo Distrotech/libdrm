@@ -32,14 +32,14 @@
 
 #ifdef __linux__
 #include <linux/config.h>
-#endif
+#endif /* __linux__ */
 
 #ifdef __FreeBSD__
 #include <sys/types.h>
 #include <sys/bus.h>
 #include <pci/pcivar.h>
 #include <opt_drm_linux.h>
-#endif
+#endif /* __FreeBSD__ */
 
 #include "tdfx.h"
 #include "drmP.h"
@@ -85,7 +85,7 @@ drm_chipinfo_t DRM(devicelist)[] = {
 	{0x121a, 0x0009, 1, "3dfx Voodoo5"},
 	{0, 0, 0, NULL}
 };
-#endif
+#endif /* __FreeBSD__ */
 
 #ifdef __linux__
 /* For now, we'll only support multihead on Linux */
@@ -100,7 +100,7 @@ static drm_pci_list_t DRM(idlist)[] = {
 };
 
 #define DRIVER_CARD_LIST DRM(idlist)
-#endif
+#endif /* __linux__ */
 
 #include "drm_auth.h"
 #include "drm_bufs.h"
@@ -128,7 +128,7 @@ static int __init tdfx_options( char *str )
 
 __setup( DRIVER_NAME "=", tdfx_options );
 #endif
-#endif
+#endif /* __linux__ */
 
 #include "drm_fops.h"
 #include "drm_init.h"
@@ -137,15 +137,13 @@ __setup( DRIVER_NAME "=", tdfx_options );
 #include "drm_memory.h"
 #ifdef __linux__
 #include "drm_proc.h"
-#endif
+#endif /* __linux__ */
 #include "drm_vm.h"
 #ifdef __linux__
 #include "drm_stub.h"
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 #include "drm_sysctl.h"
-#endif
 
-#ifdef __FreeBSD__
 DRIVER_MODULE(tdfx, pci, tdfx_driver, tdfx_devclass, 0, 0);
-#endif
+#endif /* __FreeBSD__ */

@@ -31,14 +31,14 @@
 
 #ifdef __linux__
 #include <linux/config.h>
-#endif
+#endif /* __linux__ */
 
 #ifdef __FreeBSD__
 #include <sys/types.h>
 #include <sys/bus.h>
 #include <pci/pcivar.h>
 #include <opt_drm_linux.h>
-#endif
+#endif /* __FreeBSD__ */
 
 #include "mga.h"
 #include "drmP.h"
@@ -64,7 +64,7 @@ drm_chipinfo_t DRM(devicelist)[] = {
 	{0x102b, 0x0525, 1, "Matrox G400 (AGP)"},
 	{0, 0, 0, NULL}
 };
-#endif
+#endif /* __FreeBSD__ */
 
 #define DRIVER_IOCTLS							   \
 	[DRM_IOCTL_NR(DRM_IOCTL_DMA)]	      = { mga_dma_buffers, 1, 0 }, \
@@ -112,7 +112,7 @@ static int __init mga_options( char *str )
 
 __setup( DRIVER_NAME "=", mga_options );
 #endif
-#endif
+#endif /* __linux__ */
 
 #include "drm_fops.h"
 #include "drm_init.h"
@@ -123,11 +123,9 @@ __setup( DRIVER_NAME "=", mga_options );
 #ifdef __linux__
 #include "drm_proc.h"
 #include "drm_stub.h"
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 #include "drm_sysctl.h"
-#endif
 
-#ifdef __FreeBSD__
 DRIVER_MODULE(mga, pci, mga_driver, mga_devclass, 0, 0);
-#endif
+#endif /* __FreeBSD__ */

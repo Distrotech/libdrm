@@ -34,20 +34,20 @@
 #ifdef __FreeBSD__
 #include <sys/bus.h>
 #include <pci/pcivar.h>
-#endif
+#endif /* __FreeBSD__ */
 
 int DRM(irq_busid)( DRM_OS_IOCTL )
 {
 	drm_irq_busid_t id;
 #ifdef __linux__
 	struct pci_dev	*dev;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	devclass_t pci;
 	device_t bus, dev;
 	device_t *kids;
 	int error, i, num_kids;
-#endif
+#endif /* __FreeBSD__ */
 
 	DRM_OS_KRNFROMUSR( id, (drm_irq_busid_t *)data, sizeof(id) );
 
@@ -55,7 +55,7 @@ int DRM(irq_busid)( DRM_OS_IOCTL )
 	dev = pci_find_slot(id.busnum, PCI_DEVFN(id.devnum, id.funcnum));
 	if (dev) id.irq = dev->irq;
 	else	 id.irq = 0;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	pci = devclass_find("pci");
 	if (!pci)
@@ -81,7 +81,7 @@ int DRM(irq_busid)( DRM_OS_IOCTL )
 		id.irq = pci_get_irq(dev);
 	else
 		id.irq = 0;
-#endif
+#endif /* __FreeBSD__ */
 	DRM_DEBUG("%d:%d:%d => IRQ %d\n",
 		  id.busnum, id.devnum, id.funcnum, id.irq);
 	
@@ -175,11 +175,11 @@ int DRM(getmap)( DRM_OS_IOCTL )
 #ifdef __linux__
 	drm_map_list_t *r_list = NULL;
 	struct list_head *list;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	drm_map_t    *mapinlist;
 	drm_map_list_entry_t *list;
-#endif
+#endif /* __FreeBSD__ */
 	int          idx;
 	int	     i = 0;
 
@@ -212,7 +212,7 @@ int DRM(getmap)( DRM_OS_IOCTL )
 	map.flags  = r_list->map->flags;
 	map.handle = r_list->map->handle;
 	map.mtrr   = r_list->map->mtrr;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	TAILQ_FOREACH(list, dev->maplist, link) {
 		mapinlist = list->map;
@@ -227,14 +227,14 @@ int DRM(getmap)( DRM_OS_IOCTL )
 		}
 		i++;
 	}
-#endif
+#endif /* __FreeBSD__ */
 
 	DRM_OS_UNLOCK;
 
 #ifdef __FreeBSD__
  	if (!list)
 		return EINVAL;
-#endif
+#endif /* __FreeBSD__ */
 
 	DRM_OS_KRNTOUSR( (drm_map_t *)data, map, sizeof(map) );
 
@@ -266,7 +266,7 @@ int DRM(getclient)( DRM_OS_IOCTL )
 	client.uid   = pt->uid;
 	client.magic = pt->magic;
 	client.iocs  = pt->ioctl_count;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	TAILQ_FOREACH(pt, &dev->files, link) {
 		if (i==idx)
@@ -283,7 +283,7 @@ int DRM(getclient)( DRM_OS_IOCTL )
 		}
 		i++;
 	}
-#endif
+#endif /* __FreeBSD__ */
 	DRM_OS_UNLOCK;
 
 	DRM_OS_KRNTOUSR( (drm_client_t *)data, client, sizeof(client) );

@@ -35,15 +35,15 @@
 #ifndef _DRM_H_
 #define _DRM_H_
 
-#if defined(__linux__)
+#ifdef __linux__
 #include <linux/config.h>
 #include <asm/ioctl.h>		/* For _IO* macros */
 #define DRM_IOCTL_NR(n)	     _IOC_NR(n)
-#endif
-#if defined(__FreeBSD__)
+#endif /* __linux__ */
+#ifdef __FreeBSD__
 #include <sys/ioccom.h>
 #define DRM_IOCTL_NR(n)	     ((n) & 0xff)
-#endif
+#endif /* __FreeBSD__ */
 
 #define XFREE86_VERSION(major,minor,patch,snap) \
 		((major << 16) | (minor << 8) | patch)

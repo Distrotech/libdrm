@@ -31,14 +31,14 @@
 
 #ifdef __linux__
 #include <linux/config.h>
-#endif
+#endif /* __linux__ */
 
 #ifdef __FreeBSD__
 #include <sys/types.h>
 #include <sys/bus.h>
 #include <pci/pcivar.h>
 #include <opt_drm_linux.h>
-#endif
+#endif /* __FreeBSD__ */
 
 #include "r128.h"
 #include "drmP.h"
@@ -104,7 +104,7 @@ drm_chipinfo_t DRM(devicelist)[] = {
 	{0x1002, 0x534e, 1, "ATI Rage 128 (AGP 4x?)"},
 	{0, 0, 0, NULL}
 };
-#endif
+#endif /* __FreeBSD__ */
 
 #define DRIVER_IOCTLS							    \
    [DRM_IOCTL_NR(DRM_IOCTL_DMA)]             = { r128_cce_buffers,  1, 0 }, \
@@ -162,7 +162,7 @@ static int __init r128_options( char *str )
 
 __setup( DRIVER_NAME "=", r128_options );
 #endif
-#endif
+#endif /* __linux__ */
 
 #include "drm_fops.h"
 #include "drm_init.h"
@@ -172,10 +172,10 @@ __setup( DRIVER_NAME "=", r128_options );
 #ifdef __linux__
 #include "drm_proc.h"
 #include "drm_stub.h"
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 #include "drm_sysctl.h"
-#endif
+#endif /* __FreeBSD__ */
 #include "drm_vm.h"
 #if __REALLY_HAVE_SG
 #include "drm_scatter.h"
@@ -183,4 +183,4 @@ __setup( DRIVER_NAME "=", r128_options );
 
 #ifdef __FreeBSD__
 DRIVER_MODULE(r128, pci, r128_driver, r128_devclass, 0, 0);
-#endif
+#endif /* __FreeBSD__ */

@@ -31,13 +31,13 @@
 
 #ifdef __linux__
 #include <linux/config.h>
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 #include <sys/types.h>
 #include <sys/bus.h>
 #include <pci/pcivar.h>
 #include <opt_drm_linux.h>
-#endif
+#endif /* __FreeBSD__ */
 #include "gamma.h"
 #include "drmP.h"
 #include "gamma_drv.h"
@@ -63,7 +63,7 @@ drm_chipinfo_t DRM(devicelist)[] = {
 	{0x3d3d, 0x0008, 1, "3DLabs Gamma"},
 	{0, 0, 0, NULL}
 };
-#endif
+#endif /* __FreeBSD__ */
 
 
 #define __HAVE_COUNTERS		5
@@ -110,15 +110,13 @@ __setup( DRIVER_NAME "=", gamma_options );
 #include "drm_memory.h"
 #ifdef __linux__
 #include "drm_proc.h"
-#endif
+#endif /* __linux__ */
 #include "drm_vm.h"
 #ifdef __linux__
 #include "drm_stub.h"
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 #include "drm_sysctl.h"
-#endif
 
-#ifdef __FreeBSD__
 DRIVER_MODULE(gamma, pci, gamma_driver, gamma_devclass, 0, 0);
-#endif
+#endif /* __FreeBSD__ */

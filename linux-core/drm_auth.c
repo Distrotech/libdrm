@@ -105,7 +105,7 @@ int DRM(remove_magic)(drm_device_t *dev, drm_magic_t magic)
 			DRM_OS_UNLOCK;
 #ifdef __FreeBSD__
 			DRM(free)(pt, sizeof(*pt), DRM_MEM_MAGIC);
-#endif
+#endif /* __FreeBSD__ */
 			return 0;
 		}
 	}
@@ -121,11 +121,11 @@ int DRM(getmagic)(DRM_OS_IOCTL)
 	drm_auth_t	   auth;
 #ifdef __linux__
 	static spinlock_t  lock	    = SPIN_LOCK_UNLOCKED;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	static DRM_OS_SPINTYPE lock;
 	static int	   first = 1;
-#endif
+#endif /* __FreeBSD__ */
 	DRM_OS_DEVICE;
 	DRM_OS_PRIV;
 
@@ -134,7 +134,7 @@ int DRM(getmagic)(DRM_OS_IOCTL)
 		DRM_OS_SPININIT(&lock, "drm getmagic");
 		first = 0;
 	}
-#endif
+#endif /* __FreeBSD__ */
 
 				/* Find unique magic */
 	if (priv->magic) {

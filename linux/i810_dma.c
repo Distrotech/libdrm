@@ -412,10 +412,10 @@ static int i810_dma_initialize(drm_device_t *dev,
 {
 #ifdef __linux__
 	struct list_head *list;
-#endif
-#if defined( __FreeBSD__ )
+#endif /* __linux__ */
+#ifdef __FreeBSD__
 	drm_map_list_entry_t *listentry;
-#endif
+#endif /* __FreeBSD__ */
 
    	memset(dev_priv, 0, sizeof(drm_i810_private_t));
 
@@ -429,8 +429,8 @@ static int i810_dma_initialize(drm_device_t *dev,
  			break;
  		}
  	}
-#endif
-#if defined( __FreeBSD__ )
+#endif /* __linux__ */
+#ifdef __FreeBSD__
 	TAILQ_FOREACH(listentry, dev->maplist, link) {
 		drm_map_t *map = listentry->map;
 		if (map->type == _DRM_SHM &&
@@ -439,7 +439,7 @@ static int i810_dma_initialize(drm_device_t *dev,
 			break;
 		}
 	}
-#endif
+#endif /* __FreeBSD__ */
 	
 	if(!dev_priv->sarea_map) {
 		dev->dev_private = (void *)dev_priv;

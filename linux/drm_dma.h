@@ -33,11 +33,11 @@
 #include <machine/bus.h>
 #include <machine/resource.h>
 #include <sys/rman.h>
-#endif
+#endif /* __FreeBSD__ */
 #ifdef __linux__
 #define __NO_VERSION__
 #include <linux/interrupt.h>	/* For task queue support */
-#endif
+#endif /* __linux__ */
 
 #include "drmP.h"
 
@@ -206,13 +206,13 @@ void DRM(free_buffer)(drm_device_t *dev, drm_buf_t *buf)
 	if ( __HAVE_DMA_WAITQUEUE && waitqueue_active(&buf->dma_wait)) {
 		wake_up_interruptible(&buf->dma_wait);
 	}
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	if ( buf->dma_wait ) {
 		wakeup( &buf->dma_wait );
 		buf->dma_wait = 0;
 	}
-#endif
+#endif /* __FreeBSD__ */
 #if __HAVE_DMA_FREELIST
 	else {
 		drm_device_dma_t *dma = dev->dma;
@@ -328,7 +328,7 @@ int DRM(select_queue)(drm_device_t *dev, void (*wrapper)(unsigned long))
 			dev->timer.expires  = dev->last_switch+DRM_TIME_SLICE;
 			add_timer(&dev->timer);
 		}
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		int s = splclock();
 		if (dev->timer.c_time != dev->last_switch + DRM_TIME_SLICE) {
@@ -338,7 +338,7 @@ int DRM(select_queue)(drm_device_t *dev, void (*wrapper)(unsigned long))
 				      dev);
 		}
 		splx(s);
-#endif
+#endif /* __FreeBSD__ */
 		return -1;
 	}
 
@@ -356,10 +356,10 @@ int DRM(dma_enqueue)(drm_device_t *dev, drm_dma_t *d)
 	drm_device_dma_t  *dma = dev->dma;
 #ifdef __linux__
 	DECLARE_WAITQUEUE(entry, current);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	int		  error;
-#endif
+#endif /* __FreeBSD__ */
 
 	DRM_DEBUG("%d\n", d->send_count);
 
@@ -404,7 +404,7 @@ int DRM(dma_enqueue)(drm_device_t *dev, drm_dma_t *d)
 		atomic_dec(&q->block_count);
 		current->state = TASK_RUNNING;
 		remove_wait_queue(&q->write_queue, &entry);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		atomic_inc(&q->block_count);
 		for (;;) {
@@ -417,7 +417,7 @@ int DRM(dma_enqueue)(drm_device_t *dev, drm_dma_t *d)
 			}
 		}
 		atomic_dec(&q->block_count);
-#endif
+#endif /* __FreeBSD__ */
 	}
 
 	for (i = 0; i < d->send_count; i++) {
@@ -557,7 +557,7 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 {
 #ifdef __FreeBSD__
 	int rid;
-#endif
+#endif /* __FreeBSD__ */
 	int retcode;
 
 	if ( !irq )
@@ -587,10 +587,10 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 	dev->tq.sync = 0;
 	dev->tq.routine = DRM(dma_immediate_bh);
 	dev->tq.data = dev;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	TASK_INIT(&dev->task, 0, DRM(dma_immediate_bh), dev);
-#endif
+#endif /* __FreeBSD__ */
 #endif
 
 				/* Before installing handler */
@@ -601,7 +601,7 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 	retcode = request_irq( dev->irq, DRM(dma_service),
 			   DRM_IRQ_TYPE, dev->devname, dev );
 	if ( retcode < 0 ) {
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	rid = 0;
 	dev->irqr = bus_alloc_resource(dev->device, SYS_RES_IRQ, &rid,
@@ -612,11 +612,11 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 	retcode = bus_setup_intr(dev->device, dev->irqr, INTR_TYPE_TTY,
 				 DRM(dma_service), dev, &dev->irqh);
 	if ( retcode ) {
-#endif
+#endif /* __FreeBSD__ */
 		DRM_OS_LOCK;
 #ifdef __FreeBSD__
 		bus_release_resource(dev->device, SYS_RES_IRQ, 0, dev->irqr);
-#endif
+#endif /* __FreeBSD__ */
 		dev->irq = 0;
 		DRM_OS_UNLOCK;
 		return retcode;
@@ -646,11 +646,11 @@ int DRM(irq_uninstall)( drm_device_t *dev )
 
 #ifdef __linux__
 	free_irq( irq, dev );
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	bus_teardown_intr(dev->device, dev->irqr, dev->irqh);
 	bus_release_resource(dev->device, SYS_RES_IRQ, 0, dev->irqr);
-#endif
+#endif /* __FreeBSD__ */
 	
 	return 0;
 }

@@ -454,10 +454,10 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 	drm_mga_private_t *dev_priv;
 #ifdef __linux__
 	struct list_head *list;
-#endif
-#if defined( __FreeBSD__ )
+#endif /* __linux__ */
+#ifdef __FreeBSD__
 	drm_map_list_entry_t *listentry;
-#endif
+#endif /* __FreeBSD__ */
 	int ret;
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
@@ -503,8 +503,8 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
  			break;
  		}
  	}
-#endif
-#if defined( __FreeBSD__ )
+#endif /* __linux__ */
+#ifdef __FreeBSD__
 	TAILQ_FOREACH(listentry, dev->maplist, link) {
 		drm_map_t *map = listentry->map;
 		if (map->type == _DRM_SHM &&
@@ -513,7 +513,7 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 			break;
 		}
 	}
-#endif
+#endif /* __FreeBSD__ */
 
 	if(!dev_priv->sarea) {
 		DRM_ERROR( "failed to find sarea!\n" );
@@ -734,10 +734,10 @@ int mga_dma_flush( DRM_OS_IOCTL )
 		int ret = mga_do_wait_for_idle( dev_priv );
 #ifdef __linux
 		if ( ret < 0 )
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		if ( ret )
-#endif
+#endif /* __FreeBSD__ */
 			DRM_INFO( __FUNCTION__": -EBUSY\n" );
 		return ret;
 #else

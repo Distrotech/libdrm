@@ -179,10 +179,10 @@ int DRM(setsareactx)( DRM_OS_IOCTL )
 #ifdef __linux__
 	drm_map_list_t *r_list;
 	struct list_head *list;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	drm_map_list_entry_t *list;
-#endif
+#endif /* __FreeBSD__ */
 
 	DRM_OS_KRNFROMUSR( request, (drm_ctx_priv_map_t *)data,
 			   sizeof(request) );
@@ -195,14 +195,14 @@ int DRM(setsareactx)( DRM_OS_IOCTL )
 		   r_list->map->handle == request.handle) 
 			goto found;
 	}
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	TAILQ_FOREACH(list, dev->maplist, link) {
 		map=list->map;
 		if(map->handle == request.handle) 
 			goto found;
 	}
-#endif
+#endif /* __FreeBSD__ */
 
 bad:
 	DRM_OS_UNLOCK;
@@ -211,10 +211,10 @@ bad:
 found:
 #ifdef __linux__
 	map = r_list->map;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	map = list->map;
-#endif
+#endif /* __FreeBSD__ */
 	if (!map) goto bad;
 	if (dev->max_context < 0)
 		goto bad;
@@ -506,12 +506,12 @@ static int DRM(init_queue)(drm_device_t *dev, drm_queue_t *q, drm_ctx_t *ctx)
 	init_waitqueue_head(&q->write_queue);
 	init_waitqueue_head(&q->read_queue);
 	init_waitqueue_head(&q->flush_queue);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	q->write_queue = 0;
 	q->read_queue = 0;
 	q->flush_queue = 0;
-#endif
+#endif /* __FreeBSD__ */
 
 	q->flags = ctx->flags;
 
@@ -741,14 +741,14 @@ int DRM(rmctx)( DRM_OS_IOCTL )
 			clear_bit(0, &dev->interrupt_flag);
 			DRM_OS_RETURN(EINTR);
 		}
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		static int never;
 		int retcode;
 		retcode = tsleep(&never, PZERO|PCATCH, "never", 1);
 		if (retcode)
 			return retcode;
-#endif
+#endif /* __FreeBSD__ */
 	}
 				/* Remove queued buffers */
 	while ((buf = DRM(waitlist_get)(&q->waitlist))) {
@@ -760,11 +760,11 @@ int DRM(rmctx)( DRM_OS_IOCTL )
 #ifdef __linux__
 	wake_up_interruptible(&q->read_queue);
 	wake_up_interruptible(&q->write_queue);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	wakeup( &q->block_read );
 	wakeup( &q->block_write );
-#endif
+#endif /* __FreeBSD__ */
 	DRM_OS_WAKEUP_INT( &q->flush_queue );
 				/* Finalization over.  Queue is made
 				   available when both use_count and

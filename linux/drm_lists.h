@@ -73,10 +73,10 @@ int DRM(waitlist_put)(drm_waitlist_t *bl, drm_buf_t *buf)
 	int	      left;
 #ifdef __linux__
 	unsigned long flags;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	int		s;
-#endif
+#endif /* __FreeBSD__ */
 	left = DRM_LEFTCOUNT(bl);
 	if (!left) {
 		DRM_ERROR("Overflow while adding buffer %d from pid %d\n",
@@ -86,29 +86,29 @@ int DRM(waitlist_put)(drm_waitlist_t *bl, drm_buf_t *buf)
 #if __HAVE_DMA_HISTOGRAM
 #ifdef __linux__
 	buf->time_queued = get_cycles();
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	getnanotime(&buf->time_queued);
-#endif
+#endif /* __FreeBSD__ */
 #endif
 	buf->list	 = DRM_LIST_WAIT;
 
 #ifdef __linux__
 	spin_lock_irqsave(&bl->write_lock, flags);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	simple_lock(&bl->write_lock);
 	s = spldrm();
-#endif
+#endif /* __FreeBSD__ */
 	*bl->wp = buf;
 	if (++bl->wp >= bl->end) bl->wp = bl->bufs;
 #ifdef __linux__
 	spin_unlock_irqrestore(&bl->write_lock, flags);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	splx(s);
 	simple_unlock(&bl->write_lock);
-#endif
+#endif /* __FreeBSD__ */
 
 	return 0;
 }
@@ -118,10 +118,10 @@ drm_buf_t *DRM(waitlist_get)(drm_waitlist_t *bl)
 	drm_buf_t     *buf;
 #ifdef __linux__
 	unsigned long flags;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	int		s;
-#endif
+#endif /* __FreeBSD__ */
 
 #ifdef __linux__
 	spin_lock_irqsave(&bl->read_lock, flags);
@@ -132,7 +132,7 @@ drm_buf_t *DRM(waitlist_get)(drm_waitlist_t *bl)
 	}
 	if (++bl->rp >= bl->end) bl->rp = bl->bufs;
 	spin_unlock_irqrestore(&bl->read_lock, flags);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	simple_lock(&bl->read_lock);
 	s = spldrm();
@@ -145,7 +145,7 @@ drm_buf_t *DRM(waitlist_get)(drm_waitlist_t *bl)
 	if (++bl->rp >= bl->end) bl->rp = bl->bufs;
 	splx(s);
 	simple_unlock(&bl->read_lock);
-#endif
+#endif /* __FreeBSD__ */
 	
 	return buf;
 }
@@ -161,10 +161,10 @@ int DRM(freelist_create)(drm_freelist_t *bl, int count)
 	bl->next      = NULL;
 #ifdef __linux__
 	init_waitqueue_head(&bl->waiting);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	bl->waiting = 0;
-#endif
+#endif /* __FreeBSD__ */
 
 	bl->low_mark  = 0;
 	bl->high_mark = 0;
@@ -198,10 +198,10 @@ int DRM(freelist_put)(drm_device_t *dev, drm_freelist_t *bl, drm_buf_t *buf)
 #if __HAVE_DMA_HISTOGRAM
 #ifdef __linux__
 	buf->time_freed = get_cycles();
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	getnanotime(&buf->time_queued);
-#endif
+#endif /* __FreeBSD__ */
 	DRM(histogram_compute)(dev, buf);
 #endif
 	buf->list	= DRM_LIST_FREE;
@@ -257,10 +257,10 @@ drm_buf_t *DRM(freelist_get)(drm_freelist_t *bl, int block)
 	drm_buf_t	  *buf	= NULL;
 #ifdef __linux__
 	DECLARE_WAITQUEUE(entry, current);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	int	error;
-#endif
+#endif /* __FreeBSD__ */
 
 	if (!bl || !bl->initialized) return NULL;
 
@@ -280,7 +280,7 @@ drm_buf_t *DRM(freelist_get)(drm_freelist_t *bl, int block)
 			}
 			current->state = TASK_RUNNING;
 			remove_wait_queue(&bl->waiting, &entry);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 			for (;;) {
 				if (!atomic_read(&bl->wfh)
@@ -290,7 +290,7 @@ drm_buf_t *DRM(freelist_get)(drm_freelist_t *bl, int block)
 				if (error)
 					break;
 			}
-#endif
+#endif /* __FreeBSD__ */
 		}
 		return buf;
 	}

@@ -36,11 +36,11 @@
 #define __NO_VERSION__
 #include <linux/interrupt.h>	/* For task queue support */
 #include <linux/delay.h>
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 #include <vm/vm.h>
 #include <vm/pmap.h>
-#endif
+#endif /* __FreeBSD__ */
 
 #define RADEON_FIFO_DEBUG	0
 
@@ -398,10 +398,10 @@ static int radeon_do_wait_for_idle( drm_radeon_private_t *dev_priv )
 	ret = radeon_do_wait_for_fifo( dev_priv, 64 );
 #ifdef __linux__
 	if ( ret < 0 ) return ret;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	if ( ret ) return ret;
-#endif
+#endif /* __FreeBSD__ */
 	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
 		if ( !(RADEON_READ( RADEON_RBBM_STATUS )
 		       & RADEON_RBBM_ACTIVE) ) {
@@ -674,10 +674,10 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	drm_radeon_private_t *dev_priv;
 #ifdef __linux__
 	struct list_head *list;
-#endif
-#if defined( __FreeBSD__ )
+#endif /* __linux__ */
+#ifdef __FreeBSD__
 	drm_map_list_entry_t *listentry;
-#endif
+#endif /* __FreeBSD__ */
 	u32 tmp;
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
@@ -807,8 +807,8 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
  			break;
  		}
  	}
-#endif
-#if defined( __FreeBSD__ )
+#endif /* __linux__ */
+#ifdef __FreeBSD__
 	TAILQ_FOREACH(listentry, dev->maplist, link) {
 		drm_map_t *map = listentry->map;
 		if (map->type == _DRM_SHM &&
@@ -817,7 +817,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 			break;
 		}
 	}
-#endif
+#endif /* __FreeBSD__ */
 
 	if(!dev_priv->sarea) {
 		DRM_ERROR("could not find sarea!\n");
@@ -1120,10 +1120,10 @@ int radeon_cp_stop( DRM_OS_IOCTL )
 		ret = radeon_do_cp_idle( dev_priv );
 #ifdef __linux__
 		if ( ret < 0 ) return ret;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		if ( ret ) return ret;
-#endif
+#endif /* __FreeBSD__ */
 	}
 
 	/* Finally, we can turn off the CP.  If the engine isn't idle,

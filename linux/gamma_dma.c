@@ -142,7 +142,7 @@ void gamma_dma_service( DRM_OS_IRQ_ARGS)
 		/* Dispatch new buffer */
 		queue_task(&dev->tq, &tq_immediate);
 		mark_bh(IMMEDIATE_BH);
-#endif
+#endif /* __linux__ */
 	}
 }
 
@@ -363,22 +363,22 @@ static int gamma_dma_priority(drm_device_t *dev, drm_dma_t *d)
 	drm_device_dma_t  *dma	    = dev->dma;
 #ifdef __linux__
 	DECLARE_WAITQUEUE(entry, current);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 	static int never;
-#endif
+#endif /* __FreeBSD__ */
 
 				/* Turn off interrupt handling */
 	while (test_and_set_bit(0, &dev->interrupt_flag)) {
 #ifdef __linux__
 		schedule();
 		if (signal_pending(current)) return -EINTR;
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		retcode = tsleep(&never, PZERO|PCATCH, "gamp1", 1);
 		if (retcode)
 			return retcode;
-#endif
+#endif /* __FreeBSD__ */
 	}
 	if (!(d->flags & _DRM_DMA_WHILE_LOCKED)) {
 		while (!gamma_lock_take(&dev->lock.hw_lock->lock,
@@ -389,12 +389,12 @@ static int gamma_dma_priority(drm_device_t *dev, drm_dma_t *d)
 				clear_bit(0, &dev->interrupt_flag);
 				return -EINTR;
 			}
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 			retcode = tsleep(&never, PZERO|PCATCH, "gamp2", 1);
 			if (retcode)
 				return retcode;
-#endif
+#endif /* __FreeBSD__ */
 		}
 		++must_free;
 	}
@@ -472,13 +472,13 @@ static int gamma_dma_priority(drm_device_t *dev, drm_dma_t *d)
 				retcode = EINTR;
 				goto cleanup;
 			}
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 			retcode = tsleep(&dev->context_wait,  PZERO|PCATCH,
 				       "gamctx", 0);
 			if (retcode)
 				goto cleanup;
-#endif
+#endif /* __FreeBSD__ */
 			if (dev->last_context != buf->context) {
 				DRM_ERROR("Context mismatch: %d %d\n",
 					  dev->last_context,
@@ -530,20 +530,20 @@ static int gamma_dma_send_buffers(drm_device_t *dev, drm_dma_t *d)
 		last_buf = dma->buflist[d->send_indices[d->send_count-1]];
 #ifdef __linux__
 		add_wait_queue(&last_buf->dma_wait, &entry);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		atomic_inc(&last_buf->dma_wait);
-#endif
+#endif /* __FreeBSD__ */
 	}
 
 	if ((retcode = gamma_dma_enqueue(dev, d))) {
 		if (d->flags & _DRM_DMA_BLOCK)
 #ifdef __linux__
 			remove_wait_queue(&last_buf->dma_wait, &entry);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 			atomic_dec(&last_buf->dma_wait);
-#endif
+#endif /* __FreeBSD__ */
 		return retcode;
 	}
 
@@ -564,7 +564,7 @@ static int gamma_dma_send_buffers(drm_device_t *dev, drm_dma_t *d)
 		}
 		current->state = TASK_RUNNING;
 		remove_wait_queue(&last_buf->dma_wait, &entry);
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 		for (;;) {
 			retcode = tsleep(&last_buf->dma_wait, PZERO|PCATCH,
@@ -576,16 +576,16 @@ static int gamma_dma_send_buffers(drm_device_t *dev, drm_dma_t *d)
 				break;
 		}
 		atomic_dec(&last_buf->dma_wait);
-#endif
+#endif /* __FreeBSD__ */
 		DRM_DEBUG("%d running\n", DRM_OS_CURRENTPID);
 		if (!retcode
 		    || (last_buf->list==DRM_LIST_PEND && !last_buf->pending)) {
 #ifdef __linux__
 			if (!waitqueue_active(&last_buf->dma_wait)) {
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 			if (!last_buf->dma_wait) {
-#endif
+#endif /* __FreeBSD__ */
 				gamma_free_buffer(dev, last_buf);
 			}
 		}

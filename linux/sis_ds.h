@@ -37,11 +37,11 @@
 #ifdef __linux__
 #define SD_MALLOC(s) kmalloc(s, GFP_KERNEL)
 #define SD_FREE(s) kfree(s)
-#endif
+#endif /* __linux__ */
 #ifdef __FreeBSD__
 #define SD_MALLOC(s) malloc( s, DRM(M_DRM), M_NOWAIT )
 #define SD_FREE(s) free( s, DRM(M_DRM) )
-#endif
+#endif /* __FreeBSD__ */
 
 typedef unsigned int ITEM_TYPE;
 
