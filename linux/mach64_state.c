@@ -309,7 +309,7 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 	if ( 0 )
 		mach64_print_dirty( "dispatch_vertex", sarea_priv->dirty );
 
-	DRM_INFO( "idx = %u, offset=0x%08x, address=0x%08x, used=%u\n", buf->idx, buf->bus_address, buf->address, buf->used );
+	/* DRM_INFO( "idx = %u, offset=0x%08x, address=0x%08x, used=%u\n", buf->idx, buf->bus_address, buf->address, buf->used ); */
 	
 	if ( buf->used ) {
 #if 0
@@ -330,13 +330,13 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 #endif
 
 			/* Emit the vertex buffer rendering commands */
-			if (0) {
-				unsigned * p = buf->address;
-				unsigned used = buf->used >> 2;
+			{
+				u32 *p = (u32 *)((char *)dev_priv->buffers->handle + buf->offset);
+				u32 used = buf->used >> 2;
 
 				while(used)
 				{
-					unsigned reg, count;
+					u32 reg, count;
 
 					reg = *p & 0xffff;
 					count = (*p >> 16) + 1;
@@ -346,11 +346,11 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 
 					while(count && used)
 					{
-						unsigned data;
+						u32 data;
 
 						data = *p;
 
-						/* MACH64_WRITE( reg, data ); */
+						MACH64_WRITE( reg, data );
 
 						p++;
 						used--;

@@ -56,44 +56,6 @@ typedef struct drm_mach64_buf_priv {
 	int age;
 } drm_mach64_buf_priv_t;
 
-
-				/* mach64_drv.c */
-extern int  mach64_version( struct inode *inode, struct file *filp,
-			    unsigned int cmd, unsigned long arg );
-extern int  mach64_open( struct inode *inode, struct file *filp );
-extern int  mach64_release( struct inode *inode, struct file *filp );
-extern int  mach64_ioctl( struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg );
-extern int  mach64_lock( struct inode *inode, struct file *filp,
-			 unsigned int cmd, unsigned long arg );
-extern int  mach64_unlock( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-
-				/* mach64_bufs.c */
-extern int mach64_addbufs( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int mach64_mapbufs( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-
-				/* mach64_context.c */
-extern int  mach64_resctx( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int  mach64_addctx( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int  mach64_modctx( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int  mach64_getctx( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int  mach64_switchctx( struct inode *inode, struct file *filp,
-			      unsigned int cmd, unsigned long arg );
-extern int  mach64_newctx( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int  mach64_rmctx( struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg );
-
-extern int  mach64_context_switch( drm_device_t *dev, int old, int new );
-extern int  mach64_context_switch_complete( drm_device_t *dev, int new );
-
 				/* mach64_dma.c */
 extern int mach64_dma_init( struct inode *inode, struct file *filp,
 			    unsigned int cmd, unsigned long arg );
