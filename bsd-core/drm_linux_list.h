@@ -47,10 +47,10 @@ list_empty(struct list_head *head) {
 
 static __inline__ void
 list_add_tail(struct list_head *entry, struct list_head *head) {
-	(head)->prev = entry;
-	(entry)->next = head;
 	(entry)->prev = (head)->prev;
+	(entry)->next = head;
 	(head)->prev->next = entry;
+	(head)->prev = entry;
 }
 
 static __inline__ void
