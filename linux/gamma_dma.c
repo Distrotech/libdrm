@@ -38,28 +38,33 @@
 #include <linux/delay.h>
 
 #define OLDDMA 	1
-#define QUEUED_DMA 1
+#define QUEUED_DMA 0
 
 static inline void gamma_dma_dispatch(drm_device_t *dev, unsigned long address,
 				      unsigned long length)
 {
 #if !QUEUED_DMA
-	GAMMA_WRITE(GAMMA_DMAADDRESS, virt_to_phys((void *)address));
+	if (!dev->agp) {
+		GAMMA_WRITE(GAMMA_DMAADDRESS, virt_to_phys((void *)address));
+	} else {
+		mb();
+		GAMMA_WRITE(GAMMA_DMAADDRESS, address);
+	}
 	while (GAMMA_READ(GAMMA_GCOMMANDSTATUS) != 4);
 	GAMMA_WRITE(GAMMA_DMACOUNT, length / 4);
 #else
-	mb();
 	while ( GAMMA_READ(GAMMA_INFIFOSPACE) < 6);
 	GAMMA_WRITE(GAMMA_OUTPUTFIFO, GAMMA_DMAADDRTAG);
 	if (!dev->agp) {
 		GAMMA_WRITE(GAMMA_OUTPUTFIFO+4, virt_to_phys((void*)address));
 	} else {
+		mb();
 		GAMMA_WRITE(GAMMA_OUTPUTFIFO+4, address);
 	}
 	GAMMA_WRITE(GAMMA_OUTPUTFIFO+8, GAMMA_DMACOUNTTAG);
 	GAMMA_WRITE(GAMMA_OUTPUTFIFO+12, length / 4);
 	GAMMA_WRITE(GAMMA_OUTPUTFIFO+16, GAMMA_COMMANDINTTAG);
-	GAMMA_WRITE(GAMMA_OUTPUTFIFO+20, 1); /* PAUSE DMA UNTIL COMPLETE */
+	GAMMA_WRITE(GAMMA_OUTPUTFIFO+20, 0); /* PAUSE DMA UNTIL COMPLETE */
 #endif
 }
 
@@ -111,7 +116,7 @@ static inline int gamma_dma_is_ready(drm_device_t *dev)
 #if !QUEUED_DMA
 	return(!GAMMA_READ(GAMMA_DMACOUNT));
 #else
-	return(GAMMA_READ(GAMMA_GCOMMANDSTATUS) & 0x04);
+	return (GAMMA_READ(GAMMA_GCOMMANDINTFLAGS) & 0x01); 
 #endif
 }
 
@@ -123,12 +128,17 @@ void gamma_dma_service(int irq, void *device, struct pt_regs *regs)
 	atomic_inc(&dev->counts[6]); /* _DRM_STAT_IRQ */
 
 #if !QUEUED_DMA
+#if 0
+	if (GAMMA_READ(GAMMA_GCOMMANDINTFLAGS) == 0x10) {
+	printk("CommandErrorFlags 0x%x\n",GAMMA_READ(0xc58));
+	printk("GErrorFlags 0x%x\n",GAMMA_READ(0x838));
+	}
+#endif
+
+	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 3);
 	GAMMA_WRITE(GAMMA_GDELAYTIMER, 0xc350/2); /* 0x05S */
 	GAMMA_WRITE(GAMMA_GCOMMANDINTFLAGS, 8);
 	GAMMA_WRITE(GAMMA_GINTFLAGS, 0x2001);
-#else
-	GAMMA_WRITE(GAMMA_GCOMMANDINTFLAGS, 4);
-	GAMMA_WRITE(GAMMA_GINTFLAGS, 0x2000);
 #endif
 	if (gamma_dma_is_ready(dev)) {
 				/* Free previous buffer */
@@ -143,6 +153,11 @@ void gamma_dma_service(int irq, void *device, struct pt_regs *regs)
 		queue_task(&dev->tq, &tq_immediate);
 		mark_bh(IMMEDIATE_BH);
 	}
+#if QUEUED_DMA
+	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 2);
+	GAMMA_WRITE(GAMMA_GCOMMANDINTFLAGS, 5);
+	GAMMA_WRITE(GAMMA_GINTFLAGS, 0x2000);
+#endif
 }
 
 /* Only called by gamma_dma_schedule. */
@@ -152,6 +167,7 @@ static int gamma_do_dma(drm_device_t *dev, int locked)
 	unsigned long	 length;
 	drm_buf_t	 *buf;
 	int		 retcode = 0;
+	drm_gamma_private_t *dev_priv = dev->dev_private;
 	drm_device_dma_t *dma = dev->dma;
 #if DRM_DMA_HISTOGRAM
 	cycles_t	 dma_start, dma_stop;
@@ -752,4 +768,66 @@ int gamma_dma_init( struct inode *inode, struct file *filp,
 	}
 
 	return -EINVAL;
+}
+
+static int gamma_do_copy_dma( drm_device_t *dev, drm_gamma_copy_t *copy )
+{
+	drm_device_dma_t    *dma = dev->dma;
+	drm_buf_t	    *buf;
+	unsigned int        *screenbuf;
+	drm_gamma_private_t *dev_priv;
+
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
+
+	/* We've DRM_RESTRICTED this DMA buffer */
+
+	screenbuf = dma->buflist[ GLINT_DRI_BUF_COUNT + 1 ]->address;
+
+#if 0
+	*buffer++ = 0x180;	/* Tag (FilterMode) */
+	*buffer++ = 0x200;	/* Allow FBColor through */
+	*buffer++ = 0x53B;	/* Tag */
+	*buffer++ = copy->Pitch;
+	*buffer++ = 0x53A;	/* Tag */
+	*buffer++ = copy->SrcAddress;
+	*buffer++ = 0x539;	/* Tag */
+	*buffer++ = copy->WidthHeight; /* Initiates transfer */
+	*buffer++ = 0x53C;	/* Tag - DMAOutputAddress */
+	*buffer++ = virt_to_phys((void*)screenbuf);
+	*buffer++ = 0x53D;	/* Tag - DMAOutputCount */
+	*buffer++ = copy->Count; /* Reads HostOutFifo BLOCKS until ..*/
+
+	/* Data now sitting in dma->buflist[ GLINT_DRI_BUF_COUNT + 1 ] */
+	/* Now put it back to the screen */
+
+	*buffer++ = 0x180;	/* Tag (FilterMode) */
+	*buffer++ = 0x400;	/* Allow Sync through */
+	*buffer++ = 0x538;	/* Tag - DMARectangleReadTarget */
+	*buffer++ = 0x155;	/* FBSourceData | count */
+	*buffer++ = 0x537;	/* Tag */
+	*buffer++ = copy->Pitch;
+	*buffer++ = 0x536;	/* Tag */
+	*buffer++ = copy->DstAddress;
+	*buffer++ = 0x535;	/* Tag */
+	*buffer++ = copy->WidthHeight; /* Initiates transfer */
+	*buffer++ = 0x530;	/* Tag - DMAAddr */
+	*buffer++ = virt_to_phys((void*)screenbuf);
+	*buffer++ = 0x531;
+	*buffer++ = copy->Count; /* initiates DMA transfer of color data */
+#endif
+
+	/* need to dispatch it now */
+}
+
+int gamma_dma_copy( struct inode *inode, struct file *filp,
+		  unsigned int cmd, unsigned long arg )
+{
+	drm_file_t *priv = filp->private_data;
+	drm_device_t *dev = priv->dev;
+	drm_gamma_copy_t copy;
+
+	if ( copy_from_user( &copy, (drm_gamma_copy_t *)arg, sizeof(copy) ) )
+		return -EFAULT;
+
+	return gamma_do_copy_dma( dev, &copy );
 }

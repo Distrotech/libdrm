@@ -446,6 +446,7 @@ typedef struct drm_agp_info {
 
 /* GAMMA specific ioctls */
 #define DRM_IOCTL_GAMMA_INIT		DRM_IOW( 0x40, drm_gamma_init_t)
+#define DRM_IOCTL_GAMMA_COPY		DRM_IOW( 0x41, drm_gamma_copy_t)
 
 #ifdef CONFIG_DRM_SIS
 /* SiS specific ioctls */

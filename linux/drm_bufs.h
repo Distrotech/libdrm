@@ -386,6 +386,7 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 		atomic_dec( &dev->buf_alloc );
 		return -ENOMEM;
 	}
+
 	memset( entry->buflist, 0, count * sizeof(*entry->buflist) );
 
 	entry->seglist = DRM(alloc)( count * sizeof(*entry->seglist),
@@ -522,6 +523,7 @@ int DRM(infobufs)( struct inode *inode, struct file *filp,
 		spin_unlock( &dev->count_lock );
 		return -EBUSY;
 	}
+DRM_DEBUG("CALLED INFOBUFS\n");
 	++dev->buf_use;		/* Can't allocate more after this call */
 	spin_unlock( &dev->count_lock );
 
@@ -671,6 +673,7 @@ int DRM(mapbufs)( struct inode *inode, struct file *filp,
 		spin_unlock( &dev->count_lock );
 		return -EBUSY;
 	}
+DRM_DEBUG("CALLED MAPBUFS\n");
 	dev->buf_use++;		/* Can't allocate more after this call */
 	spin_unlock( &dev->count_lock );
 

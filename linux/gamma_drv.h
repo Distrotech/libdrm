@@ -51,6 +51,8 @@ do {									\
 				/* gamma_dma.c */
 extern int gamma_dma_init( struct inode *inode, struct file *filp,
 			 unsigned int cmd, unsigned long arg );
+extern int gamma_dma_copy( struct inode *inode, struct file *filp,
+			 unsigned int cmd, unsigned long arg );
 
 extern void gamma_dma_ready(drm_device_t *dev);
 extern void gamma_dma_quiescent_single(drm_device_t *dev);
@@ -63,6 +65,7 @@ extern int  gamma_dma(struct inode *inode, struct file *filp,
 extern int  gamma_find_devices(void);
 extern int  gamma_found(void);
 
+#define GLINT_DRI_BUF_COUNT 20
 
 /* WARNING!!! MAGIC NUMBER!!!  The number of regions already added to the
    kernel must be specified here.  Currently, the number is 2.	This must
