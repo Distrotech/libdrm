@@ -64,7 +64,7 @@ CFLAGS=		-O2 $(WARNINGS)
 WARNINGS=	-Wall -Wwrite-strings -Wpointer-arith -Wcast-align \
 		-Wstrict-prototypes -Wshadow -Wnested-externs \
 		-Winline -Wpointer-arith
-MODCFLAGS=      $(CFLAGS) -DDRM_AGP -D__KERNEL__ -DMODULE -fomit-frame-pointer
+MODCFLAGS=      $(CFLAGS) -D__KERNEL__ -DMODULE -fomit-frame-pointer
 PRGCFLAGS=      $(CFLAGS) -g -ansi -pedantic -DPOSIX_C_SOURCE=199309L \
 		-D_POSIX_SOURCE -D_XOPEN_SOURCE -D_BSD_SOURCE -D_SVID_SOURCE \
 		-I../../../../../../include -I../../../../../../../../include \
@@ -114,7 +114,10 @@ SMP := $(shell gcc -E -nostdinc -I$(TREE) picker.c 2>/dev/null \
 	| grep -s 'SMP = ' | cut -d' ' -f3)
 MODVERSIONS := $(shell gcc -E -I $(TREE) picker.c 2>/dev/null \
 	| grep -s 'MODVERSIONS = ' | cut -d' ' -f3)
-all::;@echo KERNEL HEADERS IN $(TREE): SMP=${SMP} MODVERSIONS=${MODVERSIONS}
+AGP := $(shell gcc -E -nostdinc -I$(TREE) picker.c 2>/dev/null \
+	| grep -s 'AGP = ' | cut -d' ' -f3)
+all::;@echo KERNEL HEADERS IN $(TREE): SMP=${SMP} MODVERSIONS=${MODVERSIONS} \
+	AGP=${AGP}
 all:: $(LIBS) $(MODS) $(PROGS)
 endif
 
@@ -126,6 +129,9 @@ MODCFLAGS += -D__SMP__
 endif
 ifeq ($(MODVERSIONS),1)
 MODCFLAGS += -DMODVERSIONS -include $(TREE)/linux/modversions.h
+endif
+ifeq ($(AGP),1)
+MODCFLAGS += -DDRM_AGP
 endif
 
 # **** End of configuration
