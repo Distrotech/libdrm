@@ -77,79 +77,43 @@ static inline void mach64_emit_state( drm_mach64_private_t *dev_priv )
 		sarea_priv->dirty &= ~MACH64_UPLOAD_MISC;
 	}
 
-	if ( dirty & MACH64_UPLOAD_DST_OFF_PITCH ) {
-		DMAGETPTR( dev_priv, 1 );
-		
-		DMAOUTREG( MACH64_DST_OFF_PITCH, regs->dst_off_pitch );
+	DMAGETPTR( dev_priv, 9 );
 
-		DMAADVANCE( dev_priv );
-		
+	if ( dirty & MACH64_UPLOAD_DST_OFF_PITCH ) {
+		DMAOUTREG( MACH64_DST_OFF_PITCH, regs->dst_off_pitch );
 		sarea_priv->dirty &= ~MACH64_UPLOAD_DST_OFF_PITCH;
 	}
 	if ( dirty & MACH64_UPLOAD_Z_OFF_PITCH ) {
-		DMAGETPTR( dev_priv, 1 );
-		
 		DMAOUTREG( MACH64_Z_OFF_PITCH, regs->z_off_pitch );
-
-		DMAADVANCE( dev_priv );
-		
 		sarea_priv->dirty &= ~MACH64_UPLOAD_Z_OFF_PITCH;
 	}
 	if ( dirty & MACH64_UPLOAD_Z_ALPHA_CNTL ) {
-		DMAGETPTR( dev_priv, 2 );
-		
 		DMAOUTREG( MACH64_Z_CNTL, regs->z_cntl );
 		DMAOUTREG( MACH64_ALPHA_TST_CNTL, regs->alpha_tst_cntl );
-
-		DMAADVANCE( dev_priv );
-		
 		sarea_priv->dirty &= ~MACH64_UPLOAD_Z_ALPHA_CNTL;
 	}
 	if ( dirty & MACH64_UPLOAD_SCALE_3D_CNTL ) {
-		DMAGETPTR( dev_priv, 1 );
-		
 		DMAOUTREG( MACH64_SCALE_3D_CNTL, regs->scale_3d_cntl );
-
-		DMAADVANCE( dev_priv );
-		
 		sarea_priv->dirty &= ~MACH64_UPLOAD_SCALE_3D_CNTL;
 	}
 	if ( dirty & MACH64_UPLOAD_DP_FOG_CLR ) {
-		DMAGETPTR( dev_priv, 1 );
-		
 		DMAOUTREG( MACH64_DP_FOG_CLR, regs->dp_fog_clr );
-
-		DMAADVANCE( dev_priv );
-		
 		sarea_priv->dirty &= ~MACH64_UPLOAD_DP_FOG_CLR;
 	}
 	if ( dirty & MACH64_UPLOAD_DP_WRITE_MASK ) {
-		DMAGETPTR( dev_priv, 1 );
-		
 		DMAOUTREG( MACH64_DP_WRITE_MASK, regs->dp_write_mask );
-
-		DMAADVANCE( dev_priv );
-		
 		sarea_priv->dirty &= ~MACH64_UPLOAD_DP_WRITE_MASK;
 	}
 	if ( dirty & MACH64_UPLOAD_DP_PIX_WIDTH ) {
-		DMAGETPTR( dev_priv, 1 );
-		
 		DMAOUTREG( MACH64_DP_PIX_WIDTH, regs->dp_pix_width );
-
-		DMAADVANCE( dev_priv );
-		
 		sarea_priv->dirty &= ~MACH64_UPLOAD_DP_PIX_WIDTH;
 	}
 	if ( dirty & MACH64_UPLOAD_SETUP_CNTL ) {
-		DMAGETPTR( dev_priv, 1 );
-		
 		DMAOUTREG( MACH64_SETUP_CNTL, regs->setup_cntl );
-
-		DMAADVANCE( dev_priv );
-		
 		sarea_priv->dirty &= ~MACH64_UPLOAD_SETUP_CNTL;
 	}
+
+	DMAADVANCE( dev_priv );
 
 	if ( dirty & MACH64_UPLOAD_TEXTURE ) {
 		mach64_emit_texture( dev_priv );
@@ -477,6 +441,7 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 					u32 reg, count;
 
 					reg = *p & 0xffff;
+					reg = MMSELECT( reg );
 					count = (*p >> 16) + 1;
 
 					p++;
@@ -488,8 +453,8 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 
 						data = *p;
 
-						MACH64_WRITE( reg++, data );
-
+						MACH64_WRITE( reg, data );
+						reg += 4;
 						p++;
 						used--;
 						count--;
