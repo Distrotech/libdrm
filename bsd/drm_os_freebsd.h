@@ -139,6 +139,7 @@ find_first_zero_bit(volatile unsigned long *p, int max)
 
 /* Redefinitions to make templating easy */
 #define wait_queue_head_t	int
+#define agp_memory		void
 
 				/* Macros to make printf easier */
 #define DRM_ERROR(fmt, arg...) \

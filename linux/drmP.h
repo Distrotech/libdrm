@@ -632,18 +632,10 @@ extern void	     *DRM(ioremap)(unsigned long offset, unsigned long size);
 extern void	     DRM(ioremapfree)(void *pt, unsigned long size);
 
 #if __REALLY_HAVE_AGP
-#ifdef __linux__
 extern agp_memory    *DRM(alloc_agp)(int pages, u32 type);
 extern int           DRM(free_agp)(agp_memory *handle, int pages);
 extern int           DRM(bind_agp)(agp_memory *handle, unsigned int start);
 extern int           DRM(unbind_agp)(agp_memory *handle);
-#endif
-#ifdef __FreeBSD__
-extern void          *DRM(alloc_agp)(int pages, u32 type);
-extern int           DRM(free_agp)(void *handle, int pages);
-extern int           DRM(bind_agp)(void *handle, unsigned int start);
-extern int           DRM(unbind_agp)(void *handle);
-#endif
 #endif
 
 extern int	     DRM(context_switch)(drm_device_t *dev, int old, int new);
@@ -724,18 +716,10 @@ extern drm_buf_t     *DRM(freelist_get)(drm_freelist_t *bl, int block);
 extern drm_agp_head_t *DRM(agp_init)(void);
 extern void           DRM(agp_uninit)(void);
 extern void           DRM(agp_do_release)(void);
-#ifdef __linux__
 extern agp_memory     *DRM(agp_allocate_memory)(size_t pages, u32 type);
 extern int            DRM(agp_free_memory)(agp_memory *handle);
 extern int            DRM(agp_bind_memory)(agp_memory *handle, off_t start);
 extern int            DRM(agp_unbind_memory)(agp_memory *handle);
-#endif
-#ifdef __FreeBSD__
-extern void           *DRM(agp_allocate_memory)(size_t pages, u32 type);
-extern int            DRM(agp_free_memory)(void *handle);
-extern int            DRM(agp_bind_memory)(void *handle, off_t start);
-extern int            DRM(agp_unbind_memory)(void *handle);
-#endif
 #endif
 
 				/* Proc support (drm_proc.h) */
