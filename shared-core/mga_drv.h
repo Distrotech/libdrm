@@ -142,8 +142,8 @@ extern int mga_warp_init( drm_mga_private_t *dev_priv );
 
 #define MGA_READ( reg )		(_MGA_READ((u32 *)MGA_ADDR(reg)))
 #define MGA_READ8( reg )	(_MGA_READ((u8 *)MGA_ADDR(reg)))
-#define MGA_WRITE( reg, val )	do { DRM_WRITEMEMORYBARRIER(dev_priv->mmio); MGA_DEREF( reg ) = val; } while (0)
-#define MGA_WRITE8( reg, val )  do { DRM_WRITEMEMORYBARRIER(dev_priv->mmio); MGA_DEREF8( reg ) = val; } while (0)
+#define MGA_WRITE( reg, val )	do { DRM_WRITEMEMORYBARRIER(); MGA_DEREF( reg ) = val; } while (0)
+#define MGA_WRITE8( reg, val )  do { DRM_WRITEMEMORYBARRIER(); MGA_DEREF8( reg ) = val; } while (0)
 
 static inline u32 _MGA_READ(u32 *addr)
 {
