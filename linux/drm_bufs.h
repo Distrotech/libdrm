@@ -233,7 +233,13 @@ int DRM(addmap)( DRM_OS_IOCTL )
 #endif
 	DRM_OS_UNLOCK;
 
-	DRM_OS_KRNTOUSR((drm_map_t *)data, *map, sizeof(*map) );
+#ifdef __linux__
+	if ( copy_to_user( (drm_map_t *)data, map, sizeof(*map) ) )
+		DRM_OS_RETURN(EFAULT);
+#endif
+#ifdef __FreeBSD__
+	*(drm_map_t *)data = *map;
+#endif
 
 	if ( map->type != _DRM_SHM ) {
 #ifdef __linux__
