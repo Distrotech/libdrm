@@ -4,7 +4,7 @@ KMOD= 	mga
 NOMAN=	YES
 SRCS=		mga_drv.c mga_state.c mga_warp.c mga_dma.c
 SRCS+=	device_if.h bus_if.h pci_if.h opt_drm_linux.h
-CFLAGS+=	${DEBUG_FLAGS} -I. -I.. -DSMP -DAPIC_IO
+CFLAGS+=	${DEBUG_FLAGS} -I. -I.. 
 
 @:
 	ln -sf /sys @
