@@ -1113,14 +1113,14 @@ int drmAgpGetNumContexts(int fd)
 {
     int ret_val;
 
-    ret_val = ioctl(fd, DRM_IOCTL_AGP_NUM_CTX);
+    ret_val = ioctl(fd, DRM_IOCTL_AGP_NUM_CTX, NULL);
     if(ret_val == -1) return -errno;
     return ret_val;
 }
 
 int drmAgpChangeContext(int fd, int context)
 {
-    if(ioctl(fd, DRM_IOCTL_AGP_CHG_CTX, context)) return -errno;
+    if(ioctl(fd, DRM_IOCTL_AGP_CHG_CTX, (void *)context)) return -errno;
     return 0;
 }
 
