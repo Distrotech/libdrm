@@ -87,6 +87,9 @@ drm_chipinfo_t DRM(devicelist)[] = {
 };
 #endif
 
+#ifdef __linux__
+/* For now, we'll only support multihead on Linux */
+/* Uncomment this, and fixup drm_count_cards */
 static drm_pci_list_t DRM(idlist)[] = {
 	{ PCI_VENDOR_ID_3DFX, PCI_DEVICE_ID_3DFX_BANSHEE },
 	{ PCI_VENDOR_ID_3DFX, PCI_DEVICE_ID_3DFX_VOODOO3_2000 },
@@ -97,6 +100,7 @@ static drm_pci_list_t DRM(idlist)[] = {
 };
 
 #define DRIVER_CARD_LIST DRM(idlist)
+#endif
 
 #include "drm_auth.h"
 #include "drm_bufs.h"
