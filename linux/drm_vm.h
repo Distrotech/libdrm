@@ -57,17 +57,17 @@ typedef struct drm_vma_entry {
 /** \name Prototypes */
 /*@{*/
 
-extern struct page *DRM(vm_nopage)(struct vm_area_struct *vma, unsigned long address, int write_access);
-extern struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma, unsigned long address, int write_access);
-extern struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma, unsigned long address, int write_access);
-extern struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma, unsigned long address, int write_access);
-extern void DRM(vm_open)(struct vm_area_struct *vma);
-extern void DRM(vm_close)(struct vm_area_struct *vma);
-extern void DRM(vm_shm_close)(struct vm_area_struct *vma);
-extern int DRM(mmap_dma)(struct file *filp, struct vm_area_struct *vma);
-extern int DRM(mmap)(struct file *filp, struct vm_area_struct *vma);
-extern unsigned int DRM(poll)(struct file *filp, struct poll_table_struct *wait);
-extern ssize_t DRM(read)(struct file *filp, char *buf, size_t count, loff_t *off);
+extern struct page *drm_vm_nopage(struct vm_area_struct *vma, unsigned long address, int write_access);
+extern struct page *drm_vm_shm_nopage(struct vm_area_struct *vma, unsigned long address, int write_access);
+extern struct page *drm_vm_dma_nopage(struct vm_area_struct *vma, unsigned long address, int write_access);
+extern struct page *drm_vm_sg_nopage(struct vm_area_struct *vma, unsigned long address, int write_access);
+extern void drm_vm_open(struct vm_area_struct *vma);
+extern void drm_vm_close(struct vm_area_struct *vma);
+extern void drm_vm_shm_close(struct vm_area_struct *vma);
+extern int drm_mmap_dma(struct file *filp, struct vm_area_struct *vma);
+extern int drm_mmap(struct file *filp, struct vm_area_struct *vma);
+extern unsigned int drm_poll(struct file *filp, struct poll_table_struct *wait);
+extern ssize_t drm_read(struct file *filp, char *buf, size_t count, loff_t *off);
 
 /*@}*/
 

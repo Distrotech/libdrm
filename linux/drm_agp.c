@@ -1,5 +1,5 @@
 /**
- * \file drm_agp_tmp.h 
+ * \file drm_agp.c 
  * DRM support for AGP/GART backend
  *    
  * \author Rickard E. (Rik) Faith <faith@valinux.com>
@@ -32,12 +32,12 @@
  */
 
 
-
-#if __REALLY_HAVE_AGP
-
 #define __NO_VERSION__
 #include "drmP.h"
 #include <linux/module.h>
+
+
+#if __REALLY_HAVE_AGP
 
 
 /**
@@ -293,7 +293,7 @@ int drm_agp_alloc_ioctl(struct inode *inode, struct file *filp,
 	if (!dev->agp || !dev->agp->acquired) return -EINVAL;
 	if (copy_from_user(&request, (drm_agp_buffer_t *)arg, sizeof(request)))
 		return -EFAULT;
-	if (!(entry = drm_alloc(sizeof(*entry), DRM_MEM_AGPLISTS)))
+	if (!(entry = drm_alloc(sizeof(*entry))))
 		return -ENOMEM;
 
    	memset(entry, 0, sizeof(*entry));
@@ -302,7 +302,7 @@ int drm_agp_alloc_ioctl(struct inode *inode, struct file *filp,
 	type = (u32) request.type;
 
 	if (!(memory = drm_agp_alloc(pages, type))) {
-		drm_free(entry, sizeof(*entry), DRM_MEM_AGPLISTS);
+		drm_free(entry);
 		return -ENOMEM;
 	}
 
@@ -322,7 +322,7 @@ int drm_agp_alloc_ioctl(struct inode *inode, struct file *filp,
 		dev->agp->memory       = entry->next;
 		dev->agp->memory->prev = NULL;
 		drm_agp_free(memory);
-		drm_free(entry, sizeof(*entry), DRM_MEM_AGPLISTS);
+		drm_free(entry);
 		return -EFAULT;
 	}
 	return 0;
@@ -452,7 +452,7 @@ int drm_agp_free_ioctl(struct inode *inode, struct file *filp,
 	else             dev->agp->memory  = entry->next;
 	if (entry->next) entry->next->prev = entry->prev;
 	drm_agp_free(entry->memory);
-	drm_free(entry, sizeof(*entry), DRM_MEM_AGPLISTS);
+	drm_free(entry);
 	return 0;
 }
 
@@ -480,13 +480,13 @@ void drm_agp_init(drm_device_t *dev)
 	}
 	++drm_agp_refcount;
 
-	if (!(head = drm_alloc(sizeof(*head), DRM_MEM_AGPLISTS)))
+	if (!(head = drm_alloc(sizeof(*head))))
 		return;
 
 	memset((void *)head, 0, sizeof(*head));
 	drm_agp->copy_info(&head->agp_info);
 	if (head->agp_info.chipset == NOT_SUPPORTED) {
-		drm_free(head, sizeof(*head), DRM_MEM_AGPLISTS);
+		drm_free(head);
 		return;
 	}
 	head->memory = NULL;
@@ -523,7 +523,7 @@ void drm_agp_cleanup(drm_device_t *dev)
 			if ( entry->bound )
 				drm_agp_unbind( entry->memory );
 			drm_agp_free( entry->memory );
-			drm_free( entry, sizeof(*entry), DRM_MEM_AGPLISTS );
+			drm_free( entry );
 		}
 		dev->agp->memory = NULL;
 
@@ -533,7 +533,7 @@ void drm_agp_cleanup(drm_device_t *dev)
 		dev->agp->acquired = 0;
 		dev->agp->enabled  = 0;
 
-		drm_free( dev->agp, sizeof(*dev->agp), DRM_MEM_AGPLISTS );
+		drm_free( dev->agp );
 		dev->agp = NULL;
 	}
 

@@ -1,5 +1,5 @@
 /**
- * \file drm_pci_tmp.h
+ * \file drm_pci.c
  * PCI consistent memory allocation.
  * 
  * \warning These interfaces aren't stable yet.

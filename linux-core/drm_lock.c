@@ -63,13 +63,13 @@ typedef struct drm_lock_data {
 /** \name Prototypes */
 /*@{*/
 
-extern int DRM(lock_take)(__volatile__ unsigned int *lock, unsigned int context);
-extern int DRM(lock_transfer)(drm_device_t *dev, __volatile__ unsigned int *lock, unsigned int context);
-extern int DRM(lock_free)(drm_device_t *dev, __volatile__ unsigned int *lock, unsigned int context);
-extern int DRM(notifier)(void *priv);
+extern int drm_lock_take(__volatile__ unsigned int *lock, unsigned int context);
+extern int drm_lock_transfer(drm_device_t *dev, __volatile__ unsigned int *lock, unsigned int context);
+extern int drm_lock_free(drm_device_t *dev, __volatile__ unsigned int *lock, unsigned int context);
+extern int drm_notifier(void *priv);
 
-extern int DRM(lock_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
-extern int DRM(unlock_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
+extern int drm_lock_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
+extern int drm_unlock_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
 
 /*@}*/
 

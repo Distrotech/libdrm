@@ -114,12 +114,13 @@
 typedef struct drm_device drm_device_t;
 
 #include "drm_agp.h"
+#include "drm_pci.h"
 #include "drm_sg.h"
 #include "drm_bufs.h"
 #include "drm_lock.h"
 #include "drm_dma.h"
 #include "drm_vm.h"
-#include "drm_memory.h"
+#include "drm_mem.h"
 #include "drm_stub.h"
 #include "drm_fops.h"
 
@@ -263,7 +264,7 @@ static inline struct page * vmalloc_to_page(void * vmalloc_addr)
  */
 #define DRM_MEM_ERROR(area, fmt, arg...) \
 	printk(KERN_ERR "[" DRM_NAME ":%s:%s] *ERROR* " fmt , __FUNCTION__, \
-	       DRM(mem_stats)[area].name , ##arg)
+	       drm_mem_stats[area].name , ##arg)
 #define DRM_INFO(fmt, arg...)  printk(KERN_INFO "[" DRM_NAME "] " fmt , ##arg)
 
 /**
@@ -275,7 +276,7 @@ static inline struct page * vmalloc_to_page(void * vmalloc_addr)
 #if DRM_DEBUG_CODE
 #define DRM_DEBUG(fmt, arg...)						\
 	do {								\
-		if ( DRM(flags) & DRM_FLAG_DEBUG )			\
+		if ( drm_flags & DRM_FLAG_DEBUG )			\
 			printk(KERN_DEBUG				\
 			       "[" DRM_NAME ":%s] " fmt ,	\
 			       __FUNCTION__ , ##arg);			\
@@ -302,15 +303,15 @@ static inline struct page * vmalloc_to_page(void * vmalloc_addr)
 /*@{*/
 
 #define DRM_IOREMAP(map, dev)							\
-	(map)->handle = DRM(ioremap)( (map)->offset, (map)->size, (dev) )
+	(map)->handle = drm_ioremap( (map)->offset, (map)->size, (dev) )
 
 #define DRM_IOREMAP_NOCACHE(map, dev)						\
-	(map)->handle = DRM(ioremap_nocache)((map)->offset, (map)->size, (dev))
+	(map)->handle = drm_ioremap_nocache((map)->offset, (map)->size, (dev))
 
 #define DRM_IOREMAPFREE(map, dev)						\
 	do {									\
 		if ( (map)->handle && (map)->size )				\
-			DRM(ioremapfree)( (map)->handle, (map)->size, (dev) );	\
+			drm_ioremapfree( (map)->handle, (map)->size, (dev) );	\
 	} while (0)
 
 /**
@@ -562,82 +563,82 @@ struct drm_device {
 /*@{*/
 
 				/* Misc. support (drm_init.h) */
-extern int	     DRM(flags);
-extern void	     DRM(parse_options)( char *s );
-extern int           DRM(cpu_valid)( void );
+extern int	     drm_flags;
+extern void	     drm_parse_options( char *s );
+extern int           drm_cpu_valid( void );
 
 				/* Driver support (drm_drv.h) */
-extern int           DRM(version)(struct inode *inode, struct file *filp,
+extern int           drm_version(struct inode *inode, struct file *filp,
 				  unsigned int cmd, unsigned long arg);
-extern int	     DRM(noop_ioctl)(struct inode *inode, struct file *filp,
+extern int	     drm_noop_ioctl(struct inode *inode, struct file *filp,
 				  unsigned int cmd, unsigned long arg);
 
 
 				/* Misc. IOCTL support (drm_ioctl.h) */
-extern int	     DRM(irq_busid)(struct inode *inode, struct file *filp,
+extern int	     drm_irq_busid(struct inode *inode, struct file *filp,
 				    unsigned int cmd, unsigned long arg);
-extern int	     DRM(getunique)(struct inode *inode, struct file *filp,
+extern int	     drm_getunique(struct inode *inode, struct file *filp,
 				    unsigned int cmd, unsigned long arg);
-extern int	     DRM(setunique)(struct inode *inode, struct file *filp,
+extern int	     drm_setunique(struct inode *inode, struct file *filp,
 				    unsigned int cmd, unsigned long arg);
-extern int	     DRM(getmap)(struct inode *inode, struct file *filp,
+extern int	     drm_getmap(struct inode *inode, struct file *filp,
 				 unsigned int cmd, unsigned long arg);
-extern int	     DRM(getclient)(struct inode *inode, struct file *filp,
+extern int	     drm_getclient(struct inode *inode, struct file *filp,
 				    unsigned int cmd, unsigned long arg);
-extern int	     DRM(getstats)(struct inode *inode, struct file *filp,
+extern int	     drm_getstats(struct inode *inode, struct file *filp,
 				   unsigned int cmd, unsigned long arg);
 
 				/* Context IOCTL support (drm_context.h) */
-extern int	     DRM(resctx)( struct inode *inode, struct file *filp,
+extern int	     drm_resctx( struct inode *inode, struct file *filp,
 				  unsigned int cmd, unsigned long arg );
-extern int	     DRM(addctx)( struct inode *inode, struct file *filp,
+extern int	     drm_addctx( struct inode *inode, struct file *filp,
 				  unsigned int cmd, unsigned long arg );
-extern int	     DRM(modctx)( struct inode *inode, struct file *filp,
+extern int	     drm_modctx( struct inode *inode, struct file *filp,
 				  unsigned int cmd, unsigned long arg );
-extern int	     DRM(getctx)( struct inode *inode, struct file *filp,
+extern int	     drm_getctx( struct inode *inode, struct file *filp,
 				  unsigned int cmd, unsigned long arg );
-extern int	     DRM(switchctx)( struct inode *inode, struct file *filp,
+extern int	     drm_switchctx( struct inode *inode, struct file *filp,
 				     unsigned int cmd, unsigned long arg );
-extern int	     DRM(newctx)( struct inode *inode, struct file *filp,
+extern int	     drm_newctx( struct inode *inode, struct file *filp,
 				  unsigned int cmd, unsigned long arg );
-extern int	     DRM(rmctx)( struct inode *inode, struct file *filp,
+extern int	     drm_rmctx( struct inode *inode, struct file *filp,
 				 unsigned int cmd, unsigned long arg );
 
-extern int	     DRM(context_switch)(drm_device_t *dev, int old, int new);
-extern int	     DRM(context_switch_complete)(drm_device_t *dev, int new);
+extern int	     drm_context_switch(drm_device_t *dev, int old, int new);
+extern int	     drm_context_switch_complete(drm_device_t *dev, int new);
 
 #if __HAVE_CTX_BITMAP
-extern int	     DRM(ctxbitmap_init)( drm_device_t *dev );
-extern void	     DRM(ctxbitmap_cleanup)( drm_device_t *dev );
+extern int	     drm_ctxbitmap_init( drm_device_t *dev );
+extern void	     drm_ctxbitmap_cleanup( drm_device_t *dev );
 #endif
 
-extern int	     DRM(setsareactx)( struct inode *inode, struct file *filp,
+extern int	     drm_setsareactx( struct inode *inode, struct file *filp,
 				       unsigned int cmd, unsigned long arg );
-extern int	     DRM(getsareactx)( struct inode *inode, struct file *filp,
+extern int	     drm_getsareactx( struct inode *inode, struct file *filp,
 				       unsigned int cmd, unsigned long arg );
 
 				/* Drawable IOCTL support (drm_drawable.h) */
-extern int	     DRM(adddraw)(struct inode *inode, struct file *filp,
+extern int	     drm_adddraw(struct inode *inode, struct file *filp,
 				  unsigned int cmd, unsigned long arg);
-extern int	     DRM(rmdraw)(struct inode *inode, struct file *filp,
+extern int	     drm_rmdraw(struct inode *inode, struct file *filp,
 				 unsigned int cmd, unsigned long arg);
 
 
 				/* Authentication IOCTL support (drm_auth.h) */
-extern int	     DRM(add_magic)(drm_device_t *dev, drm_file_t *priv,
+extern int	     drm_add_magic(drm_device_t *dev, drm_file_t *priv,
 				    drm_magic_t magic);
-extern int	     DRM(remove_magic)(drm_device_t *dev, drm_magic_t magic);
-extern int	     DRM(getmagic)(struct inode *inode, struct file *filp,
+extern int	     drm_remove_magic(drm_device_t *dev, drm_magic_t magic);
+extern int	     drm_getmagic(struct inode *inode, struct file *filp,
 				   unsigned int cmd, unsigned long arg);
-extern int	     DRM(authmagic)(struct inode *inode, struct file *filp,
+extern int	     drm_authmagic(struct inode *inode, struct file *filp,
 				    unsigned int cmd, unsigned long arg);
 
 				/* Proc support (drm_proc.h) */
-extern struct proc_dir_entry *DRM(proc_init)(drm_device_t *dev,
+extern struct proc_dir_entry *drm_proc_init(drm_device_t *dev,
 					     int minor,
 					     struct proc_dir_entry *root,
 					     struct proc_dir_entry **dev_root);
-extern int            DRM(proc_cleanup)(int minor,
+extern int            drm_proc_cleanup(int minor,
 					struct proc_dir_entry *root,
 					struct proc_dir_entry *dev_root);
 

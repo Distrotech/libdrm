@@ -39,14 +39,14 @@
 /** \name Prototypes */
 /*@{*/
 
-extern struct file_operations DRM(fops);
+extern struct file_operations drm_fops;
 	
-extern int DRM(open)(struct inode *inode, struct file *filp);
-extern int DRM(release)(struct inode *inode, struct file *filp);
-extern int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev);
-extern int DRM(ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
-extern int DRM(flush)(struct file *filp);
-extern int DRM(fasync)(int fd, struct file *filp, int on);
+extern int drm_open(struct inode *inode, struct file *filp);
+extern int drm_release(struct inode *inode, struct file *filp);
+extern int drm_open_helper(struct inode *inode, struct file *filp, drm_device_t *dev);
+extern int drm_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
+extern int drm_flush(struct file *filp);
+extern int drm_fasync(int fd, struct file *filp, int on);
 
 /*@}*/
 

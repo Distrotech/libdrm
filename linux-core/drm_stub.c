@@ -36,8 +36,8 @@
 /** \name Prototypes */
 /*@{*/
 
-int DRM(stub_register)(const char *name, struct file_operations *fops, drm_device_t *dev);
-int DRM(stub_unregister)(int minor); 
+int drm_stub_register(const char *name, struct file_operations *fops, drm_device_t *dev);
+int drm_stub_unregister(int minor); 
 
 /*@}*/
 

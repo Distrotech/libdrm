@@ -62,9 +62,9 @@
 	__get_user(val, uaddr)
 
 
-/** 'malloc' without the overhead of DRM(alloc)() */
+/** 'malloc' without the overhead of drm_alloc() */
 #define DRM_MALLOC(x) kmalloc(x, GFP_KERNEL)
-/** 'free' without the overhead of DRM(free)() */
+/** 'free' without the overhead of drm_free() */
 #define DRM_FREE(x,size) kfree(x)
 
 /** 

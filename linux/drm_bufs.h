@@ -4,7 +4,7 @@
  * 
  * \author Rickard E. (Rik) Faith <faith@valinux.com>
  * \author Gareth Hughes <gareth@valinux.com>
- * \author JosÃ© Fonseca <jrfonseca@tungstengraphics.com>
+ * \author José Fonseca <jrfonseca@tungstengraphics.com>
  */
 
 /*
@@ -253,8 +253,8 @@ typedef struct drm_buf_entry {
 /**
  * Backward compatability buffer pools used by the addbufs_ioctl() and friends.
  *
- * There is one of these for each buffer size in log2. Note that there can't be
- * two different pools with the same log2 of the buffers size.
+ * There is one of these for each buffer log2 size. Note that therefore there
+ * can't be two different pools with the same buffer log2 size.
  */
 typedef struct drm_buf_entry {
 	drm_pool_t *	pool;		/**< the pool */
@@ -268,28 +268,28 @@ typedef struct drm_buf_entry {
 /**
  * Device buffer related data.
  */
-typedef struct drm_bufs_data_t {
+typedef struct drm_bufs_data {
 	/** buffers, grouped  by their size order for backwards compatability */
 	drm_buf_entry_t	bufs[DRM_MAX_ORDER + 1];	
 	enum {
 		_DRM_DMA_USE_AGP = 0x01,
 		_DRM_DMA_USE_SG  = 0x02
 	} flags;
-} ;
+} drm_bufs_data_t;
 
 
 
 /** \name Prototypes */
 /*@{*/
 
-extern int DRM(order)( unsigned long size );
-extern int DRM(addmap_ioctl)( struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
-extern int DRM(rmmap_ioctl)( struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
-extern int DRM(addbufs_ioctl)( struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
-extern int DRM(infobufs_ioctl)( struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
-extern int DRM(markbufs_ioctl)( struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
-extern int DRM(freebufs_ioctl)( struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
-extern int DRM(mapbufs_ioctl)( struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
+extern int drm_order( unsigned long size );
+extern int drm_addmap_ioctl( struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
+extern int drm_rmmap_ioctl( struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
+extern int drm_addbufs_ioctl( struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
+extern int drm_infobufs_ioctl( struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
+extern int drm_markbufs_ioctl( struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
+extern int drm_freebufs_ioctl( struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
+extern int drm_mapbufs_ioctl( struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
 
 /*@}*/
 

@@ -64,15 +64,15 @@ typedef struct drm_pci_data {
 /** \name Prototypes */
 /*@{*/
 
-extern void *DRM(pci_alloc)(drm_device_t *dev, size_t size, dma_addr_t *busaddr);
-extern void DRM(pci_free)(drm_device_t *dev, size_t size, void *cpuaddr, dma_addr_t busaddr);
-extern void *DRM(pci_pool_create)(drm_device_t *dev, size_t size, size_t align);
-extern void DRM(pci_pool_destroy)(drm_device_t *dev, void *entry);
-extern void *DRM(pci_pool_alloc)(void *entry, dma_addr_t *busaddr);
-extern void DRM(pci_pool_free)(void *entry, void *cpuaddr, dma_addr_t busaddr);
-extern int DRM(pci_alloc_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
-extern int DRM(pci_free_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
-extern void DRM(pci_cleanup)(drm_device_t *dev);
+extern void *drm_pci_alloc(drm_device_t *dev, size_t size, dma_addr_t *busaddr);
+extern void drm_pci_free(drm_device_t *dev, size_t size, void *cpuaddr, dma_addr_t busaddr);
+extern void *drm_pci_pool_create(drm_device_t *dev, size_t size, size_t align);
+extern void drm_pci_pool_destroy(drm_device_t *dev, void *entry);
+extern void *drm_pci_pool_alloc(void *entry, dma_addr_t *busaddr);
+extern void drm_pci_pool_free(void *entry, void *cpuaddr, dma_addr_t busaddr);
+extern int drm_pci_alloc_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
+extern int drm_pci_free_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
+extern void drm_pci_cleanup(drm_device_t *dev);
 
 /*@}*/
 

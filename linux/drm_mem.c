@@ -1,5 +1,5 @@
 /** 
- * \file drm_memory_tmp.h 
+ * \file drm_mem.c 
  * Memory management wrappers for DRM
  *
  * \author Rickard E. (Rik) Faith <faith@valinux.com>
@@ -46,7 +46,7 @@ void *drm_alloc(size_t size)
 }
 
 /** Wrapper around kmalloc() and kfree() */
-void *drm_realloc(void *ptrt, size_t oldsize, size_t size)
+void *drm_realloc(void *oldpt, size_t oldsize, size_t size)
 {
 	void *pt;
 
@@ -61,7 +61,7 @@ void *drm_realloc(void *ptrt, size_t oldsize, size_t size)
 /** Wrapper around kfree() */
 void drm_free(void *ptr)
 {
-	kfree(pt);
+	kfree(ptr);
 }
 
 /*@}*/
@@ -164,7 +164,7 @@ void drm_free_pages(unsigned long address, int order)
 /**
  * Find the drm_map that covers the range [offset, offset+size].
  */
-static inline drm_map_t *
+drm_map_t *
 drm_lookup_map (unsigned long offset, unsigned long size, drm_device_t *dev)
 {
 	struct list_head *list;
@@ -182,7 +182,7 @@ drm_lookup_map (unsigned long offset, unsigned long size, drm_device_t *dev)
 	return NULL;
 }
 
-static inline void *
+void *
 agp_remap (unsigned long offset, unsigned long size, drm_device_t *dev)
 {
 	unsigned long *phys_addr_map, i, num_pages = PAGE_ALIGN(size) / PAGE_SIZE;
@@ -225,7 +225,7 @@ agp_remap (unsigned long offset, unsigned long size, drm_device_t *dev)
 	return addr;
 }
 
-static inline unsigned long
+unsigned long
 drm_follow_page (void *vaddr)
 {
 	pgd_t *pgd = pgd_offset_k((unsigned long) vaddr);
@@ -236,7 +236,7 @@ drm_follow_page (void *vaddr)
 
 #endif /* __REALLY_HAVE_AGP && defined(VMAP_4_ARGS) */
 
-static inline void *drm_ioremap(unsigned long offset, unsigned long size, drm_device_t *dev)
+void *drm_ioremap(unsigned long offset, unsigned long size, drm_device_t *dev)
 {
 #if __REALLY_HAVE_AGP && defined(VMAP_4_ARGS)
 	if (dev->agp && dev->agp->cant_use_aperture) {
@@ -250,7 +250,7 @@ static inline void *drm_ioremap(unsigned long offset, unsigned long size, drm_de
 	return ioremap(offset, size);
 }
 
-static inline void *drm_ioremap_nocache(unsigned long offset, unsigned long size,
+void *drm_ioremap_nocache(unsigned long offset, unsigned long size,
 					drm_device_t *dev)
 {
 #if __REALLY_HAVE_AGP && defined(VMAP_4_ARGS)
@@ -265,7 +265,7 @@ static inline void *drm_ioremap_nocache(unsigned long offset, unsigned long size
 	return ioremap_nocache(offset, size);
 }
 
-static inline void drm_ioremapfree(void *pt, unsigned long size, drm_device_t *dev)
+void drm_ioremapfree(void *pt, unsigned long size, drm_device_t *dev)
 {
 #if __REALLY_HAVE_AGP && defined(VMAP_4_ARGS)
 	/*

@@ -49,39 +49,11 @@ typedef struct drm_queue {
 	atomic_t	  total_locks;	/**< Total locks statistics */
 #endif
 	drm_ctx_flags_t	  flags;	/**< Context preserving and 2D-only */
+#if 0
 	drm_waitlist_t	  waitlist;	/**< Pending buffers */
+#endif
 	wait_queue_head_t flush_queue;	/**< Processes waiting until flush */
 } drm_queue_t;
-
-/**
- * DMA data.
- */
-typedef struct drm_device_dma {
-#if 0
-	drm_buf_entry_t	  bufs[DRM_MAX_ORDER+1];	/**< buffers, grouped by their size order */
-	int		  buf_count;	/**< total number of buffers */
-	drm_buf_t	  **buflist;	/**< Vector of pointers into drm_device_dma::bufs */
-#endif
-	int		  seg_count;
-	int		  page_count;	/**< number of pages */
-	unsigned long	  *pagelist;	/**< page list */
-	unsigned long	  byte_count;
-	enum {
-		_DRM_DMA_USE_AGP = 0x01,
-		_DRM_DMA_USE_SG  = 0x02
-	} flags;
-
-	/** \name DMA support */
-	/*@{*/
-	drm_buf_t	  *this_buffer;	/**< Buffer being sent */
-	drm_buf_t	  *next_buffer; /**< Selected buffer to send */
-	drm_queue_t	  *next_queue;	/**< Queue from which buffer selected*/
-	wait_queue_head_t waiting;	/**< Processes waiting on free bufs */
-	/*@}*/
-} drm_device_dma_t;
-
-
-#if __HAVE_VBL_IRQ
 
 typedef struct drm_vbl_sig {
 	struct list_head	head;
@@ -101,7 +73,34 @@ typedef struct drm_vbl_data {
 	unsigned int      pending;
 } drm_vbl_data_t;
 
+/**
+ * DMA data.
+ */
+typedef struct drm_device_dma {
+#if 0
+	drm_buf_entry_t	  bufs[DRM_MAX_ORDER+1];	/**< buffers, grouped by their size order */
+	int		  buf_count;	/**< total number of buffers */
+	drm_buf_t	  **buflist;	/**< Vector of pointers into drm_device_dma::bufs */
+	int		  seg_count;
+	int		  page_count;	/**< number of pages */
+	unsigned long	  *pagelist;	/**< page list */
+	unsigned long	  byte_count;
+	enum {
+		_DRM_DMA_USE_AGP = 0x01,
+		_DRM_DMA_USE_SG  = 0x02
+	} flags;
+
+	/** \name DMA support */
+	/*@{*/
+	drm_buf_t	  *this_buffer;	/**< Buffer being sent */
+	drm_buf_t	  *next_buffer; /**< Selected buffer to send */
+	drm_queue_t	  *next_queue;	/**< Queue from which buffer selected*/
+	wait_queue_head_t waiting;	/**< Processes waiting on free bufs */
+	/*@}*/
 #endif
+	drm_vbl_data_t    vbl;		/**< VBLANK IRQ support */
+} drm_device_dma_t;
+
 
 
 /** \name Prototypes */

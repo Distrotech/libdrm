@@ -34,12 +34,11 @@
 #ifndef _DRM_AGP_H_
 #define _DRM_AGP_H_
 
-#ifndef __HAVE_AGP
-#define __HAVE_AGP 0
-#endif
 
-#define __REALLY_HAVE_AGP (__HAVE_AGP && \
-		(defined(CONFIG_AGP) || defined(CONFIG_AGP_MODULE)))
+#include <linux/config.h>
+
+
+#define __REALLY_HAVE_AGP (defined(CONFIG_AGP) || defined(CONFIG_AGP_MODULE))
 
 #if __REALLY_HAVE_AGP
 
