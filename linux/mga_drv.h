@@ -138,21 +138,7 @@ extern int  mga_dma_blit( DRM_OS_IOCTL );
 extern int mga_warp_install_microcode( drm_device_t *dev );
 extern int mga_warp_init( drm_device_t *dev );
 
-#ifdef __linux__
-#define mga_flush_write_combine()	mb()
-#endif
-#if defined( __FreeBSD__ )
-#define mga_flush_write_combine()								\
-{												\
-   	int xchangeDummy;									\
-	DRM_DEBUG("%s\n", __FUNCTION__);							\
-   	__asm__ volatile(" push %%eax ; xchg %%eax, %0 ; pop %%eax" : : "m" (xchangeDummy));	\
-   	__asm__ volatile(" push %%eax ; push %%ebx ; push %%ecx ; push %%edx ;"			\
-			 " movl $0,%%eax ; cpuid ; pop %%edx ; pop %%ecx ; pop %%ebx ;"		\
-			 " pop %%eax" : /* no outputs */ :  /* no inputs */ );			\
-} while (0);
-#endif
-
+#define mga_flush_write_combine()	DRM_OS_READMEMORY_BARRIER
 
 #define MGA_BASE( reg )		((u32)(dev_priv->mmio->handle))
 #define MGA_ADDR( reg )		(MGA_BASE(reg) + reg)
@@ -190,28 +176,15 @@ do {									\
 	}								\
 } while (0)
 
-#ifdef __linux__
 #define LOCK_TEST_WITH_RETURN( dev )					\
 do {									\
 	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||		\
-	     dev->lock.pid != current->pid ) {				\
-		DRM_ERROR( "%s called without lock held\n",	\
-			   __FUNCTION__ );				\
-		DRM_OS_RETURN( EINVAL );				\
-	}								\
-} while (0)
-#endif
-#ifdef __FreeBSD__
-#define LOCK_TEST_WITH_RETURN( dev )					\
-do {									\
-	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||		\
-	     dev->lock.pid != p->p_pid ) {				\
+	     dev->lock.pid != DRM_OS_CURRENTPID ) {			\
 		DRM_ERROR( "%s called without lock held\n",		\
 			   __FUNCTION__ );				\
 		DRM_OS_RETURN( EINVAL );				\
 	}								\
 } while (0)
-#endif
 
 #define WRAP_TEST_WITH_RETURN( dev_priv )				\
 do {									\
