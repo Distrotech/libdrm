@@ -1039,7 +1039,7 @@ static int radeon_cp_dispatch_texture( drm_device_t *dev,
 	 */
 	y = image->y;
 	height = image->height;
-	data = (u8 *)image->data;
+	data = image->data;
 
 	size = height * blit_width;
 
