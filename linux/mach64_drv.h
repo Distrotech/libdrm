@@ -457,20 +457,16 @@ extern int mach64_dma_blit( struct inode *inode, struct file *filp,
 
 static inline void mach64_ring_start( drm_mach64_private_t *dev_priv )
 {
-	DRM_DEBUG( "%s: head_addr: 0x%08x head: %d tail: %d space: %d\n",
-		__FUNCTION__, 
-		dev_priv->ring.head_addr, dev_priv->ring.head, dev_priv->ring.tail, dev_priv->ring.space);
-
-	mach64_do_wait_for_idle( dev_priv );
-
-#if MACH64_EXTRA_CHECKING
-	if ( MACH64_READ(MACH64_SRC_CNTL) & MACH64_SRC_BM_ENABLE ) {
-		DRM_ERROR("Call of %s with BM enabled!!!\n", __FUNCTION__ );
-		mach64_dump_ring_info( dev_priv );
-		return;
-	}
-#endif
+	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring;
 	
+	DRM_DEBUG( "%s: head_addr: 0x%08x head: %d tail: %d space: %d\n",
+		   __FUNCTION__, 
+		   ring->head_addr, ring->head, ring->tail, ring->space );
+
+	if ( mach64_do_wait_for_idle( dev_priv ) < 0 ) {
+		mach64_do_engine_reset( dev_priv );
+	}
+
 	/* enable bus mastering and block 1 registers */
 	MACH64_WRITE( MACH64_BUS_CNTL, 
 		      ( MACH64_READ(MACH64_BUS_CNTL) & 	~MACH64_BUS_MASTER_DIS ) 
@@ -478,29 +474,18 @@ static inline void mach64_ring_start( drm_mach64_private_t *dev_priv )
 
 	mach64_do_wait_for_idle( dev_priv );
 	
+	/* reset descriptor table ring head */
+	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, ring->head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB );
+	
 	dev_priv->ring_running = 1;
 }
 
 static inline void mach64_ring_resume( drm_mach64_private_t *dev_priv, drm_mach64_descriptor_ring_t *ring )
 {
-	DRM_DEBUG( "%s: new dispatch: head_addr: 0x%08x head: %d tail: %d space: %d\n",
-		__FUNCTION__, 
-		ring->head_addr, ring->head, ring->tail, ring->space);
+	DRM_DEBUG( "%s: head_addr: 0x%08x head: %d tail: %d space: %d\n",
+		   __FUNCTION__, 
+		   ring->head_addr, ring->head, ring->tail, ring->space );
 
-#if MACH64_EXTRA_CHECKING
-	if ( MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE ) {
-		DRM_ERROR("Call of %s with GUI ACTIVE!!!\n", __FUNCTION__ );
-		mach64_dump_ring_info( dev_priv );
-		mach64_do_wait_for_idle( dev_priv );
-	}
-
-	if( ring->head_addr < ring->start_addr || ring->head_addr >= ring->start_addr + ring->size ) {
-		DRM_ERROR("Bad address in BM_GUI_TABLE: 0x%08x\n", (ring)->head_addr);
-		mach64_dump_ring_info( dev_priv );
-		return;
-	}
-#endif
-		
 	/* reset descriptor table ring head */
 	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, ring->head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB );
 	
@@ -513,11 +498,52 @@ static inline void mach64_ring_resume( drm_mach64_private_t *dev_priv, drm_mach6
 	MACH64_WRITE( MACH64_DST_HEIGHT_WIDTH, 0 );
 }
 
+static inline void mach64_ring_tick( drm_mach64_private_t *dev_priv, drm_mach64_descriptor_ring_t *ring )
+{
+	DRM_DEBUG( "%s: head_addr: 0x%08x head: %d tail: %d space: %d\n",
+		   __FUNCTION__, 
+		   ring->head_addr, ring->head, ring->tail, ring->space );
+
+	if ( !dev_priv->ring_running ) {
+		mach64_ring_start( dev_priv );
+		
+		if ( ring->head != ring->tail ) {
+			mach64_ring_resume( dev_priv, ring );
+		}
+	} else {
+		/* GUI_ACTIVE must be read before BM_GUI_TABLE to correctly determine the ring head */
+		int gui_active = MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE;
+		
+		ring->head_addr = MACH64_READ(MACH64_BM_GUI_TABLE) & 0xfffffff0;
+		
+		if ( gui_active ) {
+			/* If not idle, BM_GUI_TABLE points one descriptor past the current head */
+			if ( ring->head_addr == ring->start_addr ) {
+				ring->head_addr += ring->size;
+			}
+			ring->head_addr -= 4 * sizeof(u32);
+		}
+
+		if( ring->head_addr < ring->start_addr || ring->head_addr >= ring->start_addr + ring->size ) {
+			DRM_ERROR( "bad ring head address: 0x%08x\n", ring->head_addr );
+			mach64_dump_ring_info( dev_priv );
+			mach64_do_engine_reset( dev_priv );
+			return;
+		}
+	
+		ring->head = (ring->head_addr - ring->start_addr) / sizeof(u32);
+		
+		if ( !gui_active && ring->head != ring->tail ) {
+			mach64_ring_resume( dev_priv, ring );
+		}
+	}
+}
+
 static inline void mach64_ring_stop( drm_mach64_private_t *dev_priv )
 {
 	DRM_DEBUG( "%s: head_addr: 0x%08x head: %d tail: %d space: %d\n",
-		__FUNCTION__, 
-		dev_priv->ring.head_addr, dev_priv->ring.head, dev_priv->ring.tail, dev_priv->ring.space);
+		   __FUNCTION__, 
+		   dev_priv->ring.head_addr, dev_priv->ring.head, dev_priv->ring.tail, dev_priv->ring.space );
 
 	/* restore previous SRC_CNTL to disable busmastering */
 	mach64_do_wait_for_fifo( dev_priv, 1 );
@@ -530,30 +556,6 @@ static inline void mach64_ring_stop( drm_mach64_private_t *dev_priv )
 	dev_priv->ring_running = 0;
 }
 
-#define UPDATE_RING_HEAD( dev_priv, ring )								\
-do {													\
-	int gui_active;											\
-	DRM_DEBUG( "UPDATE_RING_HEAD\n" );								\
-													\
-	if ( !(dev_priv)->ring_running ) {								\
-		mach64_ring_start( dev_priv );								\
-	}												\
-	/* GUI_ACTIVE must be read before BM_GUI_TABLE to correctly determine the ring head */		\
-	gui_active = MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE;					\
-	(ring)->head_addr = MACH64_READ(MACH64_BM_GUI_TABLE) & 0xfffffff0;				\
-	if ( gui_active ) {										\
-		/* If not idle, BM_GUI_TABLE points one descriptor past the current head */		\
-		if ( (ring)->head_addr == (ring)->start_addr ) {					\
-			(ring)->head_addr += (ring)->size;						\
-		}											\
-		(ring)->head_addr -= 4 * sizeof(u32);							\
-	}												\
-	(ring)->head = ((ring)->head_addr - (ring)->start_addr) / sizeof(u32);				\
-	if ( !gui_active && (ring)->head != (ring)->tail ) {						\
-		mach64_ring_resume( dev_priv, ring );							\
-	}												\
-} while (0)
-
 static inline void
 mach64_update_ring_snapshot( drm_mach64_private_t *dev_priv )
 {
@@ -561,7 +563,8 @@ mach64_update_ring_snapshot( drm_mach64_private_t *dev_priv )
 
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 	
-	UPDATE_RING_HEAD( dev_priv, ring );
+	mach64_ring_tick( dev_priv, ring );
+
 	ring->space = (ring->head - ring->tail) * sizeof(u32);
 	if ( ring->space <= 0 ) {
 		ring->space += ring->size;
@@ -664,8 +667,6 @@ do {											\
 		}									\
 	}										\
 	dev_priv->ring.space -= (n) * sizeof(u32);					\
-	/* HACK: force to always call UPDATE_RING_HEAD */				\
-	/*dev_priv->ring.space = 0;*/							\
 	ring = (u32 *) dev_priv->ring.start;						\
 	tail = write = dev_priv->ring.tail;						\
 	mask = dev_priv->ring.tail_mask;						\
@@ -722,7 +723,7 @@ do {									\
 	mach64_clear_dma_eol( &ring[(tail - 2) & mask] );		\
 	mach64_flush_write_combine();					\
 	dev_priv->ring.tail = write;					\
-	UPDATE_RING_HEAD( dev_priv, &(dev_priv)->ring );		\
+	mach64_ring_tick( dev_priv, &(dev_priv)->ring );		\
 } while (0)
 
 

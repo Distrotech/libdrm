@@ -179,6 +179,7 @@ int mach64_wait_ring( drm_mach64_private_t *dev_priv, int n )
 
 	/* FIXME: This is being ignored... */
 	DRM_ERROR( "failed!\n" );
+	mach64_dump_ring_info( dev_priv );
 	return -EBUSY;
 }
 
@@ -200,6 +201,7 @@ int mach64_ring_idle( drm_mach64_private_t *dev_priv )
 
 	DRM_INFO( "%s failed! GUI_STAT=0x%08x\n", __FUNCTION__, 
 		   MACH64_READ( MACH64_GUI_STAT ) );
+	mach64_dump_ring_info( dev_priv );
 	return -EBUSY;
 }
 
@@ -1401,7 +1403,7 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 
 		tail = ring->tail;
 		for ( t = 0 ; t < dev_priv->usec_timeout ; t++ ) {
-			UPDATE_RING_HEAD( dev_priv, ring );
+			mach64_ring_tick( dev_priv, ring );
 			head = ring->head;
 
 			if ( head == tail ) {
@@ -1430,8 +1432,9 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 					int i;
 					
 					for ( i = head ; i != tail ; i = (i + 4) & ring->tail_mask ) {
-						u32 o1 = ((u32 *)ring->start)[i + 1];
+						u32 o1 = le32_to_cpu(((u32 *)ring->start)[i + 1]);
 						u32 o2 = GETBUFADDR( entry->buf );
+
 						if ( o1 == o2 ) {
 							DRM_ERROR ( "Attempting to free an used buffer: i=%d  buf=0x%08x (0x%08x)\n", i, o1, o2 );
 							mach64_dump_ring_info( dev_priv );
