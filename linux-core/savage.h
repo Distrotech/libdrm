@@ -37,6 +37,7 @@
 #define __HAVE_CTX_BITMAP	1
 
 #define DRIVER_PCI_IDS							\
+        {0x5333, 0x8a22, 0, "Savage4"},                                 \
 	{0x5333, 0x8a25, 0, "ProSavage PM133"},				\
 	{0x5333, 0x8a26, 0, "ProSavage KM133"},				\
 	{0x5333, 0x8d01, 0, "ProSavage PN133"},				\
