@@ -75,6 +75,7 @@ typedef struct drm_file drm_file_t;
 #elif defined __NetBSD__
 #include "drm_os_netbsd.h"
 #endif
+#include "drm_linux_list.h"
 
 #include "drm.h"
 

@@ -231,6 +231,7 @@ typedef struct drm_chipinfo
 } drm_chipinfo_t;
 
 #define cpu_to_le32(x) (x)	/* FIXME */
+#define le32_to_cpu(x) (x)	/* FIXME */
 
 typedef unsigned long dma_addr_t;
 typedef u_int32_t atomic_t;
