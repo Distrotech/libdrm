@@ -38,7 +38,7 @@
 #include <sys/types.h>
 #include <sys/bus.h>
 #include <pci/pcivar.h>
-#include <opt_drm_linux.h>
+/* #include <opt_drm_linux.h> */
 #endif
 
 #include "tdfx.h"
@@ -94,7 +94,9 @@ static int tdfx_probe(device_t dev)
 #include "drm_ioctl.h"
 #include "drm_lock.h"
 #include "drm_memory.h"
+#ifdef __linux__
 #include "drm_proc.h"
+#endif
 #include "drm_vm.h"
 #ifdef __linux__
 #include "drm_stub.h"

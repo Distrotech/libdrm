@@ -537,6 +537,11 @@ typedef struct drm_device {
 	wait_queue_head_t buf_readers;	/* Processes waiting to read	   */
 	wait_queue_head_t buf_writers;	/* Processes waiting to ctx switch */
 
+#ifdef __FreeBSD__
+				/* Sysctl support */
+	struct drm_sysctl_info *sysctl;
+#endif
+
 #if __REALLY_HAVE_AGP
 	drm_agp_head_t    *agp;
 #endif

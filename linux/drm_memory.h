@@ -364,13 +364,13 @@ void DRM(free_pages)(unsigned long address, int order, int area)
 	unsigned long bytes = PAGE_SIZE << order;
 	int		  alloc_count;
 	int		  free_count;
-	unsigned long addr;
-	unsigned int  sz;
 
 	if (!address) {
 		DRM_MEM_ERROR(area, "Attempt to free address 0\n");
 	} else {
 #ifdef __linux__
+		unsigned long addr;
+		unsigned int  sz;
 				/* Unreserve */
 		for (addr = address, sz = bytes;
 		     sz > 0;

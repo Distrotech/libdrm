@@ -1,7 +1,7 @@
 # $FreeBSD$
 
 KMOD	= tdfx
-SRCS    = tdfx_drv.c tdfx_context.c
+SRCS    = tdfx_drv.c
 SRCS   += device_if.h bus_if.h pci_if.h
 CFLAGS += ${DEBUG_FLAGS} -I. -I..
 KMODDEPS = drm
