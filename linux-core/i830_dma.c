@@ -130,9 +130,7 @@ static struct file_operations i830_buffer_fops = {
 	.release = DRM(release),
 	.ioctl	 = DRM(ioctl),
 	.mmap	 = i830_mmap_buffers,
-	.read	 = DRM(read),
 	.fasync  = DRM(fasync),
-      	.poll	 = DRM(poll),
 };
 
 int i830_mmap_buffers(struct file *filp, struct vm_area_struct *vma)
@@ -280,7 +278,8 @@ static int i830_dma_cleanup(drm_device_t *dev)
 		for (i = 0; i < dma->buf_count; i++) {
 			drm_buf_t *buf = dma->buflist[ i ];
 			drm_i830_buf_priv_t *buf_priv = buf->dev_private;
-			DRM(ioremapfree)(buf_priv->kernel_virtual, buf->total);
+			if ( buf_priv->kernel_virtual && buf->total )
+				DRM(ioremapfree)(buf_priv->kernel_virtual, buf->total);
 		}
 	}
    	return 0;
@@ -370,7 +369,7 @@ static int i830_dma_initialize(drm_device_t *dev,
    	memset(dev_priv, 0, sizeof(drm_i830_private_t));
 
 	list_for_each(list, &dev->maplist->head) {
-		drm_map_list_t *r_list = (drm_map_list_t *)list;
+		drm_map_list_t *r_list = list_entry(list, drm_map_list_t, head);
 		if( r_list->map &&
 		    r_list->map->type == _DRM_SHM &&
 		    r_list->map->flags & _DRM_CONTAINS_LOCK ) {
