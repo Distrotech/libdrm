@@ -257,6 +257,7 @@ do {									\
 
 #define __REALLY_HAVE_AGP	(__HAVE_AGP && (defined(CONFIG_AGP) || \
 						defined(CONFIG_AGP_MODULE)))
+#define __REALLY_HAVE_SG	(__HAVE_SG)
 #define __REALLY_HAVE_MTRR	(__HAVE_MTRR && defined(CONFIG_MTRR))
 
 #define DRM_OS_LOCK 	up(&dev->struct_sem)

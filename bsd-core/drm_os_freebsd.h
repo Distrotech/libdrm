@@ -32,6 +32,7 @@
 #endif
 
 #define __REALLY_HAVE_MTRR	0
+#define __REALLY_HAVE_SG	0
 
 #if __REALLY_HAVE_AGP
 #include <pci/agpvar.h>

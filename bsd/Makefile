@@ -1,5 +1,5 @@
 # $FreeBSD$
 
-SUBDIR = tdfx mga # radeon gamma r128 radeon i810 sis
+SUBDIR = tdfx mga r128 # radeon gamma radeon i810 sis
 
 .include <bsd.subdir.mk>

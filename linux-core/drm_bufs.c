@@ -690,7 +690,7 @@ int DRM(addbufs_pci)( DRM_OS_IOCTL )
 }
 #endif /* __HAVE_PCI_DMA */
 
-#ifdef __HAVE_SG
+#if __REALLY_HAVE_SG
 int DRM(addbufs_sg)( DRM_OS_IOCTL )
 {
 	DRM_OS_DEVICE;
@@ -848,7 +848,7 @@ int DRM(addbufs_sg)( DRM_OS_IOCTL )
        atomic_dec( &dev->buf_alloc );
        return 0;
 }
-#endif /* __HAVE_SG */
+#endif /* __REALLY_HAVE_SG */
 
 int DRM(addbufs)( DRM_OS_IOCTL )
 {
@@ -866,7 +866,7 @@ int DRM(addbufs)( DRM_OS_IOCTL )
 #endif
 	else
 #endif
-#if __HAVE_SG
+#if __REALLY_HAVE_SG
 	if ( request.flags & _DRM_SG_BUFFER )
 #ifdef __linux__
 		return DRM(addbufs_sg)( inode, filp, cmd, data );
