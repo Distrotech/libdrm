@@ -214,10 +214,12 @@ static void r128_do_cce_flush( drm_r128_private_t *dev_priv )
  */
 int r128_do_cce_idle( drm_r128_private_t *dev_priv )
 {
+	drm_r128_ring_buffer_t *ring = &dev_priv->ring;
+	drm_r128_ring_status_t *status = ring->status;
 	int i;
 
 	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
-		if ( *dev_priv->ring.head == dev_priv->ring.tail ) {
+		if ( status->head == status->tail ) {
 			int pm4stat = R128_READ( R128_PM4_STAT );
 			if ( ( (pm4stat & R128_PM4_FIFOCNT_MASK) >=
 			       dev_priv->cce_fifo_size ) &&
@@ -258,8 +260,8 @@ static void r128_do_cce_reset( drm_r128_private_t *dev_priv )
 {
 	R128_WRITE( R128_PM4_BUFFER_DL_WPTR, 0 );
 	R128_WRITE( R128_PM4_BUFFER_DL_RPTR, 0 );
-	*dev_priv->ring.head = 0;
-	dev_priv->ring.tail = 0;
+	dev_priv->ring.status->head = 0;
+	dev_priv->ring.status->tail = 0;
 }
 
 /* Stop the Concurrent Command Engine.  This will not flush any pending
@@ -331,7 +333,7 @@ static void r128_cce_init_ring_buffer( drm_device_t *dev )
 	R128_WRITE( R128_PM4_BUFFER_DL_RPTR, 0 );
 
 	/* DL_RPTR_ADDR is a physical address in PCI space. */
-	*dev_priv->ring.head = 0;
+	dev_priv->ring.status->head = 0;
 	R128_WRITE( R128_PM4_BUFFER_DL_RPTR_ADDR,
 		    virt_to_bus((void *)dev_priv->status->offset) );
 
@@ -353,7 +355,6 @@ static void r128_cce_init_ring_buffer( drm_device_t *dev )
 static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 {
 	drm_r128_private_t *dev_priv;
-        int i;
 
 	dev_priv = DRM(alloc)( sizeof(drm_r128_private_t), DRM_MEM_DRIVER );
 	if ( dev_priv == NULL )
@@ -481,11 +482,10 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 	DRM_IOREMAP( dev_priv->cce_ring );
 	DRM_IOREMAP( dev_priv->buffers );
 
-	dev_priv->ring.head = (volatile u32 *)dev_priv->status->handle;
+	dev_priv->ring.status = ((drm_r128_ring_status_t *)
+				 dev_priv->status->handle);
 
 	dev_priv->ring.start = (u32 *)dev_priv->cce_ring->handle;
-	dev_priv->ring.end = ((u32 *)dev_priv->cce_ring->handle
-			      + init->ring_size / sizeof(u32));
 	dev_priv->ring.size = init->ring_size;
 	dev_priv->ring.size_l2qw = DRM(order)( init->ring_size / 8 );
 
@@ -835,16 +835,15 @@ void r128_freelist_reset( drm_device_t *dev )
 int r128_wait_ring( drm_r128_private_t *dev_priv, int n )
 {
 	drm_r128_ring_buffer_t *ring = &dev_priv->ring;
+	drm_r128_ring_status_t *status = ring->status;
 	int i;
 
 	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
-		ring->space = *ring->head - ring->tail;
-		if ( ring->space <= 0 )
-			ring->space += ring->size;
-
-		if ( ring->space >= n )
+		status->space = status->head - status->tail;
+		if ( status->space <= 0 )
+			status->space += ring->size;
+		if ( status->space >= n )
 			return 0;
-
 		udelay( 1 );
 	}
 
@@ -856,14 +855,15 @@ int r128_wait_ring( drm_r128_private_t *dev_priv, int n )
 void r128_update_ring_snapshot( drm_r128_private_t *dev_priv )
 {
 	drm_r128_ring_buffer_t *ring = &dev_priv->ring;
+	drm_r128_ring_status_t *status = ring->status;
 
-	ring->space = *ring->head - ring->tail;
+	status->space = status->head - status->tail;
 #if R128_PERFORMANCE_BOXES
-	if ( ring->space == 0 )
+	if ( status->space == 0 )
 		atomic_inc( &dev_priv->idle_count );
 #endif
-	if ( ring->space <= 0 )
-		ring->space += ring->size;
+	if ( status->space <= 0 )
+		status->space += ring->size;
 }
 
 static int r128_cce_get_buffers( drm_device_t *dev, drm_dma_t *d )

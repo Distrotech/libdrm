@@ -40,17 +40,19 @@ typedef struct drm_r128_freelist {
    	struct drm_r128_freelist *prev;
 } drm_r128_freelist_t;
 
+typedef struct drm_r128_ring_status {
+	volatile u32 head;
+	u32 __padding[3];		/* FIXME: Do we need this??? */
+	u32 tail;
+	int space;
+} drm_r128_ring_status_t;
+
 typedef struct drm_r128_ring_buffer {
+	drm_r128_ring_status_t *status;
 	u32 *start;
-	u32 *end;
 	int size;
 	int size_l2qw;
-
-	volatile u32 *head;
-	u32 tail;
 	u32 tail_mask;
-	int space;
-
 	int high_mark;
 } drm_r128_ring_buffer_t;
 
@@ -413,12 +415,13 @@ do {									\
 #define RING_SPACE_TEST_WITH_RETURN( dev_priv )				\
 do {									\
 	drm_r128_ring_buffer_t *ring = &dev_priv->ring; int i;		\
-	if ( ring->space < ring->high_mark ) {				\
+	drm_r128_ring_status_t *status = ring->status;			\
+	if ( status->space < ring->high_mark ) {			\
 		for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {	\
-			ring->space = *ring->head - ring->tail;		\
-			if ( ring->space <= 0 )				\
-				ring->space += ring->size;		\
-			if ( ring->space >= ring->high_mark )		\
+			status->space = status->head - status->tail;	\
+			if ( status->space <= 0 )			\
+				status->space += ring->size;		\
+			if ( status->space >= ring->high_mark )		\
 				goto __ring_space_done;			\
 			udelay( 1 );					\
 		}							\
@@ -454,29 +457,31 @@ do {									\
 
 #define R128_VERBOSE	0
 
-#define RING_LOCALS	int write; unsigned int tail_mask; volatile u32 *ring;
+#define RING_LOCALS							\
+	int write; unsigned int tail_mask; volatile u32 *ring;		\
+	drm_r128_ring_status_t *status = dev_priv->ring.status;
 
 #define BEGIN_RING( n ) do {						\
 	if ( R128_VERBOSE ) {						\
 		DRM_INFO( "BEGIN_RING( %d ) in %s\n",			\
 			   (n), __FUNCTION__ );				\
 	}								\
-	if ( dev_priv->ring.space < (n) * sizeof(u32) ) {		\
+	if ( status->space < (n) * sizeof(u32) ) {			\
 		r128_wait_ring( dev_priv, (n) * sizeof(u32) );		\
 	}								\
-	dev_priv->ring.space -= (n) * sizeof(u32);			\
+	status->space -= (n) * sizeof(u32);				\
 	ring = dev_priv->ring.start;					\
-	write = dev_priv->ring.tail;					\
+	write = status->tail;						\
 	tail_mask = dev_priv->ring.tail_mask;				\
 } while (0)
 
 #define ADVANCE_RING() do {						\
 	if ( R128_VERBOSE ) {						\
 		DRM_INFO( "ADVANCE_RING() tail=0x%06x wr=0x%06x\n",	\
-			  write, dev_priv->ring.tail );			\
+			  write, status->tail );			\
 	}								\
 	r128_flush_write_combine();					\
-	dev_priv->ring.tail = write;					\
+	status->tail = write;						\
 	R128_WRITE( R128_PM4_BUFFER_DL_WPTR, write );			\
 } while (0)
 
