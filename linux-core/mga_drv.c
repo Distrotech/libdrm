@@ -115,6 +115,7 @@ static drm_ioctl_desc_t	      mga_ioctls[] = {
    	[DRM_IOCTL_NR(DRM_IOCTL_MGA_VERTEX)]  = { mga_vertex,      1, 0 },
    	[DRM_IOCTL_NR(DRM_IOCTL_MGA_FLUSH)]   = { mga_flush_ioctl, 1, 0 },
    	[DRM_IOCTL_NR(DRM_IOCTL_MGA_INDICES)] = { mga_indices,     1, 0 },
+     	[DRM_IOCTL_NR(DRM_IOCTL_MGA_BLIT)]    = { mga_blit,        1, 0 }, 
 };
 
 #define MGA_IOCTL_COUNT DRM_ARRAY_SIZE(mga_ioctls)
