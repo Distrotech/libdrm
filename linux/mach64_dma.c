@@ -155,6 +155,7 @@ int mach64_do_wait_for_idle( drm_mach64_private_t *dev_priv )
 
 	DRM_INFO( "%s failed! GUI_STAT=0x%08x\n", __FUNCTION__, 
 		   MACH64_READ( MACH64_GUI_STAT ) );
+	mach64_dump_ring_info( dev_priv );
 	return -EBUSY;
 }
 
@@ -179,8 +180,7 @@ int mach64_wait_ring( drm_mach64_private_t *dev_priv, int n )
 	return -EBUSY;
 }
 
-/* Wait until all DMA requests have been processed... */
-int mach64_do_dma_flush( drm_mach64_private_t *dev_priv )
+int mach64_ring_idle( drm_mach64_private_t *dev_priv )
 {
 	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring;
 	int i;
@@ -189,7 +189,7 @@ int mach64_do_dma_flush( drm_mach64_private_t *dev_priv )
 		mach64_update_ring_snapshot( dev_priv );
 		if ( ring->head == ring->tail ) {
 			if (i > 0) {
-				DRM_DEBUG( "do_dma_idle: %d usecs\n", i );
+				DRM_DEBUG( "mach64_ring_idle: %d usecs\n", i );
 			}
 			return 0;
 		}
@@ -201,6 +201,33 @@ int mach64_do_dma_flush( drm_mach64_private_t *dev_priv )
 	return -EBUSY;
 }
 
+int mach64_ring_flush( drm_mach64_private_t *dev_priv )
+{
+	/* FIXME: It's not necessary to wait for idle when flushing */
+	return mach64_ring_idle( dev_priv );
+}
+
+void mach64_ring_reset( drm_mach64_private_t *dev_priv )
+{
+	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring;
+
+	mach64_do_release_used_buffers( dev_priv );
+	ring->head_addr = ring->start_addr;
+	ring->head = ring->tail = 0;
+	ring->space = ring->size;
+	
+	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, 
+		      ring->head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB );
+
+	dev_priv->ring_running = 0;
+}
+
+/* Wait until all DMA requests have been processed... */
+int mach64_do_dma_flush( drm_mach64_private_t *dev_priv )
+{
+	return mach64_ring_flush( dev_priv );
+}
+
 int mach64_do_dma_idle( drm_mach64_private_t *dev_priv ) {
 	int ret;
 
@@ -210,9 +237,8 @@ int mach64_do_dma_idle( drm_mach64_private_t *dev_priv ) {
 			   MACH64_READ(MACH64_BM_GUI_TABLE), dev_priv->ring.tail );
 		return ret;
 	}
-	/* Disable bus-mastering, but keep block 1 registers enabled */
-	MACH64_WRITE( MACH64_BUS_CNTL, MACH64_READ( MACH64_BUS_CNTL ) | MACH64_BUS_MASTER_DIS | MACH64_BUS_EXT_REG_EN );
-	MACH64_WRITE( MACH64_SRC_CNTL, 0 );
+
+	mach64_ring_stop( dev_priv );
 
 	/* clean up after pass */
 	mach64_do_release_used_buffers( dev_priv );
@@ -223,7 +249,6 @@ int mach64_do_dma_idle( drm_mach64_private_t *dev_priv ) {
  */
 int mach64_do_engine_reset( drm_mach64_private_t *dev_priv )
 {
-	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring;
 	u32 tmp;
 
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
@@ -254,13 +279,8 @@ int mach64_do_engine_reset( drm_mach64_private_t *dev_priv )
 	MACH64_WRITE( MACH64_SRC_CNTL, 0 );
 
 	/* Reset descriptor ring */
-	mach64_do_release_used_buffers( dev_priv );
-	ring->head_addr = ring->start_addr;
-	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, 
-		      ( ring->head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB ) );
-	ring->head = ring->tail = 0;
-	ring->space = ring->size;
-
+	mach64_ring_reset( dev_priv );
+	
 	return 0;
 }
 
@@ -344,14 +364,43 @@ void mach64_dump_engine_info( drm_mach64_private_t *dev_priv )
 	DRM_INFO( "\n" );
 }
 
-void mach64_dump_ring( drm_mach64_private_t *dev_priv )
+void mach64_dump_buf_info( drm_mach64_private_t *dev_priv, drm_buf_t *buf)
+{
+	u32 addr = GETBUFADDR( buf );
+	u32 used = buf->used >> 2;
+
+	u32 *p = GETBUFPTR( buf );
+
+	while ( used ) {
+		u32 reg, count;
+
+		reg = le32_to_cpu(*p++);
+		addr += 4;
+		used--;
+
+		count = (reg >> 16) + 1;
+		reg = reg & 0xffff;
+		reg = MMSELECT( reg );
+		while ( count && used ) {
+			DRM_INFO("%08x:\t%04x <- %08x\n", addr, reg, le32_to_cpu(*p));
+			p++;
+			addr += 4;
+			used--;
+			
+			reg += 4;
+			count--;
+		}
+	}
+}
+	
+void mach64_dump_ring_info( drm_mach64_private_t *dev_priv )
 {
 	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring;
 	int i, i0, i1;
 	
 	DRM_INFO( "\n" );
 	
-	DRM_INFO(": ring head_addr: 0x%08x head: %d tail: %d\n", ring->head_addr, ring->head, ring->tail );
+	DRM_INFO("\tring head_addr: 0x%08x head: %d tail: %d\n", ring->head_addr, ring->head, ring->tail );
 	
 	if ( ring->head <= ring->tail ) {
 		i0 = ring->head;
@@ -375,6 +424,22 @@ void mach64_dump_ring( drm_mach64_private_t *dev_priv )
 			i == ring->head ? " (head)" : "",
 			i == ring->tail ? " (tail)" : ""
 		);
+	}
+
+	{
+		struct list_head *ptr;
+		struct list_head *tmp;
+		u32 addr = ((u32 *)ring->start)[ring->head + 1];
+
+		list_for_each_safe(ptr, tmp, &dev_priv->pending) {
+			drm_mach64_freelist_t *entry = list_entry(ptr, drm_mach64_freelist_t, list);
+			drm_buf_t *buf = entry->buf;
+			u32 buf_addr = GETBUFADDR( buf );
+			
+			if ( buf_addr <= addr && addr < buf_addr + buf->used ) {
+				mach64_dump_buf_info ( dev_priv, buf );
+			}
+		}
 	}
 
 	DRM_INFO( "\n" );
@@ -720,6 +785,8 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 			dev_priv->driver_mode = MACH64_MODE_MMIO;
 			DRM_INFO( "DMA test failed (ret=%d), using pseudo-DMA mode\n", ret );
 		}
+
+		dev_priv->ring_running = 0;
 
 		/* setup offsets for physical address of table start and end */
 		dev_priv->ring.head_addr = dev_priv->ring.start_addr;
@@ -1071,28 +1138,6 @@ static int mach64_do_dispatch_pseudo_dma( drm_mach64_private_t *dev_priv )
 
 #endif /* MACH64_NO_BATCH_DISPATCH */
 
-void mach64_dma_start( drm_mach64_private_t *dev_priv )
-{
-#if MACH64_EXTRA_CHECKING
-	if ( (MACH64_READ(MACH64_SRC_CNTL) & MACH64_SRC_BM_ENABLE) ) {
-		DRM_ERROR("Call of mach64_dma_start with BM enabled!!!\n");
-		mach64_dump_ring( dev_priv );
-	}
-#endif
-	
-	mach64_do_wait_for_idle( dev_priv );
-		
-	/* enable bus mastering and block 1 registers */
-	MACH64_WRITE( MACH64_BUS_CNTL, 
-		      ( MACH64_READ(MACH64_BUS_CNTL) & 
-			~MACH64_BUS_MASTER_DIS ) 
-		      | MACH64_BUS_EXT_REG_EN );
-	/* enable GUI-master operation */
-	MACH64_WRITE( MACH64_SRC_CNTL, 
-		      MACH64_SRC_BM_ENABLE | MACH64_SRC_BM_SYNC |
-		      MACH64_SRC_BM_OP_SYSTEM_TO_REG );
-}
-
 /* IMPORTANT: This function should only be called when the engine is idle or locked up, 
  * as it assumes all buffers in the pending list have been completed by the hardware.
  */
@@ -1328,7 +1373,7 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 #if MACH64_EXTRA_CHECKING
 				if ( MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE ) {
 					DRM_ERROR( "Empty ring with non-idle engine!\n" );
-					mach64_dump_ring( dev_priv );
+					mach64_dump_ring_info( dev_priv );
 					return NULL;
 				}
 #endif
@@ -1354,7 +1399,7 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 						u32 o2 = GETBUFADDR( entry->buf );
 						if ( o1 == o2 ) {
 							DRM_ERROR ( "Attempting to free an used buffer: i=%d  buf=0x%08x (0x%08x)\n", i, o1, o2 );
-							mach64_dump_ring( dev_priv );
+							mach64_dump_ring_info( dev_priv );
 							return NULL;
 						}
 					}
@@ -1369,7 +1414,7 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 			}
 			udelay( 1 );
 		}
-		mach64_dump_ring( dev_priv );
+		mach64_dump_ring_info( dev_priv );
 		DRM_ERROR( "timeout waiting for buffers: ring head_addr: 0x%08x head: %d tail: %d\n", ring->head_addr, ring->head, ring->tail );
 		return NULL;
 	}

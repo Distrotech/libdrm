@@ -91,6 +91,8 @@ typedef struct drm_mach64_private {
 	atomic_t do_gui;       /* Flag for the bottom half to know what to do */
 	atomic_t do_blit;      /* Flag for the bottom half to know what to do */
 
+	int ring_running;
+	
 	/* DMA descriptor table (ring buffer) */
 	struct pci_pool *pool;   /* DMA memory pool */
 	drm_mach64_descriptor_ring_t ring;
@@ -143,10 +145,8 @@ extern int mach64_do_wait_for_idle( drm_mach64_private_t *dev_priv );
 extern int mach64_wait_ring( drm_mach64_private_t *dev_priv, int n );
 extern int mach64_do_release_used_buffers( drm_mach64_private_t *dev_priv );
 extern void mach64_dump_engine_info( drm_mach64_private_t *dev_priv );
-extern void mach64_dump_ring( drm_mach64_private_t *dev_priv );
+extern void mach64_dump_ring_info( drm_mach64_private_t *dev_priv );
 extern int mach64_do_engine_reset( drm_mach64_private_t *dev_priv );
-
-extern void mach64_dma_start( drm_mach64_private_t *dev_priv );
 
 extern int mach64_do_dma_idle( drm_mach64_private_t *dev_priv );
 extern int mach64_do_dma_flush( drm_mach64_private_t *dev_priv );
@@ -455,45 +455,130 @@ extern int mach64_dma_blit( struct inode *inode, struct file *filp,
  * Misc helper macros
  */
 
-#define UPDATE_RING_HEAD( dev_priv, ring )							\
-do {												\
-	int gui_active;										\
-	/* Start BM if it's not already on */							\
-	/* FIXME: This should be done with a private variable to avoid using the BUS. */	\
-	if ( !(MACH64_READ(MACH64_SRC_CNTL) & MACH64_SRC_BM_ENABLE) )				\
-		mach64_dma_start( dev_priv );							\
-	/* GUI_ACTIVE must be read before BM_GUI_TABLE to correctly determine the ring head */	\
-	gui_active = MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE;				\
-	(ring)->head_addr = (MACH64_READ(MACH64_BM_GUI_TABLE) & 0xfffffff0);			\
-	if ( gui_active ) {									\
-		/* If not idle, BM_GUI_TABLE points one descriptor past the current head */	\
-        	if ((ring)->head_addr == (ring)->start_addr)					\
-			(ring)->head_addr += (ring)->size;					\
-		(ring)->head_addr -= 4 * sizeof(u32);						\
-	}											\
-	if ( MACH64_EXTRA_CHECKING && ((ring)->head_addr < (ring)->start_addr ||		\
-	     (ring)->head_addr >= (ring)->start_addr + (ring)->size ) ) {			\
-		DRM_ERROR("Bad address in BM_GUI_TABLE: 0x%08x\n", (ring)->head_addr);		\
-		mach64_dump_ring( dev_priv );							\
-	} else {										\
-	(ring)->head = ((ring)->head_addr - (ring)->start_addr) / sizeof(u32);			\
-        if ( !gui_active && (ring)->head != (ring)->tail ) {					\
-		/* reset descriptor table ring head */						\
-		MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD,						\
-			( (ring)->head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB ) );		\
-		/* kick off the transfer */							\
-		MACH64_WRITE( MACH64_DST_HEIGHT_WIDTH, 0 );					\
-		DRM_DEBUG( "%s: new dispatch: head_addr: 0x%08x head: %d tail: %d space: %d\n",	\
-			__FUNCTION__, 								\
-			(ring)->head_addr, (ring)->head, (ring)->tail, (ring)->space);		\
-	}											\
-	}											\
+static inline void mach64_ring_start( drm_mach64_private_t *dev_priv )
+{
+	DRM_DEBUG( "%s: head_addr: 0x%08x head: %d tail: %d space: %d\n",
+		__FUNCTION__, 
+		dev_priv->ring.head_addr, dev_priv->ring.head, dev_priv->ring.tail, dev_priv->ring.space);
+
+	mach64_do_wait_for_idle( dev_priv );
+
+#if MACH64_EXTRA_CHECKING
+	if ( MACH64_READ(MACH64_SRC_CNTL) & MACH64_SRC_BM_ENABLE ) {
+		DRM_ERROR("Call of %s with BM enabled!!!\n", __FUNCTION__ );
+		mach64_dump_ring_info( dev_priv );
+		return;
+	}
+#endif
+	
+	/* enable bus mastering and block 1 registers */
+	MACH64_WRITE( MACH64_BUS_CNTL, 
+		      ( MACH64_READ(MACH64_BUS_CNTL) & 	~MACH64_BUS_MASTER_DIS ) 
+		      | MACH64_BUS_EXT_REG_EN );
+
+	/* enable GUI bus mastering, and sync the bus master to the GUI */
+	MACH64_WRITE( MACH64_SRC_CNTL, 
+		      MACH64_SRC_BM_ENABLE | MACH64_SRC_BM_SYNC |
+		      MACH64_SRC_BM_OP_SYSTEM_TO_REG );
+
+	/* FIXME: See mach64_ring_resume */
+	mach64_do_wait_for_idle( dev_priv );
+	
+	dev_priv->ring_running = 1;
+}
+
+static inline void mach64_ring_resume( drm_mach64_private_t *dev_priv, drm_mach64_descriptor_ring_t *ring )
+{
+	DRM_DEBUG( "%s: new dispatch: head_addr: 0x%08x head: %d tail: %d space: %d\n",
+		__FUNCTION__, 
+		ring->head_addr, ring->head, ring->tail, ring->space);
+
+#if 0
+	/* FIXME: at this moment this is always called on idle but we could gain something by just 
+	 * wait for FIFO when resuming the BM and in that case we will have to check for the apropriate
+	 * number of free entries here
+	 */
+	mach64_do_wait_for_fifo( dev_priv, 2 );
+#endif
+
+#if MACH64_EXTRA_CHECKING
+	if ( !(MACH64_READ(MACH64_SRC_CNTL) & MACH64_SRC_BM_ENABLE) ) {
+		DRM_ERROR("Call of %s without BM enabled!!!\n", __FUNCTION__ );
+		mach64_dump_ring_info( dev_priv );
+		return;
+	}
+
+	if ( MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE ) {
+		DRM_ERROR("Call of %s with GUI ACTIVE!!!\n", __FUNCTION__ );
+		mach64_dump_ring_info( dev_priv );
+		return;
+	}
+
+	if( ring->head_addr < ring->start_addr || ring->head_addr >= ring->start_addr + ring->size ) {
+		DRM_ERROR("Bad address in BM_GUI_TABLE: 0x%08x\n", (ring)->head_addr);
+		mach64_dump_ring_info( dev_priv );
+		return;
+	}
+#endif
+		
+	/* reset descriptor table ring head */
+	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, ring->head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB );
+	
+	/* kick off the transfer */
+	MACH64_WRITE( MACH64_DST_HEIGHT_WIDTH, 0 );
+}
+
+static inline void mach64_ring_stop( drm_mach64_private_t *dev_priv )
+{
+	DRM_DEBUG( "%s: head_addr: 0x%08x head: %d tail: %d space: %d\n",
+		__FUNCTION__, 
+		dev_priv->ring.head_addr, dev_priv->ring.head, dev_priv->ring.tail, dev_priv->ring.space);
+
+	/* restore previous SRC_CNTL to disable busmastering */
+	mach64_do_wait_for_fifo( dev_priv, 1 );
+	MACH64_WRITE( MACH64_SRC_CNTL, 0 );
+
+#if 1
+	/* FIXME: This probably can be safely removed from here. */ 
+	mach64_do_wait_for_idle( dev_priv );
+	MACH64_WRITE( MACH64_BUS_CNTL, MACH64_READ( MACH64_BUS_CNTL ) | MACH64_BUS_MASTER_DIS | MACH64_BUS_EXT_REG_EN );
+#endif
+		
+	dev_priv->ring_running = 0;
+}
+
+#define UPDATE_RING_HEAD( dev_priv, ring )								\
+do {													\
+	int gui_active;											\
+	DRM_DEBUG( "UPDATE_RING_HEAD\n" );								\
+													\
+	if ( !(dev_priv)->ring_running ) {								\
+		mach64_ring_start( dev_priv );								\
+	}												\
+	/* GUI_ACTIVE must be read before BM_GUI_TABLE to correctly determine the ring head */		\
+	/* FIXME: See mach64_ring_resume */								\
+	gui_active = MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE;					\
+	(ring)->head_addr = MACH64_READ(MACH64_BM_GUI_TABLE) & 0xfffffff0;				\
+	if ( gui_active ) {										\
+		/* If not idle, BM_GUI_TABLE points one descriptor past the current head */		\
+		if ( (ring)->head_addr == (ring)->start_addr ) {					\
+			(ring)->head_addr += (ring)->size;						\
+		}											\
+		(ring)->head_addr -= 4 * sizeof(u32);							\
+	}												\
+	(ring)->head = ((ring)->head_addr - (ring)->start_addr) / sizeof(u32);				\
+	if ( !gui_active && (ring)->head != (ring)->tail ) {						\
+		mach64_ring_resume( dev_priv, ring );							\
+	}												\
 } while (0)
 
 static inline void
 mach64_update_ring_snapshot( drm_mach64_private_t *dev_priv )
 {
 	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring;
+
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
+	
 	UPDATE_RING_HEAD( dev_priv, ring );
 	ring->space = (ring->head - ring->tail) * sizeof(u32);
 	if ( ring->space <= 0 ) {
@@ -511,9 +596,11 @@ do {									\
 	}								\
 } while (0)
 
-#if MACH64_NO_BATCH_DISPATCH
+/* FIXME: right now this is needed to ensure free buffers for state emits */
+/* CHECKME: I've disabled this as it isn't necessary - we already wait for free buffers */
+#define RING_SPACE_TEST_WITH_RETURN( dev_priv )						 
 
-#define RING_SPACE_TEST_WITH_RETURN( dev_priv )						\
+#define RING_SPACE_TEST_WITH_RETURN_( dev_priv )					\
 do {											\
 	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring; int i;			\
 	if ( ring->space < ring->high_mark ) {						\
@@ -530,31 +617,6 @@ do {											\
 	}										\
  __ring_space_done:									\
 } while (0)
-
-#else
-
-/* Check for high water mark and flush if reached */
-/* FIXME: right now this is needed to ensure free buffers for state emits */
-/* CHECKME: I've disabled this as it isn't necessary - we already wait for free buffers */
-#define RING_SPACE_TEST_WITH_RETURN( dev_priv )						 
-
-#define RING_SPACE_TEST_WITH_RETURN_( dev_priv )					 \
-do {											 \
-	struct list_head *ptr;								 \
-	int ret, queued = 0;								 \
-	if (list_empty(&dev_priv->dma_queue)) goto __queue_space_done;			 \
-	list_for_each(ptr, &dev_priv->dma_queue) {					 \
-		queued++;								 \
-	}										 \
-	if (queued >= MACH64_DMA_SIZE) {						 \
-		DRM_DEBUG("%s: high mark reached: %d\n", __FUNCTION__, MACH64_DMA_SIZE); \
-		if ((ret=mach64_do_dma_flush( dev_priv )) < 0)				 \
-			return ret;							 \
-	}										 \
-__queue_space_done:									 \
-} while (0)
-
-#endif /* MACH64_NO_BATCH_DISPATCH */
 
 #if MACH64_USE_BUFFER_AGING
 
@@ -620,6 +682,8 @@ do {											\
 		}									\
 	}										\
 	dev_priv->ring.space -= (n) * sizeof(u32);					\
+	/* HACK: force to always call UPDATE_RING_HEAD */				\
+	/*dev_priv->ring.space = 0;*/							\
 	ring = (u32 *) dev_priv->ring.start;						\
 	tail = write = dev_priv->ring.tail;						\
 	mask = dev_priv->ring.tail_mask;						\
