@@ -74,6 +74,9 @@ static int mach64_emit_cliprect( drm_mach64_private_t *dev_priv,
 	DMALOCALS;
 
 	/* Get GL scissor */
+	/* FIXME: store scissor in SAREA as a cliprect instead of in
+	 * hardware format, or do intersection client-side
+	 */
 	scissor.x1 = regs->sc_left_right & 0xffff;
 	scissor.x2 = (regs->sc_left_right & 0xffff0000) >> 16;
 	scissor.y1 = regs->sc_top_bottom & 0xffff;

@@ -60,10 +60,6 @@
 #define MACH64_UPLOAD_CONTEXT		0x00ff
 #define MACH64_UPLOAD_ALL		0x1fff
 
-#define MACH64_FRONT			0x1
-#define MACH64_BACK			0x2
-#define MACH64_DEPTH			0x4
-
 /* DMA buffer size
  */
 #define MACH64_BUFFER_SIZE		16384
@@ -168,6 +164,24 @@ typedef struct drm_mach64_sarea {
 #define DRM_IOCTL_MACH64_BLIT           DRM_IOW( 0x46, drm_mach64_blit_t)
 #define DRM_IOCTL_MACH64_FLUSH          DRM_IO(  0x47)
 
+/* Buffer flags for clears
+ */
+#define MACH64_FRONT			0x1
+#define MACH64_BACK			0x2
+#define MACH64_DEPTH			0x4
+
+/* Primitive types for vertex buffers
+ */
+#define MACH64_PRIM_POINTS		0x00000000
+#define MACH64_PRIM_LINES		0x00000001
+#define MACH64_PRIM_LINE_LOOP		0x00000002
+#define MACH64_PRIM_LINE_STRIP		0x00000003
+#define MACH64_PRIM_TRIANGLES		0x00000004
+#define MACH64_PRIM_TRIANGLE_STRIP	0x00000005
+#define MACH64_PRIM_TRIANGLE_FAN	0x00000006
+#define MACH64_PRIM_QUADS		0x00000007
+#define MACH64_PRIM_QUAD_STRIP		0x00000008
+#define MACH64_PRIM_POLYGON		0x00000009
 
 typedef struct drm_mach64_init {
 	enum {
