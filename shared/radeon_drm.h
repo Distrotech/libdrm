@@ -364,6 +364,9 @@ typedef struct {
 #define DRM_IOCTL_RADEON_CMDBUF     DRM_IOW( 0x50, drm_radeon_cmd_buffer_t)
 #define DRM_IOCTL_RADEON_GETPARAM   DRM_IOWR(0x51, drm_radeon_getparam_t)
 #define DRM_IOCTL_RADEON_FLIP	    DRM_IO(  0x52)
+#define DRM_IOCTL_RADEON_ALLOC      DRM_IOWR( 0x53, drm_radeon_mem_alloc_t)
+#define DRM_IOCTL_RADEON_FREE       DRM_IOW( 0x54, drm_radeon_mem_free_t)
+#define DRM_IOCTL_RADEON_INIT_HEAP  DRM_IOW( 0x55, drm_radeon_mem_init_heap_t)
 
 typedef struct drm_radeon_init {
 	enum {
@@ -508,5 +511,26 @@ typedef struct drm_radeon_getparam {
 	int param;
 	int *value;
 } drm_radeon_getparam_t;
+
+#define RADEON_MEM_REGION_AGP 1
+#define RADEON_MEM_REGION_FB  2
+
+typedef struct drm_radeon_mem_alloc {
+	int region;
+	int alignment;
+	int size;
+	int *region_offset;	/* offset from start of fb or agp */
+} drm_radeon_mem_alloc_t;
+
+typedef struct drm_radeon_mem_free {
+	int region;
+	int region_offset;
+} drm_radeon_mem_free_t;
+
+typedef struct drm_radeon_mem_init_heap {
+	int region;
+	int size;
+	int start;	
+} drm_radeon_mem_init_heap_t;
 
 #endif

@@ -61,6 +61,15 @@ typedef struct drm_radeon_depth_clear_t {
 	u32 se_cntl;
 } drm_radeon_depth_clear_t;
 
+
+struct mem_block {
+	struct mem_block *next;
+	struct mem_block *prev;
+	int start;
+	int size;
+	int pid;		/* 0: free, -1: heap, other: real pids */
+};
+
 typedef struct drm_radeon_private {
 	drm_radeon_ring_buffer_t ring;
 	drm_radeon_sarea_t *sarea_priv;
@@ -126,6 +135,9 @@ typedef struct drm_radeon_private {
 	drm_map_t *ring_rptr;
 	drm_map_t *buffers;
 	drm_map_t *agp_textures;
+
+	struct mem_block *agp_heap;
+	struct mem_block *fb_heap;
 } drm_radeon_private_t;
 
 typedef struct drm_radeon_buf_priv {
@@ -163,6 +175,13 @@ extern int radeon_cp_vertex2( DRM_IOCTL_ARGS );
 extern int radeon_cp_cmdbuf( DRM_IOCTL_ARGS );
 extern int radeon_cp_getparam( DRM_IOCTL_ARGS );
 extern int radeon_cp_flip( DRM_IOCTL_ARGS );
+
+extern int radeon_mem_alloc( DRM_IOCTL_ARGS );
+extern int radeon_mem_free( DRM_IOCTL_ARGS );
+extern int radeon_mem_init_heap( DRM_IOCTL_ARGS );
+extern void radeon_mem_takedown( struct mem_block **heap );
+extern void radeon_mem_release( struct mem_block *heap );
+
 
 /* Flags for stats.boxes
  */

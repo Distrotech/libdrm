@@ -1306,6 +1306,9 @@ static int radeon_do_init_pageflip( drm_device_t *dev )
 	return 0;
 }
 
+/* Called whenever a client dies, from DRM(release).
+ * NOTE:  Lock isn't necessarily held when this is called!
+ */
 int radeon_do_cleanup_pageflip( drm_device_t *dev )
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;

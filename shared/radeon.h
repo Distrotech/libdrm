@@ -48,10 +48,10 @@
 
 #define DRIVER_NAME		"radeon"
 #define DRIVER_DESC		"ATI Radeon"
-#define DRIVER_DATE		"20020611"
+#define DRIVER_DATE		"20020828"
 
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		5
+#define DRIVER_MINOR		6
 #define DRIVER_PATCHLEVEL	0
 
 /* Interface history:
@@ -68,6 +68,7 @@
  * 1.5 - Add r200 packets to cmdbuf ioctl
  *     - Add r200 function to init ioctl
  *     - Add 'scalar2' instruction to cmdbuf
+ * 1.6 - Add static agp memory manager
  */
 #define DRIVER_IOCTLS							     \
  [DRM_IOCTL_NR(DRM_IOCTL_DMA)]               = { radeon_cp_buffers,  1, 0 }, \
@@ -88,21 +89,37 @@
  [DRM_IOCTL_NR(DRM_IOCTL_RADEON_VERTEX2)]    = { radeon_cp_vertex2,  1, 0 }, \
  [DRM_IOCTL_NR(DRM_IOCTL_RADEON_CMDBUF)]     = { radeon_cp_cmdbuf,   1, 0 }, \
  [DRM_IOCTL_NR(DRM_IOCTL_RADEON_GETPARAM)]   = { radeon_cp_getparam, 1, 0 }, \
- [DRM_IOCTL_NR(DRM_IOCTL_RADEON_FLIP)]       = { radeon_cp_flip,     1, 0 }, 
+ [DRM_IOCTL_NR(DRM_IOCTL_RADEON_FLIP)]       = { radeon_cp_flip,     1, 0 }, \
+ [DRM_IOCTL_NR(DRM_IOCTL_RADEON_ALLOC)]      = { radeon_mem_alloc,   1, 0 }, \
+ [DRM_IOCTL_NR(DRM_IOCTL_RADEON_FREE)]       = { radeon_mem_free,    1, 0 }, \
+ [DRM_IOCTL_NR(DRM_IOCTL_RADEON_INIT_HEAP)]  = { radeon_mem_init_heap, 1, 1 },
 
-/* Driver customization:
+/* When a client dies:
+ *    - Check for and clean up flipped page state
+ *    - Free any alloced agp memory.
+ *
+ * DRM infrastructure takes care of reclaiming dma buffers.
  */
-#define DRIVER_PRERELEASE() do {					\
+#define DRIVER_RELEASE() do {						\
 	if ( dev->dev_private ) {					\
 		drm_radeon_private_t *dev_priv = dev->dev_private;	\
 		if ( dev_priv->page_flipping ) {			\
 			radeon_do_cleanup_pageflip( dev );		\
 		}							\
+                radeon_mem_release( dev_priv->agp_heap );		\
 	}								\
 } while (0)
 
+/* On unloading the module:
+ *    - Free memory heap structure
+ *    - Remove mappings made at startup and free dev_private.
+ */
 #define DRIVER_PRETAKEDOWN() do {					\
-	if ( dev->dev_private ) radeon_do_cleanup_cp( dev );		\
+	if ( dev->dev_private ) {					\
+		drm_radeon_private_t *dev_priv = dev->dev_private;	\
+		radeon_mem_takedown( &(dev_priv->agp_heap) );		\
+		radeon_do_cleanup_cp( dev );				\
+	}								\
 } while (0)
 
 /* DMA customization:
