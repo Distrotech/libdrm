@@ -686,7 +686,7 @@ static int drm_count_cards(void)
 		if(device == 0xffff) device = PCI_ANY_ID;
 		if(vendor == 0xffff) vendor = PCI_ANY_ID;
 		while ((pdev = pci_find_device(vendor, device, pdev))) {
-			num++;
+			num++;	/* FIXME: What about two cards of the same device id? */
 		}
 	}
 #else
@@ -758,6 +758,7 @@ static int DRM(init)( device_t nbdev )
 		dev->name   = DRIVER_NAME;
 #endif /* __linux__ */
 #ifdef __FreeBSD__
+		DRM(minor)[i]=unit;
 		DRM_OS_SPININIT(dev->count_lock, "drm device");
 		lockinit(&dev->dev_lock, PZERO, "drmlk", 0, 0);
 		dev->device = nbdev;

@@ -97,7 +97,7 @@ int DRM(waitlist_put)(drm_waitlist_t *bl, drm_buf_t *buf)
 	spin_lock_irqsave(&bl->write_lock, flags);
 #endif /* __linux__ */
 #ifdef __FreeBSD__
-	simple_lock(&bl->write_lock);
+	DRM_OS_SPINLOCK(&bl->write_lock);
 	s = spldrm();
 #endif /* __FreeBSD__ */
 	*bl->wp = buf;
@@ -107,7 +107,7 @@ int DRM(waitlist_put)(drm_waitlist_t *bl, drm_buf_t *buf)
 #endif /* __linux__ */
 #ifdef __FreeBSD__
 	splx(s);
-	simple_unlock(&bl->write_lock);
+	DRM_OS_SPINUNLOCK(&bl->write_lock);
 #endif /* __FreeBSD__ */
 
 	return 0;
@@ -134,17 +134,17 @@ drm_buf_t *DRM(waitlist_get)(drm_waitlist_t *bl)
 	spin_unlock_irqrestore(&bl->read_lock, flags);
 #endif /* __linux__ */
 #ifdef __FreeBSD__
-	simple_lock(&bl->read_lock);
+	DRM_OS_SPINLOCK(&bl->read_lock);
 	s = spldrm();
 	buf = *bl->rp;
 	if (bl->rp == bl->wp) {
 		splx(s);
-		simple_unlock(&bl->read_lock);
+		DRM_OS_SPINUNLOCK(&bl->read_lock);
 		return NULL;
 	}				     
 	if (++bl->rp >= bl->end) bl->rp = bl->bufs;
 	splx(s);
-	simple_unlock(&bl->read_lock);
+	DRM_OS_SPINUNLOCK(&bl->read_lock);
 #endif /* __FreeBSD__ */
 	
 	return buf;

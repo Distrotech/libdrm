@@ -85,10 +85,14 @@
 		return EINVAL;					\
 	}
 
-#define DRM_OS_DELAY( delay )				\
+#define DRM_OS_DELAY( udelay )					\
 do {								\
-	static int never;					\
-	tsleep(&never, PZERO|PCATCH, "drmdelay", delay );	\
+	struct timeval tv1, tv2;				\
+	microtime(&tv1);					\
+	do {							\
+		microtime(&tv2);				\
+	}							\
+	while (((tv2.tv_sec-tv1.tv_sec)*1000000 + tv2.tv_usec - tv1.tv_usec) < udelay ); \
 } while (0)
 
 #define DRM_OS_RETURN(v)	return v;
