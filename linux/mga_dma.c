@@ -578,10 +578,25 @@ static inline int mga_decide_to_fire(drm_device_t *dev)
 	   (atomic_read(&dev_priv->in_flush) && dev_priv->next_prim->num_dwords)) {
 	   	atomic_inc(&dma->total_prio);
 	   	return 1;
+	}   
+   	if(atomic_read(&dev_priv->pending_bufs) <= (MGA_NUM_PRIM_BUFS - 1)) {
+	   
+	   if(test_bit(0, &dev_priv->next_prim->swap_pending)) {
+	      atomic_inc(&dma->total_dmas);
+	      return 1;
+	   }
 	}
-   	if(test_bit(0, &dev_priv->next_prim->swap_pending)) {
-	   	atomic_inc(&dma->total_dmas);
-	   	return 1;
+   	if(atomic_read(&dev_priv->pending_bufs) <= (MGA_NUM_PRIM_BUFS / 2)) {
+	   if(dev_priv->next_prim->sec_used >= (MGA_DMA_BUF_NR / 8)) {
+	      atomic_inc(&dma->total_hit);
+	      return 1;
+	   }
+	}
+   	if(atomic_read(&dev_priv->pending_bufs) >= (MGA_NUM_PRIM_BUFS / 2)) {
+	   if(dev_priv->next_prim->sec_used >= (MGA_DMA_BUF_NR / 4)) {
+	      atomic_inc(&dma->total_missed_free);
+	      return 1;
+	   }
 	}
 
    	atomic_inc(&dma->total_tried);
