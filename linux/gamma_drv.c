@@ -56,23 +56,13 @@
 	[DRM_IOCTL_NR(DRM_IOCTL_DMA)]	     = { gamma_dma,	  1, 0 }
 
 #ifdef __FreeBSD__
-static int gamma_probe(device_t dev)
-{
-	const char *s = 0;
-
-	switch (pci_get_devid(dev)) {
-	case 0x00083d3d:
-		s = "3DLabs Gamma";
-		break;
-	}
-
-	if (s) {
-		device_set_desc(dev, s);
-		return 0;
-	}
-
-	return ENXIO;
-}
+/* List acquired from http://www.yourvote.com/pci/pcihdr.h and xc/xc/programs/Xserver/hw/xfree86/common/xf86PciInfo.h
+ * Please report to anholt@teleport.com inaccuracies or if a chip you have works that is marked unsupported here.
+ */
+drm_chipinfo_t DRM(devicelist)[] = {
+	{0x3d3d, 0x0008, 1, "3DLabs Gamma"},
+	{0, 0, 0, NULL}
+};
 #endif
 
 

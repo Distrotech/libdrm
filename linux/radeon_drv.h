@@ -651,7 +651,7 @@ do {									\
 	drm_radeon_sarea_t *sarea_priv = dev_priv->sarea_priv;		\
 	if ( sarea_priv->last_dispatch >= RADEON_MAX_VB_AGE ) {		\
 		int __ret = radeon_do_cp_idle( dev_priv );		\
-		if ( __ret < 0 ) return __ret;				\
+		if ( __ret ) return __ret;				\
 		sarea_priv->last_dispatch = 0;				\
 		radeon_freelist_reset( dev );				\
 	}								\

@@ -265,6 +265,8 @@ do {									\
 #define DRM_OS_SPINLOCK(l)	spin_lock(l)
 #define DRM_OS_SPINUNLOCK(u)	spin_unlock(u)
 #define DRM_OS_IOCTL	struct inode *inode, struct file *filp, unsigned int cmd, unsigned long data
+#define DRM_OS_TASKQUEUE_ARGS	void *dev
+#define DRM_OS_IRQ_ARGS	int irq, void *device, struct pt_regs *regs
 #define DRM_OS_DEVICE	drm_file_t	*priv	= filp->private_data; \
 			drm_device_t	*dev	= priv->dev
 #define DRM_OS_PRIV
@@ -283,6 +285,7 @@ do {									\
 	copy_from_user(arg1, arg2, arg3)
 #define DRM_OS_MALLOC(x) kmalloc(x, 0)
 #define DRM_OS_FREE(x) kfree(x)
+#define DRM_OS_VTOPHYS(addr) virt_to_phys(addr)
 
 #define DRM_OS_READMEMORYBARRIER mb()
 #define DRM_OS_WRITEMEMORYBARRIER wmb()

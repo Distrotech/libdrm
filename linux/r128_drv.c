@@ -58,35 +58,52 @@
 #define DRIVER_PATCHLEVEL	0
 
 #ifdef __FreeBSD__
-static int r128_probe(device_t dev)
-{
-	const char *s = 0;
-
-	switch (pci_get_devid(dev)) {
-	case 0x52451002:
-		s = "ATI Rage 128-RE";
-		break;
-	case 0x52461002:
-		s = "ATI Rage 128-RF";
-		break;
-	case 0x524b1002:
-		s = "ATI Rage 128-RK";
-		break;
-	case 0x524c1002:
-		s = "ATI Rage 128-RL";
-		break;
-	case 0x50461002:
-		s = "ATI Rage 128 Pro PF";
-		break;
-	}
-
-	if (s) {
-		device_set_desc(dev, s);
-		return 0;
-	}
-
-	return ENXIO;
-}
+/* List acquired from http://www.yourvote.com/pci/pcihdr.h and xc/xc/programs/Xserver/hw/xfree86/common/xf86PciInfo.h
+ * Please report to anholt@teleport.com inaccuracies or if a chip you have works that is marked unsupported here.
+ */
+drm_chipinfo_t DRM(devicelist)[] = {
+	{0x1002, 0x4c45, 1, "ATI Rage 128 Mobility LE"},
+	{0x1002, 0x4c46, 1, "ATI Rage 128 Mobility LF"},
+	{0x1002, 0x4d46, 1, "ATI Rage 128 Mobility MF (AGP 4x)"},
+	{0x1002, 0x4d4c, 1, "ATI Rage 128 Mobility ML"},
+	{0x1002, 0x5041, 0, "ATI Rage 128 Pro PA (PCI)"},
+	{0x1002, 0x5042, 1, "ATI Rage 128 Pro PB (AGP 2x)"},
+	{0x1002, 0x5043, 1, "ATI Rage 128 Pro PC (AGP 4x)"},
+	{0x1002, 0x5044, 0, "ATI Rage 128 Pro PD (PCI)"},
+	{0x1002, 0x5045, 1, "ATI Rage 128 Pro PE (AGP 2x)"},
+	{0x1002, 0x5046, 1, "ATI Rage 128 Pro PF (AGP 4x)"},
+	{0x1002, 0x5047, 0, "ATI Rage 128 Pro PG (PCI)"},
+	{0x1002, 0x5048, 1, "ATI Rage 128 Pro PH (AGP)"},
+	{0x1002, 0x5049, 1, "ATI Rage 128 Pro PI (AGP)"},
+	{0x1002, 0x504a, 0, "ATI Rage 128 Pro PJ (PCI)"},
+	{0x1002, 0x504b, 1, "ATI Rage 128 Pro PK (AGP)"},
+	{0x1002, 0x504c, 1, "ATI Rage 128 Pro PL (AGP)"},
+	{0x1002, 0x504d, 0, "ATI Rage 128 Pro PM (PCI)"},
+	{0x1002, 0x504e, 1, "ATI Rage 128 Pro PN (AGP)"},
+	{0x1002, 0x505f, 1, "ATI Rage 128 Pro PO (AGP)"},
+	{0x1002, 0x5050, 0, "ATI Rage 128 Pro PP (PCI)"},
+	{0x1002, 0x5051, 1, "ATI Rage 128 Pro PQ (AGP)"},
+	{0x1002, 0x5052, 1, "ATI Rage 128 Pro PR (AGP)"},
+	{0x1002, 0x5053, 0, "ATI Rage 128 Pro PS (PCI)"},
+	{0x1002, 0x5054, 1, "ATI Rage 128 Pro PT (AGP)"},
+	{0x1002, 0x5055, 1, "ATI Rage 128 Pro PU (AGP)"},
+	{0x1002, 0x5056, 0, "ATI Rage 128 Pro PV (PCI)"},
+	{0x1002, 0x5057, 1, "ATI Rage 128 Pro PW (AGP)"},
+	{0x1002, 0x5058, 1, "ATI Rage 128 Pro PX (AGP)"},
+	{0x1002, 0x5245, 0, "ATI Rage 128 GL (PCI)"},
+	{0x1002, 0x5246, 1, "ATI Rage 128 GL (AGP 2x)"},
+	{0x1002, 0x524b, 0, "ATI Rage 128 VR (PCI)"},
+	{0x1002, 0x524c, 1, "ATI Rage 128 VR (AGP 2x)"},
+	{0x1002, 0x5345, 0, "ATI Rage 128 SE (PCI)"},
+	{0x1002, 0x5346, 1, "ATI Rage 128 SF (AGP 2x)"},
+	{0x1002, 0x5347, 1, "ATI Rage 128 SG (AGP 4x)"},
+	{0x1002, 0x5348, 0, "ATI Rage 128 SH (unknown)"},
+	{0x1002, 0x534b, 0, "ATI Rage 128 SK (PCI)"},
+	{0x1002, 0x534c, 1, "ATI Rage 128 SL (AGP 2x)"},
+	{0x1002, 0x534d, 1, "ATI Rage 128 SM (AGP 4x)"},
+	{0x1002, 0x534e, 1, "ATI Rage 128 (AGP 4x?)"},
+	{0, 0, 0, NULL}
+};
 #endif
 
 #define DRIVER_IOCTLS							    \

@@ -534,14 +534,14 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 	DRM_IOREMAP( dev_priv->buffers );
 
 	ret = mga_warp_install_microcode( dev );
-	if ( ret < 0 ) {
+	if ( ret ) {
 		DRM_ERROR( "failed to install WARP ucode!\n" );
 		mga_do_cleanup_dma( dev );
 		return ret;
 	}
 
 	ret = mga_warp_init( dev );
-	if ( ret < 0 ) {
+	if ( ret ) {
 		DRM_ERROR( "failed to init WARP engine!\n" );
 		mga_do_cleanup_dma( dev );
 		return ret;
@@ -586,7 +586,7 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 	dev_priv->sarea_priv->last_frame.head = 0;
 	dev_priv->sarea_priv->last_frame.wrap = 0;
 
-	if ( mga_freelist_init( dev ) < 0 ) {
+	if ( mga_freelist_init( dev ) ) {
 		DRM_ERROR( "could not initialize freelist\n" );
 		mga_do_cleanup_dma( dev );
 		DRM_OS_RETURN(ENOMEM);
@@ -665,7 +665,7 @@ int mga_dma_flush( DRM_OS_IOCTL )
 	if ( lock.flags & _DRM_LOCK_QUIESCENT ) {
 #if MGA_DMA_DEBUG
 		int ret = mga_do_wait_for_idle( dev_priv );
-		if ( ret < 0 )
+		if ( ret )
 			DRM_INFO( __FUNCTION__": -EBUSY\n" );
 		return ret;
 #else

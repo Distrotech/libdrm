@@ -44,10 +44,10 @@ typedef struct drm_gamma_private {
 #define LOCK_TEST_WITH_RETURN( dev )					\
 do {									\
 	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||		\
-	     dev->lock.pid != current->pid ) {				\
+	     dev->lock.pid != DRM_OS_CURRENTPID ) {				\
 		DRM_ERROR( "%s called without lock held\n",		\
 			   __FUNCTION__ );				\
-		return -EINVAL;						\
+		DRM_OS_RETURN( EINVAL );						\
 	}								\
 } while (0)
 

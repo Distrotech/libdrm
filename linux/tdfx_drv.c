@@ -56,31 +56,17 @@
 
 
 #ifdef __FreeBSD__
-static int tdfx_probe(device_t dev)
-{
-	const char *s = 0;
-
-	switch (pci_get_devid(dev)) {
-	case 0x0003121a:
-		s = "3Dfx Voodoo Banshee graphics accelerator";
-		break;
-		
-	case 0x0005121a:
-		s = "3Dfx Voodoo 3 graphics accelerator";
-		break;
-
-	case 0x0009121a:
-		s = "3Dfx Voodoo 4/5 graphics accelerator";
-		break;
-	}
-	
-	if (s) {
-		device_set_desc(dev, s);
-		return 0;
-	}
-	
-	return ENXIO;
-}
+/* List acquired from http://www.yourvote.com/pci/pcihdr.h and xc/xc/programs/Xserver/hw/xfree86/common/xf86PciInfo.h
+ * Please report to anholt@teleport.com inaccuracies or if a chip you have works that is marked unsupported here.
+ */
+drm_chipinfo_t DRM(devicelist)[] = {
+	{0x121a, 0x0003, 1, "3dfx Voodoo Banshee"},
+	{0x121a, 0x0004, 1, "3dfx Voodoo3 2000"},
+	{0x121a, 0x0005, 1, "3dfx Voodoo3 3000"},
+	{0x121a, 0x0007, 1, "3dfx Voodoo4"},
+	{0x121a, 0x0009, 1, "3dfx Voodoo5"},
+	{0, 0, 0, NULL}
+};
 #endif
 
 #include "drm_auth.h"

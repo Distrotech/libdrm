@@ -28,9 +28,12 @@
  * 
  */
 
+#ifdef __linux
 #define __NO_VERSION__
-#include "sis.h"
 #include <linux/sisfb.h>
+#endif
+
+#include "sis.h"
 #include "drmP.h"
 #include "sis_drm.h"
 #include "sis_drv.h"
@@ -73,15 +76,13 @@ static int del_alloc_set(int context, int type, unsigned int val)
 
 /* fb management via fb device */ 
 #if 1
-int sis_fb_alloc(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg)
+int sis_fb_alloc( DRM_OS_IOCTL )
 {
   drm_sis_mem_t fb;
   struct sis_memreq req;
   int retval = 0;
    
-  if (copy_from_user(&fb, (drm_sis_mem_t *)arg, sizeof(fb)))
-	  return -EFAULT;
+  DRM_OS_KRNFROMUSR( fb, (drm_sis_mem_t *) data, sizeof(fb) );
   
   req.size = fb.size;
   sis_malloc(&req);
@@ -101,21 +102,19 @@ int sis_fb_alloc(struct inode *inode, struct file *filp, unsigned int cmd,
     fb.free = 0;
   }
    
-  if (copy_to_user((drm_sis_mem_t *)arg, &fb, sizeof(fb))) return -EFAULT;
+  DRM_OS_KRNTOUSR( (drm_sis_mem_t *) data, fb, sizeof(fb) );
 
   DRM_DEBUG("alloc fb, size = %d, offset = %ld\n", fb.size, req.offset);
 
   return retval;
 }
 
-int sis_fb_free(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg)
+int sis_fb_free( DRM_OS_IOCTL )
 {
   drm_sis_mem_t fb;
   int retval = 0;
     
-  if (copy_from_user(&fb, (drm_sis_mem_t *)arg, sizeof(fb)))
-	  return -EFAULT;
+  DRM_OS_KRNFROMUSR( fb, (drm_sis_mem_t *) data, sizeof(fb) );
   
   if(!fb.free){
     return -1;
@@ -132,14 +131,12 @@ int sis_fb_free(struct inode *inode, struct file *filp, unsigned int cmd,
 
 #else
 
-int sis_fb_alloc(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg)
+int sis_fb_alloc( DRM_OS_IOCTL )
 {
   return -1;
 }
 
-int sis_fb_free(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg)
+int sis_fb_free( DRM_OS_IOCTL )
 {
   return 0;
 }
@@ -151,13 +148,11 @@ int sis_fb_free(struct inode *inode, struct file *filp, unsigned int cmd,
 
 static memHeap_t *AgpHeap = NULL;
 
-int sisp_agp_init(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg)
+int sisp_agp_init( DRM_OS_IOCTL )
 {
   drm_sis_agp_t agp;
    
-  if (copy_from_user(&agp, (drm_sis_agp_t *)arg, sizeof(agp)))
-	  return -EFAULT;
+  DRM_OS_KRNFROMUSR( agp, (drm_sis_agp_t *) data, sizeof(agp) );
 
   AgpHeap = mmInit(agp.offset, agp.size);
 
@@ -166,8 +161,7 @@ int sisp_agp_init(struct inode *inode, struct file *filp, unsigned int cmd,
   return 0;
 }
 
-int sisp_agp_alloc(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg)
+int sisp_agp_alloc( DRM_OS_IOCTL )
 {
   drm_sis_mem_t agp;
   PMemBlock block;
@@ -176,8 +170,7 @@ int sisp_agp_alloc(struct inode *inode, struct file *filp, unsigned int cmd,
   if(!AgpHeap)
     return -1;
   
-  if (copy_from_user(&agp, (drm_sis_mem_t *)arg, sizeof(agp)))
-	  return -EFAULT;
+  DRM_OS_KRNFROMUSR( agp, (drm_sis_mem_t *) data, sizeof(agp));
   
   block = mmAllocMem(AgpHeap, agp.size, 0, 0);
   if(block){
@@ -196,15 +189,14 @@ int sisp_agp_alloc(struct inode *inode, struct file *filp, unsigned int cmd,
     agp.free = 0;
   }
    
-  if (copy_to_user((drm_sis_mem_t *)arg, &agp, sizeof(agp))) return -EFAULT;
+  DRM_OS_KRNTOUSR( (drm_sis_mem_t *) data, agp, sizeof(agp) );
 
   DRM_DEBUG("alloc agp, size = %d, offset = %d\n", agp.size, agp.offset);
 
   return retval;
 }
 
-int sisp_agp_free(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg)
+int sisp_agp_free( DRM_OS_IOCTL )
 {
   drm_sis_mem_t agp;
   int retval = 0;
@@ -212,8 +204,7 @@ int sisp_agp_free(struct inode *inode, struct file *filp, unsigned int cmd,
   if(!AgpHeap)
     return -1;
     
-  if (copy_from_user(&agp, (drm_sis_mem_t *)arg, sizeof(agp)))
-	  return -EFAULT;
+  DRM_OS_KRNFROMUSR( agp, (drm_sis_mem_t *) data, sizeof(agp));
   
   if(!agp.free){
     return -1;

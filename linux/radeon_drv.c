@@ -57,28 +57,17 @@
 #define DRIVER_PATCHLEVEL	1
 
 #ifdef __FreeBSD__
-static int radeon_probe(device_t dev)
-{
-	const char *s = 0;
-
-	switch (pci_get_devid(dev)) {
-	/* FIXME: Add radeon detection*/
-		/*case 0x0525102b:
-		s = "Matrox MGA G400 AGP graphics accelerator";
-		break;
-
-	case 0x0521102b:
-		s = "Matrox MGA G200 AGP graphics accelerator";
-		break; */
-	}
-
-	if (s) {
-		device_set_desc(dev, s);
-		return 0;
-	}
-
-	return ENXIO;
-}
+/* List acquired from http://www.yourvote.com/pci/pcihdr.h and xc/xc/programs/Xserver/hw/xfree86/common/xf86PciInfo.h
+ * Please report to anholt@teleport.com inaccuracies or if a chip you have works that is marked unsupported here.
+ */
+drm_chipinfo_t DRM(devicelist)[] = {
+	{0x1002, 0x5144, 1, "ATI Radeon QD"},
+	{0x1002, 0x5145, 1, "ATI Radeon QE"},
+	{0x1002, 0x5146, 1, "ATI Radeon QF"},
+	{0x1002, 0x5147, 1, "ATI Radeon QG"},
+	{0x1002, 0x5159, 1, "ATI Radeon VE"},
+	{0, 0, 0, NULL}
+};
 #endif
 
 #define DRIVER_IOCTLS							     \

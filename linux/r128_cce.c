@@ -161,7 +161,7 @@ int r128_do_wait_for_idle( drm_r128_private_t *dev_priv )
 	int i, ret;
 
 	ret = r128_do_wait_for_fifo( dev_priv, 64 );
-	if ( ret < 0 ) return ret;
+	if ( ret ) return ret;
 
 	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
 		if ( !(R128_READ( R128_GUI_STAT ) & R128_GUI_ACTIVE) ) {
@@ -683,7 +683,7 @@ int r128_cce_stop( DRM_OS_IOCTL )
 	 */
 	if ( stop.idle ) {
 		ret = r128_do_cce_idle( dev_priv );
-		if ( ret < 0 ) return ret;
+		if ( ret ) return ret;
 	}
 
 	/* Finally, we can turn off the CCE.  If the engine isn't idle,
@@ -929,7 +929,7 @@ int r128_wait_ring( drm_r128_private_t *dev_priv, int n )
 	DRM_OS_RETURN( EBUSY );
 }
 
-static int r128_cce_get_buffers( drm_device_t *dev, drm_dma_t *d,  int pid)
+static int r128_cce_get_buffers( drm_device_t *dev, drm_dma_t *d)
 {
 	int i;
 	drm_buf_t *buf;
@@ -938,7 +938,7 @@ static int r128_cce_get_buffers( drm_device_t *dev, drm_dma_t *d,  int pid)
 		buf = r128_freelist_get( dev );
 		if ( !buf ) DRM_OS_RETURN( EAGAIN );
 
-		buf->pid = pid;
+		buf->pid = DRM_OS_CURRENTPID;
 
 		 if ( DRM_OS_COPYTOUSR( &d->request_indices[i], &buf->idx,
 				   sizeof(buf->idx) ) )
@@ -981,7 +981,7 @@ int r128_cce_buffers( DRM_OS_IOCTL )
 	d.granted_count = 0;
 
 	if ( d.request_count ) {
-		ret = r128_cce_get_buffers( dev, &d, DRM_OS_CURRENTPID );
+		ret = r128_cce_get_buffers( dev, &d );
 	}
 
 	DRM_OS_KRNTOUSR((drm_dma_t *) data, d, sizeof(d) );

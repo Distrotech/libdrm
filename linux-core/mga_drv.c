@@ -55,27 +55,15 @@
 #define DRIVER_PATCHLEVEL	2
 
 #ifdef __FreeBSD__
-static int mga_probe(device_t dev)
-{
-	const char *s = 0;
-
-	switch (pci_get_devid(dev)) {
-	case 0x0525102b:
-		s = "Matrox MGA G400 AGP graphics accelerator";
-		break;
-
-	case 0x0521102b:
-		s = "Matrox MGA G200 AGP graphics accelerator";
-		break;
-	}
-
-	if (s) {
-		device_set_desc(dev, s);
-		return 0;
-	}
-
-	return ENXIO;
-}
+/* List acquired from http://www.yourvote.com/pci/pcihdr.h and xc/xc/programs/Xserver/hw/xfree86/common/xf86PciInfo.h
+ * Please report to anholt@teleport.com inaccuracies or if a chip you have works that is marked unsupported here.
+ */
+drm_chipinfo_t DRM(devicelist)[] = {
+	{0x102b, 0x0520, 0, "Matrox G200 (PCI)"},
+	{0x102b, 0x0521, 1, "Matrox G200 (AGP)"},
+	{0x102b, 0x0525, 1, "Matrox G400 (AGP)"},
+	{0, 0, 0, NULL}
+};
 #endif
 
 #define DRIVER_IOCTLS							   \

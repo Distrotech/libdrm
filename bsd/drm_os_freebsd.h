@@ -38,7 +38,6 @@
 #include <pci/agpvar.h>
 #endif
 
-#define DRM_WEIRD_MAPBUFS_BUG	1
 #define DRM_TIME_SLICE	      (hz/20)  /* Time slice for GLXContexts	  */
 
 #define DRM_DEV_MODE	(S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)
@@ -59,9 +58,12 @@
 #define DRM_OS_SPINUNLOCK(u)	simple_unlock(u);
 #endif
 #define DRM_OS_IOCTL	dev_t kdev, u_long cmd, caddr_t data, int flags, struct proc *p
+#define DRM_OS_TASKQUEUE_ARGS	void *dev, int pending
+#define DRM_OS_IRQ_ARGS	void *device
 #define DRM_OS_DEVICE	drm_device_t	*dev	= kdev->si_drv1
 #define DRM_OS_MALLOC(size) malloc( size, DRM(M_DRM), M_NOWAIT )
 #define DRM_OS_FREE(pt) free( pt, DRM(M_DRM) )
+#define DRM_OS_VTOPHYS(addr) vtophys(addr)
 
 #define DRM_OS_PRIV					\
 	drm_file_t	*priv	= (drm_file_t *) DRM(find_file_by_proc)(dev, p); \
@@ -77,7 +79,7 @@ do {								\
 } while (0)
 
 #define DRM_OS_RETURN(v)	return v;
-#define DRM_OS_CURRENTPID	p->p_pid
+#define DRM_OS_CURRENTPID	curproc->p_pid
 #define DRM_OS_KRNTOUSR(arg1, arg2, arg3) \
 	*arg1 = arg2
 #define DRM_OS_KRNFROMUSR(arg1, arg2, arg3) \
@@ -105,6 +107,14 @@ do {								\
 /* The macros confliced in the MALLOC_DEFINE */
 MALLOC_DECLARE(malloctype);
 #undef malloctype
+
+typedef struct drm_chipinfo
+{
+	int vendor;
+	int device;
+	int supported;
+	char *name;
+} drm_chipinfo_t;
 
 typedef unsigned long atomic_t;
 typedef u_int32_t cycles_t;
@@ -196,7 +206,7 @@ find_first_zero_bit(volatile unsigned long *p, int max)
 	} while (0)
 
 /* Redefinitions to make templating easy */
-#define wait_queue_head_t	int
+#define wait_queue_head_t	long
 #define agp_memory		void
 #define jiffies			ticks
 

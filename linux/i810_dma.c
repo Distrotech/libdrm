@@ -131,12 +131,13 @@ static int i810_freelist_put(drm_device_t *dev, drm_buf_t *buf)
    	used = cmpxchg(buf_priv->in_use, I810_BUF_CLIENT, I810_BUF_FREE);
    	if(used != I810_BUF_CLIENT) {
 	   	DRM_ERROR("Freeing buffer thats not in use : %d\n", buf->idx);
-	   	return -EINVAL;
+	   	DRM_OS_RETURN( EINVAL );
 	}
 
    	return 0;
 }
 
+#ifdef __linux__
 static struct file_operations i810_buffer_fops = {
 	open:	 DRM(open),
 	flush:	 DRM(flush),
@@ -147,6 +148,7 @@ static struct file_operations i810_buffer_fops = {
 	fasync:	 DRM(fasync),
       	poll:	 DRM(poll),
 };
+#endif
 
 int i810_mmap_buffers(struct file *filp, struct vm_area_struct *vma)
 {

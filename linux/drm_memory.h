@@ -277,13 +277,13 @@ char *DRM(strdup)(const char *s, int area)
 	return pt;
 }
 
-void DRM(strfree)(const char *s, int area)
+void DRM(strfree)(char *s, int area)
 {
 	unsigned int size;
 
 	if (!s) return;
 
-	size = 1 + (s ? strlen(s) : 0);
+	size = 1 + strlen(s);
 	DRM(free)((void *)s, size, area);
 }
 

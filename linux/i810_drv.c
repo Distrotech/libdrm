@@ -56,28 +56,10 @@
 #define DRIVER_PATCHLEVEL	0
 
 #ifdef __FreeBSD__
-static int i810_probe(device_t dev)
-{
-	const char *s = 0;
-
-	switch (pci_get_devid(dev)) {
-	/* FIXME: Add i810 detection*/
-	/*case 0x0525102b:
-		s = "Matrox MGA G400 AGP graphics accelerator";
-		break;
-
-	case 0x0521102b:
-		s = "Matrox MGA G200 AGP graphics accelerator";
-		break;*/
-	}
-
-	if (s) {
-		device_set_desc(dev, s);
-		return 0;
-	}
-
-	return ENXIO;
-}
+/* Device IDs unknown.  Can someone help?  anholt@teleport.com */
+drm_chipinfo_t DRM(devicelist)[] = {
+	{0, 0, 0, NULL}
+};
 #endif
 
 #define DRIVER_IOCTLS							    \

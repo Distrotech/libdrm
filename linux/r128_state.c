@@ -927,7 +927,7 @@ static int r128_cce_dispatch_write_span( drm_device_t *dev,
 		mask = DRM_OS_MALLOC( depth->n * sizeof(u8) );
 		if ( mask == NULL ) {
 			DRM_OS_FREE( buffer );
-			return -ENOMEM;
+			DRM_OS_RETURN( ENOMEM );
 		}
 		if ( DRM_OS_COPYFROMUSR( mask, depth->mask,
 				     depth->n * sizeof(u8) ) ) {

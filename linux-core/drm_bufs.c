@@ -40,6 +40,7 @@
 #include <vm/pmap.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_map.h>
+#include <vm/vm_param.h>
 #endif
 #include "drmP.h"
 
@@ -142,9 +143,9 @@ int DRM(addmap)( DRM_OS_IOCTL )
 			    && (entry->offset + entry->size) < (map->offset + map->size) ) 
 			|| ((entry->offset < map->offset)
 			    && (entry->offset + entry->size) >= (map->offset + map->size) ) )
-			DRM_DEBUG("map collission: add(0x%x-0x%x), current(0x%x-0x%x)\n", 
-				(int)entry->offset, (int)entry->offset + (int)entry->size - 1,
-				(int)map->offset,        (int)map->offset        + (int)map->size - 1);
+			DRM_DEBUG("map collission: add(0x%lx-0x%lx), current(0x%lx-0x%lx)\n", 
+				entry->offset, entry->offset + entry->size - 1,
+				map->offset, map->offset + map->size - 1);
 	}
 #endif
 
@@ -232,13 +233,7 @@ int DRM(addmap)( DRM_OS_IOCTL )
 #endif
 	DRM_OS_UNLOCK;
 
-#ifdef __linux__
-	if ( copy_to_user( (drm_map_t *)data, map, sizeof(*map) ) )
-		DRM_OS_RETURN(EFAULT);
-#endif
-#ifdef __FreeBSD__
-	*(drm_map_t *)data = *map;
-#endif
+	DRM_OS_KRNTOUSR((drm_map_t *)data, *map, sizeof(*map) );
 
 	if ( map->type != _DRM_SHM ) {
 #ifdef __linux__
@@ -403,7 +398,7 @@ int DRM(addbufs_agp)( DRM_OS_IOCTL )
 	DRM_DEBUG( "count:      %d\n",  count );
 	DRM_DEBUG( "order:      %d\n",  order );
 	DRM_DEBUG( "size:       %d\n",  size );
-	DRM_DEBUG( "agp_offset: 0x%x\n", (int)agp_offset );
+	DRM_DEBUG( "agp_offset: 0x%lx\n", agp_offset );
 	DRM_DEBUG( "alignment:  %d\n",  alignment );
 	DRM_DEBUG( "page_order: %d\n",  page_order );
 	DRM_DEBUG( "total:      %d\n",  total );
@@ -746,7 +741,7 @@ int DRM(addbufs_sg)( DRM_OS_IOCTL )
        DRM_DEBUG( "count:      %d\n",  count );
        DRM_DEBUG( "order:      %d\n",  order );
        DRM_DEBUG( "size:       %d\n",  size );
-       DRM_DEBUG( "agp_offset: 0x%x\n", (int)agp_offset );
+       DRM_DEBUG( "agp_offset: 0x%lx\n", agp_offset );
        DRM_DEBUG( "alignment:  %d\n",  alignment );
        DRM_DEBUG( "page_order: %d\n",  page_order );
        DRM_DEBUG( "total:      %d\n",  total );
@@ -1047,6 +1042,7 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 #endif
 #ifdef __FreeBSD__
 	vm_offset_t virtual, address;
+	struct vmspace *vms = p->p_vmspace;
 #endif
 	drm_buf_map_t request;
 	int i;
@@ -1092,7 +1088,8 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 #endif
 
 #ifdef __FreeBSD__
-			retcode = vm_mmap(&p->p_vmspace->vm_map,
+			virtual = round_page((vm_offset_t)vms->vm_daddr + MAXDSIZ);
+			retcode = vm_mmap(&vms->vm_map,
 					  &virtual,
 					  round_page(map->size),
 					  PROT_READ|PROT_WRITE, VM_PROT_ALL,
@@ -1118,7 +1115,8 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 #endif
 #endif
 #ifdef __FreeBSD__
-			retcode = vm_mmap(&p->p_vmspace->vm_map,
+			virtual = round_page((vm_offset_t)vms->vm_daddr + MAXDSIZ);
+			retcode = vm_mmap(&vms->vm_map,
 					  &virtual,
 					  round_page(dma->byte_count),
 					  PROT_READ|PROT_WRITE, VM_PROT_ALL,
@@ -1170,6 +1168,7 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 	}
  done:
 	request.count = dma->buf_count;
+
 	DRM_DEBUG( "%d buffers, retcode = %d\n", request.count, retcode );
 
 	DRM_OS_KRNTOUSR( (drm_buf_map_t *)data, request, sizeof(request) );

@@ -29,12 +29,17 @@
  *    Gareth Hughes <gareth@valinux.com>
  */
 
-#define __NO_VERSION__
-#include "drmP.h"
-
+#ifdef __FreeBSD__
+#include <machine/bus.h>
+#include <machine/resource.h>
+#include <sys/rman.h>
+#endif
 #ifdef __linux__
+#define __NO_VERSION__
 #include <linux/interrupt.h>	/* For task queue support */
 #endif
+
+#include "drmP.h"
 
 #ifndef __HAVE_DMA_WAITQUEUE
 #define __HAVE_DMA_WAITQUEUE	0
@@ -256,7 +261,12 @@ void DRM(clear_next_buffer)(drm_device_t *dev)
 
 	dma->next_buffer = NULL;
 	if (dma->next_queue && !DRM_BUFCOUNT(&dma->next_queue->waitlist)) {
+#ifdef __linux
 		wake_up_interruptible(&dma->next_queue->flush_queue);
+#endif
+#ifdef __FreeBSD__
+		wakeup(&dma->next_queue->flush_queue);
+#endif
 	}
 	dma->next_queue	 = NULL;
 }
@@ -315,6 +325,7 @@ int DRM(select_queue)(drm_device_t *dev, void (*wrapper)(unsigned long))
 	    && candidate != dev->last_context
 	    && dev->last_switch <= j
 	    && dev->last_switch + DRM_TIME_SLICE > j) {
+#ifdef __linux__
 		if (dev->timer.expires != dev->last_switch + DRM_TIME_SLICE) {
 			del_timer(&dev->timer);
 			dev->timer.function = wrapper;
@@ -322,6 +333,17 @@ int DRM(select_queue)(drm_device_t *dev, void (*wrapper)(unsigned long))
 			dev->timer.expires  = dev->last_switch+DRM_TIME_SLICE;
 			add_timer(&dev->timer);
 		}
+#endif
+#ifdef __FreeBSD__
+		int s = splclock();
+		if (dev->timer.c_time != dev->last_switch + DRM_TIME_SLICE) {
+			callout_reset(&dev->timer,
+				      dev->last_switch + DRM_TIME_SLICE - j,
+				      (void (*)(void *))wrapper,
+				      dev);
+		}
+		splx(s);
+#endif
 		return -1;
 	}
 
@@ -337,7 +359,12 @@ int DRM(dma_enqueue)(drm_device_t *dev, drm_dma_t *d)
 	int		  idx;
 	int		  while_locked = 0;
 	drm_device_dma_t  *dma = dev->dma;
+#ifdef __linux__
 	DECLARE_WAITQUEUE(entry, current);
+#endif
+#ifdef __FreeBSD__
+	int		  error;
+#endif
 
 	DRM_DEBUG("%d\n", d->send_count);
 
@@ -366,6 +393,7 @@ int DRM(dma_enqueue)(drm_device_t *dev, drm_dma_t *d)
 
 	atomic_inc(&q->use_count);
 	if (atomic_read(&q->block_write)) {
+#ifdef __linux__
 		add_wait_queue(&q->write_queue, &entry);
 		atomic_inc(&q->block_count);
 		for (;;) {
@@ -381,6 +409,20 @@ int DRM(dma_enqueue)(drm_device_t *dev, drm_dma_t *d)
 		atomic_dec(&q->block_count);
 		current->state = TASK_RUNNING;
 		remove_wait_queue(&q->write_queue, &entry);
+#endif
+#ifdef __FreeBSD__
+		atomic_inc(&q->block_count);
+		for (;;) {
+			if (!atomic_read(&q->block_write)) break;
+			error = tsleep(&q->block_write, PZERO|PCATCH,
+				       "dmawr", 0);
+			if (error) {
+				atomic_dec(&q->use_count);
+				return error;
+			}
+		}
+		atomic_dec(&q->block_count);
+#endif
 	}
 
 	for (i = 0; i < d->send_count; i++) {
@@ -392,16 +434,16 @@ int DRM(dma_enqueue)(drm_device_t *dev, drm_dma_t *d)
 			DRM_OS_RETURN(EINVAL);
 		}
 		buf = dma->buflist[ idx ];
-		if (buf->pid != current->pid) {
+		if (buf->pid != DRM_OS_CURRENTPID) {
 			atomic_dec(&q->use_count);
 			DRM_ERROR("Process %d using buffer owned by %d\n",
-				  current->pid, buf->pid);
+				  DRM_OS_CURRENTPID, buf->pid);
 			DRM_OS_RETURN(EINVAL);
 		}
 		if (buf->list != DRM_LIST_NONE) {
 			atomic_dec(&q->use_count);
 			DRM_ERROR("Process %d using buffer %d on list %d\n",
-				  current->pid, buf->idx, buf->list);
+				  DRM_OS_CURRENTPID, buf->idx, buf->list);
 		}
 		buf->used	  = d->send_sizes[i];
 		buf->while_locked = while_locked;
@@ -455,13 +497,13 @@ static int DRM(dma_get_buffers_of_order)(drm_device_t *dev, drm_dma_t *d,
 				  buf->waiting,
 				  buf->pending);
 		}
-		buf->pid     = current->pid;
-		if (copy_to_user(&d->request_indices[i],
+		buf->pid     = DRM_OS_CURRENTPID;
+		if (DRM_OS_COPYTOUSR(&d->request_indices[i],
 				 &buf->idx,
 				 sizeof(buf->idx)))
 			DRM_OS_RETURN(EFAULT);
 
-		if (copy_to_user(&d->request_sizes[i],
+		if (DRM_OS_COPYTOUSR(&d->request_sizes[i],
 				 &buf->total,
 				 sizeof(buf->total)))
 			DRM_OS_RETURN(EFAULT);
@@ -518,7 +560,10 @@ int DRM(dma_get_buffers)(drm_device_t *dev, drm_dma_t *dma)
 
 int DRM(irq_install)( drm_device_t *dev, int irq )
 {
-	int ret;
+#ifdef __FreeBSD__
+	int rid;
+#endif
+	int retcode;
 
 	if ( !irq )
 		DRM_OS_RETURN(EINVAL);
@@ -542,23 +587,44 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 	dev->dma->this_buffer = NULL;
 
 #if __HAVE_DMA_IRQ_BH
+#ifdef __linux__
 	INIT_LIST_HEAD( &dev->tq.list );
 	dev->tq.sync = 0;
 	dev->tq.routine = DRM(dma_immediate_bh);
 	dev->tq.data = dev;
+#endif
+#ifdef __FreeBSD__
+	TASK_INIT(&dev->task, 0, DRM(dma_immediate_bh), dev);
+#endif
 #endif
 
 				/* Before installing handler */
 	DRIVER_PREINSTALL();
 
 				/* Install handler */
-	ret = request_irq( dev->irq, DRM(dma_service),
-			   DRM_IRQ_TYPE, dev->devname, dev );
-	if ( ret < 0 ) {
+#ifdef __linux__
+	retcode = request_irq( dev->irq, DRM(dma_service),
+			   DRM_IRQ_TYPE,, dev->devname, dev );
+	if ( retcode < 0 ) {
+#endif
+#ifdef __FreeBSD__
+	rid = 0;
+	dev->irqr = bus_alloc_resource(dev->device, SYS_RES_IRQ, &rid,
+				      0, ~0, 1, RF_SHAREABLE);
+	if (!dev->irqr)
+		return ENOENT;
+	
+	retcode = bus_setup_intr(dev->device, dev->irqr, INTR_TYPE_TTY,
+				 DRM(dma_service), dev, &dev->irqh);
+	if ( retcode ) {
+#endif
 		DRM_OS_LOCK;
+#ifdef __FreeBSD__
+		bus_release_resource(dev->device, SYS_RES_IRQ, 0, dev->irqr);
+#endif
 		dev->irq = 0;
 		DRM_OS_UNLOCK;
-		return ret;
+		return retcode;
 	}
 
 				/* After installing handler */
@@ -583,15 +649,20 @@ int DRM(irq_uninstall)( drm_device_t *dev )
 
 	DRIVER_UNINSTALL();
 
+#ifdef __linux__
 	free_irq( irq, dev );
-
+#endif
+#ifdef __FreeBSD__
+	bus_teardown_intr(dev->device, dev->irqr, dev->irqh);
+	bus_release_resource(dev->device, SYS_RES_IRQ, 0, dev->irqr);
+#endif
+	
 	return 0;
 }
 
 int DRM(control)( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_control_t ctl;
 
 	DRM_OS_KRNFROMUSR( ctl, (drm_control_t *) data, sizeof(ctl) );

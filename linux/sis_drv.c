@@ -25,7 +25,17 @@
  *
  */
 
+#ifdef __linux__
 #include <linux/config.h>
+#endif
+
+#ifdef __FreeBSD__
+#include <sys/types.h>
+#include <sys/bus.h>
+#include <pci/pcivar.h>
+#include <opt_drm_linux.h>
+#endif
+
 #include "sis.h"
 #include "drmP.h"
 #include "sis_drm.h"
@@ -38,6 +48,18 @@
 #define DRIVER_MAJOR	 1
 #define DRIVER_MINOR	 0
 #define DRIVER_PATCHLEVEL  0
+
+#ifdef __FreeBSD__
+/* List acquired from http://www.yourvote.com/pci/pcihdr.h and xc/xc/programs/Xserver/hw/xfree86/common/xf86PciInfo.h
+ * Please report to anholt@teleport.com inaccuracies or if a chip you have works that is marked unsupported here.
+ */
+drm_chipinfo_t DRM(devicelist)[] = {
+	{0x1039, 0x0300, 1, "SIS 300"},
+	{0x1039, 0x0540, 1, "SIS 540"},
+	{0x1039, 0x0630, 1, "SIS 630"},
+	{0, 0, 0, NULL}
+};
+#endif
 
 #define DRIVER_IOCTLS \
         [DRM_IOCTL_NR(SIS_IOCTL_FB_ALLOC)]   = { sis_fb_alloc,	  1, 1 }, \
@@ -69,6 +91,15 @@
 #include "drm_lists.h"
 #include "drm_lock.h"
 #include "drm_memory.h"
-#include "drm_proc.h"
 #include "drm_vm.h"
+#ifdef __linux__
+#include "drm_proc.h"
 #include "drm_stub.h"
+#endif
+#ifdef __FreeBSD__
+#include "drm_sysctl.h"
+#endif
+
+#ifdef __FreeBSD__
+DRIVER_MODULE(sis, pci, sis_driver, sis_devclass, 0, 0);
+#endif

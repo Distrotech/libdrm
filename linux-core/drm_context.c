@@ -732,11 +732,20 @@ int DRM(rmctx)( DRM_OS_IOCTL )
 					 finalization) */
 
 	while (test_and_set_bit(0, &dev->interrupt_flag)) {
+#ifdef __linux__
 		schedule();
 		if (signal_pending(current)) {
 			clear_bit(0, &dev->interrupt_flag);
 			DRM_OS_RETURN(EINTR);
 		}
+#endif
+#ifdef __FreeBSD__
+		static int never;
+		int retcode;
+		retcode = tsleep(&never, PZERO|PCATCH, "never", 1);
+		if (retcode)
+			return retcode;
+#endif
 	}
 				/* Remove queued buffers */
 	while ((buf = DRM(waitlist_get)(&q->waitlist))) {
@@ -745,10 +754,16 @@ int DRM(rmctx)( DRM_OS_IOCTL )
 	clear_bit(0, &dev->interrupt_flag);
 
 				/* Wakeup blocked processes */
+#ifdef __linux__
 	wake_up_interruptible(&q->read_queue);
 	wake_up_interruptible(&q->write_queue);
 	wake_up_interruptible(&q->flush_queue);
-
+#endif
+#ifdef __FreeBSD__
+	wakeup( &q->block_read );
+	wakeup( &q->block_write );
+	wakeup( &q->flush_queue );
+#endif
 				/* Finalization over.  Queue is made
 				   available when both use_count and
 				   finalization become 0, which won't

@@ -973,7 +973,7 @@ static int radeon_cp_dispatch_texture( drm_device_t *dev,
 	drm_radeon_buf_priv_t *buf_priv;
 	u32 format;
 	u32 *buffer;
-	u8 *data;
+	const u8 *data;
 	int size, dwords, tex_width, blit_width;
 	u32 y, height;
 	int ret = 0, i;
@@ -982,7 +982,7 @@ static int radeon_cp_dispatch_texture( drm_device_t *dev,
 	/* FIXME: Be smarter about this...
 	 */
 	buf = radeon_freelist_get( dev );
-	if ( !buf ) return -EAGAIN;
+	if ( !buf ) DRM_OS_RETURN( EAGAIN );
 
 	DRM_DEBUG( "tex: ofs=0x%x p=%d f=%d x=%hd y=%hd w=%hd h=%hd\n",
 		   tex->offset >> 10, tex->pitch, tex->format,
@@ -1017,7 +1017,7 @@ static int radeon_cp_dispatch_texture( drm_device_t *dev,
 		break;
 	default:
 		DRM_ERROR( "invalid texture format %d\n", tex->format );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	DRM_DEBUG( "   tex=%dx%d  blit=%d\n",
@@ -1045,7 +1045,7 @@ static int radeon_cp_dispatch_texture( drm_device_t *dev,
 
 	if ( size > RADEON_MAX_TEXTURE_SIZE ) {
 		/* Texture image is too large, do a multipass upload */
-		ret = -EAGAIN;
+		ret = EAGAIN;
 
 		/* Adjust the blit size to fit the indirect buffer */
 		height = RADEON_MAX_TEXTURE_SIZE / blit_width;
@@ -1054,11 +1054,11 @@ static int radeon_cp_dispatch_texture( drm_device_t *dev,
 		/* Update the input parameters for next time */
 		image->y += height;
 		image->height -= height;
-		image->data = (char *)image->data + size;
+		image->data = (const char *)image->data + size;
 
 		if ( DRM_OS_COPYTOUSR( tex->image, image, sizeof(*image) ) ) {
 			DRM_ERROR( "EFAULT on tex->image\n" );
-			return -EFAULT;
+			DRM_OS_RETURN( EFAULT );
 		}
 	} else if ( size < 4 ) {
 		size = 4;
@@ -1095,7 +1095,7 @@ static int radeon_cp_dispatch_texture( drm_device_t *dev,
 		 */
 		if ( DRM_OS_COPYFROMUSR( buffer, data, dwords * sizeof(u32) ) ) {
 			DRM_ERROR( "EFAULT on data, %d dwords\n", dwords );
-			return -EFAULT;
+			DRM_OS_RETURN( EFAULT );
 		}
 	} else {
 		/* Texture image width is less than the minimum, so we
@@ -1106,7 +1106,7 @@ static int radeon_cp_dispatch_texture( drm_device_t *dev,
 			if ( DRM_OS_COPYFROMUSR( buffer, data, tex_width ) ) {
 				DRM_ERROR( "EFAULT on pad, %d bytes\n",
 					   tex_width );
-				return -EFAULT;
+				DRM_OS_RETURN( EFAULT );
 			}
 			buffer += 8;
 			data += tex_width;
@@ -1130,7 +1130,7 @@ static int radeon_cp_dispatch_texture( drm_device_t *dev,
 
 	ADVANCE_RING();
 
-	return ret;
+	DRM_OS_RETURN( ret );
 }
 
 static void radeon_cp_dispatch_stipple( drm_device_t *dev, u32 *stipple )
@@ -1179,7 +1179,7 @@ int radeon_cp_clear( DRM_OS_IOCTL )
 
 	if ( DRM_OS_COPYFROMUSR( &depth_boxes, clear.depth_boxes,
 			     sarea_priv->nbox * sizeof(depth_boxes[0]) ) )
-		return -EFAULT;
+		DRM_OS_RETURN( EFAULT );
 
 	radeon_cp_dispatch_clear( dev, &clear, depth_boxes );
 
@@ -1224,7 +1224,7 @@ int radeon_cp_vertex( DRM_OS_IOCTL )
 
 	if ( !dev_priv ) {
 		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	DRM_OS_KRNFROMUSR( vertex, (drm_radeon_vertex_t *) data,
@@ -1237,12 +1237,12 @@ int radeon_cp_vertex( DRM_OS_IOCTL )
 	if ( vertex.idx < 0 || vertex.idx >= dma->buf_count ) {
 		DRM_ERROR( "buffer index %d (of %d max)\n",
 			   vertex.idx, dma->buf_count - 1 );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 	if ( vertex.prim < 0 ||
 	     vertex.prim > RADEON_PRIM_TYPE_3VRT_LINE_LIST ) {
 		DRM_ERROR( "buffer prim %d\n", vertex.prim );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );
@@ -1254,11 +1254,11 @@ int radeon_cp_vertex( DRM_OS_IOCTL )
 	if ( buf->pid != DRM_OS_CURRENTPID ) {
 		DRM_ERROR( "process %d using buffer owned by %d\n",
 			   DRM_OS_CURRENTPID, buf->pid );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 	if ( buf->pending ) {
 		DRM_ERROR( "sending pending buffer %d\n", vertex.idx );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	buf->used = vertex.count;
@@ -1284,7 +1284,7 @@ int radeon_cp_indices( DRM_OS_IOCTL )
 
 	if ( !dev_priv ) {
 		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	DRM_OS_KRNFROMUSR( elts, (drm_radeon_indices_t *) data,
@@ -1297,12 +1297,12 @@ int radeon_cp_indices( DRM_OS_IOCTL )
 	if ( elts.idx < 0 || elts.idx >= dma->buf_count ) {
 		DRM_ERROR( "buffer index %d (of %d max)\n",
 			   elts.idx, dma->buf_count - 1 );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 	if ( elts.prim < 0 ||
 	     elts.prim > RADEON_PRIM_TYPE_3VRT_LINE_LIST ) {
 		DRM_ERROR( "buffer prim %d\n", elts.prim );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );
@@ -1314,11 +1314,11 @@ int radeon_cp_indices( DRM_OS_IOCTL )
 	if ( buf->pid != DRM_OS_CURRENTPID ) {
 		DRM_ERROR( "process %d using buffer owned by %d\n",
 			  DRM_OS_CURRENTPID, buf->pid );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 	if ( buf->pending ) {
 		DRM_ERROR( "sending pending buffer %d\n", elts.idx );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	count = (elts.end - elts.start) / sizeof(u16);
@@ -1326,11 +1326,11 @@ int radeon_cp_indices( DRM_OS_IOCTL )
 
 	if ( elts.start & 0x7 ) {
 		DRM_ERROR( "misaligned buffer 0x%x\n", elts.start );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 	if ( elts.start < buf->used ) {
 		DRM_ERROR( "no header 0x%x - 0x%x\n", elts.start, buf->used );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	buf->used = elts.end;
@@ -1355,13 +1355,13 @@ int radeon_cp_texture( DRM_OS_IOCTL )
 
 	if ( tex.image == NULL ) {
 		DRM_ERROR( "null texture image!\n" );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	if ( DRM_OS_COPYFROMUSR( &image,
 			     (drm_radeon_tex_image_t *)tex.image,
 			     sizeof(image) ) )
-		return -EFAULT;
+		DRM_OS_RETURN( EFAULT );
 
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 	VB_AGE_TEST_WITH_RETURN( dev_priv );
@@ -1382,7 +1382,7 @@ int radeon_cp_stipple( DRM_OS_IOCTL )
 			     sizeof(stipple) );
 
 	if ( DRM_OS_COPYFROMUSR( &mask, stipple.mask, 32 * sizeof(u32) ) )
-		return -EFAULT;
+		DRM_OS_RETURN( EFAULT );
 
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 
@@ -1405,7 +1405,7 @@ int radeon_cp_indirect( DRM_OS_IOCTL )
 
 	if ( !dev_priv ) {
 		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	DRM_OS_KRNFROMUSR( indirect, (drm_radeon_indirect_t *) data,
@@ -1418,7 +1418,7 @@ int radeon_cp_indirect( DRM_OS_IOCTL )
 	if ( indirect.idx < 0 || indirect.idx >= dma->buf_count ) {
 		DRM_ERROR( "buffer index %d (of %d max)\n",
 			   indirect.idx, dma->buf_count - 1 );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	buf = dma->buflist[indirect.idx];
@@ -1427,17 +1427,17 @@ int radeon_cp_indirect( DRM_OS_IOCTL )
 	if ( buf->pid != DRM_OS_CURRENTPID ) {
 		DRM_ERROR( "process %d using buffer owned by %d\n",
 			   DRM_OS_CURRENTPID, buf->pid );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 	if ( buf->pending ) {
 		DRM_ERROR( "sending pending buffer %d\n", indirect.idx );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	if ( indirect.start < buf->used ) {
 		DRM_ERROR( "reusing indirect: start=0x%x actual=0x%x\n",
 			   indirect.start, buf->used );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );

@@ -30,18 +30,24 @@
  *    Gareth Hughes <gareth@valinux.com>
  */
 
-#define __NO_VERSION__
 #include "drmP.h"
+
 #ifdef __linux__
+#define __NO_VERSION__
 #include <linux/poll.h>
 #endif
+
 #ifdef __FreeBSD__
 #include <sys/signalvar.h>
 #include <sys/poll.h>
 
 drm_file_t *DRM(find_file_by_proc)(drm_device_t *dev, struct proc *p)
 {
+#if __FreeBSD_version >= 500021
+	uid_t uid = p->p_ucred->cr_svuid;
+#else
 	uid_t uid = p->p_cred->p_svuid;
+#endif
 	pid_t pid = p->p_pid;
 	drm_file_t *priv;
 
@@ -113,7 +119,12 @@ int DRM(open_helper)(dev_t kdev, int flags, int fmt, struct proc *p,
 	} else {
 		priv = (drm_file_t *) DRM(alloc)(sizeof(*priv), DRM_MEM_FILES);
 		bzero(priv, sizeof(*priv));
+#if __FreeBSD_version >= 500021
+		priv->uid               = p->p_ucred->cr_svuid;
+#else
 		priv->uid		= p->p_cred->p_svuid;
+#endif
+
 		priv->pid		= p->p_pid;
 		priv->refs		= 1;
 		priv->minor		= m;
@@ -358,11 +369,8 @@ int DRM(poll)(dev_t kdev, int events, struct proc *p)
 
 int DRM(write)(dev_t kdev, struct uio *uio, int ioflag)
 {
-        struct proc   *p      = curproc;
-        drm_device_t  *dev    = kdev->si_drv1;
-
         DRM_DEBUG("pid = %d, device = %p, open_count = %d\n",
-                  p->p_pid, dev->device, dev->open_count);
+                  curproc->p_pid, ((drm_device_t *)kdev->si_drv1)->device, ((drm_device_t *)kdev->si_drv1)->open_count);
         return 0;
 }
 #endif

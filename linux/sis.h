@@ -29,11 +29,15 @@
 #ifndef __SIS_H__
 #define __SIS_H__
 
+#ifdef __linux__
 /* This remains constant for all DRM template files.
  * Name it sisdrv_##x as there's a conflict with sis_free/malloc in the kernel
  * that's used for fb devices 
  */
 #define DRM(x) sisdrv_##x
+#else
+#define DRM(x) sis_##x
+#endif
 
 /* General customization:
  */

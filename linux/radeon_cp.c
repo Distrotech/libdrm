@@ -369,7 +369,7 @@ static int radeon_do_pixcache_flush( drm_radeon_private_t *dev_priv )
 	DRM_ERROR( "failed!\n" );
 	radeon_status( dev_priv );
 #endif
-	return -EBUSY;
+	DRM_OS_RETURN( EBUSY );
 }
 
 static int radeon_do_wait_for_fifo( drm_radeon_private_t *dev_priv,
@@ -388,7 +388,7 @@ static int radeon_do_wait_for_fifo( drm_radeon_private_t *dev_priv,
 	DRM_ERROR( "failed!\n" );
 	radeon_status( dev_priv );
 #endif
-	return -EBUSY;
+	DRM_OS_RETURN( EBUSY );
 }
 
 static int radeon_do_wait_for_idle( drm_radeon_private_t *dev_priv )
@@ -396,7 +396,7 @@ static int radeon_do_wait_for_idle( drm_radeon_private_t *dev_priv )
 	int i, ret;
 
 	ret = radeon_do_wait_for_fifo( dev_priv, 64 );
-	if ( ret < 0 ) return ret;
+	if ( ret ) return ret;
 	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
 		if ( !(RADEON_READ( RADEON_RBBM_STATUS )
 		       & RADEON_RBBM_ACTIVE) ) {
@@ -410,7 +410,7 @@ static int radeon_do_wait_for_idle( drm_radeon_private_t *dev_priv )
 	DRM_ERROR( "failed!\n" );
 	radeon_status( dev_priv );
 #endif
-	return -EBUSY;
+	DRM_OS_RETURN( EBUSY );
 }
 
 
@@ -672,7 +672,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 
 	dev_priv = DRM(alloc)( sizeof(drm_radeon_private_t), DRM_MEM_DRIVER );
 	if ( dev_priv == NULL )
-		return -ENOMEM;
+		DRM_OS_RETURN( ENOMEM );
 	dev->dev_private = (void *)dev_priv;
 
 	memset( dev_priv, 0, sizeof(drm_radeon_private_t) );
@@ -686,7 +686,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 		DRM_ERROR( "PCI GART not yet supported for Radeon!\n" );
 		DRM(free)( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
 		dev->dev_private = NULL;
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 #endif
 
@@ -694,7 +694,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 		DRM_ERROR( "PCI GART memory not allocated!\n" );
 		DRM(free)( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
 		dev->dev_private = NULL;
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	dev_priv->usec_timeout = init->usec_timeout;
@@ -703,7 +703,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 		DRM_DEBUG( "TIMEOUT problem!\n" );
 		DRM(free)( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
 		dev->dev_private = NULL;
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	dev_priv->cp_mode = init->cp_mode;
@@ -721,7 +721,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 		DRM_DEBUG( "BAD cp_mode (%x)!\n", init->cp_mode );
 		DRM(free)( dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER );
 		dev->dev_private = NULL;
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	switch ( init->fb_bpp ) {
@@ -914,7 +914,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 			DRM(free)( dev_priv, sizeof(*dev_priv),
 				   DRM_MEM_DRIVER );
 			dev->dev_private = NULL;
-			return -EINVAL;
+			DRM_OS_RETURN( EINVAL );
 		}
 		/* Turn on PCI GART
 		 */
@@ -994,7 +994,7 @@ int radeon_cp_init( DRM_OS_IOCTL )
 		return radeon_do_cleanup_cp( dev );
 	}
 
-	return -EINVAL;
+	DRM_OS_RETURN( EINVAL );
 }
 
 int radeon_cp_start( DRM_OS_IOCTL )
@@ -1047,7 +1047,7 @@ int radeon_cp_stop( DRM_OS_IOCTL )
 	 */
 	if ( stop.idle ) {
 		ret = radeon_do_cp_idle( dev_priv );
-		if ( ret < 0 ) return ret;
+		if ( ret ) return ret;
 	}
 
 	/* Finally, we can turn off the CP.  If the engine isn't idle,
@@ -1074,7 +1074,7 @@ int radeon_cp_reset( DRM_OS_IOCTL )
 
 	if ( !dev_priv ) {
 		DRM_DEBUG( "%s called before init done\n", __FUNCTION__ );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	radeon_do_cp_reset( dev_priv );
@@ -1161,7 +1161,7 @@ int radeon_fullscreen( DRM_OS_IOCTL )
 		return radeon_do_cleanup_pageflip( dev );
 	}
 
-	return -EINVAL;
+	DRM_OS_RETURN( EINVAL );
 }
 
 
@@ -1184,7 +1184,7 @@ static int radeon_freelist_init( drm_device_t *dev )
 	dev_priv->head = DRM(alloc)( sizeof(drm_radeon_freelist_t),
 				     DRM_MEM_DRIVER );
 	if ( dev_priv->head == NULL )
-		return -ENOMEM;
+		DRM_OS_RETURN( ENOMEM );
 
 	memset( dev_priv->head, 0, sizeof(drm_radeon_freelist_t) );
 	dev_priv->head->age = RADEON_BUFFER_USED;
@@ -1195,7 +1195,7 @@ static int radeon_freelist_init( drm_device_t *dev )
 
 		entry = DRM(alloc)( sizeof(drm_radeon_freelist_t),
 				    DRM_MEM_DRIVER );
-		if ( !entry ) return -ENOMEM;
+		if ( !entry ) DRM_OS_RETURN( ENOMEM );
 
 		entry->age = RADEON_BUFFER_FREE;
 		entry->buf = buf;
@@ -1325,26 +1325,26 @@ int radeon_wait_ring( drm_radeon_private_t *dev_priv, int n )
 	radeon_status( dev_priv );
 	DRM_ERROR( "failed!\n" );
 #endif
-	return -EBUSY;
+	DRM_OS_RETURN( EBUSY );
 }
 
-static int radeon_cp_get_buffers( drm_device_t *dev, drm_dma_t *d, int pid )
+static int radeon_cp_get_buffers( drm_device_t *dev, drm_dma_t *d )
 {
 	int i;
 	drm_buf_t *buf;
 
 	for ( i = d->granted_count ; i < d->request_count ; i++ ) {
 		buf = radeon_freelist_get( dev );
-		if ( !buf ) return -EAGAIN;
+		if ( !buf ) DRM_OS_RETURN( EAGAIN );
 
-		buf->pid = pid;
+		buf->pid = DRM_OS_CURRENTPID;
 
 		if (DRM_OS_COPYTOUSR( &d->request_indices[i], &buf->idx,
 				   sizeof(buf->idx) ) )
-			return -EFAULT;
+			DRM_OS_RETURN( EFAULT );
 		if (DRM_OS_COPYTOUSR( &d->request_sizes[i], &buf->total,
 				   sizeof(buf->total) ) )
-			return -EFAULT;
+			DRM_OS_RETURN( EFAULT );
 
 		d->granted_count++;
 	}
@@ -1367,7 +1367,7 @@ int radeon_cp_buffers( DRM_OS_IOCTL )
 	if ( d.send_count != 0 ) {
 		DRM_ERROR( "Process %d trying to send %d buffers via drmDMA\n",
 			   DRM_OS_CURRENTPID, d.send_count );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	/* We'll send you buffers.
@@ -1375,13 +1375,13 @@ int radeon_cp_buffers( DRM_OS_IOCTL )
 	if ( d.request_count < 0 || d.request_count > dma->buf_count ) {
 		DRM_ERROR( "Process %d trying to get %d buffers (of %d max)\n",
 			   DRM_OS_CURRENTPID, d.request_count, dma->buf_count );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	d.granted_count = 0;
 
 	if ( d.request_count ) {
-		ret = radeon_cp_get_buffers( dev, &d, DRM_OS_CURRENTPID );
+		ret = radeon_cp_get_buffers( dev, &d );
 	}
 
 	DRM_OS_KRNTOUSR( (drm_dma_t *) data, d, sizeof(d) );

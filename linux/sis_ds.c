@@ -28,6 +28,7 @@
  * 
  */
 
+#ifdef __linux__
 #define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/delay.h>
@@ -37,7 +38,10 @@
 #include <linux/poll.h>
 #include <asm/io.h>
 #include <linux/pci.h>
+#endif
 
+#include "sis.h"
+#include "drmP.h"
 #include "sis_ds.h"
 
 /* Set Data Structure, not check repeated value
@@ -49,7 +53,7 @@ set_t *setInit(void)
   int i;
   set_t *set;
 
-  set = (set_t *)MALLOC(sizeof(set_t));
+  set = (set_t *)SD_MALLOC(sizeof(set_t));
   for(i = 0; i < SET_SIZE; i++){
     set->list[i].free_next = i+1;    
     set->list[i].alloc_next = -1;
@@ -134,7 +138,7 @@ int setNext(set_t *set, ITEM_TYPE *item)
 
 int setDestroy(set_t *set)
 {
-  FREE(set);
+  SD_FREE(set);
 
   return 1;
 }
@@ -171,12 +175,11 @@ int setDestroy(set_t *set)
 static void *calloc(size_t nmemb, size_t size)
 {
   void *addr;
-  addr = kmalloc(nmemb*size, GFP_KERNEL);
+  addr = SD_MALLOC(nmemb*size);
   memset(addr, 0, nmemb*size);
   return addr;
 }
-#define free(n) kfree(n)
-           
+
 void mmDumpMemInfo( memHeap_t *heap )
 {
   TMemBlock *p;
@@ -312,7 +315,7 @@ static __inline__ int Join2Blocks(TMemBlock *p)
     TMemBlock *q = p->next;
     p->size += q->size;
     p->next = q->next;
-    free(q);
+    SD_FREE(q);
     return 1;
   }
   return 0;
@@ -400,7 +403,7 @@ void mmDestroy(memHeap_t *heap)
   p = (TMemBlock *)heap;
   while (p) {
     q = p->next;
-    free(p);
+    SD_FREE(p);
     p = q;
   }
 }

@@ -34,8 +34,14 @@
 /* Set Data Structure */
 
 #define SET_SIZE 5000
-#define MALLOC(s) kmalloc(s, GFP_KERNEL)
-#define FREE(s) kfree(s)
+#ifdef __linux__
+#define SD_MALLOC(s) kmalloc(s, GFP_KERNEL)
+#define SD_FREE(s) kfree(s)
+#endif
+#ifdef __FreeBSD__
+#define SD_MALLOC(s) malloc( s, DRM(M_DRM), M_NOWAIT )
+#define SD_FREE(s) free( s, DRM(M_DRM) )
+#endif
 
 typedef unsigned int ITEM_TYPE;
 

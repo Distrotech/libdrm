@@ -492,6 +492,10 @@ typedef struct drm_device {
 
 				/* Context support */
 	int		  irq;		/* Interrupt used by board	   */
+#ifdef __FreeBSD__
+	struct resource   *irqr;	/* Resource for interrupt used by board	   */
+	void		  *irqh;	/* Handle from bus_setup_intr      */
+#endif
 	__volatile__ long context_flag;	/* Context swapping flag	   */
 	__volatile__ long interrupt_flag; /* Interruption handler flag	   */
 	__volatile__ long dma_flag;	/* DMA dispatch flag		   */
@@ -591,7 +595,7 @@ extern void	     *DRM(alloc)(size_t size, int area);
 extern void	     *DRM(realloc)(void *oldpt, size_t oldsize, size_t size,
 				   int area);
 extern char	     *DRM(strdup)(const char *s, int area);
-extern void	     DRM(strfree)(const char *s, int area);
+extern void	     DRM(strfree)(char *s, int area);
 extern void	     DRM(free)(void *pt, size_t size, int area);
 extern unsigned long DRM(alloc_pages)(int order, int area);
 extern void	     DRM(free_pages)(unsigned long address, int order,
@@ -652,10 +656,9 @@ extern int	     DRM(dma_get_buffers)(drm_device_t *dev, drm_dma_t *dma);
 #if __HAVE_DMA_IRQ
 extern int           DRM(irq_install)( drm_device_t *dev, int irq );
 extern int           DRM(irq_uninstall)( drm_device_t *dev );
-extern void          DRM(dma_service)( int irq, void *device,
-				       struct pt_regs *regs );
+extern void          DRM(dma_service)( DRM_OS_IRQ_ARGS );
 #if __HAVE_DMA_IRQ_BH
-extern void          DRM(dma_immediate_bh)( void *dev );
+extern void          DRM(dma_immediate_bh)( DRM_OS_TASKQUEUE_ARGS );
 #endif
 #endif
 #if DRM_DMA_HISTOGRAM

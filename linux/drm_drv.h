@@ -241,6 +241,36 @@ __setup( DRIVER_NAME "=", DRM(options) );
 #endif
 
 #ifdef __FreeBSD__
+
+static int DRM(probe)(device_t dev)
+{
+	const char *s = 0;
+
+	int pciid=pci_get_devid(dev);
+	int vendor = (pciid & 0x0000ffff);
+	int device = (pciid & 0xffff0000) >> 16;
+	int i=0, done=0;
+	DRM_INFO("Checking PCI vendor=%d, device=%d\n", vendor, device);
+	while ( !done && (DRM(devicelist)[i].vendor != 0 ) ) {
+		if ( (DRM(devicelist)[i].vendor == vendor) &&
+		     (DRM(devicelist)[i].device == device) ) {
+			done=1;
+			if ( DRM(devicelist)[i].supported )
+				s = DRM(devicelist)[i].name;
+			else
+				DRM_INFO("%s not supported\n", DRM(devicelist)[i].name);
+		}
+		i++;
+	}
+	
+	if (s) {
+		device_set_desc(dev, s);
+		return 0;
+	}
+
+	return ENXIO;
+}
+
 static int DRM(attach)(device_t dev)
 {
 	return DRM(init)(dev);
@@ -897,8 +927,8 @@ int DRM( close)(dev_t kdev, int flags, int fmt, struct proc *p)
 	 * Begin inline drm_release
 	 */
 
-	DRM_DEBUG( "pid = %d, device = 0x%x, open_count = %d\n",
-		   DRM_OS_CURRENTPID, (int)dev->device, dev->open_count );
+	DRM_DEBUG( "pid = %d, device = 0x%lx, open_count = %d\n",
+		   DRM_OS_CURRENTPID, (long)dev->device, dev->open_count );
 
 	if (dev->lock.hw_lock && _DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)
 	    && dev->lock.pid == DRM_OS_CURRENTPID) {
@@ -1079,8 +1109,8 @@ int DRM(ioctl)( DRM_OS_IOCTL )
 	atomic_inc( &dev->counts[_DRM_STAT_IOCTLS] );
 	++priv->ioctl_count;
 
-	DRM_DEBUG( "pid=%d, cmd=0x%02x, nr=0x%02x, dev 0x%x, auth=%d\n",
-		 DRM_OS_CURRENTPID, (int)cmd, nr, (int)dev->device, priv->authenticated );
+	DRM_DEBUG( "pid=%d, cmd=0x%02lx, nr=0x%02x, dev 0x%lx, auth=%d\n",
+		 DRM_OS_CURRENTPID, cmd, nr, (long)dev->device, priv->authenticated );
 
 #ifdef __FreeBSD__
 	switch (cmd) {

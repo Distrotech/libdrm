@@ -933,7 +933,7 @@ int mga_dma_vertex( DRM_OS_IOCTL )
 
 	DRM_OS_KRNFROMUSR( vertex, (drm_mga_vertex_t *) data, sizeof(vertex) );
 
-        if(vertex.idx < 0 || vertex.idx > dma->buf_count) return -EINVAL;
+        if(vertex.idx < 0 || vertex.idx > dma->buf_count) DRM_OS_RETURN( EINVAL );
 	buf = dma->buflist[vertex.idx];
 	buf_priv = buf->dev_private;
 
@@ -970,7 +970,7 @@ int mga_dma_indices( DRM_OS_IOCTL )
 
 	DRM_OS_KRNFROMUSR( indices, (drm_mga_indices_t *) data, sizeof(indices) );
 
-        if(indices.idx < 0 || indices.idx > dma->buf_count) return -EINVAL;
+        if(indices.idx < 0 || indices.idx > dma->buf_count) DRM_OS_RETURN( EINVAL );
 
 	buf = dma->buflist[indices.idx];
 	buf_priv = buf->dev_private;
@@ -1009,13 +1009,13 @@ int mga_dma_iload( DRM_OS_IOCTL )
 	DRM_OS_KRNFROMUSR( iload, (drm_mga_iload_t *) data, sizeof(iload) );
 
 #if 0
-	if ( mga_do_wait_for_idle( dev_priv ) < 0 ) {
+	if ( mga_do_wait_for_idle( dev_priv ) ) {
 		if ( MGA_DMA_DEBUG )
 			DRM_INFO( __FUNCTION__": -EBUSY\n" );
 		DRM_OS_RETURN( EBUSY );
 	}
 #endif
-        if(iload.idx < 0 || iload.idx > dma->buf_count) return -EINVAL;
+        if(iload.idx < 0 || iload.idx > dma->buf_count) DRM_OS_RETURN( EINVAL );
 
 	buf = dma->buflist[iload.idx];
 	buf_priv = buf->dev_private;

@@ -34,12 +34,9 @@ typedef struct drm_sis_private {
 
 /* Stereo ? - this was never committed */
 
-int sis_flip(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg);
-int sis_flip_init(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg);
-int sis_flip_final(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg);
+int sis_flip( DRM_OS_IOCTL );
+int sis_flip_init( DRM_OS_IOCTL );
+int sis_flip_final( DRM_OS_IOCTL );
 void flip_final(void);
 
 #endif

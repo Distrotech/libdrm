@@ -203,7 +203,7 @@ do {									\
 #define WRAP_WAIT_WITH_RETURN( dev_priv )				\
 do {									\
 	if ( test_bit( 0, &dev_priv->prim.wrapped ) ) {			\
-		if ( mga_do_wait_for_idle( dev_priv ) < 0 ) {		\
+		if ( mga_do_wait_for_idle( dev_priv ) ) {		\
 			if ( MGA_DMA_DEBUG )				\
 				DRM_INFO( __FUNCTION__": wrap...\n" );	\
 			DRM_OS_RETURN( EBUSY);			\
