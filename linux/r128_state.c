@@ -1484,9 +1484,8 @@ int r128_cce_stipple( DRM_OS_IOCTL )
 
 	LOCK_TEST_WITH_RETURN( dev );
 
-	if ( DRM_OS_COPYFROMUSR( &stipple, (drm_r128_stipple_t *) data,
-			     sizeof(stipple) ) )
-		DRM_OS_RETURN( EFAULT );
+	DRM_OS_KRNFROMUSR( stipple, (drm_r128_stipple_t *) data,
+			     sizeof(stipple) );
 
 	if ( DRM_OS_COPYFROMUSR( &mask, stipple.mask,
 			     32 * sizeof(u32) ) )
