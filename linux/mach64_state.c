@@ -591,8 +591,10 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 		DRM_ERROR( "buffer prim %d\n", vertex.prim );
 		return -EINVAL;
 	}
-#endif
 
+	VB_AGE_TEST_WITH_RETURN( dev_priv );
+#endif
+	
 	buf = dma->buflist[vertex.idx];
 	buf_priv = buf->dev_private;
 
@@ -607,10 +609,8 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 	}
 
 	buf->used = vertex.count;
-#if 0
 	buf_priv->prim = vertex.prim;
 	buf_priv->discard = vertex.discard;
-#endif
 
 	mach64_dma_dispatch_vertex( dev, buf );
 

@@ -77,6 +77,8 @@ int mach64_do_wait_for_idle( drm_mach64_private_t *dev_priv )
  * DMA initialization, cleanup
  */
 
+
+
 /* Reset the engine.  This will stop the DMA if it is running.
  */
 int mach64_do_engine_reset( drm_device_t *dev )
@@ -338,6 +340,20 @@ drm_buf_t *mach64_freelist_get( drm_device_t *dev )
 	DRM_ERROR( "returning NULL!\n" );
 	return NULL;
 }
+
+void mach64_freelist_reset( drm_device_t *dev )
+{
+	drm_device_dma_t *dma = dev->dma;
+	int i;
+
+	for ( i = 0 ; i < dma->buf_count ; i++ ) {
+		drm_buf_t *buf = dma->buflist[i];
+		drm_mach64_buf_priv_t *buf_priv = buf->dev_private;
+		buf_priv->age = 0;
+	}
+}
+
+
 /* ================================================================
  * DMA command submission
  */

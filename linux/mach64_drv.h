@@ -29,8 +29,20 @@
 #ifndef __MACH64_DRV_H__
 #define __MACH64_DRV_H__
 
+typedef struct drm_mach64_freelist {
+   	unsigned int age;
+   	drm_buf_t *buf;
+   	struct drm_mach64_freelist *next;
+   	struct drm_mach64_freelist *prev;
+} drm_mach64_freelist_t;
+
 typedef struct drm_mach64_private {
 	drm_mach64_sarea_t *sarea_priv;
+
+   	drm_mach64_freelist_t *head;
+   	drm_mach64_freelist_t *tail;
+
+	int usec_timeout;
 	int is_pci;
 
 	unsigned int fb_bpp;
@@ -44,8 +56,6 @@ typedef struct drm_mach64_private {
 	u32 back_offset_pitch;
 	u32 depth_offset_pitch;
 
-	int usec_timeout;
-
 	drm_map_t *sarea;
 	drm_map_t *fb;
 	drm_map_t *mmio;
@@ -54,7 +64,11 @@ typedef struct drm_mach64_private {
 } drm_mach64_private_t;
 
 typedef struct drm_mach64_buf_priv {
-	int age;
+	u32 age;
+	int prim;
+	int discard;
+	int dispatched;
+   	drm_mach64_freelist_t *list_entry;
 } drm_mach64_buf_priv_t;
 
 				/* mach64_dma.c */
@@ -66,6 +80,9 @@ extern int mach64_engine_reset( struct inode *inode, struct file *filp,
 				unsigned int cmd, unsigned long arg );
 extern int mach64_dma_buffers( struct inode *inode, struct file *filp,
 			       unsigned int cmd, unsigned long arg );
+
+extern void mach64_freelist_reset( drm_device_t *dev );
+extern drm_buf_t *mach64_freelist_get( drm_device_t *dev );
 
 extern int mach64_do_wait_for_fifo( drm_mach64_private_t *dev_priv,
 				    int entries );
@@ -366,6 +383,18 @@ do {									\
 		return -EINVAL;						\
 	}								\
 } while (0)
+
+#define VB_AGE_TEST_WITH_RETURN( dev_priv )				\
+do {									\
+	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;		\
+	if ( sarea_priv->last_dispatch >= MACH64_MAX_VB_AGE ) {		\
+		int __ret = mach64_do_dma_idle( dev_priv );		\
+		if ( __ret < 0 ) return __ret;				\
+		sarea_priv->last_dispatch = 0;				\
+		mach64_freelist_reset( dev );				\
+	}								\
+} while (0)
+
 
 /* ================================================================
  * DMA macros
