@@ -42,6 +42,8 @@
 /* mark off by Jiayo Hsu, Oct. 23, 2001*/
 
 
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
+
 #define DRIVER_IOCTLS \
 	[DRM_IOCTL_NR(DRM_IOCTL_SAVAGE_ALLOC_CONTINUOUS_MEM)] \
 	= {savage_alloc_continuous_mem,1,0},\
@@ -226,8 +228,10 @@ int savage_free_cont_mem(struct inode *inode, struct file *filp,
   free_pages((unsigned long)map->handle, get_order(size));
 
   return 1;
-}  
-
+}
+#else /* LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0) */
+#define DRIVER_IOCTLS
+#endif /* LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0) */
 
 #if 0
 
