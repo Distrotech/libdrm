@@ -1,5 +1,4 @@
 #include <linux/autoconf.h>
-#include <linux/version.h>
 
 #ifndef CONFIG_SMP
 #define CONFIG_SMP 0
@@ -11,4 +10,3 @@
 
 SMP = CONFIG_SMP
 MODVERSIONS = CONFIG_MODVERSIONS
-RELEASE = UTS_RELEASE
