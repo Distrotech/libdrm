@@ -2,6 +2,7 @@
  * Created: Fri Nov 24 22:07:58 2000 by gareth@valinux.com
  *
  * Copyright 2000 Gareth Hughes
+ * Copyright 2002 Frank C. Earl
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -24,36 +25,29 @@
  *
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
+ *    Frank C. Earl <fearl@airmail.net>
+ *    Leif Delgass <ldelgass@retinalburn.net>
  */
 
 #ifndef __MACH64_DRV_H__
 #define __MACH64_DRV_H__
 
+#include <linux/list.h>
+
 typedef struct drm_mach64_freelist {
-   	unsigned int age;
+	struct list_head  list;			/* Linux LIST structure... */
    	drm_buf_t *buf;
-   	struct drm_mach64_freelist *next;
-   	struct drm_mach64_freelist *prev;
 } drm_mach64_freelist_t;
 
 typedef struct drm_mach64_private {
 	drm_mach64_sarea_t *sarea_priv;
 
-   	drm_mach64_freelist_t *head;
-   	drm_mach64_freelist_t *tail;
-
-	int usec_timeout;
 	int is_pci;
 	enum {
 		MACH64_MODE_MMIO,
 		MACH64_MODE_DMA_SYNC,
 		MACH64_MODE_DMA_ASYNC
 	} driver_mode;
-
-	struct pci_pool *pool;
-	dma_addr_t table_handle;
-	void *cpu_addr_table;
-	u32 table_addr;
 
 	unsigned int fb_bpp;
 	unsigned int front_offset, front_pitch;
@@ -65,6 +59,21 @@ typedef struct drm_mach64_private {
 	u32 front_offset_pitch;
 	u32 back_offset_pitch;
 	u32 depth_offset_pitch;
+
+	int usec_timeout;      /* Number of microseconds to wait for a timeout on the idle functions */
+	atomic_t dma_timeout;  /* Number of interrupt dispatches since last DMA dispatch... */
+	atomic_t do_gui;       /* Flag for the bottom half to know what to do... */
+	atomic_t do_blit;      /* Flag for the bottom half to know what to do... */
+	
+	struct pci_pool *pool;
+	dma_addr_t table_handle;
+	void *cpu_addr_table;
+	u32 table_addr;
+
+	struct list_head	  free_list;     /* Free-list head  */
+	struct list_head	  empty_list;    /* Free-list placeholder list  */
+	struct list_head	  pending;    	 /* Pending submission placeholder  */
+	struct list_head	  dma_queue;     /* Submission queue head  */
 
 	drm_map_t *sarea;
 	drm_map_t *fb;
@@ -98,8 +107,7 @@ extern int mach64_do_wait_for_fifo( drm_mach64_private_t *dev_priv,
 				    int entries );
 extern int mach64_do_wait_for_idle( drm_mach64_private_t *dev_priv );
 extern void mach64_dump_engine_info( drm_mach64_private_t *dev_priv );
-extern int mach64_do_engine_reset( drm_device_t *dev );
-extern int mach64_do_cleanup_dma( drm_device_t *dev );
+extern int mach64_do_engine_reset( drm_mach64_private_t *dev_priv );
 
 				/* mach64_state.c */
 extern int mach64_dma_clear( struct inode *inode, struct file *filp,
@@ -338,7 +346,13 @@ extern int mach64_dma_vertex( struct inode *inode, struct file *filp,
 #define MACH64_Z_CNTL				0x054c
 #define MACH64_Z_OFF_PITCH			0x0548
 
-
+#define MACH64_CRTC_INT_CNTL			0x0418
+#	define MACH64_VBLANK_INT_EN			(1 << 1)
+#	define MACH64_VBLANK_INT			(1 << 2)
+#	define MACH64_VBLANK_INT_AK			(1 << 2)
+#	define MACH64_BUSMASTER_EOL_INT_EN		(1 << 24)
+#	define MACH64_BUSMASTER_EOL_INT			(1 << 25)
+#	define MACH64_BUSMASTER_EOL_INT_AK		(1 << 25)
 
 #define MACH64_DATATYPE_CI8				2
 #define MACH64_DATATYPE_ARGB1555			3
@@ -347,12 +361,6 @@ extern int mach64_dma_vertex( struct inode *inode, struct file *filp,
 #define MACH64_DATATYPE_RGB332				7
 #define MACH64_DATATYPE_RGB8				9
 #define MACH64_DATATYPE_ARGB4444			15
-
-#define MACH64_CRTC_INT_CNTL     0x0418
-
-/* Constants */
-#define MACH64_LAST_FRAME_REG		MACH64_SCRATCH_REG0
-#define MACH64_LAST_DISPATCH_REG	MACH64_SCRATCH_REG1
 
 
 #define MACH64_BASE(reg)	((u32)(dev_priv->mmio->handle))
@@ -411,14 +419,14 @@ do {									\
  * DMA macros
  */
 
-#define MACH64_USE_DMA		1
-
 #define DMA_FRAME_BUF_OFFSET	0
 #define DMA_SYS_MEM_ADDR	1
 #define DMA_COMMAND		2
 #define DMA_RESERVED		3
 
-#define DMA_CHUNKSIZE		0x1000
+#define MACH64_DMA_TIMEOUT      10           /* 10 vertical retraces should be enough */
+#define MACH64_DMA_SIZE         64           /* 1 MB (64*16kB) should be enough */
+#define DMA_CHUNKSIZE		0x1000       /* 4kB per DMA descriptor */
 #define APERTURE_OFFSET		0x7ff800
 
 

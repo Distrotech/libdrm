@@ -508,7 +508,7 @@ static int mach64_dma_dispatch_vertex( drm_device_t *dev,
 					DRM_INFO( "mach64_do_wait_for_idle failed\n" );
 					DRM_INFO( "resetting engine ...\n" );
 					mach64_dump_engine_info( dev_priv );
-					mach64_do_engine_reset( dev );
+					mach64_do_engine_reset( dev_priv );
 					return -EBUSY;
 				}
 			} else {

@@ -25,6 +25,7 @@
  *
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
+ *    Leif Delgass <ldelgass@retinalburn.net>
  */
 
 #ifndef __MACH64_H__
@@ -45,6 +46,77 @@
 /* DMA customization:
  */
 #define __HAVE_DMA		1
+#define __HAVE_DMA_IRQ          1
+#define __HAVE_DMA_IRQ_BH       1
+#define __HAVE_SHARED_IRQ       1
+
+/* called before installing service routine in _irq_install */
+#define DRIVER_PREINSTALL()						\
+do {									\
+	u32 tmp;							\
+	drm_mach64_private_t *dev_priv = dev->dev_private;		\
+									\
+	tmp = MACH64_READ(MACH64_CRTC_INT_CNTL);			\
+        DRM_DEBUG("Before PREINSTALL: CRTC_INT_CNTL = 0x%08x\n", tmp);	\
+	/* clear active interrupts */					\
+	if ( tmp & (MACH64_VBLANK_INT | MACH64_BUSMASTER_EOL_INT) ) {	\
+		/* ack bits are the same as active interrupt bits, */	\
+		/* so write back tmp to clear active interrupts */	\
+		MACH64_WRITE( MACH64_CRTC_INT_CNTL, tmp );		\
+	}								\
+									\
+	/* disable interrupts */					\
+	tmp &= ~(MACH64_VBLANK_INT_EN | MACH64_BUSMASTER_EOL_INT_EN);	\
+	MACH64_WRITE( MACH64_CRTC_INT_CNTL, tmp );			\
+        DRM_DEBUG("After PREINSTALL: CRTC_INT_CNTL = 0x%08x\n", tmp);	\
+									\
+} while(0)
+
+/* called after installing service routine in _irq_install */
+#define DRIVER_POSTINSTALL()						\
+do {									\
+	/* clear and enable interrupts */				\
+	u32 tmp;							\
+	drm_mach64_private_t *dev_priv = dev->dev_private;		\
+									\
+	tmp = MACH64_READ(MACH64_CRTC_INT_CNTL);			\
+        DRM_DEBUG("Before POSTINSTALL: CRTC_INT_CNTL = 0x%08x\n", tmp);	\
+	/* clear active interrupts */					\
+	if ( tmp & (MACH64_VBLANK_INT | MACH64_BUSMASTER_EOL_INT) ) {	\
+		/* ack bits are the same as active interrupt bits, */	\
+		/* so write back tmp to clear active interrupts */	\
+		MACH64_WRITE( MACH64_CRTC_INT_CNTL, tmp );  		\
+	}								\
+									\
+	/* enable interrupts */						\
+	tmp |= MACH64_VBLANK_INT_EN | MACH64_BUSMASTER_EOL_INT_EN;	\
+	MACH64_WRITE( MACH64_CRTC_INT_CNTL, tmp );			\
+        DRM_DEBUG("After POSTINSTALL: CRTC_INT_CNTL = 0x%08x\n", tmp);	\
+									\
+} while(0)
+
+/* called before freeing irq in _irq_uninstall */
+#define DRIVER_UNINSTALL()							\
+do {										\
+	u32 tmp;								\
+	drm_mach64_private_t *dev_priv = dev->dev_private;			\
+	if (dev_priv) {								\
+		tmp = MACH64_READ(MACH64_CRTC_INT_CNTL);			\
+        	DRM_DEBUG("Before UNINSTALL: CRTC_INT_CNTL = 0x%08x\n", tmp);	\
+		/* clear active interrupts */					\
+		if ( tmp & (MACH64_VBLANK_INT | MACH64_BUSMASTER_EOL_INT) ) { 	\
+			/* ack bits are the same as active interrupt bits, */	\
+			/* so write back tmp to clear active interrupts */	\
+			MACH64_WRITE( MACH64_CRTC_INT_CNTL, tmp );		\
+		}								\
+										\
+		/* disable interrupts */					\
+		tmp &= ~(MACH64_VBLANK_INT_EN | MACH64_BUSMASTER_EOL_INT_EN);	\
+		MACH64_WRITE( MACH64_CRTC_INT_CNTL, tmp );			\
+        	DRM_DEBUG("After UNINSTALL: CRTC_INT_CNTL = 0x%08x\n", tmp);	\
+	}									\
+} while(0)
+
 
 /* Buffer customization:
  */

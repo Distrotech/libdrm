@@ -2,6 +2,7 @@
  * Created: Thu Nov 30 20:04:32 2000 by gareth@valinux.com
  *
  * Copyright 2000 Gareth Hughes
+ * Copyright 2002 Frank C. Earl
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -24,6 +25,8 @@
  *
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
+ *    Frank C. Earl <fearl@airmail.net>
+ *    Leif Delgass <ldelgass@retinalburn.net>
  */
 
 #ifndef __MACH64_DRM_H__
@@ -61,13 +64,20 @@
 #define MACH64_BACK			0x2
 #define MACH64_DEPTH			0x4
 
-/* Keep these small for testing.
- */
-#define MACH64_NR_SAREA_CLIPRECTS	8
 
 /* WARNING: If you change any of these defines, make sure to change the
  * defines in the Xserver file (mach64_sarea.h)
  */
+
+/* DMA buffer size
+ */
+#define MACH64_BUFFER_SIZE		16384
+
+/* Keep these small for testing.
+ */
+#define MACH64_NR_SAREA_CLIPRECTS	8
+
+
 #define MACH64_CARD_HEAP		0
 #define MACH64_AGP_HEAP			1
 #define MACH64_NR_TEX_HEAPS		2
@@ -75,6 +85,9 @@
 #define MACH64_LOG_TEX_GRANULARITY	16
 
 #define MACH64_TEX_MAXLEVELS		1
+
+#define MACH64_NR_CONTEXT_REGS		15
+#define MACH64_NR_TEXTURE_REGS		4
 
 #endif /* __MACH64_SAREA_DEFINES__ */
 
@@ -149,6 +162,7 @@ typedef struct drm_mach64_init {
 
 	unsigned int sarea_priv_offset;
 	int is_pci;
+	int pseudo_dma;
 
 	unsigned int fb_bpp;
 	unsigned int front_offset, front_pitch;
@@ -177,5 +191,14 @@ typedef struct drm_mach64_vertex {
 	int count;			/* Number of vertices in buffer */
 	int discard;			/* Client finished with buffer? */
 } drm_mach64_vertex_t;
-
+#if 0
+typedef struct drm_mach64_blit {
+	int idx;
+	int pitch;
+	int offset;
+	int format;
+	unsigned short x, y;
+	unsigned short width, height;
+} drm_mach64_blit_t;
+#endif
 #endif

@@ -2,6 +2,7 @@
  * Created: Sun Dec 03 19:20:26 2000 by gareth@valinux.com
  *
  * Copyright 2000 Gareth Hughes
+ * Copyright 2002 Frank C. Earl
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -24,6 +25,8 @@
  *
  * Authors:
  *   Gareth Hughes <gareth@valinux.com>
+ *   Frank C. Earl <fearl@airmail.net>
+ *   Leif Delgass <ldelgass@retinalburn.net>
  */
 
 #include "mach64.h"
@@ -32,6 +35,94 @@
 
 #include <linux/interrupt.h>	/* For task queue support */
 #include <linux/delay.h>
+#include <linux/list.h>
+
+int mach64_do_cleanup_dma( drm_device_t *dev );
+int mach64_handle_dma( drm_mach64_private_t *dev_priv );
+int mach64_do_dispatch_dma( drm_mach64_private_t *dev_priv );
+int mach64_do_complete_blit( drm_mach64_private_t *dev_priv );
+int mach64_do_wait_for_dma( drm_mach64_private_t *dev_priv );
+int mach64_do_release_used_buffers( drm_mach64_private_t *dev_priv );
+int mach64_init_freelist( drm_device_t *dev );
+
+static DECLARE_WAIT_QUEUE_HEAD(read_wait);
+
+
+/* ================================================================
+ * Interrupt handler
+ */
+
+void mach64_dma_service(int irq, void *device, struct pt_regs *regs)
+{
+        drm_device_t *dev = (drm_device_t *) device;
+	drm_mach64_private_t *dev_priv = (drm_mach64_private_t *)dev->dev_private;
+        
+        unsigned int flags;
+
+        /* Check to see if we've been interrupted for VBLANK or the BLIT completion
+           and ack the interrupt accordingly...  Set flags for the handler to 
+           know that it needs to process accordingly... */
+        flags = MACH64_READ(MACH64_CRTC_INT_CNTL);
+        if (flags & MACH64_VBLANK_INT)
+        {                
+                /* VBLANK -- GUI-master dispatch and polling... */
+                MACH64_WRITE(MACH64_CRTC_INT_CNTL, flags | MACH64_VBLANK_INT_AK);
+                atomic_inc(&dev_priv->do_gui);
+        }
+        if (flags & MACH64_BUSMASTER_EOL_INT)
+        {                
+                /* Completion of BLIT op */
+                MACH64_WRITE(MACH64_CRTC_INT_CNTL, flags | MACH64_BUSMASTER_EOL_INT_AK);
+                atomic_inc(&dev_priv->do_blit);
+        }               
+        /* Check for an error condition in the engine...  */
+        if (MACH64_READ(MACH64_FIFO_STAT) & 0x80000000) 
+        {
+                /* This would be a failure to maintain FIFO discipline
+                   per the SDK sources.   Need to reset... */
+                mach64_do_engine_reset(dev_priv);
+        }
+#if 0
+	/* According to reg. ref this bit is BUS_MSTR_RD_LINE and on my
+	 * card (LT Pro), it's set by default (LLD)
+	 */
+        if (MACH64_READ(MACH64_BUS_CNTL) & 0x00200000)
+        {
+                /* This would be a host data error, per information from
+                   Vernon Chiang @ ATI (Thanks, Vernon!).  Need to reset... */
+                mach64_do_engine_reset(dev_priv);
+        }
+#endif
+        /* Ok, now that we've gotten that out of the way, schedule the bottom half accordingly... */
+	queue_task(&dev->tq, &tq_immediate);
+	mark_bh(IMMEDIATE_BH);
+        
+        return;
+}
+
+/* Handle the DMA dispatch/completion */
+void mach64_dma_immediate_bh(void *device)
+{
+        drm_device_t *dev = (drm_device_t *) device;
+        drm_mach64_private_t *dev_priv = (drm_mach64_private_t *)dev->dev_private;
+
+        /* Handle the completion of a blit pass... */
+        if (atomic_read(&dev_priv->do_blit) > 0)
+        {
+                atomic_set(&dev_priv->do_blit, 0);
+                /*  mach64_do_complete_blit(dev_priv); */
+        }        
+
+        /* Check to see if we've been told to handle gui-mastering... */
+        if (atomic_read(&dev_priv->do_gui) > 0)
+        {
+                atomic_set(&dev_priv->do_gui, 0);
+                /*  mach64_handle_dma(dev_priv); */
+        }
+        
+        wake_up_interruptible(&read_wait);
+        return;
+}
 
 
 /* ================================================================
@@ -72,44 +163,60 @@ int mach64_do_wait_for_idle( drm_mach64_private_t *dev_priv )
 	return -EBUSY;
 }
 
+/* Wait until all DMA requests have been processed... */
+int mach64_do_wait_for_dma( drm_mach64_private_t *dev_priv )
+{
+	int i, ret;
 
-/* ================================================================
- * DMA initialization, cleanup
- */
+	/* Assume we timeout... */
+	ret = -EBUSY;
 
-
+	for ( i = 0 ; i < dev_priv->usec_timeout; i++ ) 
+	{
+		if ( list_empty(&dev_priv->dma_queue) )
+		{
+			ret = mach64_do_wait_for_idle( dev_priv );
+			break;
+		}
+		udelay( 1 );
+	}
+	
+	if (ret != 0)
+		DRM_INFO( "do_wait_for_dma failed! GUI_STAT=0x%08x\n", MACH64_READ( MACH64_GUI_STAT ) );
+	
+	return ret;
+}
 
 /* Reset the engine.  This will stop the DMA if it is running.
  */
-int mach64_do_engine_reset( drm_device_t *dev )
+int mach64_do_engine_reset( drm_mach64_private_t *dev_priv )
 {
-	drm_mach64_private_t *dev_priv = dev->dev_private;
-	u32 bus_cntl, gen_test_cntl;
+	u32 tmp;
 
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
 	/* Kill off any outstanding DMA transfers.
 	 */
-	bus_cntl = MACH64_READ( MACH64_BUS_CNTL );
+	tmp = MACH64_READ( MACH64_BUS_CNTL );
 	MACH64_WRITE( MACH64_BUS_CNTL,
-				  bus_cntl | MACH64_BUS_MASTER_DIS );
+				  tmp | MACH64_BUS_MASTER_DIS );
 
 	/* Reset the GUI engine (high to low transition).
 	 */
-	gen_test_cntl = MACH64_READ( MACH64_GEN_TEST_CNTL );
+	tmp = MACH64_READ( MACH64_GEN_TEST_CNTL );
 	MACH64_WRITE( MACH64_GEN_TEST_CNTL,
-				  gen_test_cntl & ~MACH64_GUI_ENGINE_ENABLE );
+				  tmp & ~MACH64_GUI_ENGINE_ENABLE );
 	/* Enable the GUI engine
 	 */
-	gen_test_cntl = MACH64_READ( MACH64_GEN_TEST_CNTL );
+	tmp = MACH64_READ( MACH64_GEN_TEST_CNTL );
 	MACH64_WRITE( MACH64_GEN_TEST_CNTL,
-				  gen_test_cntl | MACH64_GUI_ENGINE_ENABLE );
+				  tmp | MACH64_GUI_ENGINE_ENABLE );
 
 	/* ensure engine is not locked up by clearing any FIFO or HOST errors
 	*/
-	bus_cntl = MACH64_READ( MACH64_BUS_CNTL );
-	MACH64_WRITE( MACH64_BUS_CNTL, bus_cntl | 0x00a00000 );
-
+	tmp = MACH64_READ( MACH64_BUS_CNTL );
+	MACH64_WRITE( MACH64_BUS_CNTL, tmp | 0x00a00000 );
+	
 	return 0;
 }
 
@@ -190,6 +297,9 @@ void mach64_dump_engine_info( drm_mach64_private_t *dev_priv )
 	DRM_INFO( "\n" );
 }
 
+/* ================================================================
+ * DMA test and initialization
+ */
 
 static int mach64_bm_dma_test( drm_device_t *dev )
 {
@@ -199,6 +309,7 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 	u32 data_addr;
 	u32 *table, *data;
 	u32 regs[3], expected[3];
+	u32 src_cntl;
 	int i;
 
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
@@ -216,7 +327,9 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 		data_addr = (u32) data_handle;
 	}
 
-	MACH64_WRITE( MACH64_SRC_CNTL, 0x00000000 );
+	src_cntl = MACH64_READ( MACH64_SRC_CNTL );
+	src_cntl &= ~MACH64_SRC_BM_ENABLE;
+	MACH64_WRITE( MACH64_SRC_CNTL, src_cntl );
 
 	MACH64_WRITE( MACH64_VERTEX_1_S, 0x00000000 );
 	MACH64_WRITE( MACH64_VERTEX_1_T, 0x00000000 );
@@ -234,7 +347,7 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 	data[2] = expected[1] = 0x22222222;
 	data[3] = expected[2] = 0x33333333;
 	data[4] = cpu_to_le32(0x0000006d); /* SRC_CNTL */
-	data[5] = 0x00000000;
+	data[5] = cpu_to_le32(src_cntl);
 
 	DRM_DEBUG( "Preparing table ...\n" );
 	table[0] = cpu_to_le32(MACH64_BM_ADDR + APERTURE_OFFSET);
@@ -257,7 +370,7 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 	if ( ( i = mach64_do_wait_for_idle( dev_priv ) ) ) {
 		DRM_INFO( "mach64_do_wait_for_idle failed (result=%d)\n", i);
 		DRM_INFO( "resetting engine ...\n");
-		mach64_do_engine_reset( dev );
+		mach64_do_engine_reset( dev_priv );
 		DRM_INFO( "freeing data buffer memory.\n" );
 		pci_pool_free( dev_priv->pool, cpu_addr_data, data_handle );
 		DRM_INFO( "returning ...\n" );
@@ -290,7 +403,7 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 		DRM_INFO( "mach64_do_wait_for_idle failed (result=%d)\n", i);
 		mach64_dump_engine_info( dev_priv );
 		DRM_INFO( "resetting engine ...\n");
-		mach64_do_engine_reset( dev );
+		mach64_do_engine_reset( dev_priv );
 		DRM_INFO( "freeing data buffer memory.\n" );
 		pci_pool_free( dev_priv->pool, cpu_addr_data, data_handle );
 		DRM_INFO( "returning ...\n" );
@@ -410,93 +523,328 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 		}
 	}
 
-#if MACH64_USE_DMA
-	/* enable block 1 registers and bus mastering */
-	MACH64_WRITE( MACH64_BUS_CNTL, 
-		      ( ( MACH64_READ(MACH64_BUS_CNTL) 
-			  | MACH64_BUS_EXT_REG_EN ) 
-			& ~MACH64_BUS_MASTER_DIS ) );
+	if ( !init->pseudo_dma ) {
+		/* enable block 1 registers and bus mastering */
+		MACH64_WRITE( MACH64_BUS_CNTL, 
+			      ( ( MACH64_READ(MACH64_BUS_CNTL) 
+				  | MACH64_BUS_EXT_REG_EN ) 
+				& ~MACH64_BUS_MASTER_DIS ) );
 
-	/* changing the FIFO size from the default seems to cause problems with DMA */
-	tmp = MACH64_READ( MACH64_GUI_CNTL );
-	if ( (tmp & MACH64_CMDFIFO_SIZE_MASK) != MACH64_CMDFIFO_SIZE_128 ) {
-		DRM_INFO( "Setting FIFO size to 128 entries\n");
-		/* FIFO must be empty to change the FIFO depth */
-		if ((ret=mach64_do_wait_for_idle( dev_priv ))) {
-			dev->dev_private = (void *)dev_priv;
-			mach64_do_cleanup_dma( dev );
-			DRM_ERROR("wait for idle failed before changing FIFO depth!\n");
-			return ret;
+		/* changing the FIFO size from the default seems to cause problems with DMA */
+		tmp = MACH64_READ( MACH64_GUI_CNTL );
+		if ( (tmp & MACH64_CMDFIFO_SIZE_MASK) != MACH64_CMDFIFO_SIZE_128 ) {
+			DRM_INFO( "Setting FIFO size to 128 entries\n");
+			/* FIFO must be empty to change the FIFO depth */
+			if ((ret=mach64_do_wait_for_idle( dev_priv ))) {
+				dev->dev_private = (void *)dev_priv;
+				mach64_do_cleanup_dma( dev );
+				DRM_ERROR("wait for idle failed before changing FIFO depth!\n");
+				return ret;
+			}
+			MACH64_WRITE( MACH64_GUI_CNTL, ( ( tmp & ~MACH64_CMDFIFO_SIZE_MASK ) \
+							 | MACH64_CMDFIFO_SIZE_128 ) );
+			/* need to read GUI_STAT for proper sync according to register reference */
+			if ((ret=mach64_do_wait_for_idle( dev_priv ))) {
+				dev->dev_private = (void *)dev_priv;
+				mach64_do_cleanup_dma( dev );
+				DRM_ERROR("wait for idle failed when changing FIFO depth!\n");
+				return ret;
+			}
 		}
-		MACH64_WRITE( MACH64_GUI_CNTL, ( ( tmp & ~MACH64_CMDFIFO_SIZE_MASK ) \
-						 | MACH64_CMDFIFO_SIZE_128 ) );
-		/* need to read GUI_STAT for proper sync according to register reference */
-		if ((ret=mach64_do_wait_for_idle( dev_priv ))) {
-			dev->dev_private = (void *)dev_priv;
-			mach64_do_cleanup_dma( dev );
-			DRM_ERROR("wait for idle failed when changing FIFO depth!\n");
-			return ret;
+
+		/* create pci pool for descriptor memory */
+		DRM_INFO( "Creating pci pool\n");
+		dev_priv->pool = pci_pool_create( "mach64",   /* name */ 
+						  NULL,       /* dev */
+						  0x4000,     /* size - 16KB */
+						  0x4000,     /* align - 16KB */
+						  0x4000,     /* alloc - 16KB */
+						  SLAB_ATOMIC /* flags */ 
+			);
+
+		if (!dev_priv->pool) {
+			dev_priv->driver_mode = MACH64_MODE_MMIO;
+			DRM_INFO( "pci_pool_create failed, using pseudo-DMA mode\n");
+			dev->dev_private = (void *) dev_priv;
+			return 0;
 		}
-	}
 
-	/* create pci pool for descriptor memory */
-	DRM_INFO( "Creating pci pool\n");
-	dev_priv->pool = pci_pool_create( "mach64",   /* name */ 
-					  NULL,       /* dev */
-					  0x4000,     /* size - 16KB */
-					  0x4000,     /* align - 16KB */
-					  0x4000,     /* alloc - 16KB */
-					  SLAB_ATOMIC /* flags */ 
-		);
+		/* allocate descriptor memory from pci pool */
+		DRM_INFO( "Allocating descriptor table memory\n" );
+		dev_priv->cpu_addr_table = pci_pool_alloc( dev_priv->pool, SLAB_ATOMIC, 
+							   &dev_priv->table_handle );
+		if (!dev_priv->cpu_addr_table || !dev_priv->table_handle) {
+			pci_pool_destroy( dev_priv->pool );
+			dev_priv->driver_mode = MACH64_MODE_MMIO;
+			DRM_INFO( "pci_pool_alloc failed, using pseudo-DMA mode\n");
+			dev->dev_private = (void *) dev_priv;
+			return 0;
+		} else {
+			dev_priv->table_addr = (u32) dev_priv->table_handle;
+			memset( dev_priv->cpu_addr_table, 0x0, 0x4000 );
+		}
 
-	if (!dev_priv->pool) {
-		dev_priv->driver_mode = MACH64_MODE_MMIO;
-		DRM_INFO( "pci_pool_create failed, using MMIO mode\n");
+		DRM_INFO( "descriptor table: cpu addr: 0x%08x, bus addr: 0x%08x\n", 
+			  (u32) dev_priv->cpu_addr_table, dev_priv->table_addr );
+
+		/* setup physical address and size of descriptor table */
+		MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, 
+			      ( dev_priv->table_addr | MACH64_CIRCULAR_BUF_SIZE_16KB ) );
+
+		/* try a DMA GUI-mastering pass and fall back to MMIO if it fails */
 		dev->dev_private = (void *) dev_priv;
-		return 0;
-	}
-
-	/* allocate descriptor memory from pci pool */
-	DRM_INFO( "Allocating descriptor table memory\n" );
-	dev_priv->cpu_addr_table = pci_pool_alloc( dev_priv->pool, SLAB_ATOMIC, 
-						   &dev_priv->table_handle );
-	if (!dev_priv->cpu_addr_table || !dev_priv->table_handle) {
-		pci_pool_destroy( dev_priv->pool );
-		dev_priv->driver_mode = MACH64_MODE_MMIO;
-		DRM_INFO( "pci_pool_alloc failed, using MMIO mode\n");
-		dev->dev_private = (void *) dev_priv;
-		return 0;
-	} else {
-		dev_priv->table_addr = (u32) dev_priv->table_handle;
-		memset( dev_priv->cpu_addr_table, 0x0, 0x4000 );
-	}
-
-	DRM_INFO( "descriptor table: cpu addr: 0x%08x, bus addr: 0x%08x\n", 
-		  (u32) dev_priv->cpu_addr_table, dev_priv->table_addr );
-
-	/* setup physical address and size of descriptor table */
-	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, 
-		      ( dev_priv->table_addr | MACH64_CIRCULAR_BUF_SIZE_16KB ) );
-
-	/* try a DMA GUI-mastering pass and fall back to MMIO if it fails */
-	dev->dev_private = (void *) dev_priv;
-	DRM_INFO( "Starting DMA test...\n");
-	if ( (ret=mach64_bm_dma_test( dev )) == 0 ) {
-		dev_priv->driver_mode = MACH64_MODE_DMA_SYNC;
-		DRM_INFO( "DMA test succeeded, using synchronous DMA mode\n");
+		DRM_INFO( "Starting DMA test...\n");
+		if ( (ret=mach64_bm_dma_test( dev )) == 0 ) {
+			dev_priv->driver_mode = MACH64_MODE_DMA_SYNC;
+			DRM_INFO( "DMA test succeeded, using synchronous DMA mode\n");
+		} else {
+			dev_priv->driver_mode = MACH64_MODE_MMIO;
+			DRM_INFO( "DMA test failed (ret=%d), using pseudo-DMA mode\n", ret );
+		}
 	} else {
 		dev_priv->driver_mode = MACH64_MODE_MMIO;
-		DRM_INFO( "DMA test failed (ret=%d), using MMIO mode\n", ret );
+		DRM_INFO( "Forcing pseudo-DMA mode\n");
 	}
-#else
-	dev_priv->driver_mode = MACH64_MODE_MMIO;
-	DRM_INFO( "Using MMIO mode\n");
-#endif
+
+	/* Set up the freelist, empty (placeholder), pending, and DMA request queues... */
+	INIT_LIST_HEAD(&dev_priv->free_list);
+	INIT_LIST_HEAD(&dev_priv->empty_list);
+	INIT_LIST_HEAD(&dev_priv->pending);
+	INIT_LIST_HEAD(&dev_priv->dma_queue);
+
+	mach64_init_freelist( dev );
+
+        /* Set up for interrupt handling proper- clear state on the handler
+	 * The handler is enabled by the DDX via the DRM(control) ioctl once we return */
+        atomic_set(&dev_priv->do_gui, 0);                
+        atomic_set(&dev_priv->do_blit, 0);                
+        atomic_set(&dev_priv->dma_timeout, -1);	
 
 	dev->dev_private = (void *) dev_priv;
 	
 	return 0;
 }
+
+/* ================================================================
+ * Primary DMA stream management
+ */
+
+/*
+	Manage the GUI-Mastering operations of the chip.  Since the GUI-Master
+	operation is slightly less intelligent than the BLIT operation (no interrupt
+	for completion), we have to provide the completion detection, etc. in 
+	a state engine.
+*/
+int mach64_handle_dma( drm_mach64_private_t *dev_priv )
+{
+	struct list_head 		*ptr;
+	int 				i;
+	int				timeout;
+		
+	timeout = atomic_read(&dev_priv->dma_timeout);
+	
+	/* Check for engine idle... */
+	if (!(MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE))
+	{
+		/* Check to see if we had a DMA pass going... */
+		if ( timeout > -1)
+		{
+			/* Ok, do the clean up for the previous pass... */
+			mach64_do_release_used_buffers(dev_priv);
+			atomic_set(&dev_priv->dma_timeout, -1);
+		}
+		
+		/* Now, check for queued buffers... */	
+		if (!list_empty(&dev_priv->dma_queue))
+		{
+			ptr = dev_priv->dma_queue.next;
+			for(i = 0; i < MACH64_DMA_SIZE && !list_empty(&dev_priv->dma_queue); i++)
+			{
+				/* FIXME -- We REALLY need to be doing this based off of not just
+				   a DMA-able size that's tolerable, but also rounding up/down by
+				   what was submitted to us- if the client's submitting 3 buffer
+				   submits, we really want to push all three at the same time to
+				   the DMA channel. */
+				list_del(ptr);
+				list_add_tail(ptr, &dev_priv->pending);
+			}
+			atomic_set(&dev_priv->dma_timeout, 0);
+		}
+		
+		/* Check to see if we've got a DMA pass set up */
+		if (atomic_read(&dev_priv->dma_timeout) == 0)
+		{
+			/* Make sure we're locked and fire off the prepped pass */
+			mach64_do_dispatch_dma(dev_priv);
+		}
+	}
+	else
+	{
+		/* Check to see if we've got a GUI-Master going... */
+		if ((timeout > -1) && !(MACH64_READ( MACH64_BUS_CNTL ) & MACH64_BUS_MASTER_DIS))
+		{
+			/* Check for DMA timeout */
+			if (timeout > MACH64_DMA_TIMEOUT)
+			{
+				/* Assume the engine's hung bigtime...  */
+				mach64_do_engine_reset(dev_priv);				
+				mach64_do_release_used_buffers(dev_priv);
+				atomic_set(&dev_priv->dma_timeout, -1);
+			}
+			else
+			{
+				atomic_inc(&dev_priv->dma_timeout);
+			}			
+		}		
+	}
+	
+        return 0;
+}
+
+
+/*
+	Perform the clean-up for the blit operation- turn off DMA
+	operation (not support) and unlock the DRM.
+*/
+int mach64_do_complete_blit( drm_mach64_private_t *dev_priv )
+{
+	/* Turn off DMA mode -- we don't have anything going because the chip
+	   tells us that it completed in this case (Why didn't they do this for
+	   GUI Master operation?!)  */	
+        MACH64_WRITE( MACH64_BUS_CNTL, MACH64_READ( MACH64_BUS_CNTL ) | MACH64_BUS_MASTER_DIS );
+	
+        return 0;
+}
+
+
+/*
+	Take the pending list and build up a descriptor table for
+	GUI-Master use, then fire off the DMA engine with the list.
+	(The list includes a register reset buffer that the DRM
+	only controls)
+*/
+
+/* FIXME: need to add commands to terminate DMA at the end of the stream */
+
+int mach64_do_dispatch_dma( drm_mach64_private_t *dev_priv )
+{
+	u32 *table_ptr = (u32 *) dev_priv->cpu_addr_table;
+	struct list_head 	*ptr;	
+	drm_mach64_freelist_t 	*entry;
+	drm_buf_t *buf;
+	int size, i, pages, remainder, tableDwords;
+	u32 address, page, end_flag;
+	u32 *p;
+
+	tableDwords = 0;
+
+	/* Iterate the pending list build a descriptor table accordingly... */	
+	list_for_each(ptr, &dev_priv->pending)
+	{
+		entry = list_entry(ptr, drm_mach64_freelist_t, list);
+		buf = entry->buf;
+		size = buf->used;
+
+		if (dev_priv->is_pci) {
+			address = (u32) virt_to_bus((void *)buf->address);
+			p = (u32 *) buf->address;
+		} else {
+			address = (u32) buf->bus_address;
+			p = (u32 *)((char *)dev_priv->buffers->handle + 
+				    buf->offset);
+		}
+
+		pages = (size + DMA_CHUNKSIZE - 1) / DMA_CHUNKSIZE;
+		for ( i = 0 ; i < pages-1 ; i++ ) {
+			page = address + i * DMA_CHUNKSIZE;
+
+			table_ptr[DMA_FRAME_BUF_OFFSET] = cpu_to_le32(MACH64_BM_ADDR + 
+								      APERTURE_OFFSET);
+			table_ptr[DMA_SYS_MEM_ADDR] = cpu_to_le32(page);
+			table_ptr[DMA_COMMAND] = cpu_to_le32(DMA_CHUNKSIZE | 0x40000000);
+			table_ptr[DMA_RESERVED] = 0;
+
+			tableDwords += 4;
+			table_ptr += 4;
+		}
+
+		/* if this is the last buffer, we need to set the final descriptor flag */
+		end_flag = (ptr->next == &dev_priv->pending) ? 0x80000000 : 0;
+
+                /* generate the final descriptor for any remaining commands in this buffer */
+		page = address + i * DMA_CHUNKSIZE;
+		remainder = size - i * DMA_CHUNKSIZE;
+		table_ptr[DMA_FRAME_BUF_OFFSET] = cpu_to_le32(MACH64_BM_ADDR + APERTURE_OFFSET);
+		table_ptr[DMA_SYS_MEM_ADDR] = cpu_to_le32(page);
+		table_ptr[DMA_COMMAND] = cpu_to_le32(remainder | end_flag | 0x40000000);
+		table_ptr[DMA_RESERVED] = 0;
+
+		tableDwords += 4;
+		table_ptr += 4;
+	}
+	
+	/* Now, dispatch the whole lot to the gui-master engine */
+
+	/* flush write combining */
+	mach64_flush_write_combine();
+	mach64_do_wait_for_idle( dev_priv );
+	
+	/* enable bus mastering */
+	MACH64_WRITE( MACH64_BUS_CNTL, 
+		      ( MACH64_READ(MACH64_BUS_CNTL) 
+			& ~MACH64_BUS_MASTER_DIS ) );
+	/* enable VBLANK interrupt */
+	MACH64_WRITE( MACH64_CRTC_INT_CNTL, MACH64_READ(MACH64_CRTC_INT_CNTL) | 
+		      MACH64_VBLANK_INT_EN);
+	/* reset descriptor table head */
+	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, ( dev_priv->table_addr 
+						 | MACH64_CIRCULAR_BUF_SIZE_16KB ) );
+	/* enable GUI-master operation */
+	MACH64_WRITE( MACH64_SRC_CNTL, 
+		      MACH64_SRC_BM_ENABLE | MACH64_SRC_BM_SYNC |
+		      MACH64_SRC_BM_OP_SYSTEM_TO_REG );
+	/* kick off the transfer */
+	MACH64_WRITE( MACH64_DST_HEIGHT_WIDTH, 0 );
+
+#if 0
+	if ( dev_priv->driver_mode == MACH64_MODE_DMA_SYNC )
+		if ( mach64_do_wait_for_idle( dev_priv ) ) {
+			DRM_INFO( "mach64_do_wait_for_idle failed\n" );
+			DRM_INFO( "resetting engine ...\n" );
+			mach64_dump_engine_info( dev_priv );
+			mach64_do_engine_reset( dev_priv );
+			return -EBUSY;
+		}
+	}
+#endif
+        return 0;
+}
+
+
+/* 
+	Release completed, releaseable buffers to the freelist, currently 
+	ignore flags for buffers that aren't flagged for release (shouldn't 
+	be any, but you never know what someone's going to do to us...).
+*/
+int mach64_do_release_used_buffers( drm_mach64_private_t *dev_priv )
+{
+	struct list_head *ptr;	
+	struct list_head *tmp;	
+	
+	/* Iterate the pending list and shove the whole lot into the freelist... */	
+	list_for_each_safe(ptr, tmp, &dev_priv->pending)
+	{
+		list_del(ptr);
+		list_add_tail(ptr, &dev_priv->free_list);
+	}
+	
+        return 0;
+}
+
+
+/* ================================================================
+ * DMA cleanup
+ */
 
 int mach64_do_cleanup_dma( drm_device_t *dev )
 {
@@ -505,13 +853,14 @@ int mach64_do_cleanup_dma( drm_device_t *dev )
 	if ( dev->dev_private ) {
 		drm_mach64_private_t *dev_priv = dev->dev_private;
 
+		/* Discard the allocations for the descriptor table... */
 		if ( (dev_priv->pool != NULL) && 
 		     (dev_priv->cpu_addr_table != NULL) && dev_priv->table_handle ) {
 			DRM_INFO( "freeing descriptor table from pci pool\n" );
 			pci_pool_free( dev_priv->pool, dev_priv->cpu_addr_table, 
 				       dev_priv->table_handle );
 		}
-		if ( dev_priv->pool ) {
+		if ( dev_priv->pool != NULL ) {
 			DRM_INFO( "destroying pci pool\n" );
 			pci_pool_destroy( dev_priv->pool );
 		}
@@ -527,6 +876,10 @@ int mach64_do_cleanup_dma( drm_device_t *dev )
 	
 	return 0;
 }
+
+/* ================================================================
+ * IOCTL handlers
+ */
 
 int mach64_dma_init( struct inode *inode, struct file *filp,
 		     unsigned int cmd, unsigned long arg )
@@ -569,17 +922,14 @@ int mach64_engine_reset( struct inode *inode, struct file *filp,
 {
         drm_file_t *priv = filp->private_data;
         drm_device_t *dev = priv->dev;
+	drm_mach64_private_t *dev_priv = dev->dev_private;
+	
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
 	LOCK_TEST_WITH_RETURN( dev );
 
-	return mach64_do_engine_reset( dev );
+	return mach64_do_engine_reset( dev_priv );
 }
-
-
-/* ================================================================
- * Primary DMA stream management
- */
 
 
 /* ================================================================
@@ -587,6 +937,11 @@ int mach64_engine_reset( struct inode *inode, struct file *filp,
  */
 #define MACH64_BUFFER_USED	0xffffffff
 #define MACH64_BUFFER_FREE	0
+
+int mach64_init_freelist( drm_device_t *dev )
+{
+	return 0;
+}
 
 drm_buf_t *mach64_freelist_get( drm_device_t *dev )
 {
@@ -642,9 +997,8 @@ void mach64_freelist_reset( drm_device_t *dev )
 
 
 /* ================================================================
- * DMA command submission
+ * DMA buffer request and submission IOCTL handler
  */
-
 
 static int mach64_dma_get_buffers( drm_device_t *dev, drm_dma_t *d )
 {
@@ -669,44 +1023,85 @@ static int mach64_dma_get_buffers( drm_device_t *dev, drm_dma_t *d )
 	return 0;
 }
 
+/*
+        Through some pretty thorough testing, it has been found that the 
+        RagePRO engine will pretty much ignore any "commands" sent
+        via the gui-master pathway that aren't gui operations (the register
+        gets set, but the actions that are normally associated with the setting
+        of those said registers doesn't happen.).  So, it's safe to send us
+        buffers of gui commands from userspace (altering the buffer in mid-
+        execution will at worst scribble all over the screen and pushing
+        bogus commands will have no apparent effect...)
+
+        FCE (03-08-2002)
+*/
 int mach64_dma_buffers( struct inode *inode, struct file *filp,
-		      unsigned int cmd, unsigned long arg )
+			unsigned int cmd, unsigned long arg )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
-	drm_device_dma_t *dma = dev->dma;
-	int ret = 0;
+        drm_file_t *priv = filp->private_data;
+        drm_device_t *dev = priv->dev;
+	drm_mach64_private_t *dev_priv = dev->dev_private;
+        drm_device_dma_t *dma = dev->dma;
+	struct list_head *ptr;
+	drm_mach64_freelist_t *entry;
 	drm_dma_t d;
+        int ret = 0;
+	int i;
 
-	LOCK_TEST_WITH_RETURN( dev );
+        LOCK_TEST_WITH_RETURN( dev );
 
-	if ( copy_from_user( &d, (drm_dma_t *) arg, sizeof(d) ) )
-		return -EFAULT;
+        if ( copy_from_user( &d, (drm_dma_t *)arg, sizeof(d) ) )
+        {
+                return -EFAULT;
+        }
 
-	/* Please don't send us buffers.
-	 */
-	if ( d.send_count != 0 ) {
-		DRM_ERROR( "Process %d trying to send %d buffers via drmDMA\n",
-			   current->pid, d.send_count );
-		return -EINVAL;
-	}
+        /* Queue up buffers sent to us...
+        */
+        if ( d.send_count > 0 ) 
+        {
+		for (i = 0; i < d.send_count ; i++)
+		{
+			if (!list_empty(&dev_priv->empty_list))
+			{
+				ptr = dev_priv->empty_list.next;
+				list_del(ptr);
+				entry = list_entry(ptr, drm_mach64_freelist_t, list);
+				entry->buf = dma->buflist[d.send_indices[i]];
+				list_add_tail(ptr, &dev_priv->dma_queue);
+			}
+			else
+			{
+				return -EFAULT;
+			}
+		}
+        }
+        else
+        {
+                /* Send the caller as many as they ask for, so long as we
+                   have them in hand to give...
+                */
+                if ( d.request_count < 0 || d.request_count > dma->buf_count ) 
+                {
+                        DRM_ERROR( "Process %d trying to get %d buffers (of %d max)\n",
+                                current->pid, d.request_count, dma->buf_count );
+                        ret = -EINVAL;
+                }
+                else
+                {
+                        d.granted_count = 0;
 
-	/* We'll send you buffers.
-	 */
-	if ( d.request_count < 0 || d.request_count > dma->buf_count ) {
-		DRM_ERROR( "Process %d trying to get %d buffers (of %d max)\n",
-			   current->pid, d.request_count, dma->buf_count );
-		return -EINVAL;
-	}
+                        if ( d.request_count ) 
+                        {
+                                ret = mach64_dma_get_buffers( dev, &d );
+                        }
 
-	d.granted_count = 0;
-
-	if ( d.request_count ) {
-		ret = mach64_dma_get_buffers( dev, &d );
-	}
-
-	if ( copy_to_user( (drm_dma_t *) arg, &d, sizeof(d) ) )
-		return -EFAULT;
-
-	return ret;
+                        if ( copy_to_user( (drm_dma_t *)arg, &d, sizeof(d) ) )
+                        {
+                                ret = -EFAULT;
+                        }
+                }
+        }
+        
+        return ret;
 }
+
