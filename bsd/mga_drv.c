@@ -28,7 +28,7 @@
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/mga_drv.c,v 1.4 2003/03/09 02:08:28 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/mga_drv.c,v 1.5 2003/04/25 01:18:46 anholt Exp $
  */
 
 #include "mga.h"
@@ -56,7 +56,6 @@ drm_chipinfo_t DRM(devicelist)[] = {
 #include "drm_drawable.h"
 #include "drm_drv.h"
 #include "drm_fops.h"
-#include "drm_init.h"
 #include "drm_ioctl.h"
 #include "drm_lock.h"
 #include "drm_memory.h"

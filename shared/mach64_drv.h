@@ -793,9 +793,9 @@ do {									\
 		DRM_INFO( "ADVANCE_RING() wr=0x%06x tail=0x%06x\n",	\
 			  _ring_write, _ring_tail );			\
 	}								\
-	DRM_READMEMORYBARRIER(dev_priv->mmio);				\
+	DRM_MEMORYBARRIER();						\
 	mach64_clear_dma_eol( &_ring[(_ring_tail - 2) & _ring_mask] );	\
-	DRM_READMEMORYBARRIER(dev_priv->mmio);				\
+	DRM_MEMORYBARRIER();						\
 	dev_priv->ring.tail = _ring_write;				\
 	mach64_ring_tick( dev_priv, &(dev_priv)->ring );		\
 } while (0)

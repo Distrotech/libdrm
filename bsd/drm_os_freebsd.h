@@ -1,5 +1,5 @@
 /*
- * $FreeBSD: src/sys/dev/drm/drm_os_freebsd.h,v 1.8 2003/03/09 02:08:28 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_os_freebsd.h,v 1.9 2003/04/25 01:18:46 anholt Exp $
  */
 #include <sys/param.h>
 #include <sys/queue.h>
@@ -27,6 +27,7 @@
 #include <machine/pmap.h>
 #include <machine/bus.h>
 #include <machine/resource.h>
+#include <sys/endian.h>
 #include <sys/mman.h>
 #include <sys/rman.h>
 #include <sys/memrange.h>
@@ -49,7 +50,7 @@
 #endif
 
 #ifdef __i386__
-#define __REALLY_HAVE_MTRR	(__HAVE_MTRR)
+#define __REALLY_HAVE_MTRR	(__HAVE_MTRR) && (__FreeBSD_version >= 500000)
 #else
 #define __REALLY_HAVE_MTRR	0
 #endif
@@ -206,10 +207,21 @@ while (!condition) {							\
 #define DRM_GET_USER_UNCHECKED(val, uaddr)			\
 	((val) = fuword(uaddr), 0)
 
-#define DRM_WRITEMEMORYBARRIER( map )					\
-	bus_space_barrier((map)->iot, (map)->ioh, 0, (map)->size, 0);
-#define DRM_READMEMORYBARRIER( map )					\
-	bus_space_barrier((map)->iot, (map)->ioh, 0, (map)->size, BUS_SPACE_BARRIER_READ);
+/* DRM_READMEMORYBARRIER() prevents reordering of reads.
+ * DRM_WRITEMEMORYBARRIER() prevents reordering of writes.
+ * DRM_MEMORYBARRIER() prevents reordering of reads and writes.
+ */
+#if defined(__i386__)
+#define DRM_READMEMORYBARRIER()		__asm __volatile( \
+					"lock; addl $0,0(%%esp)" : : : "memory");
+#define DRM_WRITEMEMORYBARRIER()	__asm __volatile("" : : : "memory");
+#define DRM_MEMORYBARRIER()		__asm __volatile( \
+					"lock; addl $0,0(%%esp)" : : : "memory");
+#elif defined(__alpha__)
+#define DRM_READMEMORYBARRIER()		alpha_mb();
+#define DRM_WRITEMEMORYBARRIER()	alpha_wmb();
+#define DRM_MEMORYBARRIER()		alpha_mb();
+#endif
 
 #define PAGE_ALIGN(addr) round_page(addr)
 
@@ -218,7 +230,7 @@ while (!condition) {							\
 #endif
 
 #define malloctype DRM(M_DRM)
-/* The macros confliced in the MALLOC_DEFINE */
+/* The macros conflicted in the MALLOC_DEFINE */
 MALLOC_DECLARE(malloctype);
 #undef malloctype
 
@@ -230,12 +242,11 @@ typedef struct drm_chipinfo
 	char *name;
 } drm_chipinfo_t;
 
-#define cpu_to_le32(x) (x)	/* FIXME */
-#define le32_to_cpu(x) (x)	/* FIXME */
+#define cpu_to_le32(x) htole32(x)
+#define le32_to_cpu(x) le32toh(x)
 
 typedef unsigned long dma_addr_t;
 typedef u_int32_t atomic_t;
-typedef u_int32_t cycles_t;
 typedef u_int32_t u32;
 typedef u_int16_t u16;
 typedef u_int8_t u8;
@@ -251,16 +262,23 @@ typedef u_int8_t u8;
 #if __FreeBSD_version < 500000
 /* The extra atomic functions from 5.0 haven't been merged to 4.x */
 static __inline int
-atomic_cmpset_int(volatile int *dst, int old, int new)
+atomic_cmpset_int(volatile u_int *dst, u_int exp, u_int src)
 {
-	int s = splhigh();
-	if (*dst==old) {
-		*dst = new;
-		splx(s);
-		return 1;
-	}
-	splx(s);
-	return 0;
+	int res = exp;
+
+	__asm __volatile (
+	"	lock ;			"
+	"	cmpxchgl %1,%2 ;	"
+	"       setz	%%al ;		"
+	"	movzbl	%%al,%0 ;	"
+	"1:				"
+	"# atomic_cmpset_int"
+	: "+a" (res)			/* 0 (result) */
+	: "r" (src),			/* 1 */
+	  "m" (*(dst))			/* 2 */
+	: "memory");				 
+
+	return (res);
 }
 #endif
 
@@ -319,10 +337,8 @@ find_first_zero_bit(volatile void *p, int max)
  * exist.
  */
 #if (__FreeBSD_version < 500002 && __FreeBSD_version > 500000) || __FreeBSD_version < 420000
-/* FIXME: again, what's the exact date? */
 #define MODULE_VERSION(a,b)		struct __hack
 #define MODULE_DEPEND(a,b,c,d,e)	struct __hack
-
 #endif
 
 /* Redefinitions to make templating easy */
@@ -348,8 +364,6 @@ find_first_zero_bit(volatile void *p, int max)
 #define DRM_DEBUG(fmt, arg...)		 do { } while (0)
 #endif
 
-#define DRM_PROC_LIMIT (PAGE_SIZE-80)
-
 #if (__FreeBSD_version >= 500000) || ((__FreeBSD_version < 500000) && (__FreeBSD_version >= 410002))
 #define DRM_SYSCTL_HANDLER_ARGS	(SYSCTL_HANDLER_ARGS)
 #else
@@ -357,14 +371,11 @@ find_first_zero_bit(volatile void *p, int max)
 #endif
 
 #define DRM_SYSCTL_PRINT(fmt, arg...)		\
+do {						\
   snprintf(buf, sizeof(buf), fmt, ##arg);	\
   error = SYSCTL_OUT(req, buf, strlen(buf));	\
-  if (error) return error;
-
-#define DRM_SYSCTL_PRINT_RET(ret, fmt, arg...)	\
-  snprintf(buf, sizeof(buf), fmt, ##arg);	\
-  error = SYSCTL_OUT(req, buf, strlen(buf));	\
-  if (error) { ret; return error; }
+  if (error) return error;			\
+} while (0)
 
 
 #define DRM_FIND_MAP(dest, o)						\
@@ -386,7 +397,6 @@ extern d_ioctl_t	DRM(ioctl);
 extern d_open_t		DRM(open);
 extern d_close_t	DRM(close);
 extern d_read_t		DRM(read);
-extern d_write_t	DRM(write);
 extern d_poll_t		DRM(poll);
 extern d_mmap_t		DRM(mmap);
 extern int		DRM(open_helper)(dev_t kdev, int flags, int fmt, 
@@ -398,5 +408,7 @@ extern drm_file_t	*DRM(find_file_by_proc)(drm_device_t *dev,
 extern int		DRM(sysctl_init)(drm_device_t *dev);
 extern int		DRM(sysctl_cleanup)(drm_device_t *dev);
 
-/* Memory info sysctl (drm_memory.h) */
+/* Memory info sysctl (drm_memory_debug.h) */
+#ifdef DEBUG_MEMORY
 extern int		DRM(mem_info) DRM_SYSCTL_HANDLER_ARGS;
+#endif

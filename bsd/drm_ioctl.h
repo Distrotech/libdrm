@@ -28,7 +28,7 @@
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/drm_ioctl.h,v 1.3 2003/03/09 02:08:28 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_ioctl.h,v 1.4 2003/04/25 01:18:46 anholt Exp $
  */
 
 #include "drmP.h"
@@ -121,15 +121,6 @@ int DRM(setunique)( DRM_IOCTL_ARGS )
 
 	dev->unique[dev->unique_len] = '\0';
 
-	dev->devname = DRM(alloc)(strlen(dev->name) + strlen(dev->unique) + 2,
-				  DRM_MEM_DRIVER);
-	if(!dev->devname) {
-		DRM(free)(dev->devname, sizeof(*dev->devname), DRM_MEM_DRIVER);
-		return DRM_ERR(ENOMEM);
-	}
-	sprintf(dev->devname, "%s@%s", dev->name, dev->unique);
-
-
 	return 0;
 }
 
@@ -148,7 +139,7 @@ int DRM(getmap)( DRM_IOCTL_ARGS )
 	idx = map.offset;
 
 	DRM_LOCK;
-	if (idx < 0 || idx >= dev->map_count) {
+	if (idx < 0) {
 		DRM_UNLOCK;
 		return DRM_ERR(EINVAL);
 	}
@@ -237,5 +228,11 @@ int DRM(getstats)( DRM_IOCTL_ARGS )
 
 	DRM_COPY_TO_USER_IOCTL( (drm_stats_t *)data, stats, sizeof(stats) );
 
+	return 0;
+}
+
+int DRM(noop)(DRM_IOCTL_ARGS)
+{
+	DRM_DEBUG("\n");
 	return 0;
 }

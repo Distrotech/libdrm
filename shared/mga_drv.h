@@ -131,7 +131,7 @@ extern int  mga_getparam( DRM_IOCTL_ARGS );
 extern int mga_warp_install_microcode( drm_mga_private_t *dev_priv );
 extern int mga_warp_init( drm_mga_private_t *dev_priv );
 
-#define mga_flush_write_combine()	DRM_WRITEMEMORYBARRIER(dev_priv->primary)
+#define mga_flush_write_combine()	DRM_WRITEMEMORYBARRIER()
 
 #if defined(__linux__) && defined(__alpha__)
 #define MGA_BASE( reg )		((unsigned long)(dev_priv->mmio->handle))
@@ -147,7 +147,7 @@ extern int mga_warp_init( drm_mga_private_t *dev_priv );
 
 static inline u32 _MGA_READ(u32 *addr)
 {
-	DRM_READMEMORYBARRIER(dev_priv->mmio);
+	DRM_MEMORYBARRIER();
 	return *(volatile u32 *)addr;
 }
 #else

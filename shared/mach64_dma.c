@@ -523,7 +523,7 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 		DRM_DEBUG( " data[%d] = 0x%08x\n", i, data[i] );
 	}
 
-	DRM_READMEMORYBARRIER(dev_priv->mmio);
+	DRM_MEMORYBARRIER();
 
 	DRM_DEBUG( "waiting for idle...\n" );
 	if ( ( i = mach64_do_wait_for_idle( dev_priv ) ) ) {
@@ -999,6 +999,8 @@ int mach64_dma_init( DRM_IOCTL_ARGS )
 	drm_mach64_init_t init;
 		
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
+
+	LOCK_TEST_WITH_RETURN( dev, filp );
 
 	DRM_COPY_FROM_USER_IOCTL( init, (drm_mach64_init_t *)data, 
 	    sizeof(init) );
