@@ -170,4 +170,11 @@ typedef struct drm_mach64_clear {
 	unsigned int clear_depth;
 } drm_mach64_clear_t;
 
+typedef struct drm_mach64_vertex {
+	int prim;
+	int idx;			/* Index of vertex buffer */
+	int count;			/* Number of vertices in buffer */
+	int discard;			/* Client finished with buffer? */
+} drm_mach64_vertex_t;
+
 #endif

@@ -456,7 +456,6 @@ typedef struct drm_scatter_gather {
 #define DRM_IOCTL_I810_MC		DRM_IOW( 0x4c, drm_i810_mc_t)
 #define DRM_IOCTL_I810_RSTATUS		DRM_IO ( 0x4d )
 
-
 /* Rage 128 specific ioctls */
 #define DRM_IOCTL_R128_INIT		DRM_IOW( 0x40, drm_r128_init_t)
 #define DRM_IOCTL_R128_CCE_START	DRM_IO(  0x41)
@@ -516,10 +515,13 @@ typedef struct drm_scatter_gather {
 #define DRM_IOCTL_I830_SWAP		DRM_IO ( 0x46)
 #define DRM_IOCTL_I830_COPY		DRM_IOW( 0x47, drm_i830_copy_t)
 #define DRM_IOCTL_I830_DOCOPY		DRM_IO ( 0x48)
+
 /* Mach64 specific ioctls */
-#define DRM_IOCTL_MACH64_INIT	DRM_IOW( 0x40, drm_mach64_init_t)
-#define DRM_IOCTL_MACH64_CLEAR	DRM_IOW( 0x41, drm_mach64_clear_t)
-#define DRM_IOCTL_MACH64_SWAP	DRM_IO(  0x42)
-#define DRM_IOCTL_MACH64_IDLE	DRM_IO(  0x43)
+#define DRM_IOCTL_MACH64_INIT		DRM_IOW( 0x40, drm_mach64_init_t)
+#define DRM_IOCTL_MACH64_IDLE		DRM_IO(  0x41)
+#define DRM_IOCTL_MACH64_RESET		DRM_IO(  0x42)
+#define DRM_IOCTL_MACH64_SWAP		DRM_IO(  0x43)
+#define DRM_IOCTL_MACH64_CLEAR		DRM_IOW( 0x44, drm_mach64_clear_t)
+#define DRM_IOCTL_MACH64_VERTEX		DRM_IOW( 0x45, drm_mach64_vertex_t)
 
 #endif

@@ -99,17 +99,24 @@ extern int mach64_dma_init( struct inode *inode, struct file *filp,
 			    unsigned int cmd, unsigned long arg );
 extern int mach64_dma_idle( struct inode *inode, struct file *filp,
 			    unsigned int cmd, unsigned long arg );
+extern int mach64_engine_reset( struct inode *inode, struct file *filp,
+				unsigned int cmd, unsigned long arg );
+extern int mach64_dma_buffers( struct inode *inode, struct file *filp,
+			       unsigned int cmd, unsigned long arg );
 
 extern int mach64_do_wait_for_fifo( drm_mach64_private_t *dev_priv,
 				    int entries );
 extern int mach64_do_wait_for_idle( drm_mach64_private_t *dev_priv );
-extern int mach64_do_engine_reset( drm_mach64_private_t *dev_priv );
+extern int mach64_do_engine_reset( drm_device_t *dev );
+extern int mach64_do_cleanup_dma( drm_device_t *dev );
 
-				/* r128_state.c */
+				/* mach64_state.c */
 extern int mach64_dma_clear( struct inode *inode, struct file *filp,
 			     unsigned int cmd, unsigned long arg );
 extern int mach64_dma_swap( struct inode *inode, struct file *filp,
 			    unsigned int cmd, unsigned long arg );
+extern int mach64_dma_vertex( struct inode *inode, struct file *filp,
+			      unsigned int cmd, unsigned long arg );
 
 
 /* ================================================================

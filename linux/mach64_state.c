@@ -294,6 +294,101 @@ static void mach64_dma_dispatch_swap( drm_device_t *dev )
 #endif
 }
 
+static void mach64_dma_dispatch_vertex( drm_device_t *dev,
+					drm_buf_t *buf )
+{
+	drm_mach64_private_t *dev_priv = dev->dev_private;
+	drm_mach64_buf_priv_t *buf_priv = buf->dev_private;
+	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
+	int offset = buf->bus_address;
+	int size = buf->used;
+	int i = 0;
+	DRM_DEBUG( "%s: buf=%d nbox=%d\n",
+		   __FUNCTION__, buf->idx, sarea_priv->nbox );
+
+	if ( 0 )
+		mach64_print_dirty( "dispatch_vertex", sarea_priv->dirty );
+
+	DRM_INFO( "idx = %u, offset=0x%08x, address=0x%08x, used=%u\n", buf->idx, buf->bus_address, buf->address, buf->used );
+	
+	if ( buf->used ) {
+#if 0
+		buf_priv->dispatched = 1;
+
+		if ( sarea_priv->dirty & ~MACH64_UPLOAD_CLIPRECTS ) {
+			mach64_emit_state( dev_priv );
+		}
+#endif
+
+		do {
+#if 0
+			/* Emit the next set of up to three cliprects */
+			if ( i < sarea_priv->nbox ) {
+				mach64_emit_clip_rects( dev_priv,
+							&sarea_priv->boxes[i]);
+			}
+#endif
+
+			/* Emit the vertex buffer rendering commands */
+			if (0) {
+				unsigned * p = buf->address;
+				unsigned used = buf->used >> 2;
+
+				while(used)
+				{
+					unsigned reg, count;
+
+					reg = *p & 0xffff;
+					count = (*p >> 16) + 1;
+
+					p++;
+					used--;
+
+					while(count && used)
+					{
+						unsigned data;
+
+						data = *p;
+
+						/* MACH64_WRITE( reg, data ); */
+
+						p++;
+						used--;
+						count--;
+					}
+				}
+			}
+		} while ( ++i < sarea_priv->nbox );
+	}
+
+#if 0
+	if ( buf_priv->discard ) {
+		buf_priv->age = dev_priv->sarea_priv->last_dispatch;
+
+		/* Emit the vertex buffer age */
+		BEGIN_RING( 2 );
+
+		OUT_RING( CCE_PACKET0( MACH64_LAST_DISPATCH_REG, 0 ) );
+		OUT_RING( buf_priv->age );
+
+		ADVANCE_RING();
+
+		buf->pending = 1;
+		buf->used = 0;
+		/* FIXME: Check dispatched field */
+		buf_priv->dispatched = 0;
+	}
+#else
+	buf->used = 0;
+	buf->pid = 0;
+#endif
+
+	dev_priv->sarea_priv->last_dispatch++;
+
+	sarea_priv->dirty &= ~MACH64_UPLOAD_CLIPRECTS;
+	sarea_priv->nbox = 0;
+}
+
 
 /* ================================================================
  * IOCTL functions
@@ -349,5 +444,68 @@ int mach64_dma_swap( struct inode *inode, struct file *filp,
 	 */
 	dev_priv->sarea_priv->dirty |= (MACH64_UPLOAD_CONTEXT |
 					MACH64_UPLOAD_MISC);
+	return 0;
+}
+
+int mach64_dma_vertex( struct inode *inode, struct file *filp,
+		       unsigned int cmd, unsigned long arg )
+{
+	drm_file_t *priv = filp->private_data;
+	drm_device_t *dev = priv->dev;
+	drm_mach64_private_t *dev_priv = dev->dev_private;
+	drm_device_dma_t *dma = dev->dma;
+	drm_buf_t *buf;
+	drm_mach64_buf_priv_t *buf_priv;
+	drm_mach64_vertex_t vertex;
+
+	LOCK_TEST_WITH_RETURN( dev );
+
+	if ( !dev_priv ) {
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
+		return -EINVAL;
+	}
+
+	if ( copy_from_user( &vertex, (drm_mach64_vertex_t *)arg,
+			     sizeof(vertex) ) )
+		return -EFAULT;
+
+	DRM_DEBUG( "%s: pid=%d index=%d count=%d discard=%d\n",
+		   __FUNCTION__, current->pid,
+		   vertex.idx, vertex.count, vertex.discard );
+
+#if 0
+	if ( vertex.idx < 0 || vertex.idx >= dma->buf_count ) {
+		DRM_ERROR( "buffer index %d (of %d max)\n",
+			   vertex.idx, dma->buf_count - 1 );
+		return -EINVAL;
+	}
+	if ( vertex.prim < 0 ||
+	     vertex.prim > R128_CCE_VC_CNTL_PRIM_TYPE_TRI_TYPE2 ) {
+		DRM_ERROR( "buffer prim %d\n", vertex.prim );
+		return -EINVAL;
+	}
+#endif
+
+	buf = dma->buflist[vertex.idx];
+	buf_priv = buf->dev_private;
+
+	if ( buf->pid != current->pid ) {
+		DRM_ERROR( "process %d using buffer owned by %d\n",
+			   current->pid, buf->pid );
+		return -EINVAL;
+	}
+	if ( buf->pending ) {
+		DRM_ERROR( "sending pending buffer %d\n", vertex.idx );
+		return -EINVAL;
+	}
+
+	buf->used = vertex.count;
+#if 0
+	buf_priv->prim = vertex.prim;
+	buf_priv->discard = vertex.discard;
+#endif
+
+	mach64_dma_dispatch_vertex( dev, buf );
+
 	return 0;
 }
