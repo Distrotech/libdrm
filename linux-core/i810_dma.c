@@ -94,7 +94,12 @@ static drm_buf_t *i810_freelist_get(drm_device_t *dev)
 {
    	drm_device_dma_t *dma = dev->dma;
 	int		 i;
+#ifdef __linux__
    	int 		 used;
+#endif /* __linux__ */
+#ifdef __FreeBSD__
+	char		failed;
+#endif /* __FreeBSD__ */
 
 	/* Linear search might not be the best solution */
 
@@ -102,11 +107,17 @@ static drm_buf_t *i810_freelist_get(drm_device_t *dev)
 	   	drm_buf_t *buf = dma->buflist[ i ];
 	   	drm_i810_buf_priv_t *buf_priv = buf->dev_private;
 		/* In use is already a pointer */
+#ifdef __linux__
 	   	used = cmpxchg(buf_priv->in_use, I810_BUF_FREE,
 			       I810_BUF_CLIENT);
-	   	if(used == I810_BUF_FREE) {
+	   	if(used == I810_BUF_FREE)
+#endif /* __linux__ */
+#ifdef __FreeBSD__
+		_DRM_CAS(buf_priv->in_use, I810_BUF_FREE, I810_BUF_CLIENT,
+							failed);
+		if (!failed)
+#endif /* __FreeBSD__ */
 			return buf;
-		}
 	}
    	return NULL;
 }
@@ -118,11 +129,22 @@ static drm_buf_t *i810_freelist_get(drm_device_t *dev)
 static int i810_freelist_put(drm_device_t *dev, drm_buf_t *buf)
 {
    	drm_i810_buf_priv_t *buf_priv = buf->dev_private;
+#ifdef __linux__ 
    	int used;
+#endif /* __linux__ */
+#ifdef __FreeBSD__
+	char failed;
+#endif /* __FreeBSD__ */
 
    	/* In use is already a pointer */
+#ifdef __linux__
    	used = cmpxchg(buf_priv->in_use, I810_BUF_CLIENT, I810_BUF_FREE);
    	if(used != I810_BUF_CLIENT) {
+#endif /* __linux__ */
+#ifdef __FreeBSD__
+   	_DRM_CAS(buf_priv->in_use, I810_BUF_CLIENT, I810_BUF_FREE, failed);
+	if(failed) {
+#endif /* __FreeBSD__ */
 	   	DRM_ERROR("Freeing buffer thats not in use : %d\n", buf->idx);
 	   	DRM_OS_RETURN( EINVAL );
 	}
@@ -291,7 +313,7 @@ static void i810_free_page(drm_device_t *dev, unsigned long page)
 
 	atomic_dec(&virt_to_page(page)->count);
 	clear_bit(PG_locked, &virt_to_page(page)->flags);
-	wake_up(&virt_to_page(page)->wait);
+	DRM_OS_WAKEUP(&virt_to_page(page)->wait);
 	free_page(page);
 	return;
 }
@@ -820,7 +842,13 @@ static void i810_dma_dispatch_vertex(drm_device_t *dev,
    	int nbox = sarea_priv->nbox;
 	unsigned long address = (unsigned long)buf->bus_address;
 	unsigned long start = address - dev->agp->base;
-	int i = 0, u;
+	int i = 0;
+#ifdef __linux__
+	int u;
+#endif /* __linux__ */
+#ifdef __FreeBSD__ 
+	char failed;
+#endif /* __FreeBSD__ */
    	RING_LOCALS;
 
    	i810_kernel_lost_context(dev);
@@ -829,11 +857,17 @@ static void i810_dma_dispatch_vertex(drm_device_t *dev,
 		nbox = I810_NR_SAREA_CLIPRECTS;
 
 	if (discard) {
+#ifdef __linux__
 		u = cmpxchg(buf_priv->in_use, I810_BUF_CLIENT,
 			    I810_BUF_HARDWARE);
-		if(u != I810_BUF_CLIENT) {
+		if(u != I810_BUF_CLIENT)
+#endif /* __linux__ */
+#ifdef __FreeBSD__
+		_DRM_CAS(buf_priv->in_use, I810_BUF_CLIENT,
+			    I810_BUF_HARDWARE, failed);
+		if (failed)
+#endif /* __FreeBSD__ */
 			DRM_DEBUG("xxxx 2\n");
-		}
 	}
 
 	if (used > 4*1024)
@@ -931,7 +965,7 @@ void i810_dma_immediate_bh(void *device)
       	drm_i810_private_t *dev_priv = (drm_i810_private_t *)dev->dev_private;
 
    	atomic_set(&dev_priv->flush_done, 1);
-   	wake_up_interruptible(&dev_priv->flush_queue);
+   	DRM_OS_WAKEUP_INT(&dev_priv->flush_queue);
 }
 
 static inline void i810_dma_emit_flush(drm_device_t *dev)
@@ -948,7 +982,7 @@ static inline void i810_dma_emit_flush(drm_device_t *dev)
 
 /*  	i810_wait_ring( dev, dev_priv->ring.Size - 8 ); */
 /*     	atomic_set(&dev_priv->flush_done, 1); */
-/*     	wake_up_interruptible(&dev_priv->flush_queue); */
+/*     	DRM_OS_WAKEUP_INT(&dev_priv->flush_queue); */
 }
 
 static inline void i810_dma_quiescent_emit(drm_device_t *dev)
@@ -967,7 +1001,7 @@ static inline void i810_dma_quiescent_emit(drm_device_t *dev)
 
 /*  	i810_wait_ring( dev, dev_priv->ring.Size - 8 ); */
 /*     	atomic_set(&dev_priv->flush_done, 1); */
-/*     	wake_up_interruptible(&dev_priv->flush_queue); */
+/*     	DRM_OS_WAKEUP_INT(&dev_priv->flush_queue); */
 }
 
 void i810_dma_quiescent(drm_device_t *dev)
@@ -1040,10 +1074,19 @@ static int i810_flush_queue(drm_device_t *dev)
 	   	drm_buf_t *buf = dma->buflist[ i ];
 	   	drm_i810_buf_priv_t *buf_priv = buf->dev_private;
 
+#ifdef __linux__
 		int used = cmpxchg(buf_priv->in_use, I810_BUF_HARDWARE,
 				   I810_BUF_FREE);
 
 		if (used == I810_BUF_HARDWARE)
+#endif /* __linux__ */
+#ifdef __FreeBSD__
+		char failed;
+		_DRM_CAS(buf_priv->in_use, I810_BUF_HARDWARE,
+				   I810_BUF_FREE, failed);
+
+		if (!failed)
+#endif /* __FreeBSD__ */
 			DRM_DEBUG("reclaimed from HARDWARE\n");
 		if (used == I810_BUF_CLIENT)
 			DRM_DEBUG("still on client HARDWARE\n");
@@ -1069,10 +1112,20 @@ void i810_reclaim_buffers(drm_device_t *dev, pid_t pid)
 	   	drm_i810_buf_priv_t *buf_priv = buf->dev_private;
 
 		if (buf->pid == pid && buf_priv) {
+#ifdef __linux__
 			int used = cmpxchg(buf_priv->in_use, I810_BUF_CLIENT,
 					   I810_BUF_FREE);
 
 			if (used == I810_BUF_CLIENT)
+#endif /* __linux__ */
+#ifdef __FreeBSD__
+			char failed;
+			_DRM_CAS(buf_priv->in_use, I810_BUF_CLIENT,
+					   I810_BUF_FREE, failed);
+
+			if (!failed)
+#endif /* __FreeBSD__ */
+	
 				DRM_DEBUG("reclaimed from client\n");
 		   	if(buf_priv->currently_mapped == I810_BUF_MAPPED)
 		     		buf_priv->currently_mapped = I810_BUF_UNMAPPED;
