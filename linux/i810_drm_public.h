@@ -58,15 +58,15 @@ typedef struct _xf86drmClipRectRec {
 
 #define I810_USE_BATCH 1
 
-#define I810_DMA_BUF_ORDER     14
+#define I810_DMA_BUF_ORDER     12
 #define I810_DMA_BUF_SZ        (1<<I810_DMA_BUF_ORDER)
-#define I810_DMA_BUF_NR        32
+#define I810_DMA_BUF_NR        256
 
 #define I810_NR_SAREA_CLIPRECTS 2
 
-/* Each region is a minimum of 64k, and there are at most 128 of them.
+/* Each region is a minimum of 64k, and there are at most 64 of them.
  */
-#define I810_NR_TEX_REGIONS 128
+#define I810_NR_TEX_REGIONS 64
 #define I810_LOG_MIN_TEX_REGION_SIZE 16
 
 typedef struct {

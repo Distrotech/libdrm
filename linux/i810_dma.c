@@ -629,7 +629,7 @@ static inline void i810_dma_emit_flush(drm_device_t *dev)
    	i810_kernel_lost_context(dev);
    	BEGIN_LP_RING(2);
       	OUT_RING( CMD_REPORT_HEAD );
-#if 1
+#if 0
    	OUT_RING( GFX_OP_BREAKPOINT_INTERRUPT );
 #else
    	OUT_RING( GFX_OP_USER_INTERRUPT );
@@ -655,6 +655,7 @@ static int i810_flush_queue(drm_device_t *dev)
    	add_wait_queue(&dev_priv->flush_queue, &entry);
    	for (;;) {
 	      	i810_dma_emit_flush(dev);
+	   	if (atomic_read(&dev_priv->flush_done) == 1) break;
 	   	if (atomic_read(&dev_priv->flush_done) == 1) break;	
 	   	curTime = __gettimeinmillis();
 	   	if (startTime == 0 || curTime < startTime /*wrap case*/) {
@@ -663,7 +664,7 @@ static int i810_flush_queue(drm_device_t *dev)
 		   	DRM_ERROR("lockup\n");
 		   	goto out_wait_flush;
 		}	   
-	      	schedule_timeout(HZ/60);
+	      	schedule_timeout(HZ*3);
 	      	if (signal_pending(current)) {
 		   	ret = -EINTR; /* Can't restart */
 		   	break;
@@ -731,6 +732,7 @@ int i810_lock(struct inode *inode, struct file *filp, unsigned int cmd,
 	 */
 
 	if (!ret) {
+#if 0
 	   	if (_DRM_LOCKING_CONTEXT(dev->lock.hw_lock->lock)
 		    != lock.context) {
 			long j = jiffies - dev->lock.lock_time;
@@ -742,6 +744,7 @@ int i810_lock(struct inode *inode, struct file *filp, unsigned int cmd,
 				schedule_timeout(j);
 			}
 		}
+#endif
 		add_wait_queue(&dev->lock.lock_queue, &entry);
 		for (;;) {
 			if (!dev->lock.hw_lock) {
