@@ -38,7 +38,7 @@
 
 # **** End of SMP/MODVERSIONS detection
 
-MODS =		gamma.o tdfx.o r128.o radeon.o
+MODS =		gamma.o trident.o tdfx.o r128.o radeon.o
 LIBS =
 
 DRMTEMPLATES =	drm_auth.h drm_bufs.h drm_context.h drm_dma.h drm_drawable.h \
@@ -51,6 +51,9 @@ GAMMAHEADERS =	gamma_drv.h $(DRMHEADERS) $(DRMTEMPLATES)
 
 TDFXOBJS =	tdfx_drv.o
 TDFXHEADERS =	tdfx.h $(DRMHEADERS) $(DRMTEMPLATES)
+
+TRIDENTOBJS =	trident_drv.o
+TRIDENTHEADERS = trident.h $(DRMHEADERS) $(DRMTEMPLATES)
 
 R128OBJS =	r128_drv.o r128_cce.o r128_state.o
 R128HEADERS =	r128.h r128_drv.h r128_drm.h $(DRMHEADERS) $(DRMTEMPLATES)
@@ -206,6 +209,11 @@ gamma.o: $(GAMMAOBJS)
 tdfx_drv.o: tdfx_drv.c
 	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
 tdfx.o: $(TDFXOBJS) $(LIBS)
+	$(LD) -r $^ -o $@
+
+trident_drv.o: trident_drv.c
+	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
+trident.o: $(TRIDENTOBJS) $(LIBS)
 	$(LD) -r $^ -o $@
 
 sis.o: $(SISOBJS) $(LIBS)
