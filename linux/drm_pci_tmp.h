@@ -1,6 +1,6 @@
 /**
  * \file drm_pci_tmp.h
- * \brief ioctl's to manage PCI memory
+ * ioctl's to manage PCI memory
  * 
  * \warning These interfaces aren't stable yet.
  * 
@@ -45,7 +45,7 @@
 /*@{*/
 
 /**
- * \brief Allocate a PCI consistent memory block, for DMA.
+ * Allocate a PCI consistent memory block, for DMA.
  */
 void * DRM(pci_alloc)( drm_device_t *dev, size_t size, 
 		       dma_addr_t *busaddr )
@@ -54,7 +54,7 @@ void * DRM(pci_alloc)( drm_device_t *dev, size_t size,
 }
 
 /**
- * \brief Free a PCI consistent memory block.
+ * Free a PCI consistent memory block.
  */
 void DRM(pci_free)( drm_device_t *dev, size_t size, void *cpuaddr, 
 		    dma_addr_t busaddr )
@@ -72,7 +72,7 @@ void DRM(pci_free)( drm_device_t *dev, size_t size, void *cpuaddr,
 /*@{*/
 
 /**
- * \brief Create a pool of PCI consistent memory blocks, for DMA.
+ * Create a pool of PCI consistent memory blocks, for DMA.
  *
  * \return a handle on success, or NULL on failure.
  * 
@@ -88,7 +88,7 @@ void *DRM(pci_pool_create)( drm_device_t *dev, size_t size, size_t align )
 }
 
 /**
- * \brief Destroy a pool of PCI consistent memory blocks.
+ * Destroy a pool of PCI consistent memory blocks.
  */
 void DRM(pci_pool_destroy)( drm_device_t *dev, void *entry )
 {
@@ -98,7 +98,7 @@ void DRM(pci_pool_destroy)( drm_device_t *dev, void *entry )
 }
 
 /**
- * \brief Allocate a block from a PCI consistent memory block pool.
+ * Allocate a block from a PCI consistent memory block pool.
  *
  * \return the virtual address of a block on success, or NULL on failure. 
  */
@@ -110,7 +110,7 @@ void *DRM(pci_pool_alloc)( void *entry, dma_addr_t *busaddr )
 }
 
 /**
- * \brief Free a block back into a PCI consistent memory block pool.
+ * Free a block back into a PCI consistent memory block pool.
  */
 void DRM(pci_pool_free)( void *entry, void *cpuaddr, dma_addr_t busaddr )
 {
@@ -212,7 +212,7 @@ int DRM(pci_free_ioctl)( struct inode *inode, struct file *filp,
 /*@{*/
 
 /** 
- * \brief Called on driver exit to free the PCI memory allocated by userspace.
+ * Called on driver exit to free the PCI memory allocated by userspace.
  */
 void DRM(pci_cleanup)( drm_device_t *dev )
 {
