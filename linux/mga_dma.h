@@ -55,7 +55,7 @@ if( (tmp_buf->max_dwords - tmp_buf->num_dwords) < length ||    		\
 drm_mga_prim_buf_t *tmp_buf = 						\
 	dev_priv->prim_bufs[dev_priv->current_prim_idx];		\
 if(MGA_VERBOSE) \
-printk("PRIMGETPTR in %s\n", __FUNCTION__); \
+DRM_DEBUG("PRIMGETPTR in %s\n", __FUNCTION__); \
 dma_ptr = tmp_buf->current_dma_ptr;    					\
 num_dwords = tmp_buf->num_dwords;      					\
 phys_head = tmp_buf->phys_head;						\
@@ -64,7 +64,7 @@ outcount = 0;								\
 
 #define PRIMPTR(prim_buf) do {					\
 if(MGA_VERBOSE) \
-printk("PRIMPTR in %s\n", __FUNCTION__); \
+DRM_DEBUG("PRIMPTR in %s\n", __FUNCTION__); \
 dma_ptr = prim_buf->current_dma_ptr;				\
 num_dwords = prim_buf->num_dwords;				\
 phys_head = prim_buf->phys_head;       				\
@@ -73,9 +73,9 @@ outcount = 0;							\
 
 #define PRIMFINISH(prim_buf) do {				\
 	if (MGA_VERBOSE) {					\
-		printk(KERN_INFO "PRIMFINISH in %s\n", __FUNCTION__);		\
+		DRM_DEBUG( "PRIMFINISH in %s\n", __FUNCTION__);	\
                 if (outcount & 3)				\
-                      printk(KERN_INFO " --- truncation\n");	\
+                      DRM_DEBUG(" --- truncation\n");	        \
         }							\
 	prim_buf->num_dwords = num_dwords;			\
 	prim_buf->current_dma_ptr = dma_ptr;			\
@@ -85,9 +85,9 @@ outcount = 0;							\
 drm_mga_prim_buf_t *tmp_buf = 					\
 	dev_priv->prim_bufs[dev_priv->current_prim_idx];	\
 	if (MGA_VERBOSE) {					\
-		printk(KERN_INFO "PRIMADVANCE in %s\n", __FUNCTION__);		\
+		DRM_DEBUG("PRIMADVANCE in %s\n", __FUNCTION__);	\
                 if (outcount & 3)				\
-                      printk(KERN_INFO " --- truncation\n");	\
+                      DRM_DEBUG(" --- truncation\n");	\
         }							\
 	tmp_buf->num_dwords = num_dwords;      			\
 	tmp_buf->current_dma_ptr = dma_ptr;    			\
@@ -103,8 +103,7 @@ drm_mga_prim_buf_t *tmp_buf = 					\
 	tempIndex[outcount]=ADRINDEX(reg);				\
 	dma_ptr[1+outcount] = val;					\
 	if (MGA_VERBOSE)						\
-		printk(KERN_INFO					\
-		       "   PRIMOUT %d: 0x%x -- 0x%x\n",			\
+		DRM_DEBUG("   PRIMOUT %d: 0x%x -- 0x%x\n",		\
 		       num_dwords + 1 + outcount, ADRINDEX(reg), val);	\
 	if( ++outcount == 4) {						\
 		outcount = 0;						\
@@ -126,11 +125,5 @@ drm_mga_prim_buf_t *tmp_buf = 					\
 		      (0xC << DC_bop_SHIFT) | DC_bltmod_bfcol | 	\
 		      DC_pattern_disable | DC_transc_disable | 		\
 		      DC_clipdis_enable)				\
-
-#define MGA_ILOAD_CMD (DC_opcod_iload | DC_atype_rpl |          	\
-		       DC_linear_linear | DC_bltmod_bfcol |       	\
-		       (0xC << DC_bop_SHIFT) | DC_sgnzero_enable |	\
-		       DC_shftzero_enable | DC_clipdis_enable)
-
 
 #endif

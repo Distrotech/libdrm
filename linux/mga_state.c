@@ -39,35 +39,23 @@
 
 static void mgaEmitClipRect( drm_mga_private_t *dev_priv, xf86drmClipRectRec *box )
 {
+   	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
+	unsigned int *regs = sarea_priv->ContextState;
 	PRIMLOCALS;
 
-   	/* This takes a max of 10 dwords */
+   	/* This takes 10 dwords */
 	PRIMGETPTR( dev_priv );
+   
+   	/* Force reset of dwgctl (eliminates clip disable) */
+	PRIMOUTREG( MGAREG_DMAPAD, 0 );
+	PRIMOUTREG( MGAREG_DMAPAD, 0 );
+	PRIMOUTREG( MGAREG_DMAPAD, 0 );
+   	PRIMOUTREG( MGAREG_DWGCTL, regs[MGA_CTXREG_DWGCTL] );
 
-	/* JC: The G400 seems to have an issue with the second WARP
-	 * not stalling clipper register writes.  This bothers me, but
-	 * the only way I could get it to never clip the last triangle
-	 * under any circumstances is by inserting TWO dwgsync
-	 * commands.
-	 *
-	 * KW: Additionally the mga seems to be able to get itself
-	 * into a wierd state where it ignores cliprects for every
-	 * *second* triangle...  I don't know what provokes this, but
-	 * I have seen it flip between 'correct' and 'wierd' modes and
-	 * back without stopping or restarting either the X server or
-	 * the 3d apps themselves.  
-	 */
- 	if (dev_priv->chipset == MGA_CARD_TYPE_G400 && 0) { 
-		PRIMOUTREG( MGAREG_DMAPAD, 0 );
-		PRIMOUTREG( MGAREG_DMAPAD, 0 );
-		PRIMOUTREG( MGAREG_DWGSYNC, dev_priv->last_sync_tag - 1 );
-		PRIMOUTREG( MGAREG_DWGSYNC, dev_priv->last_sync_tag - 1 );
-	}
-
+	PRIMOUTREG( MGAREG_DMAPAD, 0 );
 	PRIMOUTREG( MGAREG_CXBNDRY, ((box->x2)<<16)|(box->x1) );
 	PRIMOUTREG( MGAREG_YTOP, box->y1 * dev_priv->stride/2 );
 	PRIMOUTREG( MGAREG_YBOT, box->y2 * dev_priv->stride/2 );
-	PRIMOUTREG( MGAREG_DMAPAD, 0 );
 
 	PRIMADVANCE( dev_priv );
 }
@@ -425,71 +413,63 @@ static int mgaVerifyState( drm_mga_private_t *dev_priv )
 	return rv == 0;
 }
 
-#if 0
-/* This is very broken */
-
-static void mga_dma_dispatch_tex_blit(drm_device_t *dev, drm_buf_t *buf, u16 x1,
-				      u16 x2, u16 y1, u16 y2, unsigned int destOrg,
-				      unsigned int mAccess, unsigned int pitch)
+static int mgaVerifyIload( drm_mga_private_t *dev_priv, 
+			   unsigned long bus_address, 
+			   unsigned int dstOrg, int length )
 {
-	int use_agp = PDEA_pagpxfer_enable;
-      	drm_mga_private_t *dev_priv = dev->dev_private;
-   	drm_mga_buf_priv_t *buf_priv = buf->dev_private;
-   	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
-	unsigned long address = (unsigned long)buf->bus_address;
-   	int length;
-   	int width, height;
-   	int texperdword = 0;
-   	PRIMLOCALS;
-   
-   	switch((maccess & 0x00000003)) {
-	case 0:
-	   	texperdword = 4;
-      		break;
-	case 1:
-      		texperdword = 2;
-	   	break;
-	case 2:
-      		texperdword = 1;
-      		break;
+   	if(dstOrg < dev_priv->textureOffset ||
+	   dstOrg + length > 
+	   (dev_priv->textureOffset + dev_priv->textureSize)) {
+	   	return -EINVAL;
 	}
-   
-   	length = (y2 - y1) * (x2 - x1) / texperdword;
-   
-   	x2 = (x2 + (texperdword - 1)) & ~(texperdword - 1);
-   	x1 = (x1 + (texperdword - 1)) & ~(texperdword - 1);
-   	width = x2 - x1;
-   	height = y2 - y1;
-   
-	PRIMRESET(dev_priv);		
-   	PRIMGETPTR(dev_priv);
-   	PRIMOUTREG(MGAREG_DSTORG, dstorg);
-   	PRIMOUTREG(MGAREG_MACCESS, maccess);
-   	PRIMOUTREG(MGAREG_PITCH, pitch);
-   	PRIMOUTREG(MGAREG_YDSTLEN, (y1 << 16) | height);
-   
-   	PRIMOUTREG(MGAREG_FXBNDRY, ((x1+width-1) << 16) | x1);
-   	PRIMOUTREG(MGAREG_AR0, width * height - 1);
-      	PRIMOUTREG(MGAREG_AR3, 0 );
-   	PRIMOUTREG(MGAREG_DWGCTL+MGAREG_MGA_EXEC, MGA_ILOAD_CMD);
-	   	   
-   	PRIMOUTREG(MGAREG_DMAPAD, 0);
-   	PRIMOUTREG(MGAREG_DMAPAD, 0);
-   	PRIMOUTREG(MGAREG_SRCORG, ((__u32)address) | TT_BLIT);
-   	PRIMOUTREG(MGAREG_SECEND, ((__u32)(address + length)) | use_agp);
-	   
-   	PRIMOUTREG(MGAREG_DSTORG, dev_priv->frontOffset);
-   	PRIMOUTREG(MGAREG_MACCESS, dev_priv->mAccess);
-   	PRIMOUTREG(MGAREG_PITCH, dev_priv->stride);
-   	PRIMOUTREG(MGAREG_AR0, 0 );
-
-      	PRIMOUTREG(MGAREG_AR3, 0 );
-	PRIMOUTREG(MGAREG_DMAPAD, 0);
-	PRIMOUTREG(MGAREG_DMAPAD, 0);
-   	PRIMOUTREG(MGAREG_SOFTRAP, 0);
-   	PRIMADVANCE(dev_priv);
+   	if(length % 64) {
+	   	return -EINVAL;
+	}
+   	return 0;
 }
-#endif
+
+/* This copies a 64 byte aligned agp region to the frambuffer
+ * with a standard blit, the ioctl needs to do checking */
+
+static inline void mga_dma_dispatch_tex_blit( drm_device_t *dev, 
+					      unsigned long bus_address, 
+					      int length, 
+					      unsigned int destOrg )
+{
+   	drm_mga_private_t *dev_priv = dev->dev_private;
+   	int use_agp = PDEA_pagpxfer_enable;
+   	u16 y2;
+    	PRIMLOCALS;
+    
+   	length = length / sizeof(u32);
+        y2 = length / 64;
+ 
+	PRIM_OVERFLOW(dev, dev_priv, 30);
+	PRIMGETPTR( dev_priv );
+
+      	dev_priv->last_sync_tag = mga_create_sync_tag(dev);
+
+	PRIMOUTREG( MGAREG_DSTORG, destOrg);
+	PRIMOUTREG( MGAREG_MACCESS, 0x00000002);
+	PRIMOUTREG( MGAREG_SRCORG, bus_address | use_agp);
+	PRIMOUTREG( MGAREG_AR5, 64);  
+
+	PRIMOUTREG( MGAREG_PITCH, 64);
+	PRIMOUTREG( MGAREG_DMAPAD, 0);
+	PRIMOUTREG( MGAREG_DMAPAD, 0);
+	PRIMOUTREG( MGAREG_DWGCTL, MGA_COPY_CMD); 
+
+   	PRIMOUTREG(MGAREG_AR0, 63);
+   	PRIMOUTREG(MGAREG_AR3, 0);		
+   	PRIMOUTREG(MGAREG_FXBNDRY, (63 << 16));
+   	PRIMOUTREG(MGAREG_YDSTLEN+MGAREG_MGA_EXEC, y2);
+  
+	PRIMOUTREG( MGAREG_SRCORG, 0);
+	PRIMOUTREG( MGAREG_PITCH, dev_priv->stride / dev_priv->cpp);
+      	PRIMOUTREG( MGAREG_DMAPAD, 0);
+      	PRIMOUTREG( MGAREG_DWGSYNC, dev_priv->last_sync_tag);
+    	PRIMADVANCE(dev_priv);
+}
 
 static inline void mga_dma_dispatch_vertex(drm_device_t *dev, 
 					   drm_buf_t *buf, int real_idx,
@@ -502,8 +482,8 @@ static inline void mga_dma_dispatch_vertex(drm_device_t *dev,
 	int length = buf->used;	
 	int use_agp = PDEA_pagpxfer_enable;
 	int i = 0;
-   	PRIMLOCALS;
    	int primary_needed;
+      	PRIMLOCALS;
 
 	DRM_DEBUG("dispatch vertex %d addr 0x%lx, length 0x%x nbox %d dirty %x\n", 
 		  buf->idx, address, length, sarea_priv->nbox, sarea_priv->dirty);
@@ -592,7 +572,8 @@ static inline void mga_dma_dispatch_clear( drm_device_t *dev, int flags,
 					  unsigned int clear_zval )
 {
    	drm_mga_private_t *dev_priv = dev->dev_private;
-   	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
+      	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
+	unsigned int *regs = sarea_priv->ContextState;
 	int nbox = sarea_priv->nbox;
 	xf86drmClipRectRec *pbox = sarea_priv->boxes;
 	unsigned int cmd;
@@ -604,9 +585,9 @@ static inline void mga_dma_dispatch_clear( drm_device_t *dev, int flags,
 		cmd = MGA_CLEAR_CMD | DC_atype_blk;
 	else
 		cmd = MGA_CLEAR_CMD | DC_atype_rstr;
-
-   	primary_needed = nbox * 35;
-   	if(primary_needed == 0) primary_needed = 35;
+   
+   	primary_needed = nbox * 60;
+   	if(primary_needed == 0) primary_needed = 60;
 	PRIM_OVERFLOW(dev, dev_priv, primary_needed);
 	PRIMGETPTR( dev_priv );
       	dev_priv->last_sync_tag = mga_create_sync_tag(dev);
@@ -658,6 +639,12 @@ static inline void mga_dma_dispatch_clear( drm_device_t *dev, int flags,
 		}
 	}
 
+	/* Force reset of DWGCTL */
+   	PRIMOUTREG( MGAREG_DMAPAD, 0);   
+	PRIMOUTREG( MGAREG_DMAPAD, 0);   
+ 	PRIMOUTREG( MGAREG_DMAPAD, 0);
+      	PRIMOUTREG( MGAREG_DWGCTL, regs[MGA_CTXREG_DWGCTL] );
+   
 	PRIMOUTREG( MGAREG_DMAPAD, 0);
 	PRIMOUTREG( MGAREG_DMAPAD, 0);
       	PRIMOUTREG( MGAREG_DMAPAD, 0);
@@ -669,6 +656,7 @@ static inline void mga_dma_dispatch_swap( drm_device_t *dev )
 {
    	drm_mga_private_t *dev_priv = dev->dev_private;
       	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
+	unsigned int *regs = sarea_priv->ContextState;
 	int nbox = sarea_priv->nbox;
 	xf86drmClipRectRec *pbox = sarea_priv->boxes;
 	int i;
@@ -676,7 +664,7 @@ static inline void mga_dma_dispatch_swap( drm_device_t *dev )
    	PRIMLOCALS;
 
    	primary_needed = nbox * 5;
-   	primary_needed += 15;
+   	primary_needed += 60;
 	PRIM_OVERFLOW(dev, dev_priv, primary_needed);
 	PRIMGETPTR( dev_priv );
    
@@ -705,6 +693,12 @@ static inline void mga_dma_dispatch_swap( drm_device_t *dev )
 		PRIMOUTREG(MGAREG_FXBNDRY, pbox[i].x1|((pbox[i].x2 - 1)<<16));
 		PRIMOUTREG(MGAREG_YDSTLEN+MGAREG_MGA_EXEC, (pbox[i].y1<<16)|h);
 	}
+   
+   	/* Force reset of DWGCTL */
+   	PRIMOUTREG( MGAREG_DMAPAD, 0);
+      	PRIMOUTREG( MGAREG_DMAPAD, 0);
+   	PRIMOUTREG( MGAREG_DMAPAD, 0);
+      	PRIMOUTREG( MGAREG_DWGCTL, regs[MGA_CTXREG_DWGCTL] );
   
 	PRIMOUTREG( MGAREG_SRCORG, 0);
 	PRIMOUTREG( MGAREG_DMAPAD, 0);
@@ -768,36 +762,45 @@ int mga_swap_bufs(struct inode *inode, struct file *filp,
    	return 0;
 }
 
-/* This is very broken */
 int mga_iload(struct inode *inode, struct file *filp,
-	      unsigned int cmd, unsigned long arg)
+ 	      unsigned int cmd, unsigned long arg)
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
-      	drm_device_dma_t *dma = dev->dma;
-      	drm_buf_t *buf;
-      	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
-      	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
-      	__volatile__ unsigned int *status = 
-     		(__volatile__ unsigned int *)dev_priv->status_page;
-	drm_mga_iload_t iload;
-
-	copy_from_user_ret(&iload, (drm_mga_iload_t *)arg, sizeof(iload),
-			   -EFAULT);
-   	buf = dma->buflist[iload.idx];
-#if 0
-   	sarea_priv->dirty |= (MGA_UPLOAD_CTX | MGA_UPLOAD_2D);
+ 	drm_file_t *priv = filp->private_data;
+ 	drm_device_t *dev = priv->dev;
+   	drm_device_dma_t  *dma	    = dev->dma;
+       	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
+       	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
+       	__volatile__ unsigned int *status = 
+      		(__volatile__ unsigned int *)dev_priv->status_page;
+   	drm_buf_t *buf;
+   	drm_mga_buf_priv_t *buf_priv;
+ 	drm_mga_iload_t iload;
+	unsigned long bus_address;
    
-   	DRM_DEBUG("buf->used : %d\n", buf->used);
-   
-   	mga_dma_dispatch_tex_blit(dev, buf, iload.x1, iload.x2, iload.y1, iload.y2,
-				  iload.destOrg, iload.mAccess, iload.pitch);
+ 	copy_from_user_ret(&iload, (drm_mga_iload_t *)arg, sizeof(iload),
+ 			   -EFAULT);
 
+   	buf = dma->buflist[ iload.idx ];
+	buf_priv = buf->dev_private;
+   	bus_address = buf->bus_address;
+   
+	if(mgaVerifyIload(dev_priv, 
+			  iload.destOrg, 
+			  bus_address, 
+			  iload.length)) {
+	      	mga_freelist_put(dev, buf);
+	   	return -EINVAL;
+	}
+    
+   	sarea_priv->dirty |= MGA_UPLOAD_CTX;
+    
+   	mga_dma_dispatch_tex_blit(dev, bus_address, iload.length, 
+				  iload.destOrg);
+   	buf_priv->my_freelist->age = dev_priv->last_sync_tag;
+    	mga_freelist_put(dev, buf);
 	mga_dma_schedule(dev, 1);
-#endif
-   	mga_freelist_put(dev, buf);
-   	sarea_priv->last_dispatch = status[1];
-	return 0; 
+    	sarea_priv->last_dispatch = status[1];
+ 	return 0; 
 }
 
 int mga_vertex(struct inode *inode, struct file *filp,

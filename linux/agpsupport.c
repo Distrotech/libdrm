@@ -277,15 +277,12 @@ drm_agp_head_t *drm_agp_init(void)
 
 	for (fill = &drm_agp_fill[0]; fill->name; fill++) {
 		char *n  = (char *)fill->name;
-#if 0
 		*fill->f = (drm_agp_func_u)get_module_symbol(NULL, n);
-#endif
-		*fill->f = (drm_agp_func_u)get_module_symbol(NULL, n);
-		printk("%s resolves to 0x%08lx\n", n, (*fill->f).address);
+		DRM_DEBUG("%s resolves to 0x%08lx\n", n, (*fill->f).address);
 		if (!(*fill->f).address) agp_available = 0;
 	}
    
-	printk("agp_available = %d\n", agp_available);
+	DRM_DEBUG("agp_available = %d\n", agp_available);
 
 	if (agp_available) {
 		if (!(head = drm_alloc(sizeof(*head), DRM_MEM_AGPLISTS)))

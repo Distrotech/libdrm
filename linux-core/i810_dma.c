@@ -58,7 +58,7 @@
 
 #define BEGIN_LP_RING(n) do {					\
    if (I810_VERBOSE)						\
-      printk("BEGIN_LP_RING(%d) in %s\n", n, __FUNCTION__);	\
+      DRM_DEBUG("BEGIN_LP_RING(%d) in %s\n", n, __FUNCTION__);	\
    if (dev_priv->ring.space < n*4) i810_wait_ring(dev, n*4, 0);	\
    dev_priv->ring.space -= n*4;					\
    outring = dev_priv->ring.tail;				\
@@ -67,13 +67,13 @@
 } while (0)
 
 #define ADVANCE_LP_RING() do {					\
-    if (I810_VERBOSE) printk("ADVANCE_LP_RING\n");		\
+    if (I810_VERBOSE) DRM_DEBUG("ADVANCE_LP_RING\n");		\
     dev_priv->ring.tail = outring;                      	\
     I810_WRITE(LP_RING + RING_TAIL, outring);			\
 } while(0)
 
 #define OUT_RING(n) do {				\
-   if (I810_VERBOSE) printk("   OUT_RING %x\n", (int)(n));	\
+   if (I810_VERBOSE) DRM_DEBUG("   OUT_RING %x\n", (int)(n));	\
    *(volatile unsigned int *)(virt + outring) = n;	\
    outring += 4;					\
    outring &= ringmask;					\
@@ -86,13 +86,13 @@ static inline void i810_print_status_page(drm_device_t *dev)
 	u32 *temp = (u32 *)dev_priv->hw_status_page;
    	int i;
 
-   	printk(  "hw_status: Interrupt Status : %x\n", temp[0]);
-   	printk(  "hw_status: LpRing Head ptr : %x\n", temp[1]);
-   	printk(  "hw_status: IRing Head ptr : %x\n", temp[2]);
-      	printk(  "hw_status: Reserved : %x\n", temp[3]);
-   	printk(  "hw_status: Driver Counter : %d\n", temp[5]);
+   	DRM_DEBUG(  "hw_status: Interrupt Status : %x\n", temp[0]);
+   	DRM_DEBUG(  "hw_status: LpRing Head ptr : %x\n", temp[1]);
+   	DRM_DEBUG(  "hw_status: IRing Head ptr : %x\n", temp[2]);
+      	DRM_DEBUG(  "hw_status: Reserved : %x\n", temp[3]);
+   	DRM_DEBUG(  "hw_status: Driver Counter : %d\n", temp[5]);
    	for(i = 6; i < dma->buf_count + 6; i++) {
-	   	printk(  "buffer status idx : %d used: %d\n", i - 6, temp[i]);
+	   	DRM_DEBUG(  "buffer status idx : %d used: %d\n", i - 6, temp[i]);
 	}
 }
 
@@ -209,7 +209,7 @@ static int i810_dma_cleanup(drm_device_t *dev)
 static int __gettimeinmillis(void)
 {
    struct timeval timep;   
-   do_gettimeofday(&timep);
+   get_fast_time(&timep);
    return(timep.tv_sec * 1000) + (timep.tv_usec / 1000);
 }
 
@@ -277,7 +277,7 @@ static int i810_freelist_init(drm_device_t *dev)
 	   	drm_i810_buf_priv_t *buf_priv = buf->dev_private;
 	   
 	   	buf_priv->in_use = hw_status + my_idx;
-	   	printk("buf_priv->in_use : %p\n", buf_priv->in_use);
+	   	DRM_DEBUG("buf_priv->in_use : %p\n", buf_priv->in_use);
 	   	*buf_priv->in_use = I810_BUF_FREE;
 	   	buf_priv->my_use_idx = my_idx;
 	   	my_idx += 4;
@@ -642,6 +642,10 @@ static int i810_flush_queue(drm_device_t *dev)
    	DECLARE_WAITQUEUE(entry, current);
   	drm_i810_private_t *dev_priv = (drm_i810_private_t *)dev->dev_private;
    	int ret = 0;
+   	int startTime = 0;
+   	int curTime = 0;
+      	int timeout_millis = 3000;
+      
 
    	if(dev_priv == NULL) {
 	   	return 0;
@@ -651,13 +655,22 @@ static int i810_flush_queue(drm_device_t *dev)
    	add_wait_queue(&dev_priv->flush_queue, &entry);
    	for (;;) {
 	      	i810_dma_emit_flush(dev);
-	   	if (atomic_read(&dev_priv->flush_done) == 1) break;
-	      	schedule_timeout(DRM_LOCK_SLICE);
+	   	if (atomic_read(&dev_priv->flush_done) == 1) break;	
+	   	curTime = __gettimeinmillis();
+	   	if (startTime == 0 || curTime < startTime /*wrap case*/) {
+		   	startTime = curTime;
+	   	} else if (curTime - startTime > timeout_millis) {
+		   	DRM_ERROR("lockup\n");
+		   	goto out_wait_flush;
+		}	   
+	      	schedule_timeout(HZ/60);
 	      	if (signal_pending(current)) {
 		   	ret = -EINTR; /* Can't restart */
 		   	break;
 		}
-	   }
+	}
+   
+out_wait_flush:
    	current->state = TASK_RUNNING;
    	remove_wait_queue(&dev_priv->flush_queue, &entry);
    

@@ -38,7 +38,7 @@
 static int i810_alloc_queue(drm_device_t *dev)
 {
    	int temp = drm_ctxbitmap_next(dev);
-   	printk("i810_alloc_queue: %d\n", temp);
+   	DRM_DEBUG("i810_alloc_queue: %d\n", temp);
 	return temp;
 }
 
@@ -57,7 +57,7 @@ int i810_context_switch(drm_device_t *dev, int old, int new)
         dev->ctx_start = get_cycles();
 #endif
         
-        printk("Context switch from %d to %d\n", old, new);
+        DRM_DEBUG("Context switch from %d to %d\n", old, new);
 
         if (new == dev->last_context) {
                 clear_bit(0, &dev->context_flag);
@@ -104,7 +104,7 @@ int i810_resctx(struct inode *inode, struct file *filp, unsigned int cmd,
 	drm_ctx_t	ctx;
 	int		i;
 
-	printk("%d\n", DRM_RESERVED_CONTEXTS);
+	DRM_DEBUG("%d\n", DRM_RESERVED_CONTEXTS);
 	copy_from_user_ret(&res, (drm_ctx_res_t *)arg, sizeof(res), -EFAULT);
 	if (res.count >= DRM_RESERVED_CONTEXTS) {
 		memset(&ctx, 0, sizeof(ctx));
@@ -134,11 +134,11 @@ int i810_addctx(struct inode *inode, struct file *filp, unsigned int cmd,
 		ctx.handle = i810_alloc_queue(dev);
 	}
         if (ctx.handle == -1) {
-		printk("Not enough free contexts.\n");
+		DRM_DEBUG("Not enough free contexts.\n");
 				/* Should this return -EBUSY instead? */
 		return -ENOMEM;
 	}
-	printk("%d\n", ctx.handle);
+	DRM_DEBUG("%d\n", ctx.handle);
 	copy_to_user_ret((drm_ctx_t *)arg, &ctx, sizeof(ctx), -EFAULT);
 	return 0;
 }
@@ -170,7 +170,7 @@ int i810_switchctx(struct inode *inode, struct file *filp, unsigned int cmd,
 	drm_ctx_t	ctx;
 
 	copy_from_user_ret(&ctx, (drm_ctx_t *)arg, sizeof(ctx), -EFAULT);
-	printk("%d\n", ctx.handle);
+	DRM_DEBUG("%d\n", ctx.handle);
 	return i810_context_switch(dev, dev->last_context, ctx.handle);
 }
 
@@ -182,7 +182,7 @@ int i810_newctx(struct inode *inode, struct file *filp, unsigned int cmd,
 	drm_ctx_t	ctx;
 
 	copy_from_user_ret(&ctx, (drm_ctx_t *)arg, sizeof(ctx), -EFAULT);
-	printk("%d\n", ctx.handle);
+	DRM_DEBUG("%d\n", ctx.handle);
 	i810_context_switch_complete(dev, ctx.handle);
 
 	return 0;
@@ -196,7 +196,7 @@ int i810_rmctx(struct inode *inode, struct file *filp, unsigned int cmd,
 	drm_ctx_t	ctx;
 
 	copy_from_user_ret(&ctx, (drm_ctx_t *)arg, sizeof(ctx), -EFAULT);
-	printk("%d\n", ctx.handle);
+	DRM_DEBUG("%d\n", ctx.handle);
    	if(ctx.handle != DRM_KERNEL_CONTEXT) {
 	   	drm_ctxbitmap_free(dev, ctx.handle);
 	}
