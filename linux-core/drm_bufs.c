@@ -265,7 +265,7 @@ int DRM(rmmap)( DRM_OS_IOCTL )
 	DRM_OS_DEVICE;
 #ifdef __linux__
 	struct list_head *list;
-	drm_map_list_t *r_list;
+	drm_map_list_t *r_list = NULL;
 	drm_vma_entry_t *pt, *prev;
 #endif
 #ifdef __FreeBSD__
@@ -361,6 +361,46 @@ int DRM(rmmap)( DRM_OS_IOCTL )
 
 #if __HAVE_DMA
 
+
+static void DRM(cleanup_buf_error)(drm_buf_entry_t *entry)
+{
+	int i;
+
+	if (entry->seg_count) {
+		for (i = 0; i < entry->seg_count; i++) {
+			DRM(free_pages)(entry->seglist[i],
+					entry->page_order,
+					DRM_MEM_DMA);
+		}
+		DRM(free)(entry->seglist,
+			  entry->seg_count *
+			  sizeof(*entry->seglist),
+			  DRM_MEM_SEGS);
+
+		entry->seg_count = 0;
+	}
+
+   	if(entry->buf_count) {
+	   	for(i = 0; i < entry->buf_count; i++) {
+			if(entry->buflist[i].dev_private) {
+				DRM(free)(entry->buflist[i].dev_private,
+					  entry->buflist[i].dev_priv_size,
+					  DRM_MEM_BUFS);
+			}
+		}
+		DRM(free)(entry->buflist,
+			  entry->buf_count *
+			  sizeof(*entry->buflist),
+			  DRM_MEM_BUFS);
+
+#if __HAVE_DMA_FREELIST
+	   	DRM(freelist_destroy)(&entry->freelist);
+#endif
+
+		entry->buf_count = 0;
+	}
+}
+
 #if __REALLY_HAVE_AGP
 int DRM(addbufs_agp)( DRM_OS_IOCTL )
 {
@@ -379,6 +419,7 @@ int DRM(addbufs_agp)( DRM_OS_IOCTL )
 	int total;
 	int byte_count;
 	int i;
+	drm_buf_t **temp_buflist;
 
 	if ( !dma ) DRM_OS_RETURN(EINVAL);
 
@@ -474,6 +515,11 @@ int DRM(addbufs_agp)( DRM_OS_IOCTL )
 		buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
 		buf->dev_private = DRM(alloc)( sizeof(DRIVER_BUF_PRIV_T),
 					       DRM_MEM_BUFS );
+		if(!buf->dev_private) {
+			/* Set count correctly so we free the proper amount. */
+			entry->buf_count = count;
+			DRM(cleanup_buf_error)(entry);
+		}
 		memset( buf->dev_private, 0, buf->dev_priv_size );
 
 #if __HAVE_DMA_HISTOGRAM
@@ -490,11 +536,20 @@ int DRM(addbufs_agp)( DRM_OS_IOCTL )
 
 	DRM_DEBUG( "byte_count: %d\n", byte_count );
 
-	dma->buflist = DRM(realloc)( dma->buflist,
+	temp_buflist = DRM(realloc)( dma->buflist,
 				     dma->buf_count * sizeof(*dma->buflist),
 				     (dma->buf_count + entry->buf_count)
 				     * sizeof(*dma->buflist),
 				     DRM_MEM_BUFS );
+	if(!temp_buflist) {
+		/* Free the entry because it isn't valid */
+		DRM(cleanup_buf_error)(entry);
+		DRM_OS_UNLOCK;
+		atomic_dec( &dev->buf_alloc );
+		DRM_OS_RETURN(ENOMEM);
+	}
+	dma->buflist = temp_buflist;
+
 	for ( i = 0 ; i < entry->buf_count ; i++ ) {
 		dma->buflist[i + dma->buf_count] = &entry->buflist[i];
 	}
@@ -544,6 +599,8 @@ int DRM(addbufs_pci)( DRM_OS_IOCTL )
 	int i;
 	int byte_count;
 	int page_count;
+	unsigned long *temp_pagelist;
+	drm_buf_t **temp_buflist;
 
 	if ( !dma ) DRM_OS_RETURN(EINVAL);
 
@@ -615,11 +672,24 @@ int DRM(addbufs_pci)( DRM_OS_IOCTL )
 	}
 	memset( entry->seglist, 0, count * sizeof(*entry->seglist) );
 
-	dma->pagelist = DRM(realloc)( dma->pagelist,
+	temp_pagelist = DRM(realloc)( dma->pagelist,
 				      dma->page_count * sizeof(*dma->pagelist),
 				      (dma->page_count + (count << page_order))
 				      * sizeof(*dma->pagelist),
 				      DRM_MEM_PAGES );
+	if(!temp_pagelist) {
+		DRM(free)( entry->buflist,
+			   count * sizeof(*entry->buflist),
+			   DRM_MEM_BUFS );
+		DRM(free)( entry->seglist,
+			   count * sizeof(*entry->seglist),
+			   DRM_MEM_SEGS );
+		DRM_OS_UNLOCK;
+		atomic_dec( &dev->buf_alloc );
+		DRM_OS_RETURN(ENOMEM);
+	}
+
+	dma->pagelist = temp_pagelist;
 	DRM_DEBUG( "pagelist: %d entries\n",
 		   dma->page_count + (count << page_order) );
 
@@ -671,11 +741,20 @@ int DRM(addbufs_pci)( DRM_OS_IOCTL )
 		byte_count += PAGE_SIZE << page_order;
 	}
 
-	dma->buflist = DRM(realloc)( dma->buflist,
+	temp_buflist = DRM(realloc)( dma->buflist,
 				     dma->buf_count * sizeof(*dma->buflist),
 				     (dma->buf_count + entry->buf_count)
 				     * sizeof(*dma->buflist),
 				     DRM_MEM_BUFS );
+	if(!temp_buflist) {
+		/* Free the entry because it isn't valid */
+		DRM(cleanup_buf_error)(entry);
+		DRM_OS_UNLOCK;
+		atomic_dec( &dev->buf_alloc );
+		DRM_OS_RETURN(ENOMEM);
+	}
+	dma->buflist = temp_buflist;
+
 	for ( i = 0 ; i < entry->buf_count ; i++ ) {
 		dma->buflist[i + dma->buf_count] = &entry->buflist[i];
 	}
@@ -708,165 +787,185 @@ int DRM(addbufs_pci)( DRM_OS_IOCTL )
 int DRM(addbufs_sg)( DRM_OS_IOCTL )
 {
 	DRM_OS_DEVICE;
-       drm_device_dma_t *dma = dev->dma;
-       drm_buf_desc_t request;
-       drm_buf_entry_t *entry;
-       drm_buf_t *buf;
-       unsigned long offset;
-       unsigned long agp_offset;
-       int count;
-       int order;
-       int size;
-       int alignment;
-       int page_order;
-       int total;
-       int byte_count;
-       int i;
+	drm_file_t *priv = filp->private_data;
+	drm_device_t *dev = priv->dev;
+	drm_device_dma_t *dma = dev->dma;
+	drm_buf_desc_t request;
+	drm_buf_entry_t *entry;
+	drm_buf_t *buf;
+	unsigned long offset;
+	unsigned long agp_offset;
+	int count;
+	int order;
+	int size;
+	int alignment;
+	int page_order;
+	int total;
+	int byte_count;
+	int i;
+	drm_buf_t **temp_buflist;
 
-       if ( !dma ) DRM_OS_RETURN(EINVAL);
+	if ( !dma ) DRM_OS_RETURN(EINVAL);
 
 	DRM_OS_KRNFROMUSR( request, (drm_buf_desc_t *)data, sizeof(request) );
 
-       count = request.count;
-       order = DRM(order)( request.size );
-       size = 1 << order;
+	count = request.count;
+	order = DRM(order)( request.size );
+	size = 1 << order;
 
-       alignment  = (request.flags & _DRM_PAGE_ALIGN)
+	alignment  = (request.flags & _DRM_PAGE_ALIGN)
 #ifdef __linux__
                ? PAGE_ALIGN(size) : size;
 #endif
 #ifdef __FreeBSD__
 		? round_page(size) : size;
 #endif
-       page_order = order - PAGE_SHIFT > 0 ? order - PAGE_SHIFT : 0;
-       total = PAGE_SIZE << page_order;
+	page_order = order - PAGE_SHIFT > 0 ? order - PAGE_SHIFT : 0;
+	total = PAGE_SIZE << page_order;
 
-       byte_count = 0;
-       agp_offset = request.agp_start;
+	byte_count = 0;
+	agp_offset = request.agp_start;
 
-       DRM_DEBUG( "count:      %d\n",  count );
-       DRM_DEBUG( "order:      %d\n",  order );
-       DRM_DEBUG( "size:       %d\n",  size );
-       DRM_DEBUG( "agp_offset: 0x%lx\n", agp_offset );
-       DRM_DEBUG( "alignment:  %d\n",  alignment );
-       DRM_DEBUG( "page_order: %d\n",  page_order );
-       DRM_DEBUG( "total:      %d\n",  total );
+	DRM_DEBUG( "count:      %d\n",  count );
+	DRM_DEBUG( "order:      %d\n",  order );
+	DRM_DEBUG( "size:       %d\n",  size );
+	DRM_DEBUG( "agp_offset: %ld\n", agp_offset );
+	DRM_DEBUG( "alignment:  %d\n",  alignment );
+	DRM_DEBUG( "page_order: %d\n",  page_order );
+	DRM_DEBUG( "total:      %d\n",  total );
 
-       if ( order < DRM_MIN_ORDER || order > DRM_MAX_ORDER ) 
+	if ( order < DRM_MIN_ORDER || order > DRM_MAX_ORDER ) 
 		DRM_OS_RETURN(EINVAL);
-       if ( dev->queue_count ) 
-		DRM_OS_RETURN(EBUSY); /* Not while in use */
+	if ( dev->queue_count ) DRM_OS_RETURN(EBUSY); /* Not while in use */
 
 	DRM_OS_SPINLOCK( &dev->count_lock );
-       if ( dev->buf_use ) {
+	if ( dev->buf_use ) {
 		DRM_OS_SPINUNLOCK( &dev->count_lock );
-               DRM_OS_RETURN(EBUSY);
-       }
-       atomic_inc( &dev->buf_alloc );
+		DRM_OS_RETURN(EBUSY);
+	}
+	atomic_inc( &dev->buf_alloc );
 	DRM_OS_SPINUNLOCK( &dev->count_lock );
 
 	DRM_OS_LOCK;
-       entry = &dma->bufs[order];
-       if ( entry->buf_count ) {
+	entry = &dma->bufs[order];
+	if ( entry->buf_count ) {
 		DRM_OS_UNLOCK;
-               atomic_dec( &dev->buf_alloc );
-               	DRM_OS_RETURN(ENOMEM); /* May only call once for each order */
-       }
+		atomic_dec( &dev->buf_alloc );
+		DRM_OS_RETURN(ENOMEM); /* May only call once for each order */
+	}
 
 	if (count < 0 || count > 4096) {
 		DRM_OS_UNLOCK;
 		atomic_dec( &dev->buf_alloc );
-               	DRM_OS_RETURN(EINVAL);
+		DRM_OS_RETURN(EINVAL);
 	}
 
-       entry->buflist = DRM(alloc)( count * sizeof(*entry->buflist),
-                                   DRM_MEM_BUFS );
-       if ( !entry->buflist ) {
+	entry->buflist = DRM(alloc)( count * sizeof(*entry->buflist),
+				     DRM_MEM_BUFS );
+	if ( !entry->buflist ) {
 		DRM_OS_UNLOCK;
-               atomic_dec( &dev->buf_alloc );
-               	DRM_OS_RETURN(ENOMEM);
-       }
-       memset( entry->buflist, 0, count * sizeof(*entry->buflist) );
+		atomic_dec( &dev->buf_alloc );
+		DRM_OS_RETURN(ENOMEM);
+	}
+	memset( entry->buflist, 0, count * sizeof(*entry->buflist) );
 
-       entry->buf_size = size;
-       entry->page_order = page_order;
+	entry->buf_size = size;
+	entry->page_order = page_order;
 
-       offset = 0;
+	offset = 0;
 
-       while ( entry->buf_count < count ) {
-               buf          = &entry->buflist[entry->buf_count];
-               buf->idx     = dma->buf_count + entry->buf_count;
-               buf->total   = alignment;
-               buf->order   = order;
-               buf->used    = 0;
+	while ( entry->buf_count < count ) {
+		buf          = &entry->buflist[entry->buf_count];
+		buf->idx     = dma->buf_count + entry->buf_count;
+		buf->total   = alignment;
+		buf->order   = order;
+		buf->used    = 0;
 
-               buf->offset  = (dma->byte_count + offset);
-               buf->bus_address = agp_offset + offset;
-               buf->address = (void *)(agp_offset + offset + dev->sg->handle);
-               buf->next    = NULL;
-               buf->waiting = 0;
-               buf->pending = 0;
+		buf->offset  = (dma->byte_count + offset);
+		buf->bus_address = agp_offset + offset;
+		buf->address = (void *)(agp_offset + offset + dev->sg->handle);
+		buf->next    = NULL;
+		buf->waiting = 0;
+		buf->pending = 0;
 #ifdef __linux__
-               init_waitqueue_head( &buf->dma_wait );
+		init_waitqueue_head( &buf->dma_wait );
 #endif
 #ifdef __FreeBSD__
 		buf->dma_wait = 0;
 #endif
-               buf->pid     = 0;
+		buf->pid     = 0;
 
-               buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
-               buf->dev_private = DRM(alloc)( sizeof(DRIVER_BUF_PRIV_T),
-                                              DRM_MEM_BUFS );
-               memset( buf->dev_private, 0, buf->dev_priv_size );
+		buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
+		buf->dev_private = DRM(alloc)( sizeof(DRIVER_BUF_PRIV_T),
+					       DRM_MEM_BUFS );
+		if(!buf->dev_private) {
+			/* Set count correctly so we free the proper amount. */
+			entry->buf_count = count;
+			DRM(cleanup_buf_error)(entry);
+			DRM_OS_UNLOCK;
+			atomic_dec( &dev->buf_alloc );
+			DRM_OS_RETURN(ENOMEM);
+		}
 
-#if __HAVE_DMA_HISTOGRAM
-               buf->time_queued = 0;
-               buf->time_dispatched = 0;
-               buf->time_completed = 0;
-               buf->time_freed = 0;
-#endif
-               DRM_DEBUG( "buffer %d @ %p\n",
-                          entry->buf_count, buf->address );
+		memset( buf->dev_private, 0, buf->dev_priv_size );
 
-               offset += alignment;
-               entry->buf_count++;
-               byte_count += PAGE_SIZE << page_order;
-       }
+# if __HAVE_DMA_HISTOGRAM
+		buf->time_queued = 0;
+		buf->time_dispatched = 0;
+		buf->time_completed = 0;
+		buf->time_freed = 0;
+# endif
+		DRM_DEBUG( "buffer %d @ %p\n",
+			   entry->buf_count, buf->address );
 
-       DRM_DEBUG( "byte_count: %d\n", byte_count );
+		offset += alignment;
+		entry->buf_count++;
+		byte_count += PAGE_SIZE << page_order;
+	}
 
-       dma->buflist = DRM(realloc)( dma->buflist,
-                                    dma->buf_count * sizeof(*dma->buflist),
-                                    (dma->buf_count + entry->buf_count)
-                                    * sizeof(*dma->buflist),
-                                    DRM_MEM_BUFS );
-       for ( i = 0 ; i < entry->buf_count ; i++ ) {
-               dma->buflist[i + dma->buf_count] = &entry->buflist[i];
-       }
+	DRM_DEBUG( "byte_count: %d\n", byte_count );
 
-       dma->buf_count += entry->buf_count;
-       dma->byte_count += byte_count;
+	temp_buflist = DRM(realloc)( dma->buflist,
+				     dma->buf_count * sizeof(*dma->buflist),
+				     (dma->buf_count + entry->buf_count)
+				     * sizeof(*dma->buflist),
+				     DRM_MEM_BUFS );
+	if(!temp_buflist) {
+		/* Free the entry because it isn't valid */
+		DRM(cleanup_buf_error)(entry);
+		DRM_OS_UNLOCK;
+		atomic_dec( &dev->buf_alloc );
+		DRM_OS_RETURN(ENOMEM);
+	}
+	dma->buflist = temp_buflist;
 
-       DRM_DEBUG( "dma->buf_count : %d\n", dma->buf_count );
-       DRM_DEBUG( "entry->buf_count : %d\n", entry->buf_count );
+	for ( i = 0 ; i < entry->buf_count ; i++ ) {
+		dma->buflist[i + dma->buf_count] = &entry->buflist[i];
+	}
+
+	dma->buf_count += entry->buf_count;
+	dma->byte_count += byte_count;
+
+	DRM_DEBUG( "dma->buf_count : %d\n", dma->buf_count );
+	DRM_DEBUG( "entry->buf_count : %d\n", entry->buf_count );
 
 #if __HAVE_DMA_FREELIST
-       DRM(freelist_create)( &entry->freelist, entry->buf_count );
-       for ( i = 0 ; i < entry->buf_count ; i++ ) {
-               DRM(freelist_put)( dev, &entry->freelist, &entry->buflist[i] );
-       }
+	DRM(freelist_create)( &entry->freelist, entry->buf_count );
+	for ( i = 0 ; i < entry->buf_count ; i++ ) {
+		DRM(freelist_put)( dev, &entry->freelist, &entry->buflist[i] );
+	}
 #endif
 	DRM_OS_UNLOCK;
 
-       request.count = entry->buf_count;
-       request.size = size;
+	request.count = entry->buf_count;
+	request.size = size;
 
 	DRM_OS_KRNTOUSR( (drm_buf_desc_t *)data, request, sizeof(request) );
 
-       dma->flags = _DRM_DMA_USE_SG;
+	dma->flags = _DRM_DMA_USE_SG;
 
-       atomic_dec( &dev->buf_alloc );
-       return 0;
+	atomic_dec( &dev->buf_alloc );
+	return 0;
 }
 #endif /* __REALLY_HAVE_SG */
 
