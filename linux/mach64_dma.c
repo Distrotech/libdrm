@@ -514,8 +514,8 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 	void *cpu_addr_data;
 	u32 data_addr;
 	u32 *table, *data;
-	u32 regs[3], expected[3];
-	u32 saved_src_cntl;
+	u32 expected[2];
+	u32 src_cntl, pat_reg0, pat_reg1;
 	int i, count, failed;
 
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
@@ -537,37 +537,45 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 	 * in case our test fails.  This prevents the X server
 	 * from disabling it's cache for this register
 	 */
-	saved_src_cntl = MACH64_READ( MACH64_SRC_CNTL );
+	src_cntl = MACH64_READ( MACH64_SRC_CNTL );
+	pat_reg0 = MACH64_READ( MACH64_PAT_REG0 );
+	pat_reg1 = MACH64_READ( MACH64_PAT_REG1 );
 
-	mach64_do_wait_for_fifo( dev_priv, 4 );
-			
+	mach64_do_wait_for_fifo( dev_priv, 3 );
+
 	MACH64_WRITE( MACH64_SRC_CNTL, 0 );
-
-	MACH64_WRITE( MACH64_VERTEX_1_S, 0x00000000 );
-	MACH64_WRITE( MACH64_VERTEX_1_T, 0x00000000 );
-	MACH64_WRITE( MACH64_VERTEX_1_W, 0x00000000 );
+	MACH64_WRITE( MACH64_PAT_REG0, 0x11111111 );
+	MACH64_WRITE( MACH64_PAT_REG1, 0x11111111 );
 
 	mach64_do_wait_for_idle( dev_priv );
-	
-	for (i=0; i < 3; i++) {
-		DRM_DEBUG( "(Before DMA Transfer) reg %d = 0x%08x\n", i, 
-			   MACH64_READ( (MACH64_VERTEX_1_S + i*4) ) );
+
+	for (i=0; i < 2; i++) {
+		u32 reg;
+		reg = MACH64_READ( (MACH64_PAT_REG0 + i*4) );
+		DRM_DEBUG( "(Before DMA Transfer) reg %d = 0x%08x\n", i, reg );
+		if ( reg != 0x11111111 ) {
+			DRM_INFO( "Error initializing test registers\n" );
+			DRM_INFO( "resetting engine ...\n");
+			mach64_do_engine_reset( dev_priv );
+			DRM_INFO( "freeing data buffer memory.\n" );
+			pci_free_consistent( dev->pdev, 0x1000, 
+					     cpu_addr_data, data_handle );
+			DRM_INFO( "returning ...\n" );
+			return -EIO;
+		}
 	}
 
-	/* use only s,t,w vertex registers so we don't have to mask any results */
-	/* fill up a buffer with sets of 3 consecutive writes starting with VERTEX_1_S */
+	/* fill up a buffer with sets of 2 consecutive writes starting with PAT_REG0 */
 	count = 0;
 
-	data[count++] = cpu_to_le32(DMAREG(MACH64_VERTEX_1_S) | (2 << 16));
-	data[count++] = expected[0] = 0x11111111;
-	data[count++] = expected[1] = 0x22222222;
-	data[count++] = expected[2] = 0x33333333;
+	data[count++] = cpu_to_le32(DMAREG(MACH64_PAT_REG0) | (1 << 16));
+	data[count++] = expected[0] = 0x22222222;
+	data[count++] = expected[1] = 0xaaaaaaaa;
 
 	while (count < 1020) {
-		data[count++] = cpu_to_le32(DMAREG(MACH64_VERTEX_1_S) | (2 << 16));
-		data[count++] = 0x11111111;
+		data[count++] = cpu_to_le32(DMAREG(MACH64_PAT_REG0) | (1 << 16));
 		data[count++] = 0x22222222;
-		data[count++] = 0x33333333;
+		data[count++] = 0xaaaaaaaa;
 	}
 	data[count++] = cpu_to_le32(DMAREG(MACH64_SRC_CNTL) | (0 << 16));
 	data[count++] = 0;
@@ -583,11 +591,11 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 	DRM_DEBUG( "table[2] = 0x%08x\n", table[2] );
 	DRM_DEBUG( "table[3] = 0x%08x\n", table[3] );
 
-	for ( i = 0 ; i < 8 ; i++) {
+	for ( i = 0 ; i < 6 ; i++ ) {
 		DRM_DEBUG( " data[%d] = 0x%08x\n", i, data[i] );
 	}
 	DRM_DEBUG( " ...\n" );
-	for ( i = count-6 ; i < count ; i++) {
+	for ( i = count-5 ; i < count ; i++ ) {
 		DRM_DEBUG( " data[%d] = 0x%08x\n", i, data[i] );
 	}
 
@@ -598,8 +606,10 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 		DRM_INFO( "mach64_do_wait_for_idle failed (result=%d)\n", i);
 		DRM_INFO( "resetting engine ...\n");
 		mach64_do_engine_reset( dev_priv );
-		mach64_do_wait_for_fifo( dev_priv, 1 );
-		MACH64_WRITE( MACH64_SRC_CNTL, saved_src_cntl );
+		mach64_do_wait_for_fifo( dev_priv, 3 );
+		MACH64_WRITE( MACH64_SRC_CNTL, src_cntl );
+		MACH64_WRITE( MACH64_PAT_REG0, pat_reg0 );
+		MACH64_WRITE( MACH64_PAT_REG1, pat_reg1 );
 		DRM_INFO( "freeing data buffer memory.\n" );
 		pci_free_consistent( dev->pdev, 0x1000, cpu_addr_data, data_handle );
 		DRM_INFO( "returning ...\n" );
@@ -634,8 +644,10 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 		mach64_dump_engine_info( dev_priv );
 		DRM_INFO( "resetting engine ...\n");
 		mach64_do_engine_reset( dev_priv );
-		mach64_do_wait_for_fifo( dev_priv, 1 );
-		MACH64_WRITE( MACH64_SRC_CNTL, saved_src_cntl );
+		mach64_do_wait_for_fifo( dev_priv, 3 );
+		MACH64_WRITE( MACH64_SRC_CNTL, src_cntl );
+		MACH64_WRITE( MACH64_PAT_REG0, pat_reg0 );
+		MACH64_WRITE( MACH64_PAT_REG1, pat_reg1 );
 		DRM_INFO( "freeing data buffer memory.\n" );
 		pci_free_consistent( dev->pdev, 0x1000, cpu_addr_data, data_handle );
 		DRM_INFO( "returning ...\n" );
@@ -644,19 +656,26 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 
 	DRM_INFO( "waiting for idle...done\n" );
 
+	/* restore SRC_CNTL */
 	mach64_do_wait_for_fifo( dev_priv, 1 );
-	MACH64_WRITE( MACH64_SRC_CNTL, saved_src_cntl );
+	MACH64_WRITE( MACH64_SRC_CNTL, src_cntl );
 
 	failed = 0;
 
 	/* Check register values to see if the GUI master operation succeeded */
-	for ( i = 0; i < 3; i++ ) {
-		regs[i] = MACH64_READ( (MACH64_VERTEX_1_S + i*4) );
-		DRM_DEBUG( "(After DMA Transfer) reg %d = 0x%08x\n", i, regs[i] );
-		if (regs[i] != expected[i]) {
+	for ( i = 0; i < 2; i++ ) {
+		u32 reg;
+		reg = MACH64_READ( (MACH64_PAT_REG0 + i*4) );
+		DRM_DEBUG( "(After DMA Transfer) reg %d = 0x%08x\n", i, reg );
+		if (reg != expected[i]) {
 			failed = -1;
 		}
 	}
+
+	/* restore pattern registers */
+	mach64_do_wait_for_fifo( dev_priv, 2 );
+	MACH64_WRITE( MACH64_PAT_REG0, pat_reg0 );
+	MACH64_WRITE( MACH64_PAT_REG1, pat_reg1 );
 
 	DRM_DEBUG( "freeing data buffer memory.\n" );
 	pci_free_consistent( dev->pdev, 0x1000, cpu_addr_data, data_handle );
