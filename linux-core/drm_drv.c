@@ -590,10 +590,6 @@ static int __init drm_init( void )
 
 	DRIVER_PREINIT();
 
-#if __REALLY_HAVE_AGP
-	DRM(agp_init)();
-#endif
-	
 	for (i = 0; i < DRM(numdevs); i++) {
 		dev = &(DRM(device)[i]);
 		memset( (void *)dev, 0, sizeof(*dev) );
@@ -606,7 +602,7 @@ static int __init drm_init( void )
 		dev->name   = DRIVER_NAME;
 
 #if __REALLY_HAVE_AGP
-		DRM(agp_init_dev)( dev );
+		DRM(agp_init)( dev );
 #if __MUST_HAVE_AGP
 		
 		if ( dev->agp == NULL ) {
@@ -687,13 +683,9 @@ static void __exit drm_cleanup( void )
 		DRM(takedown)( dev );
 
 #if __REALLY_HAVE_AGP
-		DRM(agp_cleanup_dev)( dev );
+		DRM(agp_cleanup)( dev );
 #endif
 	}
-
-#if __REALLY_HAVE_AGP
-	DRM(agp_cleanup)();
-#endif
 
 	DRIVER_POSTCLEANUP();
 	kfree(DRM(minor));

@@ -98,10 +98,8 @@ extern int DRM(agp_free_ioctl)(struct inode *inode, struct file *filp, unsigned 
 extern int DRM(agp_bind_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
 extern int DRM(agp_unbind_ioctl)(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
 
-extern void DRM(agp_init)(void);
-extern void DRM(agp_cleanup)(void);
-extern void DRM(agp_init_dev)(drm_device_t *dev);
-extern void DRM(agp_cleanup_dev)(drm_device_t *dev);
+extern void DRM(agp_init)(drm_device_t *dev);
+extern void DRM(agp_cleanup)(drm_device_t *dev);
 
 /*@}*/
 

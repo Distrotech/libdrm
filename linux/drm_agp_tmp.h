@@ -44,6 +44,7 @@
  * Pointer to the drm_agp_t structure made available by the AGPGART module.
  */
 static const drm_agp_t *drm_agp = NULL;
+static unsigned drm_agp_refcount = 0;
 
 
 /**********************************************************************/
@@ -463,40 +464,21 @@ int DRM(agp_free_ioctl)(struct inode *inode, struct file *filp,
 /*@{*/
 
 /**
- * Initialize the global AGP resources.
- *
- * Gets the drm_agp_t structure which is made available by the agpgart module
- * via the inter_module_* functions.
- */
-void DRM(agp_init)(void)
-{
-	drm_agp = (drm_agp_t *)inter_module_get("drm_agp");
-}
-
-/**
- * Free the global AGP resources.
- *
- * Releases the pointer in ::drm_agp.
- */
-void DRM(agp_cleanup)(void)
-{
-	if (drm_agp) {
-		inter_module_put("drm_agp");
-		drm_agp = NULL;
-	}
-}
-
-/**
  * Initialize the device AGP resources.
  *
  * Creates and initializes a drm_agp_head structure in drm_device_t::agp.
  */
-void DRM(agp_init_dev)(drm_device_t *dev)
+void DRM(agp_init)(drm_device_t *dev)
 {
 	drm_agp_head_t *head         = NULL;
 
-	if (!drm_agp)
-		return;
+	if (!drm_agp) {
+		drm_agp = (drm_agp_t *)inter_module_get("drm_agp");
+
+		if (!drm_agp)
+			return;
+	}
+	++drm_agp_refcount;
 
 	if (!(head = DRM(alloc)(sizeof(*head), DRM_MEM_AGPLISTS)))
 		return;
@@ -528,7 +510,7 @@ void DRM(agp_init_dev)(drm_device_t *dev)
 /**
  * Free the device AGP resources.
  */
-void DRM(agp_cleanup_dev)(drm_device_t *dev)
+void DRM(agp_cleanup)(drm_device_t *dev)
 {
 	if ( dev->agp ) {
 		drm_agp_mem_t *entry;
@@ -538,7 +520,8 @@ void DRM(agp_cleanup_dev)(drm_device_t *dev)
                                    intact until drv_cleanup is called. */
 		for ( entry = dev->agp->memory ; entry ; entry = nexte ) {
 			nexte = entry->next;
-			if ( entry->bound ) DRM(agp_unbind)( entry->memory );
+			if ( entry->bound )
+				DRM(agp_unbind)( entry->memory );
 			DRM(agp_free)( entry->memory );
 			DRM(free)( entry, sizeof(*entry), DRM_MEM_AGPLISTS );
 		}
@@ -552,6 +535,11 @@ void DRM(agp_cleanup_dev)(drm_device_t *dev)
 
 		DRM(free)( dev->agp, sizeof(*dev->agp), DRM_MEM_AGPLISTS );
 		dev->agp = NULL;
+	}
+
+	if (!--drm_agp_refcount) {
+		inter_module_put("drm_agp");
+		drm_agp = NULL;
 	}
 }
 
