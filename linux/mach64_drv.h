@@ -44,6 +44,11 @@ typedef struct drm_mach64_private {
 
 	int usec_timeout;
 	int is_pci;
+	enum {
+		MACH64_MODE_MMIO,
+		MACH64_MODE_DMA_SYNC,
+		MACH64_MODE_DMA_ASYNC
+	} driver_mode;
 
 	struct pci_pool *pool;
 	dma_addr_t table_handle;

@@ -49,7 +49,7 @@ int mach64_do_wait_for_fifo( drm_mach64_private_t *dev_priv, int entries )
 		udelay( 1 );
 	}
 
-	DRM_INFO( "failed! slots=%d entries=%d\n", slots, entries );
+	DRM_INFO( "%s failed! slots=%d entries=%d\n", __FUNCTION__, slots, entries );
 	return -EBUSY;
 }
 
@@ -67,7 +67,7 @@ int mach64_do_wait_for_idle( drm_mach64_private_t *dev_priv )
 		udelay( 1 );
 	}
 
-	DRM_INFO( "failed! GUI_STAT=0x%08x\n",
+	DRM_INFO( "%s failed! GUI_STAT=0x%08x\n", __FUNCTION__, 
 		   MACH64_READ( MACH64_GUI_STAT ) );
 	return -EBUSY;
 }
@@ -191,117 +191,89 @@ void mach64_dump_engine_info( drm_mach64_private_t *dev_priv )
 }
 
 
-static void mach64_bm_dma_test( drm_device_t *dev )
+static int mach64_bm_dma_test( drm_device_t *dev )
 {
 	drm_mach64_private_t *dev_priv = dev->dev_private;
-	struct pci_pool *pool;
-	dma_addr_t table_handle, data_handle;
-	u32 table_addr, data_addr;
+	dma_addr_t data_handle;
+	void *cpu_addr_data;
+	u32 data_addr;
 	u32 *table, *data;
-
-	void *cpu_addr_table, *cpu_addr_data;
+	u32 regs[3], expected[3];
 	int i;
 
-	DRM_INFO( "Creating pool ... \n");
-	pool = pci_pool_create( "mach64", NULL, 0x4000,
-				0x4000, 0x4000, SLAB_ATOMIC );
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
-	if (!pool) {
-		DRM_INFO( "pci_pool_create failed!\n" );
-		return;
-	}
+	table = (u32 *) dev_priv->cpu_addr_table;
 
-	DRM_INFO( "Allocating table memory ...\n" );
-	cpu_addr_table = pci_pool_alloc( pool, SLAB_ATOMIC, &table_handle );
-	if (!cpu_addr_table || !table_handle) {
-		DRM_INFO( "table-memory allocation failed!\n" );
-		return;
-	} else {
-		table = (u32 *) cpu_addr_table;
-		table_addr = (u32) table_handle;
-		memset( cpu_addr_table, 0x0, 0x4000 );
-	}
-
-	DRM_INFO( "Allocating data memory ...\n" );
-	cpu_addr_data = pci_pool_alloc( pool, SLAB_ATOMIC, &data_handle );
+	/* FIXME: get a dma buffer from the freelist here rather than using the pool */
+	DRM_DEBUG( "Allocating data memory ...\n" );
+	cpu_addr_data = pci_pool_alloc( dev_priv->pool, SLAB_ATOMIC, &data_handle );
 	if (!cpu_addr_data || !data_handle) {
 		DRM_INFO( "data-memory allocation failed!\n" );
-		return;
+		return -ENOMEM;
 	} else {
 		data = (u32 *) cpu_addr_data;
 		data_addr = (u32) data_handle;
 	}
 
 	MACH64_WRITE( MACH64_SRC_CNTL, 0x00000000 );
-/*  	MACH64_WRITE( MACH64_PAT_REG0, 0x11111111 ); */
-
-/*  	DRM_INFO( "(Before DMA Transfer) PAT_REG0 = 0x%08x\n", */
-/*  		  MACH64_READ( MACH64_PAT_REG0 ) ); */
 
 	MACH64_WRITE( MACH64_VERTEX_1_S, 0x00000000 );
 	MACH64_WRITE( MACH64_VERTEX_1_T, 0x00000000 );
 	MACH64_WRITE( MACH64_VERTEX_1_W, 0x00000000 );
-	MACH64_WRITE( MACH64_VERTEX_1_SPEC_ARGB, 0x00000000 );
-	MACH64_WRITE( MACH64_VERTEX_1_Z, 0x00000000 );
-	MACH64_WRITE( MACH64_VERTEX_1_ARGB, 0x00000000 );
-	MACH64_WRITE( MACH64_VERTEX_1_X_Y, 0x00000000 );
+	
+	for (i=0; i < 3; i++) {
+		DRM_DEBUG( "(Before DMA Transfer) reg %d = 0x%08x\n", i, 
+			   MACH64_READ( (MACH64_VERTEX_1_S + i*4) ) );
+	}
 
-  	DRM_INFO( "(Before DMA Transfer) VERTEX_1_S = 0x%08x\n", 
-  		  MACH64_READ( MACH64_VERTEX_1_S ) );
-	DRM_INFO( "(Before DMA Transfer) VERTEX_1_T = 0x%08x\n", 
-  		  MACH64_READ( MACH64_VERTEX_1_T ) );
-	DRM_INFO( "(Before DMA Transfer) VERTEX_1_W = 0x%08x\n", 
-  		  MACH64_READ( MACH64_VERTEX_1_W ) );
-	DRM_INFO( "(Before DMA Transfer) VERTEX_1_SPEC_ARGB = 0x%08x\n", 
-  		  MACH64_READ( MACH64_VERTEX_1_SPEC_ARGB ) );
-	DRM_INFO( "(Before DMA Transfer) VERTEX_1_Z = 0x%08x\n", 
-  		  MACH64_READ( MACH64_VERTEX_1_Z ) );
-	DRM_INFO( "(Before DMA Transfer) VERTEX_1_ARGB = 0x%08x\n", 
-  		  MACH64_READ( MACH64_VERTEX_1_ARGB ) );
-	DRM_INFO( "(Before DMA Transfer) VERTEX_1_X_Y = 0x%08x\n", 
-  		  MACH64_READ( MACH64_VERTEX_1_X_Y ) );
-	/* a0 = PAT_REG0 */
-	/* 1_90 = VERTEX_1_S, setup 7 sequential reg writes */
-	data[0] = cpu_to_le32(0x00060190); 
-	data[1] = 0x11111111;
-	data[2] = 0x22222222;
-	data[3] = 0x33333333;
-	data[4] = 0x44444444;
-	data[5] = 0x55555555;
-	data[6] = 0x66666666;
-	data[7] = 0x77777777;
-	data[8] = cpu_to_le32(0x0000006d);
-	data[9] = 0x00000000;
+	/* 1_90 = VERTEX_1_S, setup 3 sequential reg writes */
+	/* use only s,t,w vertex registers so we don't have to mask any results */
+	data[0] = cpu_to_le32(0x00020190); 
+	data[1] = expected[0] = 0x11111111;
+	data[2] = expected[1] = 0x22222222;
+	data[3] = expected[2] = 0x33333333;
+	data[4] = cpu_to_le32(0x0000006d); /* SRC_CNTL */
+	data[5] = 0x00000000;
 
-	DRM_INFO( "Preparing table ...\n" );
+	DRM_DEBUG( "Preparing table ...\n" );
 	table[0] = cpu_to_le32(MACH64_BM_ADDR + APERTURE_OFFSET);
 	table[1] = cpu_to_le32(data_addr);
 	table[2] = cpu_to_le32(10 * sizeof( u32 ) | 0x80000000 | 0x40000000);
 	table[3] = 0;
 
-	DRM_INFO( "table[0] = 0x%08x\n", table[0] );
-	DRM_INFO( "table[1] = 0x%08x\n", table[1] );
-	DRM_INFO( "table[2] = 0x%08x\n", table[2] );
-	DRM_INFO( "table[3] = 0x%08x\n", table[3] );
+	DRM_DEBUG( "table[0] = 0x%08x\n", table[0] );
+	DRM_DEBUG( "table[1] = 0x%08x\n", table[1] );
+	DRM_DEBUG( "table[2] = 0x%08x\n", table[2] );
+	DRM_DEBUG( "table[3] = 0x%08x\n", table[3] );
 
-	for ( i = 0 ; i < 10 ; i++) {
-		DRM_INFO( " data[%d] = 0x%08x\n", i, data[i] );
+	for ( i = 0 ; i < 6 ; i++) {
+		DRM_DEBUG( " data[%d] = 0x%08x\n", i, data[i] );
 	}
 
-	mb();
+	mach64_flush_write_combine();
 
-	DRM_INFO( "waiting for idle...\n" );
-	mach64_do_wait_for_idle( dev_priv );
+	DRM_DEBUG( "waiting for idle...\n" );
+	if ( ( i = mach64_do_wait_for_idle( dev_priv ) ) ) {
+		DRM_INFO( "mach64_do_wait_for_idle failed (result=%d)\n", i);
+		DRM_INFO( "resetting engine ...\n");
+		mach64_do_engine_reset( dev );
+		DRM_INFO( "freeing data buffer memory.\n" );
+		pci_pool_free( dev_priv->pool, cpu_addr_data, data_handle );
+		DRM_INFO( "returning ...\n" );
+		return i;
+	}
+	DRM_DEBUG( "waiting for idle...done\n" );
 	
-	DRM_INFO( "BUS_CNTL = 0x%08x\n", MACH64_READ( MACH64_BUS_CNTL ) );
-	DRM_INFO( "SRC_CNTL = 0x%08x\n", MACH64_READ( MACH64_SRC_CNTL ) );
-	DRM_INFO( "\n" );
-	DRM_INFO( "data  = 0x%08x\n", data_addr );
-	DRM_INFO( "table = 0x%08x\n", table_addr );
+	DRM_DEBUG( "BUS_CNTL = 0x%08x\n", MACH64_READ( MACH64_BUS_CNTL ) );
+	DRM_DEBUG( "SRC_CNTL = 0x%08x\n", MACH64_READ( MACH64_SRC_CNTL ) );
+	DRM_DEBUG( "\n" );
+	DRM_DEBUG( "data bus addr = 0x%08x\n", data_addr );
+	DRM_DEBUG( "table bus addr = 0x%08x\n", dev_priv->table_addr );
 
 	DRM_INFO( "starting DMA transfer...\n" );
 	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD,
-			  table_addr |
+			  dev_priv->table_addr |
 			  MACH64_CIRCULAR_BUF_SIZE_16KB );
 
 	MACH64_WRITE( MACH64_SRC_CNTL, 
@@ -309,40 +281,36 @@ static void mach64_bm_dma_test( drm_device_t *dev )
 		      MACH64_SRC_BM_OP_SYSTEM_TO_REG );
 
 	/* Kick off the transfer */
-	DRM_INFO( "starting DMA transfer... done.\n" );
+	DRM_DEBUG( "starting DMA transfer... done.\n" );
 	MACH64_WRITE( MACH64_DST_HEIGHT_WIDTH, 0 );
-	MACH64_WRITE( MACH64_SRC_CNTL, 0 );
 
 	DRM_INFO( "waiting for idle...\n" );
-	if ((i=mach64_do_wait_for_idle( dev_priv ))) {
+	if ( ( i = mach64_do_wait_for_idle( dev_priv ) ) ) {
+		/* engine locked up, dump register state and reset */
 		DRM_INFO( "mach64_do_wait_for_idle failed (result=%d)\n", i);
+		mach64_dump_engine_info( dev_priv );
 		DRM_INFO( "resetting engine ...\n");
 		mach64_do_engine_reset( dev );
+		DRM_INFO( "freeing data buffer memory.\n" );
+		pci_pool_free( dev_priv->pool, cpu_addr_data, data_handle );
+		DRM_INFO( "returning ...\n" );
+		return i;
+	}
+	DRM_INFO( "waiting for idle...done\n" );
+
+	/* Check register values to see if the GUI master operation succeeded */
+	for ( i = 0; i < 3; i++ ) {
+		regs[i] = MACH64_READ( (MACH64_VERTEX_1_S + i*4) );
+		DRM_DEBUG( "(After DMA Transfer) reg %d = 0x%08x\n", i, regs[i] );
+		if (regs[i] != expected[i])
+			return -1; /* GUI master operation failed */
 	}
 
-/*  	DRM_INFO( "(After DMA Transfer) PAT_REG0 = 0x%08x\n", */
-/*  		  MACH64_READ( MACH64_PAT_REG0 ) ); */
-
-	DRM_INFO( "(After DMA Transfer) VERTEX_1_S = 0x%08x\n", 
-  		  MACH64_READ( MACH64_VERTEX_1_S ) );
-	DRM_INFO( "(After DMA Transfer) VERTEX_1_T = 0x%08x\n", 
-  		  MACH64_READ( MACH64_VERTEX_1_T ) );
-	DRM_INFO( "(After DMA Transfer) VERTEX_1_W = 0x%08x\n", 
-  		  MACH64_READ( MACH64_VERTEX_1_W ) );
-	DRM_INFO( "(After DMA Transfer) VERTEX_1_SPEC_ARGB = 0x%08x\n", 
-  		  MACH64_READ( MACH64_VERTEX_1_SPEC_ARGB ) );
-	DRM_INFO( "(After DMA Transfer) VERTEX_1_Z = 0x%08x\n", 
-  		  MACH64_READ( MACH64_VERTEX_1_Z ) );
-	DRM_INFO( "(After DMA Transfer) VERTEX_1_ARGB = 0x%08x\n", 
-  		  MACH64_READ( MACH64_VERTEX_1_ARGB ) );
-	DRM_INFO( "(After DMA Transfer) VERTEX_1_X_Y = 0x%08x\n", 
-  		  MACH64_READ( MACH64_VERTEX_1_X_Y ) );
-
-	DRM_INFO( "freeing memory.\n" );
-	pci_pool_free( pool, cpu_addr_table, table_handle );
-	pci_pool_free( pool, cpu_addr_data, data_handle );
-	pci_pool_destroy( pool );
-	DRM_INFO( "returning ...\n" );
+	DRM_DEBUG( "freeing data buffer memory.\n" );
+	pci_pool_free( dev_priv->pool, cpu_addr_data, data_handle );
+	DRM_DEBUG( "returning ...\n" );
+	
+	return 0;
 }
 
 
@@ -351,6 +319,7 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 	drm_mach64_private_t *dev_priv;
 	struct list_head *list;
 	u32 tmp;
+	int ret;
 
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
@@ -441,25 +410,36 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 		}
 	}
 
-	tmp = MACH64_READ( MACH64_BUS_CNTL );
-	tmp = ( tmp | MACH64_BUS_EXT_REG_EN ) & ~MACH64_BUS_MASTER_DIS;
-	MACH64_WRITE( MACH64_BUS_CNTL, tmp );
+#if MACH64_USE_DMA
+	/* enable block 1 registers and bus mastering */
+	MACH64_WRITE( MACH64_BUS_CNTL, 
+		      ( ( MACH64_READ(MACH64_BUS_CNTL) 
+			  | MACH64_BUS_EXT_REG_EN ) 
+			& ~MACH64_BUS_MASTER_DIS ) );
 
 	/* changing the FIFO size from the default seems to cause problems with DMA */
 	tmp = MACH64_READ( MACH64_GUI_CNTL );
 	if ( (tmp & MACH64_CMDFIFO_SIZE_MASK) != MACH64_CMDFIFO_SIZE_128 ) {
 		DRM_INFO( "Setting FIFO size to 128 entries\n");
 		/* FIFO must be empty to change the FIFO depth */
-		mach64_do_wait_for_idle( dev_priv );
+		if ((ret=mach64_do_wait_for_idle( dev_priv ))) {
+			dev->dev_private = (void *)dev_priv;
+			mach64_do_cleanup_dma( dev );
+			DRM_ERROR("wait for idle failed before changing FIFO depth!\n");
+			return ret;
+		}
 		MACH64_WRITE( MACH64_GUI_CNTL, ( ( tmp & ~MACH64_CMDFIFO_SIZE_MASK ) \
 						 | MACH64_CMDFIFO_SIZE_128 ) );
-		/* need to read GUI_STAT for proper synch according to register reference */
-		mach64_do_wait_for_idle( dev_priv );
+		/* need to read GUI_STAT for proper sync according to register reference */
+		if ((ret=mach64_do_wait_for_idle( dev_priv ))) {
+			dev->dev_private = (void *)dev_priv;
+			mach64_do_cleanup_dma( dev );
+			DRM_ERROR("wait for idle failed when changing FIFO depth!\n");
+			return ret;
+		}
 	}
 
-	dev->dev_private = (void *) dev_priv;
-	mach64_bm_dma_test( dev );
-	
+	/* create pci pool for descriptor memory */
 	DRM_INFO( "Creating pci pool\n");
 	dev_priv->pool = pci_pool_create( "mach64",   /* name */ 
 					  NULL,       /* dev */
@@ -470,28 +450,48 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 		);
 
 	if (!dev_priv->pool) {
-		mach64_do_cleanup_dma( dev );
-		DRM_INFO( "pci_pool_create failed!\n" );
-		return -ENOMEM; /* FIXME: what should we return? */
+		dev_priv->driver_mode = MACH64_MODE_MMIO;
+		DRM_INFO( "pci_pool_create failed, using MMIO mode\n");
+		dev->dev_private = (void *) dev_priv;
+		return 0;
 	}
 
+	/* allocate descriptor memory from pci pool */
 	DRM_INFO( "Allocating descriptor table memory\n" );
 	dev_priv->cpu_addr_table = pci_pool_alloc( dev_priv->pool, SLAB_ATOMIC, 
 						   &dev_priv->table_handle );
 	if (!dev_priv->cpu_addr_table || !dev_priv->table_handle) {
-		mach64_do_cleanup_dma( dev );
-		DRM_INFO( "Descriptor table memory allocation failed!\n" );
-		return -EINVAL; /* FIXME: what should we return? */
+		pci_pool_destroy( dev_priv->pool );
+		dev_priv->driver_mode = MACH64_MODE_MMIO;
+		DRM_INFO( "pci_pool_alloc failed, using MMIO mode\n");
+		dev->dev_private = (void *) dev_priv;
+		return 0;
 	} else {
 		dev_priv->table_addr = (u32) dev_priv->table_handle;
 		memset( dev_priv->cpu_addr_table, 0x0, 0x4000 );
 	}
 
-	DRM_INFO( "descriptor table: cpu address: 0x%08x, phys address: 0x%08x\n", 
+	DRM_INFO( "descriptor table: cpu addr: 0x%08x, bus addr: 0x%08x\n", 
 		  (u32) dev_priv->cpu_addr_table, dev_priv->table_addr );
+
 	/* setup physical address and size of descriptor table */
 	MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, 
 		      ( dev_priv->table_addr | MACH64_CIRCULAR_BUF_SIZE_16KB ) );
+
+	/* try a DMA GUI-mastering pass and fall back to MMIO if it fails */
+	dev->dev_private = (void *) dev_priv;
+	DRM_INFO( "Starting DMA test...\n");
+	if ( (ret=mach64_bm_dma_test( dev )) == 0 ) {
+		dev_priv->driver_mode = MACH64_MODE_DMA_SYNC;
+		DRM_INFO( "DMA test succeeded, using synchronous DMA mode\n");
+	} else {
+		dev_priv->driver_mode = MACH64_MODE_MMIO;
+		DRM_INFO( "DMA test failed (ret=%d), using MMIO mode\n", ret );
+	}
+#else
+	dev_priv->driver_mode = MACH64_MODE_MMIO;
+	DRM_INFO( "Using MMIO mode\n");
+#endif
 
 	dev->dev_private = (void *) dev_priv;
 	
@@ -513,7 +513,7 @@ int mach64_do_cleanup_dma( drm_device_t *dev )
 		dev->dev_private = NULL;
 
 		if ( dev_priv->table_handle ) {
-			DRM_INFO( "freeing table from pci pool\n" );
+			DRM_INFO( "freeing descriptor table from pci pool\n" );
 			pci_pool_free( dev_priv->pool, dev_priv->cpu_addr_table, 
 				       dev_priv->table_handle );
 		}

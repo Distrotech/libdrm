@@ -396,7 +396,7 @@ static void mach64_dma_dispatch_swap( drm_device_t *dev )
 #endif
 }
 
-static void mach64_dma_dispatch_vertex( drm_device_t *dev,
+static int mach64_dma_dispatch_vertex( drm_device_t *dev,
 					drm_buf_t *buf )
 {
 	drm_mach64_private_t *dev_priv = dev->dev_private;
@@ -430,8 +430,8 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 			}
 #endif
 
-#if MACH64_USE_DMA
-			{
+
+			if (dev_priv->driver_mode != MACH64_MODE_MMIO) {
 				int i, pages, remainder, tableDwords;
 				u32 address, page;
 				u32 *table_ptr = (u32 *) dev_priv->cpu_addr_table;
@@ -504,16 +504,15 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 					      MACH64_SRC_BM_OP_SYSTEM_TO_REG );
 				MACH64_WRITE( MACH64_DST_HEIGHT_WIDTH, 0 );
 				
-				if (mach64_do_wait_for_idle( dev_priv )) {
+				if ( mach64_do_wait_for_idle( dev_priv ) ) {
 					DRM_INFO( "mach64_do_wait_for_idle failed\n" );
 					DRM_INFO( "resetting engine ...\n" );
-					mach64_do_engine_reset( dev );
 					mach64_dump_engine_info( dev_priv );
+					mach64_do_engine_reset( dev );
+					return -EBUSY;
 				}
-			}
-#else
-			/* Emit the vertex buffer rendering commands */
-			{
+			} else {
+				/* Emit the vertex buffer rendering commands */
 				u32 *p;
 				u32 used = buf->used >> 2;
 				u32 fifo = 0;
@@ -537,7 +536,7 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 					while ( count && used ) {
 						if ( !fifo ) {
 							if ( mach64_do_wait_for_fifo( dev_priv, 16 ) < 0 )
-								return;
+								return -EBUSY;
 							
 							fifo = 16;
 						}
@@ -552,7 +551,6 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 					}
 				}
 			}
-#endif /* MACH64_USE_DMA */
 		} while ( ++i < sarea_priv->nbox );
 	}
 
@@ -581,6 +579,8 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 
 	sarea_priv->dirty &= ~MACH64_UPLOAD_CLIPRECTS;
 	sarea_priv->nbox = 0;
+
+	return 0;
 }
 
 
@@ -700,7 +700,5 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 	buf_priv->prim = vertex.prim;
 	buf_priv->discard = vertex.discard;
 #endif
-	mach64_dma_dispatch_vertex( dev, buf );
-
-	return 0;
+	return mach64_dma_dispatch_vertex( dev, buf );
 }
