@@ -189,7 +189,7 @@ typedef struct drm_mach64_init {
 		DRM_MACH64_CLEANUP_DMA = 0x02
 	} func;
 
-	unsigned int sarea_priv_offset;
+	unsigned long sarea_priv_offset;
 	int is_pci;
 	int pseudo_dma;
 
@@ -200,10 +200,10 @@ typedef struct drm_mach64_init {
 	unsigned int depth_bpp;
 	unsigned int depth_offset, depth_pitch;
 
-	unsigned int fb_offset;
-	unsigned int mmio_offset;
-	unsigned int buffers_offset;
-	unsigned int agp_textures_offset;
+	unsigned long fb_offset;
+	unsigned long mmio_offset;
+	unsigned long buffers_offset;
+	unsigned long agp_textures_offset;
 } drm_mach64_init_t;
 
 typedef struct drm_mach64_clear {

@@ -428,12 +428,12 @@ extern int mach64_dma_blit( struct inode *inode, struct file *filp,
 #define MACH64_LAST_DISPATCH_REG		MACH64_PAT_REG1
 #define MACH64_MAX_VB_AGE		0x7fffffff
 
-#define MACH64_BASE(reg)	((u32)(dev_priv->mmio->handle))
+#define MACH64_BASE(reg)	((unsigned long)(dev_priv->mmio->handle))
 
 #define MACH64_ADDR(reg)	(MACH64_BASE(reg) + reg)
 
-#define MACH64_READ(reg)	readl(MACH64_ADDR(reg))
-#define MACH64_WRITE(reg,val)	writel((val), MACH64_ADDR(reg))
+#define MACH64_READ(reg)	readl( (volatile u32 *) MACH64_ADDR(reg) )
+#define MACH64_WRITE(reg,val)	writel( (val), (volatile u32 *) MACH64_ADDR(reg) )
 
 
 #define DWMREG0		0x0400
@@ -597,7 +597,7 @@ do {									\
 
 /* FIXME: right now this is needed to ensure free buffers for state emits */
 /* CHECKME: I've disabled this as it isn't necessary - we already wait for free buffers */
-#define RING_SPACE_TEST_WITH_RETURN( dev_priv )						 
+#define RING_SPACE_TEST_WITH_RETURN( dev_priv )
 
 #define RING_SPACE_TEST_WITH_RETURN_( dev_priv )					\
 do {											\
