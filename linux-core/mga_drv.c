@@ -643,8 +643,8 @@ int mga_unlock(struct inode *inode, struct file *filp, unsigned int cmd,
 	drm_device_t	  *dev	  = priv->dev;
 	drm_lock_t	  lock;
 
-	if (copy_from_user(&lock, (drm_lock_t *)arg, sizeof(lock)))
-		return -EFAULT;
+	drm_copy_from_user_ret(&lock, 
+			       (drm_lock_t *)arg, sizeof(lock), -EFAULT);
 
 	if (lock.context == DRM_KERNEL_CONTEXT) {
 		DRM_ERROR("Process %d using kernel context %d\n",

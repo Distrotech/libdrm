@@ -835,6 +835,72 @@ extern void __inline drm_big_fscking_lock_filp(drm_device_t *dev,
 extern void __inline drm_big_fscking_unlock_filp(drm_device_t *dev, 
 						 drm_file_t *filp);
 
+/* This is not smp safe! */
+static __inline__ drm_file_t *drm_find_filp_by_current_pid(drm_device_t *dev)
+{
+	drm_file_t *first;
+
+/*	down(&dev->struct_sem); */
+	first = dev->file_first;
+	while(first != NULL) {
+		if(first->pid == current->pid) {
+			break;
+		}
+		first = first->next;
+	}
+
+/*	up(&dev->struct_sem); */
+	return first;
+}
+
+static __inline__ void drm_release_big_fscking_lock(drm_device_t *dev, drm_file_t *filp)
+{
+	if(filp->lock_depth >= 0)
+		spin_unlock_irqrestore(&dev->big_fscking_lock, 
+				       filp->irq_flags);
+}
+
+static __inline__ void drm_reacquire_big_fscking_lock(drm_device_t *dev, drm_file_t *filp)
+{
+	unsigned long flags;
+
+	if(filp->lock_depth >= 0) {
+		barrier();
+		spin_lock_irqsave(&dev->big_fscking_lock, flags);
+		filp->irq_flags = flags;
+	}
+}
+
+/* Enable interrupts around copy/to/from/user */
+#define drm_copy_to_user_ret(to,from,n,retval) do {\
+   drm_file_t *filp = drm_find_filp_by_current_pid(dev);\
+   if(filp == NULL) {\
+      sti();\
+      BUG();\
+   }\
+   drm_release_big_fscking_lock(dev, filp);\
+   if (copy_to_user(to,from,n)) {\
+      drm_reacquire_big_fscking_lock(dev, filp);\
+      return retval;\
+   }\
+   drm_reacquire_big_fscking_lock(dev, filp);\
+}while(0)
+
+#define drm_copy_from_user_ret(to,from,n,retval) do {\
+   drm_file_t *filp = drm_find_filp_by_current_pid(dev);\
+   if(filp == NULL) {\
+      sti();\
+      BUG();\
+   }\
+   drm_release_big_fscking_lock(dev, filp);\
+   if (copy_from_user(to,from,n)) {\
+      drm_reacquire_big_fscking_lock(dev, filp);\
+      return retval;\
+   }\
+   drm_reacquire_big_fscking_lock(dev, filp);\
+}while(0)
+
+
 #if defined(CONFIG_AGP) || defined(CONFIG_AGP_MODULE)
 				/* AGP/GART support (agpsupport.c) */
 extern drm_agp_head_t *drm_agp_init(void);

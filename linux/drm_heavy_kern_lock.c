@@ -7,57 +7,28 @@
 #include "drmP.h"
 #include <asm/softirq.h>
 
-/* This is not smp safe! */
-static __inline__ drm_file_t *drm_find_filp_by_current_pid(drm_device_t *dev)
-{
-	drm_file_t *first;
-
-/*	down(&dev->struct_sem); */
-	first = dev->file_first;
-	while(first != NULL) {
-		if(first->pid == current->pid) {
-			break;
-		}
-		first = first->next;
-	}
-
-/*	up(&dev->struct_sem); */
-	return first;
-}
-
-static __inline__ void drm_release_big_fscking_lock(drm_device_t *dev, drm_file_t *filp)
-{
-	if(filp->lock_depth >= 0)
-		spin_unlock_irqrestore(&dev->big_fscking_lock, 
-				       filp->irq_flags);
-}
-
-static __inline__ void drm_reacquire_big_fscking_lock(drm_device_t *dev, drm_file_t *filp)
-{
-	unsigned long flags;
-
-	if(filp->lock_depth >= 0) {
-		barrier();
-		spin_lock_irqsave(&dev->big_fscking_lock, flags);
-		filp->irq_flags = flags;
-	}
-}
-
 /* This can NEVER be called from an interrupt */
 void drm_schedule(drm_device_t *dev)
 {
 	drm_file_t *filp;
 
 	if(in_interrupt()) {
+		sti();
 		BUG();
 	}
 
 	filp = drm_find_filp_by_current_pid(dev);
-	if(filp == NULL) BUG();
+	if(filp == NULL) {
+	   sti();
+	   BUG();
+	}
 	drm_release_big_fscking_lock(dev, filp);
 	schedule();
 	drm_reacquire_big_fscking_lock(dev, filp);
 }
+
+
+
 
 void drm_schedule_timeout(drm_device_t *dev, unsigned long timeout)
 {

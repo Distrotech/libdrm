@@ -852,8 +852,9 @@ int mga_clear_bufs(struct inode *inode, struct file *filp,
 	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	drm_mga_clear_t clear;
 
-	if (copy_from_user(&clear, (drm_mga_clear_t *) arg, sizeof(clear)))
-		return -EFAULT;
+	drm_copy_from_user_ret(&clear,
+			       (drm_mga_clear_t *)arg, sizeof(clear), -EFAULT);
+
 	DRM_DEBUG("%s\n", __FUNCTION__);
 
 	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
@@ -928,8 +929,8 @@ int mga_iload(struct inode *inode, struct file *filp,
 	DRM_DEBUG("%s\n", __FUNCTION__);
 
 	DRM_DEBUG("Starting Iload\n");
-	if (copy_from_user(&iload, (drm_mga_iload_t *) arg, sizeof(iload)))
-		return -EFAULT;
+	drm_copy_from_user_ret(&iload,
+			       (drm_mga_clear_t *)arg, sizeof(iload), -EFAULT);
 
 	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
 		DRM_ERROR("mga_iload called without lock held\n");
@@ -975,8 +976,9 @@ int mga_vertex(struct inode *inode, struct file *filp,
 	drm_mga_vertex_t vertex;
 	DRM_DEBUG("%s\n", __FUNCTION__);
 
-	if (copy_from_user(&vertex, (drm_mga_vertex_t *) arg, sizeof(vertex)))
-		return -EFAULT;
+	drm_copy_from_user_ret(&vertex,
+			       (drm_mga_vertex_t *)arg, sizeof(vertex), 
+			       -EFAULT);
 
 	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
 		DRM_ERROR("mga_vertex called without lock held\n");
@@ -1026,8 +1028,9 @@ int mga_indices(struct inode *inode, struct file *filp,
 	drm_mga_indices_t indices;
 	DRM_DEBUG("%s\n", __FUNCTION__);
 
-	if (copy_from_user(&indices, (drm_mga_indices_t *) arg, sizeof(indices)))
-		return -EFAULT;
+	drm_copy_from_user_ret(&indices,
+			       (drm_mga_indices_t *)arg, sizeof(indices), 
+			       -EFAULT);
 
 	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
 		DRM_ERROR("mga_indices called without lock held\n");
@@ -1074,12 +1077,11 @@ static int mga_dma_get_buffers(drm_device_t * dev, drm_dma_t * d)
 		if (!buf)
 			break;
 		buf->pid = current->pid;
-		if (copy_to_user(&d->request_indices[i],
-				 &buf->idx, sizeof(buf->idx)))
-			return -EFAULT;
-		if (copy_to_user(&d->request_sizes[i],
-				 &buf->total, sizeof(buf->total)))
-			return -EFAULT;
+		drm_copy_to_user_ret(&d->request_indices[i],
+				     &buf->idx, 
+				     sizeof(buf->idx), -EFAULT);
+		drm_copy_to_user_ret(&d->request_sizes[i],
+				     &buf->total, sizeof(buf->total), -EFAULT);
 		++d->granted_count;
 	}
 	return 0;
@@ -1095,8 +1097,10 @@ int mga_dma(struct inode *inode, struct file *filp, unsigned int cmd,
 	drm_dma_t d;
 	DRM_DEBUG("%s\n", __FUNCTION__);
 
-	if (copy_from_user(&d, (drm_dma_t *) arg, sizeof(d)))
-		return -EFAULT;
+	drm_copy_from_user_ret(&d,
+			       (drm_dma_t *)arg, sizeof(d), 
+			       -EFAULT);
+
 	DRM_DEBUG("%d %d: %d send, %d req\n",
 		  current->pid, d.context, d.send_count, d.request_count);
 
@@ -1131,7 +1135,9 @@ int mga_dma(struct inode *inode, struct file *filp, unsigned int cmd,
 
 	DRM_DEBUG("%d returning, granted = %d\n",
 		  current->pid, d.granted_count);
-	if (copy_to_user((drm_dma_t *) arg, &d, sizeof(d)))
-		return -EFAULT;
+	drm_copy_to_user_ret((drm_dma_t *) arg,
+			     &d, sizeof(d), 
+			     -EFAULT);
+
 	return retcode;
 }

@@ -205,6 +205,7 @@ static void mga_reset_freelist(drm_device_t *dev)
  * These operations are not atomic b/c they are protected by the
  * hardware lock */
 
+/* Wrap the schedule correctly */
 drm_buf_t *mga_freelist_get(drm_device_t *dev)
 {
    	DECLARE_WAITQUEUE(entry, current);
@@ -220,17 +221,19 @@ drm_buf_t *mga_freelist_get(drm_device_t *dev)
 	if(failed >= 1000 && dev_priv->tail->age >= dev_priv->last_prim_age) {
 		DRM_DEBUG("I'm waiting on the freelist!!! %d\n",
 		       dev_priv->last_prim_age);
-	   	set_bit(MGA_IN_GETBUF, &dev_priv->dispatch_status);
-		current->state = TASK_INTERRUPTIBLE;
 	   	add_wait_queue(&dev_priv->buf_queue, &entry);
+	   	set_bit(MGA_IN_GETBUF, &dev_priv->dispatch_status);
 	   	for (;;) {
 		   	mga_dma_schedule(dev, 0);
+			current->state = TASK_INTERRUPTIBLE;
 		   	if(!test_bit(MGA_IN_GETBUF,
 				     &dev_priv->dispatch_status))
 				break;
-		   	atomic_inc(&dev->total_sleeps);
 		   	drm_schedule(dev);
 		   	if (signal_pending(current)) {
+	   			current->state = TASK_RUNNING;
+	   			remove_wait_queue(&dev_priv->buf_queue, 
+						  &entry);
 				clear_bit(MGA_IN_GETBUF,
 					  &dev_priv->dispatch_status);
 			   	goto failed_getbuf;
@@ -418,16 +421,17 @@ void mga_fire_primary(drm_device_t *dev, drm_mga_prim_buf_t *prim)
    	mga_flush_write_combine();
 
     	atomic_inc(&dev_priv->pending_bufs);
-       	MGA_WRITE(MGAREG_PRIMADDRESS, phys_head | TT_GENERAL);
- 	MGA_WRITE(MGAREG_PRIMEND, (phys_head + num_dwords * 4) | use_agp);
-   	prim->num_dwords = 0;
-	sarea_priv->last_enqueue = prim->prim_age;
-
    	next_idx = prim->idx + 1;
     	if(next_idx >= MGA_NUM_PRIM_BUFS)
 		next_idx = 0;
 
     	dev_priv->next_prim = dev_priv->prim_bufs[next_idx];
+   	prim->num_dwords = 0;
+
+       	MGA_WRITE(MGAREG_PRIMADDRESS, phys_head | TT_GENERAL);
+ 	MGA_WRITE(MGAREG_PRIMEND, (phys_head + num_dwords * 4) | use_agp);
+	sarea_priv->last_enqueue = prim->prim_age;
+
 	return;
 
  out_prim_wait:
@@ -447,6 +451,7 @@ int mga_advance_primary(drm_device_t *dev)
    	drm_device_dma_t  *dma      = dev->dma;
    	int next_prim_idx;
    	int ret = 0;
+	drm_file_t *filp = drm_find_filp_by_current_pid(dev);
 
    	/* This needs to reset the primary buffer if available,
 	 * we should collect stats on how many times it bites
@@ -457,22 +462,27 @@ int mga_advance_primary(drm_device_t *dev)
    	if(next_prim_idx >= MGA_NUM_PRIM_BUFS)
      		next_prim_idx = 0;
    	prim_buffer = dev_priv->prim_bufs[next_prim_idx];
+
 	set_bit(MGA_IN_WAIT, &dev_priv->dispatch_status);
 
-      	/* In use is cleared in interrupt handler */
+	if(filp == NULL) {
+		sti();
+		BUG();
+   	}
 
+	drm_release_big_fscking_lock(dev, filp);
+
+      	/* In use is cleared in interrupt handler */
    	if(test_and_set_bit(MGA_BUF_IN_USE, &prim_buffer->buffer_status)) {
 	   	add_wait_queue(&dev_priv->wait_queue, &entry);
-		current->state = TASK_INTERRUPTIBLE;
 
 	   	for (;;) {
 		   	mga_dma_schedule(dev, 0);
+			current->state = TASK_INTERRUPTIBLE;
 		   	if(!test_and_set_bit(MGA_BUF_IN_USE,
 					     &prim_buffer->buffer_status))
 				break;
-		   	atomic_inc(&dev->total_sleeps);
-		   	atomic_inc(&dma->total_missed_sched);
-		   	drm_schedule(dev);
+		   	schedule();
 		   	if (signal_pending(current)) {
 			   	ret = -ERESTARTSYS;
 			   	break;
@@ -480,16 +490,19 @@ int mga_advance_primary(drm_device_t *dev)
 		}
 	   	current->state = TASK_RUNNING;
 	   	remove_wait_queue(&dev_priv->wait_queue, &entry);
-	   	if(ret) return ret;
 	}
 	clear_bit(MGA_IN_WAIT, &dev_priv->dispatch_status);
+
+	drm_reacquire_big_fscking_lock(dev, filp);
+
+   	if(ret) return ret;
 
    	/* This primary buffer is now free to use */
    	prim_buffer->current_dma_ptr = prim_buffer->head;
    	prim_buffer->num_dwords = 0;
    	prim_buffer->sec_used = 0;
 	prim_buffer->prim_age = dev_priv->next_prim_age++;
-	if(prim_buffer->prim_age == 0 || prim_buffer->prim_age == 0xffffffff) {
+	if(0 && (prim_buffer->prim_age == 0 || prim_buffer->prim_age == 0xffffffff)) {
 	   mga_flush_queue(dev);
 	   mga_dma_quiescent(dev);
 	   mga_reset_freelist(dev);
@@ -615,6 +628,7 @@ int mga_dma_schedule(drm_device_t *dev, int locked)
 		}
 	}
 
+   	clear_bit(0, &dev->dma_flag);
 sch_out_wakeup:
       	if(test_bit(MGA_IN_FLUSH, &dev_priv->dispatch_status) &&
 	   atomic_read(&dev_priv->pending_bufs) == 0) {
@@ -634,7 +648,6 @@ sch_out_wakeup:
 			  dev_priv->last_prim_age);
 	}
 
-   	clear_bit(0, &dev->dma_flag);
 	drm_big_fscking_unlock(dev);
 	return retval;
 }
@@ -846,8 +859,8 @@ int mga_dma_init(struct inode *inode, struct file *filp,
 
    	DRM_DEBUG("%s\n", __FUNCTION__);
 
-	if (copy_from_user(&init, (drm_mga_init_t *)arg, sizeof(init)))
-		return -EFAULT;
+	drm_copy_from_user_ret(&init,
+			       (drm_mga_init_t *)arg, sizeof(init), -EFAULT);
 
 	switch(init.func) {
 	case MGA_INIT_DMA:
@@ -929,8 +942,8 @@ int mga_control(struct inode *inode, struct file *filp, unsigned int cmd,
 	drm_device_t	*dev	= priv->dev;
 	drm_control_t	ctl;
 
-	if (copy_from_user(&ctl, (drm_control_t *)arg, sizeof(ctl)))
-		return -EFAULT;
+	drm_copy_from_user_ret(&ctl,
+			       (drm_control_t *)arg, sizeof(ctl), -EFAULT);
 
    	DRM_DEBUG("%s\n", __FUNCTION__);
 
@@ -949,6 +962,7 @@ static int mga_flush_queue(drm_device_t *dev)
    	DECLARE_WAITQUEUE(entry, current);
   	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
    	int ret = 0;
+	drm_file_t *filp = drm_find_filp_by_current_pid(dev);
 
    	DRM_DEBUG("%s\n", __FUNCTION__);
 
@@ -959,26 +973,38 @@ static int mga_flush_queue(drm_device_t *dev)
 	drm_big_fscking_lock(dev);
 
    	if(dev_priv->next_prim->num_dwords != 0) {
-   		current->state = TASK_INTERRUPTIBLE;
    		add_wait_queue(&dev_priv->flush_queue, &entry);
 		set_bit(MGA_IN_FLUSH, &dev_priv->dispatch_status);
-		mga_dma_schedule(dev, 0);
+		if(filp == NULL) {
+			sti();
+			BUG();
+   		}
+
+		drm_release_big_fscking_lock(dev, filp);
+
    		for (;;) {
+			mga_dma_schedule(dev, 0);
+			current->state = TASK_INTERRUPTIBLE;
 	   		if (!test_bit(MGA_IN_FLUSH,
 				      &dev_priv->dispatch_status))
 				break;
-		   	atomic_inc(&dev->total_sleeps);
-	      		drm_schedule(dev);
+	      		schedule();
 	      		if (signal_pending(current)) {
 		   		ret = -EINTR; /* Can't restart */
+				current->state = TASK_RUNNING;
+				remove_wait_queue(&dev_priv->flush_queue, 
+						  &entry);
+				drm_reacquire_big_fscking_lock(dev, filp);
 				clear_bit(MGA_IN_FLUSH,
 					  &dev_priv->dispatch_status);
-		   		break;
+		   		goto flush_out_unlock;
 			}
 		}
    		current->state = TASK_RUNNING;
    		remove_wait_queue(&dev_priv->flush_queue, &entry);
+		drm_reacquire_big_fscking_lock(dev, filp);
 	}
+flush_out_unlock:
 	drm_big_fscking_unlock(dev);
 
    	return ret;
@@ -1021,8 +1047,8 @@ int mga_lock(struct inode *inode, struct file *filp, unsigned int cmd,
 	drm_lock_t	  lock;
 
 	DRM_DEBUG("%s\n", __FUNCTION__);
-	if (copy_from_user(&lock, (drm_lock_t *)arg, sizeof(lock)))
-		return -EFAULT;
+	drm_copy_from_user_ret(&lock,
+			       (drm_lock_t *)arg, sizeof(lock), -EFAULT);
 
 	if (lock.context == DRM_KERNEL_CONTEXT) {
 		DRM_ERROR("Process %d using kernel context %d\n",
@@ -1100,8 +1126,8 @@ int mga_flush_ioctl(struct inode *inode, struct file *filp,
       	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
 
    	DRM_DEBUG("%s\n", __FUNCTION__);
-	if (copy_from_user(&lock, (drm_lock_t *)arg, sizeof(lock)))
-		return -EFAULT;
+	drm_copy_from_user_ret(&lock,
+			       (drm_lock_t *)arg, sizeof(lock), -EFAULT);
 
 	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
 		DRM_ERROR("mga_flush_ioctl called without lock held\n");
