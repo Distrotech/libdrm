@@ -142,7 +142,7 @@
 
 #ifdef __linux__
 typedef int drm_ioctl_t( DRM_OS_IOCTL );
-#endif
+#endif /* __linux__ */
 
 typedef struct drm_pci_list {
 	u16 vendor;
