@@ -117,6 +117,8 @@
 
 #define DRM_DEBUG_CODE 2	  /* Include debugging code (if > 1, then
 				     also include looping detection. */
+#define DRM_DEBUG_MEMORY 1	  /* Include memory allocation debugging code
+				     from drm_memory_debug.h */
 
 #define DRM_HASH_SIZE	      16 /* Size of key hash table		  */
 #define DRM_KERNEL_CONTEXT    0	 /* Change drm_resctx if changed	  */

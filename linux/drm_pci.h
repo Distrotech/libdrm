@@ -55,9 +55,11 @@ DRM(pci_alloc)(drm_device_t *dev, size_t size, size_t align,
 	       dma_addr_t maxaddr, dma_addr_t *busaddr)
 {
 	void *address;
+#if 0
 	unsigned long addr;
 	size_t sz;
-#if DEBUG_MEMORY
+#endif
+#if DRM_DEBUG_MEMORY
 	int area = DRM_MEM_DMA;
 
 	spin_lock(&DRM(mem_lock));
@@ -83,7 +85,7 @@ DRM(pci_alloc)(drm_device_t *dev, size_t size, size_t align,
 
 	address = pci_alloc_consistent( dev->pdev, size, busaddr );
 
-#if DEBUG_MEMORY
+#if DRM_DEBUG_MEMORY
 	if (address == NULL) {
 		spin_lock(&DRM(mem_lock));
 		++DRM(mem_stats)[area].fail_count;
@@ -122,16 +124,20 @@ DRM(pci_alloc)(drm_device_t *dev, size_t size, size_t align,
 void
 DRM(pci_free)(drm_device_t *dev, size_t size, void *vaddr, dma_addr_t busaddr)
 {
+#if 0
 	unsigned long addr;
 	size_t sz;
-#if DEBUG_MEMORY
+#endif
+#if DRM_DEBUG_MEMORY
 	int area = DRM_MEM_DMA;
 	int alloc_count;
 	int free_count;
 #endif
 
 	if (!vaddr) {
+#if DRM_DEBUG_MEMORY
 		DRM_MEM_ERROR(area, "Attempt to free address 0\n");
+#endif
 	} else {
 #if 0
 		/* XXX - Is virt_to_page() legal for consistent mem? */
@@ -145,7 +151,7 @@ DRM(pci_free)(drm_device_t *dev, size_t size, void *vaddr, dma_addr_t busaddr)
 		pci_free_consistent( dev->pdev, size, vaddr, busaddr );
 	}
 
-#if DEBUG_MEMORY
+#if DRM_DEBUG_MEMORY
 	spin_lock(&DRM(mem_lock));
 	free_count  = ++DRM(mem_stats)[area].free_count;
 	alloc_count =	DRM(mem_stats)[area].succeed_count;

@@ -34,13 +34,11 @@
 #include "drmP.h"
 
 /* Cut down version of drm_memory_debug.h, which used to be called
- * drm_memory.h.  If you want the debug functionality, change 0 to 1
- * below.
+ * drm_memory.h.  If you want the debug functionality, set DRM_DEBUG_MEMORY
+ * to 1 in drmP.h.
  */
-#define DEBUG_MEMORY 0
 
-
-#if DEBUG_MEMORY
+#if DRM_DEBUG_MEMORY
 #include "drm_memory_debug.h"
 #else
 void DRM(mem_init)(void)
