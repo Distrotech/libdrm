@@ -38,8 +38,10 @@
 #include "drmP.h"
 #include "mga_drv.h"
 
+#ifdef __linux__
 #include <linux/interrupt.h>	/* For task queue support */
 #include <linux/delay.h>
+#endif
 
 #define MGA_DEFAULT_USEC_TIMEOUT	10000
 #define MGA_FREELIST_DEBUG		0
@@ -61,7 +63,7 @@ int mga_do_wait_for_idle( drm_mga_private_t *dev_priv )
 			MGA_WRITE8( MGA_CRTC_INDEX, 0 );
 			return 0;
 		}
-		udelay( 1 );
+		DRM_OS_DELAY( 1 );
 	}
 
 #if MGA_DMA_DEBUG
@@ -80,7 +82,7 @@ int mga_do_dma_idle( drm_mga_private_t *dev_priv )
 	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
 		status = MGA_READ( MGA_STATUS ) & MGA_DMA_IDLE_MASK;
 		if ( status == MGA_ENDPRDMASTS ) return 0;
-		udelay( 1 );
+		DRM_OS_DELAY( 1 );
 	}
 
 #if MGA_DMA_DEBUG
@@ -121,7 +123,7 @@ int mga_do_engine_reset( drm_mga_private_t *dev_priv )
 	 * How about we clean up after ourselves?
 	 */
 	MGA_WRITE( MGA_RST, MGA_SOFTRESET );
-	udelay( 15 );				/* Wait at least 10 usecs */
+	DRM_OS_DELAY( 15 );		/* Wait at least 10 usecs */
 	MGA_WRITE( MGA_RST, 0 );
 
 	/* Initialize the registers that get clobbered by the soft
@@ -451,7 +453,12 @@ int mga_freelist_put( drm_device_t *dev, drm_buf_t *buf )
 static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 {
 	drm_mga_private_t *dev_priv;
+#ifdef __linux__
 	struct list_head *list;
+#endif
+#if defined( __FreeBSD__ )
+	drm_map_list_entry_t *listentry;
+#endif
 	int ret;
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
@@ -488,6 +495,7 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 	dev_priv->texture_offset = init->texture_offset[0];
 	dev_priv->texture_size = init->texture_size[0];
 
+#ifdef __linux__
 	list_for_each( list, &dev->maplist->head ) {
 		drm_map_list_t *entry = (drm_map_list_t *)list;
 		if ( entry->map &&
@@ -497,6 +505,19 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
  			break;
  		}
  	}
+#endif
+#if defined( __FreeBSD__ )
+	TAILQ_FOREACH(listentry, dev->maplist, link) {
+		drm_map_t *map = listentry->map;
+		if (map->type == _DRM_SHM &&
+			map->flags & _DRM_CONTAINS_LOCK) {
+			dev_priv->sarea = map;
+			break;
+		}
+	}
+#else
+#error
+#endif
 
 	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
 	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
@@ -557,7 +578,8 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 
 	dev_priv->prim.high_mark = 256 * DMA_BLOCK_SIZE;
 
-	spin_lock_init( &dev_priv->prim.list_lock );
+	/* FIXME: This lock is unused */
+	/* spin_lock_init( &dev_priv->prim.list_lock ); */
 
 	dev_priv->prim.status[0] = dev_priv->primary->offset;
 	dev_priv->prim.status[1] = 0;
@@ -598,15 +620,12 @@ int mga_do_cleanup_dma( drm_device_t *dev )
 	return 0;
 }
 
-int mga_dma_init( struct inode *inode, struct file *filp,
-		  unsigned int cmd, unsigned long arg )
+int mga_dma_init( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_mga_init_t init;
 
-	if ( copy_from_user( &init, (drm_mga_init_t *)arg, sizeof(init) ) )
-		return -EFAULT;
+	DRM_OS_KRNFROMUSR( init, (drm_mga_init_t *) data, sizeof(init) );
 
 	switch ( init.func ) {
 	case MGA_INIT_DMA:
@@ -615,7 +634,7 @@ int mga_dma_init( struct inode *inode, struct file *filp,
 		return mga_do_cleanup_dma( dev );
 	}
 
-	return -EINVAL;
+	DRM_OS_RETURN( EINVAL );
 }
 
 
@@ -623,18 +642,15 @@ int mga_dma_init( struct inode *inode, struct file *filp,
  * Primary DMA stream management
  */
 
-int mga_dma_flush( struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg )
+int mga_dma_flush( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
 	drm_lock_t lock;
 
 	LOCK_TEST_WITH_RETURN( dev );
 
-	if ( copy_from_user( &lock, (drm_lock_t *)arg, sizeof(lock) ) )
-		return -EFAULT;
+	DRM_OS_KRNFROMUSR( lock, (drm_lock_t *) data, sizeof(lock) );
 
 	DRM_DEBUG( "%s: %s%s%s\n",
 		   __FUNCTION__,
@@ -662,11 +678,9 @@ int mga_dma_flush( struct inode *inode, struct file *filp,
 	}
 }
 
-int mga_dma_reset( struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg )
+int mga_dma_reset( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
 
 	LOCK_TEST_WITH_RETURN( dev );
@@ -679,6 +693,7 @@ int mga_dma_reset( struct inode *inode, struct file *filp,
  * DMA buffer management
  */
 
+#if 0
 static int mga_dma_get_buffers( drm_device_t *dev, drm_dma_t *d )
 {
 	drm_buf_t *buf;
@@ -686,51 +701,52 @@ static int mga_dma_get_buffers( drm_device_t *dev, drm_dma_t *d )
 
 	for ( i = d->granted_count ; i < d->request_count ; i++ ) {
 		buf = mga_freelist_get( dev );
-		if ( !buf ) return -EAGAIN;
+		if ( !buf )
+			DRM_OS_RETURN( EAGAIN );
 
 		buf->pid = current->pid;
 
-		if ( copy_to_user( &d->request_indices[i],
+		if ( DRM_OS_COPYTOUSR( &d->request_indices[i],
 				   &buf->idx, sizeof(buf->idx) ) )
-			return -EFAULT;
-		if ( copy_to_user( &d->request_sizes[i],
+			DRM_OS_RETURN( EFAULT );
+		if ( DRM_OS_COPYTOUSR( &d->request_sizes[i],
 				   &buf->total, sizeof(buf->total) ) )
-			return -EFAULT;
+			DRM_OS_RETURN( EFAULT );
 
 		d->granted_count++;
 	}
 	return 0;
 }
+#endif /* 0 */
 
-int mga_dma_buffers( struct inode *inode, struct file *filp,
-		     unsigned int cmd, unsigned long arg )
+int mga_dma_buffers( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_device_dma_t *dma = dev->dma;
 	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
 	drm_dma_t d;
+	drm_buf_t *buf;
+	int i;
 	int ret = 0;
 
 	LOCK_TEST_WITH_RETURN( dev );
 
-	if ( copy_from_user( &d, (drm_dma_t *)arg, sizeof(d) ) )
-		return -EFAULT;
+	DRM_OS_KRNFROMUSR( d, (drm_dma_t *) data, sizeof(d) );
 
 	/* Please don't send us buffers.
 	 */
 	if ( d.send_count != 0 ) {
 		DRM_ERROR( "Process %d trying to send %d buffers via drmDMA\n",
-			   current->pid, d.send_count );
-		return -EINVAL;
+			   DRM_OS_CURRENTPID, d.send_count );
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	/* We'll send you buffers.
 	 */
 	if ( d.request_count < 0 || d.request_count > dma->buf_count ) {
 		DRM_ERROR( "Process %d trying to get %d buffers (of %d max)\n",
-			   current->pid, d.request_count, dma->buf_count );
-		return -EINVAL;
+			   DRM_OS_CURRENTPID, d.request_count, dma->buf_count );
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	WRAP_TEST_WITH_RETURN( dev_priv );
@@ -738,11 +754,26 @@ int mga_dma_buffers( struct inode *inode, struct file *filp,
 	d.granted_count = 0;
 
 	if ( d.request_count ) {
-		ret = mga_dma_get_buffers( dev, &d );
+		for ( i = d.granted_count ; i < d.request_count ; i++ ) {
+			buf = mga_freelist_get( dev );
+			if ( !buf )
+				DRM_OS_RETURN( EAGAIN );
+
+			buf->pid = DRM_OS_CURRENTPID;
+
+			if ( DRM_OS_COPYTOUSR( &d.request_indices[i],
+					   &buf->idx, sizeof(buf->idx) ) )
+				DRM_OS_RETURN( EFAULT );
+			if ( DRM_OS_COPYTOUSR( &d.request_sizes[i],
+					   &buf->total, sizeof(buf->total) ) )
+				DRM_OS_RETURN( EFAULT );
+	
+			d.granted_count++;
+		}
+		ret = 0;
 	}
 
-	if ( copy_to_user( (drm_dma_t *)arg, &d, sizeof(d) ) )
-		return -EFAULT;
+	DRM_OS_KRNTOUSR( data, &d, sizeof(d) );
 
 	return ret;
 }

@@ -46,7 +46,11 @@ int DRM(unblock)( DRM_OS_IOCTL )
 
 int DRM(lock_take)(__volatile__ unsigned int *lock, unsigned int context)
 {
-	unsigned int old, new, prev;
+	unsigned int old, new;
+#ifdef __linux__
+	unsigned int prev;
+#endif
+
 #ifdef __FreeBSD__
 	char failed;
 #endif
@@ -84,7 +88,10 @@ int DRM(lock_take)(__volatile__ unsigned int *lock, unsigned int context)
 int DRM(lock_transfer)(drm_device_t *dev,
 		       __volatile__ unsigned int *lock, unsigned int context)
 {
-	unsigned int old, new, prev;
+	unsigned int old, new;
+#ifdef __linux__
+	unsigned int prev;
+#endif
 #ifdef __FreeBSD__
 	char failed;
 #endif
@@ -107,7 +114,10 @@ int DRM(lock_transfer)(drm_device_t *dev,
 int DRM(lock_free)(drm_device_t *dev,
 		   __volatile__ unsigned int *lock, unsigned int context)
 {
-	unsigned int old, new, prev;
+	unsigned int old, new;
+#ifdef __linux__
+	unsigned int prev;
+#endif
 	pid_t        pid = dev->lock.pid;
 #ifdef __FreeBSD__
 	char failed;
@@ -280,7 +290,10 @@ int DRM(finish)( DRM_OS_IOCTL )
 int DRM(notifier)(void *priv)
 {
 	drm_sigdata_t *s = (drm_sigdata_t *)priv;
-	unsigned int  old, new, prev;
+	unsigned int  old, new;
+#ifdef __linux__
+	unsigned int prev;
+#endif
 #ifdef __FreeBSD__
 	char failed;
 #endif
@@ -305,3 +318,4 @@ int DRM(notifier)(void *priv)
 #endif
 	return 0;
 }
+

@@ -13,7 +13,9 @@
 #include <sys/filio.h>
 #include <sys/sysctl.h>
 #include <sys/select.h>
+#if __FreeBSD_version >= 500000
 #include <sys/selinfo.h>
+#endif
 #include <sys/bus.h>
 #if __FreeBSD_version >= 400005
 #include <sys/taskqueue.h>
@@ -48,8 +50,21 @@
 #define DRM_OS_SPINUNLOCK(u)	simple_unlock(u);
 #endif
 #define DRM_OS_IOCTL	dev_t kdev, u_long cmd, caddr_t data, int flags, struct proc *p
-#define DRM_OS_DEVICE	drm_file_t	*priv; \
-			drm_device_t	*dev	= kdev->si_drv1
+#define DRM_OS_DEVICE	drm_device_t	*dev	= kdev->si_drv1
+
+#define DRM_OS_PRIV					\
+	drm_file_t	*priv	= (drm_file_t *) DRM(find_file_by_proc)(dev, p); \
+	if (!priv) {						\
+		DRM_DEBUG("can't find authenticator\n");	\
+		return EINVAL;					\
+	}
+
+#define DRM_OS_DELAY( delay )				\
+do {								\
+	static int never;					\
+	tsleep(&never, PZERO|PCATCH, "drmdelay", delay );	\
+} while (0)
+
 #define DRM_OS_RETURN(v)	return v;
 #define DRM_OS_CURRENTPID	p->p_pid
 #define DRM_OS_KRNTOUSR(arg1, arg2, arg3) \
@@ -61,10 +76,14 @@
 #define DRM_OS_COPYFROMUSR(arg1, arg2, arg3) \
 	copyin(arg2, arg1, arg3)
 
+#define PAGE_ALIGN(addr) (((addr)+PAGE_SIZE-1)&PAGE_MASK)
+
 typedef unsigned long atomic_t;
 typedef u_int32_t cycles_t;
 typedef u_int32_t spinlock_t;
 typedef u_int32_t u32;
+typedef u_int16_t u16;
+typedef u_int8_t u8;
 #define atomic_set(p, v)	(*(p) = (v))
 #define atomic_read(p)		(*(p))
 #define atomic_inc(p)		atomic_add_long(p, 1)
@@ -174,7 +193,7 @@ find_first_zero_bit(volatile unsigned long *p, int max)
 
 #define DRM_PROC_LIMIT (PAGE_SIZE-80)
 
-#if __FreeBSD_version >= 500000
+#if (__FreeBSD_version >= 500000) || ((__FreeBSD_version < 500000) && (__FreeBSD_version >= 410002))
 #define DRM_SYSCTL_HANDLER_ARGS	(SYSCTL_HANDLER_ARGS)
 #else
 #define DRM_SYSCTL_HANDLER_ARGS	SYSCTL_HANDLER_ARGS
@@ -263,7 +282,7 @@ extern d_ioctl_t	DRM(mapbufs);
 #endif
 
 /* Memory management support (drm_memory.h) */
-extern int		DRM(mem_info)DRM_SYSCTL_HANDLER_ARGS;
+extern int		DRM(mem_info) DRM_SYSCTL_HANDLER_ARGS;
 
 /* DMA support (drm_dma.h) */
 #if __HAVE_DMA_IRQ

@@ -122,12 +122,12 @@ int DRM(getmagic)(DRM_OS_IOCTL)
 #ifdef __linux__
 	static spinlock_t  lock	    = SPIN_LOCK_UNLOCKED;
 #endif
-	DRM_OS_DEVICE;
 #ifdef __FreeBSD__
 	static struct simplelock  lock;
-
-	priv = (drm_file_t *) DRM(find_file_by_proc)(dev, p);
 #endif
+	DRM_OS_DEVICE;
+	DRM_OS_PRIV;
+
 
 				/* Find unique magic */
 	if (priv->magic) {

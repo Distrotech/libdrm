@@ -168,8 +168,9 @@ static int DRM(_mem_info)(char *buf, char **start, off_t offset,
 	return len - offset;
 }
 #endif
+
 #ifdef __FreeBSD__
-static int DRM(_mem_info)SYSCTL_HANDLER_ARGS
+static int DRM(_mem_info) DRM_SYSCTL_HANDLER_ARGS
 {
 	drm_mem_stats_t *pt;
 	char buf[128];
@@ -207,7 +208,7 @@ int DRM(mem_info)(char *buf, char **start, off_t offset,
 		  int len, int *eof, void *data)
 #endif
 #ifdef __FreeBSD__
-int DRM(mem_info)SYSCTL_HANDLER_ARGS
+int DRM(mem_info) DRM_SYSCTL_HANDLER_ARGS
 #endif
 {
 	int ret;
@@ -309,13 +310,13 @@ unsigned long DRM(alloc_pages)(int order, int area)
 {
 #ifdef __linux__
 	unsigned long address;
+	unsigned long addr;
+	unsigned int  sz;
 #endif
 #ifdef __FreeBSD__
 	vm_offset_t address;
 #endif
 	unsigned long bytes	  = PAGE_SIZE << order;
-	unsigned long addr;
-	unsigned int  sz;
 
 #ifdef __linux__
 	DRM_OS_SPINLOCK(&DRM(mem_lock));

@@ -50,7 +50,7 @@
 #define DRM_NAME	"drm"	  /* Name in kernel, /dev, and /proc	    */
 #define DRM_MIN_ORDER	5	  /* At least 2^5 bytes = 32 bytes	    */
 #define DRM_MAX_ORDER	22	  /* Up to 2^22 bytes = 4MB		    */
-#define DRM_RAM_PERCENT 10	  /* How much system ram can we lock?	    */
+#define DRM_RAM_PERCENT 50	  /* How much system ram can we lock?	    */
 
 #define _DRM_LOCK_HELD	0x80000000 /* Hardware lock is held		    */
 #define _DRM_LOCK_CONT	0x40000000 /* Hardware lock is contended	    */
@@ -86,9 +86,7 @@ typedef struct drm_tex_region {
 #include "i810_drm.h"
 #include "r128_drm.h"
 #include "radeon_drm.h"
-#ifdef CONFIG_DRM_SIS
 #include "sis_drm.h"
-#endif
 
 typedef struct drm_version {
 	int    version_major;	  /* Major version			    */
@@ -465,7 +463,6 @@ typedef struct drm_scatter_gather {
 #define DRM_IOCTL_RADEON_STIPPLE	DRM_IOW( 0x4c, drm_radeon_stipple_t)
 #define DRM_IOCTL_RADEON_INDIRECT	DRM_IOWR(0x4d, drm_radeon_indirect_t)
 
-#ifdef CONFIG_DRM_SIS
 /* SiS specific ioctls */
 #define SIS_IOCTL_FB_ALLOC		DRM_IOWR(0x44, drm_sis_mem_t)
 #define SIS_IOCTL_FB_FREE		DRM_IOW( 0x45, drm_sis_mem_t)
@@ -475,6 +472,5 @@ typedef struct drm_scatter_gather {
 #define SIS_IOCTL_FLIP			DRM_IOW( 0x48, drm_sis_flip_t)
 #define SIS_IOCTL_FLIP_INIT		DRM_IO(  0x49)
 #define SIS_IOCTL_FLIP_FINAL		DRM_IO(  0x50)
-#endif
 
 #endif

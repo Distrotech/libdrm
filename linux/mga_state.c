@@ -412,7 +412,7 @@ static int mga_verify_context( drm_mga_private_t *dev_priv )
 			   ctx->dstorg, dev_priv->front_offset,
 			   dev_priv->back_offset );
 		ctx->dstorg = 0;
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	return 0;
@@ -432,7 +432,7 @@ static int mga_verify_tex( drm_mga_private_t *dev_priv, int unit )
 		DRM_ERROR( "*** bad TEXORG: 0x%x, unit %d\n",
 			   tex->texorg, unit );
 		tex->texorg = 0;
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	return 0;
@@ -474,13 +474,13 @@ static int mga_verify_iload( drm_mga_private_t *dev_priv,
 	     dstorg + length > (dev_priv->texture_offset +
 				dev_priv->texture_size) ) {
 		DRM_ERROR( "*** bad iload DSTORG: 0x%x\n", dstorg );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	if ( length & MGA_ILOAD_MASK ) {
 		DRM_ERROR( "*** bad iload length: 0x%x\n",
 			   length & MGA_ILOAD_MASK );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	return 0;
@@ -493,7 +493,7 @@ static int mga_verify_blit( drm_mga_private_t *dev_priv,
 	     (dstorg & 0x3) == (MGA_SRCACC_PCI | MGA_SRCMAP_SYSMEM) ) {
 		DRM_ERROR( "*** bad blit: src=0x%x dst=0x%x\n",
 			   srcorg, dstorg );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 	return 0;
 }
@@ -873,19 +873,16 @@ static void mga_dma_dispatch_blit( drm_device_t *dev,
  *
  */
 
-int mga_dma_clear( struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg )
+int mga_dma_clear( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_mga_private_t *dev_priv = dev->dev_private;
 	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	drm_mga_clear_t clear;
 
 	LOCK_TEST_WITH_RETURN( dev );
 
-	if ( copy_from_user( &clear, (drm_mga_clear_t *) arg, sizeof(clear) ) )
-		return -EFAULT;
+	DRM_OS_KRNFROMUSR( clear, (drm_mga_clear_t *) data, sizeof(clear) );
 
 	if ( sarea_priv->nbox > MGA_NR_SAREA_CLIPRECTS )
 		sarea_priv->nbox = MGA_NR_SAREA_CLIPRECTS;
@@ -901,11 +898,9 @@ int mga_dma_clear( struct inode *inode, struct file *filp,
 	return 0;
 }
 
-int mga_dma_swap( struct inode *inode, struct file *filp,
-		  unsigned int cmd, unsigned long arg )
+int mga_dma_swap( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_mga_private_t *dev_priv = dev->dev_private;
 	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
 
@@ -925,11 +920,9 @@ int mga_dma_swap( struct inode *inode, struct file *filp,
 	return 0;
 }
 
-int mga_dma_vertex( struct inode *inode, struct file *filp,
-		    unsigned int cmd, unsigned long arg )
+int mga_dma_vertex( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_mga_private_t *dev_priv = dev->dev_private;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_t *buf;
@@ -938,10 +931,7 @@ int mga_dma_vertex( struct inode *inode, struct file *filp,
 
 	LOCK_TEST_WITH_RETURN( dev );
 
-	if ( copy_from_user( &vertex,
-			     (drm_mga_vertex_t *)arg,
-			     sizeof(vertex) ) )
-		return -EFAULT;
+	DRM_OS_KRNFROMUSR( vertex, (drm_mga_vertex_t *) data, sizeof(vertex) );
 
 	buf = dma->buflist[vertex.idx];
 	buf_priv = buf->dev_private;
@@ -956,7 +946,7 @@ int mga_dma_vertex( struct inode *inode, struct file *filp,
 			buf_priv->dispatched = 0;
 			mga_freelist_put( dev, buf );
 		}
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	WRAP_TEST_WITH_RETURN( dev_priv );
@@ -966,11 +956,9 @@ int mga_dma_vertex( struct inode *inode, struct file *filp,
 	return 0;
 }
 
-int mga_dma_indices( struct inode *inode, struct file *filp,
-		     unsigned int cmd, unsigned long arg )
+int mga_dma_indices( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_mga_private_t *dev_priv = dev->dev_private;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_t *buf;
@@ -979,10 +967,7 @@ int mga_dma_indices( struct inode *inode, struct file *filp,
 
 	LOCK_TEST_WITH_RETURN( dev );
 
-	if ( copy_from_user( &indices,
-			     (drm_mga_indices_t *)arg,
-			     sizeof(indices) ) )
-		return -EFAULT;
+	DRM_OS_KRNFROMUSR( indices, (drm_mga_indices_t *) data, sizeof(indices) );
 
 	buf = dma->buflist[indices.idx];
 	buf_priv = buf->dev_private;
@@ -996,7 +981,7 @@ int mga_dma_indices( struct inode *inode, struct file *filp,
 			buf_priv->dispatched = 0;
 			mga_freelist_put( dev, buf );
 		}
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	WRAP_TEST_WITH_RETURN( dev_priv );
@@ -1006,11 +991,9 @@ int mga_dma_indices( struct inode *inode, struct file *filp,
 	return 0;
 }
 
-int mga_dma_iload( struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg )
+int mga_dma_iload( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_device_dma_t *dma = dev->dma;
 	drm_mga_private_t *dev_priv = dev->dev_private;
 	drm_buf_t *buf;
@@ -1020,14 +1003,13 @@ int mga_dma_iload( struct inode *inode, struct file *filp,
 
 	LOCK_TEST_WITH_RETURN( dev );
 
-	if ( copy_from_user( &iload, (drm_mga_iload_t *)arg, sizeof(iload) ) )
-		return -EFAULT;
+	DRM_OS_KRNFROMUSR( iload, (drm_mga_iload_t *) data, sizeof(iload) );
 
 #if 0
 	if ( mga_do_wait_for_idle( dev_priv ) < 0 ) {
 		if ( MGA_DMA_DEBUG )
 			DRM_INFO( __FUNCTION__": -EBUSY\n" );
-		return -EBUSY;
+		DRM_OS_RETURN( EBUSY );
 	}
 #endif
 
@@ -1036,7 +1018,7 @@ int mga_dma_iload( struct inode *inode, struct file *filp,
 
 	if ( mga_verify_iload( dev_priv, iload.dstorg, iload.length ) ) {
 		mga_freelist_put( dev, buf );
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 	}
 
 	WRAP_TEST_WITH_RETURN( dev_priv );
@@ -1050,11 +1032,9 @@ int mga_dma_iload( struct inode *inode, struct file *filp,
 	return 0;
 }
 
-int mga_dma_blit( struct inode *inode, struct file *filp,
-		  unsigned int cmd, unsigned long arg )
+int mga_dma_blit( DRM_OS_IOCTL )
 {
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	DRM_OS_DEVICE;
 	drm_mga_private_t *dev_priv = dev->dev_private;
 	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	drm_mga_blit_t blit;
@@ -1062,14 +1042,13 @@ int mga_dma_blit( struct inode *inode, struct file *filp,
 
 	LOCK_TEST_WITH_RETURN( dev );
 
-	if ( copy_from_user( &blit, (drm_mga_blit_t *)arg, sizeof(blit) ) )
-		return -EFAULT;
+	DRM_OS_KRNFROMUSR( blit, (drm_mga_blit_t *) data, sizeof(blit) );
 
 	if ( sarea_priv->nbox > MGA_NR_SAREA_CLIPRECTS )
 		sarea_priv->nbox = MGA_NR_SAREA_CLIPRECTS;
 
 	if ( mga_verify_blit( dev_priv, blit.srcorg, blit.dstorg ) )
-		return -EINVAL;
+		DRM_OS_RETURN( EINVAL );
 
 	WRAP_TEST_WITH_RETURN( dev_priv );
 

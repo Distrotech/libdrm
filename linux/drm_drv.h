@@ -676,7 +676,7 @@ static int DRM(init)( device_t nbdev )
 		DRM(stub_unregister)(DRM(minor));
 #endif
 #ifdef __FreeBSD__
-		DRM(sysctl_cleanup)();
+		DRM(sysctl_cleanup)( dev );
 		destroy_dev(dev->devnode);
 #endif
 		DRM(takedown)( dev );
@@ -1069,14 +1069,7 @@ int DRM(ioctl)( DRM_OS_IOCTL )
 	d_ioctl_t *func;
 #endif
 	int nr = DRM_IOCTL_NR(cmd);
-
-#ifdef __FreeBSD__
-	priv = DRM(find_file_by_proc)(dev, p);
-	if (!priv) {
-		DRM_DEBUG("can't find authenticator\n");
-		return EINVAL;
-	}
-#endif
+	DRM_OS_PRIV;
 
 	atomic_inc( &dev->ioctl_count );
 	atomic_inc( &dev->counts[_DRM_STAT_IOCTLS] );

@@ -31,6 +31,12 @@
 #ifndef __MGA_DRV_H__
 #define __MGA_DRV_H__
 
+#ifndef u8
+#define u8  u_int8_t
+#define u16 u_int16_t
+#define u32 u_int32_t
+#endif
+
 typedef struct drm_mga_primary_buffer {
 	u8 *start;
 	u8 *end;
@@ -103,14 +109,10 @@ typedef struct drm_mga_private {
 } drm_mga_private_t;
 
 				/* mga_dma.c */
-extern int mga_dma_init( struct inode *inode, struct file *filp,
-			 unsigned int cmd, unsigned long arg );
-extern int mga_dma_flush( struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg );
-extern int mga_dma_reset( struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg );
-extern int mga_dma_buffers( struct inode *inode, struct file *filp,
-			    unsigned int cmd, unsigned long arg );
+extern int mga_dma_init( DRM_OS_IOCTL );
+extern int mga_dma_flush( DRM_OS_IOCTL );
+extern int mga_dma_reset( DRM_OS_IOCTL );
+extern int mga_dma_buffers( DRM_OS_IOCTL );
 
 extern int mga_do_wait_for_idle( drm_mga_private_t *dev_priv );
 extern int mga_do_dma_idle( drm_mga_private_t *dev_priv );
@@ -125,24 +127,30 @@ extern void mga_do_dma_wrap_end( drm_mga_private_t *dev_priv );
 extern int mga_freelist_put( drm_device_t *dev, drm_buf_t *buf );
 
 				/* mga_state.c */
-extern int  mga_dma_clear( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int  mga_dma_swap( struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg );
-extern int  mga_dma_vertex( struct inode *inode, struct file *filp,
-			    unsigned int cmd, unsigned long arg );
-extern int  mga_dma_indices( struct inode *inode, struct file *filp,
-			     unsigned int cmd, unsigned long arg );
-extern int  mga_dma_iload( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int  mga_dma_blit( struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg );
+extern int  mga_dma_clear( DRM_OS_IOCTL );
+extern int  mga_dma_swap( DRM_OS_IOCTL );
+extern int  mga_dma_vertex( DRM_OS_IOCTL );
+extern int  mga_dma_indices( DRM_OS_IOCTL );
+extern int  mga_dma_iload( DRM_OS_IOCTL );
+extern int  mga_dma_blit( DRM_OS_IOCTL );
 
 				/* mga_warp.c */
 extern int mga_warp_install_microcode( drm_device_t *dev );
 extern int mga_warp_init( drm_device_t *dev );
 
+#ifdef __linux__
 #define mga_flush_write_combine()	mb()
+#endif
+#if defined( __FreeBSD__ )
+#define mga_flush_write_combine()								\
+   	int xchangeDummy;									\
+	DRM_DEBUG("%s\n", __FUNCTION__);							\
+   	__asm__ volatile(" push %%eax ; xchg %%eax, %0 ; pop %%eax" : : "m" (xchangeDummy));	\
+   	__asm__ volatile(" push %%eax ; push %%ebx ; push %%ecx ; push %%edx ;"			\
+			 " movl $0,%%eax ; cpuid ; pop %%edx ; pop %%ecx ; pop %%ebx ;"		\
+			 " pop %%eax" : /* no outputs */ :  /* no inputs */ );			\
+} while (0);
+#endif
 
 
 #define MGA_BASE( reg )		((u32)(dev_priv->mmio->handle))
@@ -181,15 +189,28 @@ do {									\
 	}								\
 } while (0)
 
+#ifdef __linux__
 #define LOCK_TEST_WITH_RETURN( dev )					\
 do {									\
 	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||		\
 	     dev->lock.pid != current->pid ) {				\
-		DRM_ERROR( "%s called without lock held\n",		\
+		DRM_ERROR( "%s called without lock held\n",	\
 			   __FUNCTION__ );				\
-		return -EINVAL;						\
+		DRM_OS_RETURN( EINVAL );				\
 	}								\
 } while (0)
+#endif
+#ifdef __FreeBSD__
+#define LOCK_TEST_WITH_RETURN( dev )					\
+do {									\
+	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||		\
+	     dev->lock.pid != p->p_pid ) {				\
+		DRM_ERROR( "%s called without lock held\n",		\
+			   __FUNCTION__ );				\
+		DRM_OS_RETURN( EINVAL );				\
+	}								\
+} while (0)
+#endif
 
 #define WRAP_TEST_WITH_RETURN( dev_priv )				\
 do {									\
@@ -200,7 +221,7 @@ do {									\
 			    dev_priv->prim.high_mark ) {		\
 			if ( MGA_DMA_DEBUG )				\
 				DRM_INFO( __FUNCTION__": wrap...\n" );	\
-			return -EBUSY;					\
+			DRM_OS_RETURN( EBUSY);				\
 		}							\
 	}								\
 } while (0)
@@ -211,7 +232,7 @@ do {									\
 		if ( mga_do_wait_for_idle( dev_priv ) < 0 ) {		\
 			if ( MGA_DMA_DEBUG )				\
 				DRM_INFO( __FUNCTION__": wrap...\n" );	\
-			return -EBUSY;					\
+			DRM_OS_RETURN( EBUSY);			\
 		}							\
 		mga_do_dma_wrap_end( dev_priv );			\
 	}								\
