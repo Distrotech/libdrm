@@ -351,7 +351,7 @@ void DRM(ioremapfree)(void *pt, unsigned long size)
 	}
 }
 
-#if defined(CONFIG_AGP) || defined(CONFIG_AGP_MODULE)
+#if __REALLY_HAVE_AGP
 
 agp_memory *DRM(alloc_agp)(int pages, u32 type)
 {

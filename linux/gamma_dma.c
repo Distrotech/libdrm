@@ -44,23 +44,16 @@ static inline void gamma_dma_dispatch(drm_device_t *dev, unsigned long address,
 				      unsigned long length)
 {
 #if !QUEUED_DMA
-	if (!dev->agp) {
-		GAMMA_WRITE(GAMMA_DMAADDRESS, virt_to_phys((void *)address));
-	} else {
-		mb();
-		GAMMA_WRITE(GAMMA_DMAADDRESS, address);
-	}
+	mb();
+	while ( GAMMA_READ(GAMMA_INFIFOSPACE) < 2);
+	GAMMA_WRITE(GAMMA_DMAADDRESS, address);
 	while (GAMMA_READ(GAMMA_GCOMMANDSTATUS) != 4);
 	GAMMA_WRITE(GAMMA_DMACOUNT, length / 4);
 #else
+	mb();
 	while ( GAMMA_READ(GAMMA_INFIFOSPACE) < 6);
 	GAMMA_WRITE(GAMMA_OUTPUTFIFO, GAMMA_DMAADDRTAG);
-	if (!dev->agp) {
-		GAMMA_WRITE(GAMMA_OUTPUTFIFO+4, virt_to_phys((void*)address));
-	} else {
-		mb();
-		GAMMA_WRITE(GAMMA_OUTPUTFIFO+4, address);
-	}
+	GAMMA_WRITE(GAMMA_OUTPUTFIFO+4, address);
 	GAMMA_WRITE(GAMMA_OUTPUTFIFO+8, GAMMA_DMACOUNTTAG);
 	GAMMA_WRITE(GAMMA_OUTPUTFIFO+12, length / 4);
 	GAMMA_WRITE(GAMMA_OUTPUTFIFO+16, GAMMA_COMMANDINTTAG);
@@ -128,10 +121,16 @@ void gamma_dma_service(int irq, void *device, struct pt_regs *regs)
 	atomic_inc(&dev->counts[6]); /* _DRM_STAT_IRQ */
 
 #if !QUEUED_DMA
-#if 0
+#if 1
 	if (GAMMA_READ(GAMMA_GCOMMANDINTFLAGS) == 0x10) {
+#if 0
 	printk("CommandErrorFlags 0x%x\n",GAMMA_READ(0xc58));
 	printk("GErrorFlags 0x%x\n",GAMMA_READ(0x838));
+#endif
+	GAMMA_WRITE(GAMMA_GCOMMANDINTFLAGS, 0x10);
+	GAMMA_WRITE(0xc58, 0x4); /* Clear DMA overrun */
+	GAMMA_WRITE(0xc58, 0xffffffff); /* Clear everything overrun */
+	GAMMA_WRITE(0x838, 0x2000);
 	}
 #endif
 
@@ -253,7 +252,19 @@ static int gamma_do_dma(drm_device_t *dev, int locked)
 	buf->time_dispatched = get_cycles();
 #endif
 
+/* WE NOW ARE ON LOGICAL PAGES!!! */
+#if 0
+printk("0x%x 0x%x 0x%x\n",dev_priv->buffers->handle,dev_priv->buffers->size,dev_priv->buffers->offset);
+printk("start of dma buffer 0x%x 0x%x 0x%x 0x%x\n",
+		*(unsigned int *)dev_priv->buffers->handle,
+		*(unsigned int *)((void*)dev_priv->buffers->handle+(buf->idx<<12)+4),
+		*(unsigned int *)((void*)dev_priv->buffers->handle+(buf->idx<<12)+8),
+		*(unsigned int *)((void*)dev_priv->buffers->handle+(buf->idx<<12)+12));
+#endif
+address = buf->idx << 12;
+#if 1
 	gamma_dma_dispatch(dev, address, length);
+#endif
 	gamma_free_buffer(dev, dma->this_buffer);
 	dma->this_buffer = buf;
 
@@ -619,9 +630,39 @@ int gamma_dma(struct inode *inode, struct file *filp, unsigned int cmd,
 static int gamma_do_init_dma( drm_device_t *dev, drm_gamma_init_t *init )
 {
 	drm_gamma_private_t *dev_priv;
-	int ret;
+	drm_device_dma_t    *dma = dev->dma;
+	drm_buf_t	    *buf;
+	unsigned int        *pagebuf;
+	unsigned int	    physbuf;
+	int ret, i;
+	unsigned int	    *pgt;
+
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
+if (init->pcimode) {
+	printk("INITING PCI DMA MODE\n");
+	for (i = 0; i < 21; i++) {
+	buf = dma->buflist[i];
+	printk("0x%x 0x%x\n",buf->address,virt_to_phys((void*)buf->address));
+	}
+
+	buf = dma->buflist[GLINT_DRI_BUF_COUNT];
+	pgt = buf->address;
+	printk("pgt = 0x%x\n",pgt);
+
+	printk("0x%x\n",virt_to_phys((void*)buf->address) >> 12);
+ 	for (i = 0; i < GLINT_DRI_BUF_COUNT; i++) {
+		buf = dma->buflist[i];
+		*pgt = virt_to_phys((void*)buf->address) | 0x07;
+		printk("0x%x ",*pgt);
+		pgt++;
+	}
+
+	buf = dma->buflist[GLINT_DRI_BUF_COUNT];
+	GAMMA_WRITE( GAMMA_PAGETABLEADDR, virt_to_phys((void*)buf->address) );
+	GAMMA_WRITE( GAMMA_PAGETABLELENGTH, 2 );
+} else {
+	printk("INITING AGP DMA MODE\n");
 	dev_priv = DRM(alloc)( sizeof(drm_gamma_private_t), DRM_MEM_DRIVER );
 	if ( !dev_priv )
 		return -ENOMEM;
@@ -629,97 +670,41 @@ static int gamma_do_init_dma( drm_device_t *dev, drm_gamma_init_t *init )
 
 	memset( dev_priv, 0, sizeof(drm_gamma_private_t) );
 
-#if 0
-	dev_priv->chipset = init->chipset;
-
-	dev_priv->usec_timeout = MGA_DEFAULT_USEC_TIMEOUT;
-
-	if ( init->sgram ) {
-		dev_priv->clear_cmd = MGA_DWGCTL_CLEAR | MGA_ATYPE_BLK;
-	} else {
-		dev_priv->clear_cmd = MGA_DWGCTL_CLEAR | MGA_ATYPE_RSTR;
-	}
-	dev_priv->maccess	= init->maccess;
-
-	dev_priv->fb_cpp	= init->fb_cpp;
-	dev_priv->front_offset	= init->front_offset;
-	dev_priv->front_pitch	= init->front_pitch;
-	dev_priv->back_offset	= init->back_offset;
-	dev_priv->back_pitch	= init->back_pitch;
-
-	dev_priv->depth_cpp	= init->depth_cpp;
-	dev_priv->depth_offset	= init->depth_offset;
-	dev_priv->depth_pitch	= init->depth_pitch;
-#endif
-
 	dev_priv->sarea = dev->maplist[0];
 
-#if 0
-	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
-	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
-	DRM_FIND_MAP( dev_priv->status, init->status_offset );
-
-	DRM_FIND_MAP( dev_priv->warp, init->warp_offset );
-	DRM_FIND_MAP( dev_priv->primary, init->primary_offset );
-#endif
 	DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
 
 	dev_priv->sarea_priv =
 		(drm_gamma_sarea_t *)((u8 *)dev_priv->sarea->handle +
 				    init->sarea_priv_offset);
 
-#if 0
-	DRM_IOREMAP( dev_priv->warp );
-	DRM_IOREMAP( dev_priv->primary );
-#endif
 	DRM_IOREMAP( dev_priv->buffers );
 
-	GAMMA_WRITE( GAMMA_GDMACONTROL, GAMMA_USE_AGP );
-#if 0
-	dev_priv->prim.status = (u32 *)dev_priv->status->handle;
-
-	mga_do_wait_for_idle( dev_priv );
-
-	/* Init the primary DMA registers.
-	 */
-	MGA_WRITE( MGA_PRIMADDRESS,
-		   dev_priv->primary->offset | MGA_DMA_GENERAL );
-
-	MGA_WRITE( MGA_PRIMPTR,
-		   virt_to_bus((void *)dev_priv->prim.status) |
-		   MGA_PRIMPTREN0 |	/* Soft trap, SECEND, SETUPEND */
-		   MGA_PRIMPTREN1 );	/* DWGSYNC */
-
-	dev_priv->prim.start = (u8 *)dev_priv->primary->handle;
-	dev_priv->prim.end = ((u8 *)dev_priv->primary->handle
-			      + dev_priv->primary->size);
-	dev_priv->prim.size = dev_priv->primary->size;
-
-	dev_priv->prim.head = &dev_priv->prim.status[0];
-	dev_priv->prim.tail = 0;
-	dev_priv->prim.space = dev_priv->prim.size;
-
-	dev_priv->prim.last_flush = 0;
-	dev_priv->prim.last_wrap = 0;
-
-	dev_priv->prim.high_mark = 256 * DMA_BLOCK_SIZE;
-
-	spin_lock_init( &dev_priv->prim.list_lock );
-
-	dev_priv->prim.status[0] = dev_priv->primary->offset;
-	dev_priv->prim.status[1] = 0;
-
-	dev_priv->sarea_priv->last_wrap = 0;
-	dev_priv->sarea_priv->last_frame.head = 0;
-	dev_priv->sarea_priv->last_frame.wrap = 0;
-
-	if ( mga_freelist_init( dev ) < 0 ) {
-		DRM_ERROR( "could not initialize freelist\n" );
-		mga_do_cleanup_dma( dev );
-		return -ENOMEM;
+printk("0x%x 0x%x 0x%x\n",dev_priv->buffers->handle,dev_priv->buffers->size,dev_priv->buffers->offset);
+	for (i = 0; i < 21; i++) {
+	buf = dma->buflist[i];
+	printk("0x%x\n",buf->address);
 	}
-#endif
 
+	buf = dma->buflist[GLINT_DRI_BUF_COUNT];
+	pgt = buf->address;
+	printk("pgt = 0x%x\n",pgt);
+
+	printk("0x%x\n",virt_to_phys((void*)buf->address) >> 12);
+ 	for (i = 0; i < GLINT_DRI_BUF_COUNT; i++) {
+		buf = dma->buflist[i];
+		*pgt = (unsigned int)buf->address + 0x07;
+		printk("0x%x ",*pgt);
+		pgt++;
+	}
+
+	buf = dma->buflist[GLINT_DRI_BUF_COUNT];
+
+	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 3);
+	GAMMA_WRITE( GAMMA_GDMACONTROL, 0x6e);
+	GAMMA_WRITE( GAMMA_PAGETABLEADDR, virt_to_phys((void*)buf->address) );
+	GAMMA_WRITE( GAMMA_PAGETABLELENGTH, 2 );
+}
 	return 0;
 }
 
@@ -730,17 +715,7 @@ int gamma_do_cleanup_dma( drm_device_t *dev )
 	if ( dev->dev_private ) {
 		drm_gamma_private_t *dev_priv = dev->dev_private;
 
-#if 0
-		DRM_IOREMAPFREE( dev_priv->warp );
-		DRM_IOREMAPFREE( dev_priv->primary );
-#endif
 		DRM_IOREMAPFREE( dev_priv->buffers );
-
-#if 0
-		if ( dev_priv->head != NULL ) {
-			mga_freelist_cleanup( dev );
-		}
-#endif
 
 		DRM(free)( dev->dev_private, sizeof(drm_gamma_private_t),
 			   DRM_MEM_DRIVER );

@@ -65,29 +65,7 @@ typedef struct drm_gamma_init {
 	} func;
 
    	int sarea_priv_offset;
-
-#if 0
-	int chipset;
-   	int sgram;
-
-	unsigned int maccess;
-
-   	unsigned int fb_cpp;
-	unsigned int front_offset, front_pitch;
-   	unsigned int back_offset, back_pitch;
-
-   	unsigned int depth_cpp;
-   	unsigned int depth_offset, depth_pitch;
-
-   	unsigned int texture_offset[MGA_NR_TEX_HEAPS];
-   	unsigned int texture_size[MGA_NR_TEX_HEAPS];
-
-	unsigned int fb_offset;
-	unsigned int mmio_offset;
-	unsigned int status_offset;
-	unsigned int warp_offset;
-	unsigned int primary_offset;
-#endif
+	int pcimode;
 	unsigned int buffers_offset;
 } drm_gamma_init_t;
 

@@ -111,6 +111,8 @@ extern int  gamma_found(void);
 #define GAMMA_OUTPUTFIFO       0x2000
 #define GAMMA_SYNC	       0x8c40
 #define GAMMA_SYNC_TAG	       0x0188
+#define GAMMA_PAGETABLEADDR    0x0C00
+#define GAMMA_PAGETABLELENGTH  0x0C08
 
 #define GAMMA_PASSTHROUGH	0x1FE
 #define GAMMA_DMAADDRTAG	0x530

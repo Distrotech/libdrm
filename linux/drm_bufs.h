@@ -673,7 +673,7 @@ int DRM(mapbufs)( struct inode *inode, struct file *filp,
 		spin_unlock( &dev->count_lock );
 		return -EBUSY;
 	}
-DRM_DEBUG("CALLED MAPBUFS\n");
+
 	dev->buf_use++;		/* Can't allocate more after this call */
 	spin_unlock( &dev->count_lock );
 
