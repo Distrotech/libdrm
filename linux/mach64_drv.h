@@ -37,6 +37,7 @@
 typedef struct drm_mach64_freelist {
 	struct list_head  list;			/* Linux LIST structure... */
    	drm_buf_t *buf;
+	unsigned int age;
 } drm_mach64_freelist_t;
 
 typedef struct drm_mach64_private {
@@ -64,11 +65,16 @@ typedef struct drm_mach64_private {
 	atomic_t dma_timeout;  /* Number of interrupt dispatches since last DMA dispatch... */
 	atomic_t do_gui;       /* Flag for the bottom half to know what to do... */
 	atomic_t do_blit;      /* Flag for the bottom half to know what to do... */
-	
-	struct pci_pool *pool;
-	dma_addr_t table_handle;
-	void *cpu_addr_table;
-	u32 table_addr;
+
+	/* DMA descriptor table (ring buffer) */
+	struct pci_pool *pool;   /* DMA memory pool */
+	int table_size;          /* size of table (ring buffer) in bytes */
+	dma_addr_t table_handle; /* handle returned by pci_pool_alloc */
+	void *cpu_addr_table;    /* virtual address of table head */
+	u32 table_addr;          /* physical address of table head */
+	u32 table_start;         /* physical address of start of table ring */
+	u32 table_end;           /* physical address of end of table ring */
+	u32 *table_wptr;         /* write pointer to table (ring tail) */
 
 	struct list_head	  free_list;     /* Free-list head  */
 	struct list_head	  empty_list;    /* Free-list placeholder list  */
@@ -95,19 +101,24 @@ extern int mach64_dma_init( struct inode *inode, struct file *filp,
 			    unsigned int cmd, unsigned long arg );
 extern int mach64_dma_idle( struct inode *inode, struct file *filp,
 			    unsigned int cmd, unsigned long arg );
+extern int mach64_dma_flush( struct inode *inode, struct file *filp,
+			    unsigned int cmd, unsigned long arg );
 extern int mach64_engine_reset( struct inode *inode, struct file *filp,
 				unsigned int cmd, unsigned long arg );
 extern int mach64_dma_buffers( struct inode *inode, struct file *filp,
 			       unsigned int cmd, unsigned long arg );
 
-extern void mach64_freelist_reset( drm_device_t *dev );
-extern drm_buf_t *mach64_freelist_get( drm_device_t *dev );
+extern void mach64_freelist_reset( drm_mach64_private_t *dev_priv );
+extern drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv );
 
 extern int mach64_do_wait_for_fifo( drm_mach64_private_t *dev_priv,
 				    int entries );
 extern int mach64_do_wait_for_idle( drm_mach64_private_t *dev_priv );
 extern void mach64_dump_engine_info( drm_mach64_private_t *dev_priv );
 extern int mach64_do_engine_reset( drm_mach64_private_t *dev_priv );
+
+extern int mach64_do_dma_idle( drm_mach64_private_t *dev_priv );
+extern int mach64_do_dma_flush( drm_mach64_private_t *dev_priv );
 
 				/* mach64_state.c */
 extern int mach64_dma_clear( struct inode *inode, struct file *filp,
@@ -116,7 +127,8 @@ extern int mach64_dma_swap( struct inode *inode, struct file *filp,
 			    unsigned int cmd, unsigned long arg );
 extern int mach64_dma_vertex( struct inode *inode, struct file *filp,
 			      unsigned int cmd, unsigned long arg );
-
+extern int mach64_dma_blit( struct inode *inode, struct file *filp,
+			    unsigned int cmd, unsigned long arg );
 
 /* ================================================================
  * Registers
@@ -283,6 +295,7 @@ extern int mach64_dma_vertex( struct inode *inode, struct file *filp,
 #define MACH64_ONE_OVER_AREA_UC			0x0300
 
 #define MACH64_PAT_REG0				0x0680
+#define MACH64_PAT_REG1				0x0684
 
 #define MACH64_SC_LEFT_RIGHT                    0x06a8
 #define MACH64_SC_TOP_BOTTOM                    0x06b4
@@ -347,12 +360,25 @@ extern int mach64_dma_vertex( struct inode *inode, struct file *filp,
 #define MACH64_Z_OFF_PITCH			0x0548
 
 #define MACH64_CRTC_INT_CNTL			0x0418
-#	define MACH64_VBLANK_INT_EN			(1 << 1)
-#	define MACH64_VBLANK_INT			(1 << 2)
-#	define MACH64_VBLANK_INT_AK			(1 << 2)
-#	define MACH64_BUSMASTER_EOL_INT_EN		(1 << 24)
-#	define MACH64_BUSMASTER_EOL_INT			(1 << 25)
-#	define MACH64_BUSMASTER_EOL_INT_AK		(1 << 25)
+#	define MACH64_CRTC_VBLANK_INT_EN		(1 << 1)
+#	define MACH64_CRTC_VBLANK_INT			(1 << 2)
+#	define MACH64_CRTC_VBLANK_INT_AK		(1 << 2)
+#	define MACH64_CRTC_VLINE_INT_EN			(1 << 3)
+#	define MACH64_CRTC_VLINE_INT			(1 << 4)
+#	define MACH64_CRTC_VLINE_INT_AK			(1 << 4)
+#	define MACH64_CRTC_VLINE_SYNC			(1 << 5)
+#	define MACH64_CRTC_FRAME			(1 << 6)
+#	define MACH64_CRTC_SNAPSHOT_INT_EN		(1 << 7)
+#	define MACH64_CRTC_SNAPSHOT_INT			(1 << 8)
+#	define MACH64_CRTC_SNAPSHOT_INT_AK		(1 << 8)
+#	define MACH64_CRTC_BUSMASTER_EOL_INT_EN		(1 << 24)
+#	define MACH64_CRTC_BUSMASTER_EOL_INT		(1 << 25)
+#	define MACH64_CRTC_BUSMASTER_EOL_INT_AK		(1 << 25)
+#	define MACH64_CRTC_GP_INT_EN			(1 << 26)
+#	define MACH64_CRTC_GP_INT			(1 << 27)
+#	define MACH64_CRTC_GP_INT_AK			(1 << 27)
+#	define MACH64_CRTC_VBLANK2_INT			(1 << 31)
+#	define MACH64_CRTC_VBLANK2_INT_AK		(1 << 31)
 
 #define MACH64_DATATYPE_CI8				2
 #define MACH64_DATATYPE_ARGB1555			3
@@ -362,6 +388,10 @@ extern int mach64_dma_vertex( struct inode *inode, struct file *filp,
 #define MACH64_DATATYPE_RGB8				9
 #define MACH64_DATATYPE_ARGB4444			15
 
+/* Constants */
+#define MACH64_LAST_FRAME_REG			MACH64_PAT_REG0
+#define MACH64_LAST_DISPATCH_REG		MACH64_PAT_REG1
+#define MACH64_MAX_VB_AGE		0x7fffffff
 
 #define MACH64_BASE(reg)	((u32)(dev_priv->mmio->handle))
 
@@ -403,6 +433,24 @@ do {									\
 	}								\
 } while (0)
 
+/* Check for high water mark and flush if reached */
+/* FIXME: right now this is needed to ensure free buffers for state emits */
+#define QUEUE_SPACE_TEST_WITH_RETURN( dev_priv )					 \
+do {											 \
+	struct list_head *ptr;								 \
+	int ret, queued = 0;								 \
+	if (list_empty(&dev_priv->dma_queue)) goto __queue_space_done;			 \
+	list_for_each(ptr, &dev_priv->dma_queue) {					 \
+		queued++;								 \
+	}										 \
+	if (queued >= MACH64_DMA_SIZE) {						 \
+		DRM_DEBUG("%s: high mark reached: %d\n", __FUNCTION__, MACH64_DMA_SIZE); \
+		if ((ret=mach64_do_dma_flush( dev_priv )) < 0)				 \
+			return ret;							 \
+	}										 \
+__queue_space_done:									 \
+} while (0)
+
 #define VB_AGE_TEST_WITH_RETURN( dev_priv )				\
 do {									\
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;		\
@@ -410,7 +458,7 @@ do {									\
 		int __ret = mach64_do_dma_idle( dev_priv );		\
 		if ( __ret < 0 ) return __ret;				\
 		sarea_priv->last_dispatch = 0;				\
-		mach64_freelist_reset( dev );				\
+		mach64_freelist_reset( dev_priv );			\
 	}								\
 } while (0)
 
@@ -425,7 +473,7 @@ do {									\
 #define DMA_RESERVED		3
 
 #define MACH64_DMA_TIMEOUT      10           /* 10 vertical retraces should be enough */
-#define MACH64_DMA_SIZE         64           /* 1 MB (64*16kB) should be enough */
+#define MACH64_DMA_SIZE         96           /* Queue high water mark (number of buffers) */
 #define DMA_CHUNKSIZE		0x1000       /* 4kB per DMA descriptor */
 #define APERTURE_OFFSET		0x7ff800
 
@@ -434,31 +482,89 @@ do {									\
 
 #define mach64_flush_write_combine()	mb()
 
-#define DMALOCALS
+#define GET_RING_HEAD( dev_priv )							   \
+do {											   \
+	dev_priv->table_start = (MACH64_READ(MACH64_BM_GUI_TABLE) & 0xfffffff0);	   \
+	/* BM_GUI_TABLE points to the next descriptor to be processed (pre-incremented) */ \
+	if (dev_priv->table_start == dev_priv->table_addr)				   \
+		dev_priv->table_start +=  (dev_priv->table_size - sizeof(u32));		   \
+	else										   \
+		dev_priv->table_start -= sizeof(u32);					   \
+} while (0)
 
+#define DMALOCALS  drm_buf_t *buf = NULL; u32 *p; int outcount = 0
+
+#define GETBUFPTR( dev_priv, _p, _buf )							\
+do {											\
+	if (dev_priv->is_pci)								\
+		(_p) = (u32 *) (_buf)->address;						\
+	else										\
+		(_p) = (u32 *)((char *)dev_priv->buffers->handle + (_buf)->offset);	\
+} while(0)
+
+/* FIXME: use a private set of smaller buffers for state emits, clears, and swaps? */
 #define DMAGETPTR( dev_priv, n )					\
 do {									\
 	if ( MACH64_VERBOSE ) {						\
 		DRM_INFO( "DMAGETPTR( %d ) in %s\n",			\
 			  n, __FUNCTION__ );				\
 	}								\
-	mach64_do_wait_for_fifo( dev_priv, n );				\
-} while (0)
-
-#define DMAOUTREG( reg, val )						\
-do {									\
-	if ( MACH64_VERBOSE ) {						\
-		DRM_INFO( "   DMAOUTREG( 0x%x = 0x%08x )\n",		\
-			  reg, val );					\
+	buf = mach64_freelist_get( dev_priv );				\
+	if (buf == NULL) {						\
+		DRM_ERROR("%s: couldn't get buffer in DMAGETPTR\n",	\
+			   __FUNCTION__ );				\
+		return -EAGAIN;						\
 	}								\
-	MACH64_WRITE( reg, val );					\
+	buf->pid = current->pid;					\
+	outcount = 0;							\
+									\
+        GETBUFPTR( dev_priv, p, buf );					\
 } while (0)
 
-#define DMAADVANCE( dev_priv )						\
-do {									\
-	if ( MACH64_VERBOSE ) {						\
-		DRM_INFO( "DMAADVANCE() in %s\n", __FUNCTION__ );	\
-	}								\
+#define DMAOUTREG( reg, val )					\
+do {								\
+	if ( MACH64_VERBOSE ) {					\
+		DRM_INFO( "   DMAOUTREG( 0x%x = 0x%08x )\n",	\
+			  reg, val );				\
+	}							\
+	p[outcount++] = cpu_to_le32(DMAREG(reg));		\
+	p[outcount++] = cpu_to_le32((val));			\
+	buf->used += 8;						\
 } while (0)
 
-#endif
+#define DMAADVANCE( dev_priv )							\
+do {										\
+	struct list_head *ptr;							\
+	drm_mach64_freelist_t *entry;						\
+										\
+	if ( MACH64_VERBOSE ) {							\
+		DRM_INFO( "DMAADVANCE() in %s\n", __FUNCTION__ );		\
+	}									\
+										\
+	if (list_empty(&dev_priv->empty_list)) {				\
+		DRM_ERROR( "%s: empty placeholder list in DMAADVANCE()\n",	\
+			   __FUNCTION__ );					\
+		return -EFAULT;							\
+	}									\
+										\
+	/* Add the buffer to the DMA queue */					\
+	ptr = dev_priv->empty_list.next;					\
+	list_del(ptr);								\
+	entry = list_entry(ptr, drm_mach64_freelist_t, list);			\
+	entry->buf = buf;							\
+	entry->buf->waiting = 1;						\
+	list_add_tail(ptr, &dev_priv->dma_queue);				\
+										\
+} while (0)
+
+#define DMAFLUSH( dev_priv )					\
+do {								\
+	int ret;						\
+	if ( MACH64_VERBOSE ) {					\
+		DRM_INFO( "DMAFLUSH() in %s\n", __FUNCTION__ );	\
+	}							\
+	if ((ret=mach64_do_dma_flush( dev_priv )) < 0)		\
+			return ret;				\
+} while (0)
+
+#endif /* __MACH64_DRV_H__ */

@@ -523,7 +523,6 @@ typedef struct drm_scatter_gather {
 #define DRM_IOCTL_MACH64_SWAP		DRM_IO(  0x43)
 #define DRM_IOCTL_MACH64_CLEAR		DRM_IOW( 0x44, drm_mach64_clear_t)
 #define DRM_IOCTL_MACH64_VERTEX		DRM_IOW( 0x45, drm_mach64_vertex_t)
-#if 0
 #define DRM_IOCTL_MACH64_BLIT		DRM_IOW( 0x46, drm_mach64_blit_t)
-#endif
+#define DRM_IOCTL_MACH64_FLUSH		DRM_IO(  0x47)
 #endif

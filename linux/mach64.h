@@ -46,9 +46,12 @@
 /* DMA customization:
  */
 #define __HAVE_DMA		1
+#define __HAVE_DMA_FREELIST     0
+#if 0
 #define __HAVE_DMA_IRQ          1
 #define __HAVE_DMA_IRQ_BH       1
 #define __HAVE_SHARED_IRQ       1
+#endif
 
 /* called before installing service routine in _irq_install */
 #define DRIVER_PREINSTALL()						\
@@ -59,14 +62,16 @@ do {									\
 	tmp = MACH64_READ(MACH64_CRTC_INT_CNTL);			\
         DRM_DEBUG("Before PREINSTALL: CRTC_INT_CNTL = 0x%08x\n", tmp);	\
 	/* clear active interrupts */					\
-	if ( tmp & (MACH64_VBLANK_INT | MACH64_BUSMASTER_EOL_INT) ) {	\
+	if ( tmp & (MACH64_CRTC_VBLANK_INT				\
+		    | MACH64_CRTC_BUSMASTER_EOL_INT) ) {		\
 		/* ack bits are the same as active interrupt bits, */	\
 		/* so write back tmp to clear active interrupts */	\
 		MACH64_WRITE( MACH64_CRTC_INT_CNTL, tmp );		\
 	}								\
 									\
 	/* disable interrupts */					\
-	tmp &= ~(MACH64_VBLANK_INT_EN | MACH64_BUSMASTER_EOL_INT_EN);	\
+	tmp &= ~(MACH64_CRTC_VBLANK_INT_EN 				\
+		 | MACH64_CRTC_BUSMASTER_EOL_INT_EN);			\
 	MACH64_WRITE( MACH64_CRTC_INT_CNTL, tmp );			\
         DRM_DEBUG("After PREINSTALL: CRTC_INT_CNTL = 0x%08x\n", tmp);	\
 									\
@@ -82,14 +87,16 @@ do {									\
 	tmp = MACH64_READ(MACH64_CRTC_INT_CNTL);			\
         DRM_DEBUG("Before POSTINSTALL: CRTC_INT_CNTL = 0x%08x\n", tmp);	\
 	/* clear active interrupts */					\
-	if ( tmp & (MACH64_VBLANK_INT | MACH64_BUSMASTER_EOL_INT) ) {	\
+	if ( tmp & (MACH64_CRTC_VBLANK_INT 				\
+		    | MACH64_CRTC_BUSMASTER_EOL_INT) ) {		\
 		/* ack bits are the same as active interrupt bits, */	\
 		/* so write back tmp to clear active interrupts */	\
-		MACH64_WRITE( MACH64_CRTC_INT_CNTL, tmp );  		\
+		MACH64_WRITE( MACH64_CRTC_INT_CNTL, tmp );		\
 	}								\
 									\
 	/* enable interrupts */						\
-	tmp |= MACH64_VBLANK_INT_EN | MACH64_BUSMASTER_EOL_INT_EN;	\
+	tmp |= (MACH64_CRTC_VBLANK_INT_EN 				\
+		| MACH64_CRTC_BUSMASTER_EOL_INT_EN);			\
 	MACH64_WRITE( MACH64_CRTC_INT_CNTL, tmp );			\
         DRM_DEBUG("After POSTINSTALL: CRTC_INT_CNTL = 0x%08x\n", tmp);	\
 									\
@@ -104,14 +111,16 @@ do {										\
 		tmp = MACH64_READ(MACH64_CRTC_INT_CNTL);			\
         	DRM_DEBUG("Before UNINSTALL: CRTC_INT_CNTL = 0x%08x\n", tmp);	\
 		/* clear active interrupts */					\
-		if ( tmp & (MACH64_VBLANK_INT | MACH64_BUSMASTER_EOL_INT) ) { 	\
+		if ( tmp & (MACH64_CRTC_VBLANK_INT 				\
+			    | MACH64__CRTCBUSMASTER_EOL_INT) ) {		\
 			/* ack bits are the same as active interrupt bits, */	\
 			/* so write back tmp to clear active interrupts */	\
 			MACH64_WRITE( MACH64_CRTC_INT_CNTL, tmp );		\
 		}								\
 										\
 		/* disable interrupts */					\
-		tmp &= ~(MACH64_VBLANK_INT_EN | MACH64_BUSMASTER_EOL_INT_EN);	\
+		tmp &= ~(MACH64_CRTC_VBLANK_INT_EN 				\
+			 | MACH64_CRTC_BUSMASTER_EOL_INT_EN);			\
 		MACH64_WRITE( MACH64_CRTC_INT_CNTL, tmp );			\
         	DRM_DEBUG("After UNINSTALL: CRTC_INT_CNTL = 0x%08x\n", tmp);	\
 	}									\

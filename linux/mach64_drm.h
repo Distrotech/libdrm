@@ -73,6 +73,10 @@
  */
 #define MACH64_BUFFER_SIZE		16384
 
+/* Byte offsets for host blit buffer data
+ */
+#define MACH64_HOSTDATA_BLIT_OFFSET	104
+
 /* Keep these small for testing.
  */
 #define MACH64_NR_SAREA_CLIPRECTS	8
@@ -191,7 +195,7 @@ typedef struct drm_mach64_vertex {
 	int count;			/* Number of vertices in buffer */
 	int discard;			/* Client finished with buffer? */
 } drm_mach64_vertex_t;
-#if 0
+
 typedef struct drm_mach64_blit {
 	int idx;
 	int pitch;
@@ -200,5 +204,5 @@ typedef struct drm_mach64_blit {
 	unsigned short x, y;
 	unsigned short width, height;
 } drm_mach64_blit_t;
-#endif
+
 #endif

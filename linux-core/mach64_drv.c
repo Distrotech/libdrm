@@ -44,18 +44,16 @@
 #define DRIVER_PATCHLEVEL	0
 
 
-#define DRIVER_IOCTLS								\
-	[DRM_IOCTL_NR(DRM_IOCTL_DMA)]	        = { mach64_dma_buffers, 1, 0 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_INIT)]   = { mach64_dma_init,    1, 1 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_CLEAR)]  = { mach64_dma_clear,   1, 0 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_SWAP)]   = { mach64_dma_swap,    1, 0 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_IDLE)]   = { mach64_dma_idle,    1, 0 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_VERTEX)] = { mach64_dma_vertex,  1, 0 }
-
-#if 0
-   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_BLIT)]   = { mach64_blit,       1, 0 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_FLUSH)]  = { mach64_flush,      1, 0 },
-#endif
+#define DRIVER_IOCTLS									\
+	[DRM_IOCTL_NR(DRM_IOCTL_DMA)]	        = { mach64_dma_buffers,    1, 0 },	\
+   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_INIT)]   = { mach64_dma_init,       1, 1 },	\
+   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_CLEAR)]  = { mach64_dma_clear,      1, 0 },	\
+   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_SWAP)]   = { mach64_dma_swap,       1, 0 },	\
+   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_IDLE)]   = { mach64_dma_idle,       1, 0 },	\
+   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_RESET)]  = { mach64_engine_reset,   1, 0 },	\
+   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_VERTEX)] = { mach64_dma_vertex,     1, 0 },	\
+   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_BLIT)]   = { mach64_dma_blit,       1, 0 },	\
+   	[DRM_IOCTL_NR(DRM_IOCTL_MACH64_FLUSH)]  = { mach64_dma_flush,      1, 0 },
 
 #include "drm_agpsupport.h"
 #include "drm_auth.h"
