@@ -490,6 +490,11 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 
 	dev_priv->usec_timeout		= 1000000;
 
+	INIT_LIST_HEAD(&dev_priv->free_list);
+	INIT_LIST_HEAD(&dev_priv->empty_list);
+	INIT_LIST_HEAD(&dev_priv->pending);
+	INIT_LIST_HEAD(&dev_priv->dma_queue);
+
 	list_for_each(list, &dev->maplist->head) {
 		drm_map_list_t *r_list = (drm_map_list_t *)list;
 		if( r_list->map && 
@@ -658,10 +663,6 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 #endif
 
 	/* Set up the freelist, empty (placeholder), pending, and DMA request queues... */
-	INIT_LIST_HEAD(&dev_priv->free_list);
-	INIT_LIST_HEAD(&dev_priv->empty_list);
-	INIT_LIST_HEAD(&dev_priv->pending);
-	INIT_LIST_HEAD(&dev_priv->dma_queue);
 
 	mach64_init_freelist( dev );
 
