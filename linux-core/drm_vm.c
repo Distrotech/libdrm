@@ -34,6 +34,7 @@
 #ifndef _DRM_VM_H_
 #define _DRM_VM_H_
 
+
 /**
  * Mappings list
  */
@@ -41,6 +42,16 @@ typedef struct drm_map_list {
 	struct list_head	head;	/**< list head */
 	drm_map_t		*map;	/**< mapping */
 } drm_map_list_t;
+
+
+/**
+ * Virtual Memory Areas list.  Used debugging purposes.
+ */
+typedef struct drm_vma_entry {
+	struct vm_area_struct *vma;
+	struct drm_vma_entry  *next;
+	pid_t		      pid;
+} drm_vma_entry_t;
 
 
 /** \name Prototypes */

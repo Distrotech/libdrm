@@ -121,6 +121,7 @@ typedef struct drm_device drm_device_t;
 #include "drm_vm.h"
 #include "drm_memory.h"
 #include "drm_stub.h"
+#include "drm_fops.h"
 
 
 /***********************************************************************/
@@ -420,12 +421,6 @@ typedef struct drm_magic_head {
 	struct drm_magic_entry *tail;
 } drm_magic_head_t;
 
-typedef struct drm_vma_entry {
-	struct vm_area_struct *vma;
-	struct drm_vma_entry  *next;
-	pid_t		      pid;
-} drm_vma_entry_t;
-
 /** File private data */
 typedef struct drm_file {
 	int		  authenticated;
@@ -574,19 +569,9 @@ extern int           DRM(cpu_valid)( void );
 				/* Driver support (drm_drv.h) */
 extern int           DRM(version)(struct inode *inode, struct file *filp,
 				  unsigned int cmd, unsigned long arg);
-extern int           DRM(open)(struct inode *inode, struct file *filp);
-extern int           DRM(release)(struct inode *inode, struct file *filp);
-extern int           DRM(ioctl)(struct inode *inode, struct file *filp,
-				unsigned int cmd, unsigned long arg);
 extern int	     DRM(noop_ioctl)(struct inode *inode, struct file *filp,
 				  unsigned int cmd, unsigned long arg);
 
-
-				/* Device support (drm_fops.h) */
-extern int	     DRM(open_helper)(struct inode *inode, struct file *filp,
-				      drm_device_t *dev);
-extern int	     DRM(flush)(struct file *filp);
-extern int	     DRM(fasync)(int fd, struct file *filp, int on);
 
 				/* Misc. IOCTL support (drm_ioctl.h) */
 extern int	     DRM(irq_busid)(struct inode *inode, struct file *filp,
@@ -646,12 +631,6 @@ extern int	     DRM(getmagic)(struct inode *inode, struct file *filp,
 				   unsigned int cmd, unsigned long arg);
 extern int	     DRM(authmagic)(struct inode *inode, struct file *filp,
 				    unsigned int cmd, unsigned long arg);
-
-				/* Stub support (drm_stub.h) */
-int                   DRM(stub_register)(const char *name,
-					 struct file_operations *fops,
-					 drm_device_t *dev);
-int                   DRM(stub_unregister)(int minor);
 
 				/* Proc support (drm_proc.h) */
 extern struct proc_dir_entry *DRM(proc_init)(drm_device_t *dev,
