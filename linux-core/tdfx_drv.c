@@ -89,4 +89,4 @@ static drm_pci_list_t DRM(idlist)[] = {
 #include "drm_memory_tmp.h"
 #include "drm_proc.h"
 #include "drm_vm_tmp.h"
-#include "drm_stub.h"
+#include "drm_stub_tmp.h"

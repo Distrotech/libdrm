@@ -120,6 +120,7 @@ typedef struct drm_device drm_device_t;
 #include "drm_dma.h"
 #include "drm_vm.h"
 #include "drm_memory.h"
+#include "drm_stub.h"
 
 
 /***********************************************************************/
