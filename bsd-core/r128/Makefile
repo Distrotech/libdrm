@@ -1,11 +1,11 @@
 # $FreeBSD$
 
-KMOD	= drm
-SRCS	= init.c memory.c auth.c context.c drawable.c bufs.c \
-	  lists.c lock.c ioctl.c fops.c vm.c dma.c sysctl.c  \
-	  agpsupport.c ctxbitmap.c
+KMOD	= r128
+SRCS    = r128_cce.c r128_drv.c r128_state.c
 SRCS   += device_if.h bus_if.h pci_if.h
 CFLAGS += ${DEBUG_FLAGS} -I..
+KERN    = /usr/src/sys
+KMODDEPS = drm
 
 @:
 	ln -sf /sys @

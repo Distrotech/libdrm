@@ -3,8 +3,69 @@ XCOMM $XFree86: xc/programs/Xserver/hw/xfree86/os-support/bsd/drm/kernel/Imakefi
 #include <Server.tmpl>
 
 XCOMM We need to use Linux headers to avoid skew, OS dependencies will be
-XCOMM held in a drm_os.h file (hopefully).
+XCOMM held in a drm_os.h file (eventually/hopefully). Currently these
+XCOMM dependencies are stuck in drmP.h
 
+LinkFile(gamma/gamma.h,$(XF86OSSRC)/linux/drm/kernel/gamma.h)
+LinkFile(gamma/gamma_drv.h,$(XF86OSSRC)/linux/drm/kernel/gamma_drv.h)
+LinkFile(gamma/gamma_drv.c,$(XF86OSSRC)/linux/drm/kernel/gamma_drv.c)
+LinkFile(gamma/gamma_dma.c,$(XF86OSSRC)/linux/drm/kernel/gamma_dma.c)
+
+LinkFile(mga/mga.h,$(XF86OSSRC)/linux/drm/kernel/mga.h)
+LinkFile(mga/mga_drv.h,$(XF86OSSRC)/linux/drm/kernel/mga_drv.h)
+LinkFile(mga/mga_ucode.h,$(XF86OSSRC)/linux/drm/kernel/mga_ucode.h)
+LinkFile(mga/mga_dma.c,$(XF86OSSRC)/linux/drm/kernel/mga_dma.c)
+LinkFile(mga/mga_drv.c,$(XF86OSSRC)/linux/drm/kernel/mga_drv.c)
+LinkFile(mga/mga_state.c,$(XF86OSSRC)/linux/drm/kernel/mga_state.c)
+LinkFile(mga/mga_warp.c,$(XF86OSSRC)/linux/drm/kernel/mga_warp.c)
+
+LinkFile(tdfx/tdfx.h,$(XF86OSSRC)/linux/drm/kernel/tdfx.h)
+LinkFile(tdfx/tdfx_drv.c,$(XF86OSSRC)/linux/drm/kernel/tdfx_drv.c)
+
+LinkFile(r128/r128.h,$(XF86OSSRC)/linux/drm/kernel/r128.h)
+LinkFile(r128/r128_cce.c,$(XF86OSSRC)/linux/drm/kernel/r128_cce.c)
+LinkFile(r128/r128_drv.c,$(XF86OSSRC)/linux/drm/kernel/r128_drv.c)
+LinkFile(r128/r128_drv.h,$(XF86OSSRC)/linux/drm/kernel/r128_drv.h)
+LinkFile(r128/r128_state.c,$(XF86OSSRC)/linux/drm/kernel/r128_state.c)
+
+LinkFile(radeon/radeon.h,$(XF86OSSRC)/linux/drm/kernel/radeon.h)
+LinkFile(radeon/radeon_context.c,$(XF86OSSRC)/linux/drm/kernel/radeon_context.c)
+LinkFile(radeon/radeon_drv.h,$(XF86OSSRC)/linux/drm/kernel/radeon_drv.h)
+LinkFile(radeon/radeon_bufs.c,$(XF86OSSRC)/linux/drm/kernel/radeon_bufs.c)
+LinkFile(radeon/radeon_cp.c,$(XF86OSSRC)/linux/drm/kernel/radeon_cp.c)
+LinkFile(radeon/radeon_drv.c,$(XF86OSSRC)/linux/drm/kernel/radeon_drv.c)
+LinkFile(radeon/radeon_state.c,$(XF86OSSRC)/linux/drm/kernel/radeon_state.c)
+
+LinkFile(i810/i810.h,$(XF86OSSRC)/linux/drm/kernel/i810.h)
+LinkFile(i810/i810_dma.c,$(XF86OSSRC)/linux/drm/kernel/i810_dma.c)
+LinkFile(i810/i810_drv.c,$(XF86OSSRC)/linux/drm/kernel/i810_drv.c)
+LinkFile(i810/i810_drv.h,$(XF86OSSRC)/linux/drm/kernel/i810_drv.h)
+
+LinkFile(sis/sis_context.c,$(XF86OSSRC)/linux/drm/kernel/sis_context.c)
+LinkFile(sis/sis_drv.c,$(XF86OSSRC)/linux/drm/kernel/sis_drv.c)
+LinkFile(sis/sis_drv.h,$(XF86OSSRC)/linux/drm/kernel/sis_drv.h)
+LinkFile(sis/sis_ds.h,$(XF86OSSRC)/linux/drm/kernel/sis_ds.h)
+LinkFile(sis/sis_ds.c,$(XF86OSSRC)/linux/drm/kernel/sis_ds.c)
+LinkFile(sis/sis_mm.c,$(XF86OSSRC)/linux/drm/kernel/sis_mm.c)
+
+LinkSourceFile(ati_pcigart.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_agpsupport.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_auth.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_bufs.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_context.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_dma.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_drawable.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_drv.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_fops.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_init.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_ioctl.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_lists.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_lock.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_memory.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_proc.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_scatter.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_stub.h,$(XF86OSSRC)/linux/drm/kernel)
+LinkSourceFile(drm_vm.h,$(XF86OSSRC)/linux/drm/kernel)
 LinkSourceFile(drm.h,$(XF86OSSRC)/linux/drm/kernel)
 LinkSourceFile(drmP.h,$(XF86OSSRC)/linux/drm/kernel)
 LinkSourceFile(i810_drm.h,$(XF86OSSRC)/linux/drm/kernel)
