@@ -32,7 +32,9 @@
 #define __NO_VERSION__
 #include "drmP.h"
 
+#ifdef __linux__
 #include <linux/interrupt.h>	/* For task queue support */
+#endif
 
 #ifndef __HAVE_DMA_WAITQUEUE
 #define __HAVE_DMA_WAITQUEUE	0

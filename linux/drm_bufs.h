@@ -30,7 +30,9 @@
  */
 
 #define __NO_VERSION__
+#ifdef __linux__
 #include <linux/vmalloc.h>
+#endif
 #include "drmP.h"
 
 #ifndef __HAVE_PCI_DMA

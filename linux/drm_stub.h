@@ -31,8 +31,10 @@
 #define __NO_VERSION__
 #include "drmP.h"
 
+#ifdef __linux__
 #if LINUX_VERSION_CODE < 0x020400
 #include "stubsupport-pre24.h"
+#endif
 #endif
 
 #define DRM_STUB_MAXCARDS 16	/* Enough for one machine */

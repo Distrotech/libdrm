@@ -111,3 +111,32 @@ find_first_zero_bit(volatile u_int32_t *p, int max)
 #define MODULE_DEPEND(a,b,c,d,e)	struct __hack
 
 #endif
+
+#define __drm_dummy_lock(lock) (*(__volatile__ unsigned int *)lock)
+#define _DRM_CAS(lock,old,new,__ret)				       \
+	do {							       \
+		int __dummy;	/* Can't mark eax as clobbered */      \
+		__asm__ __volatile__(				       \
+			"lock ; cmpxchg %4,%1\n\t"		       \
+			"setnz %0"				       \
+			: "=d" (__ret),				       \
+			  "=m" (__drm_dummy_lock(lock)),	       \
+			  "=a" (__dummy)			       \
+			: "2" (old),				       \
+			  "r" (new));				       \
+	} while (0)
+
+/* Redefinitions to make templating easy */
+#define wait_queue_head_t	int
+#define cycles_t		struct timespec
+
+#define DRM_FIND_MAP(dest, o)						\
+	do {								\
+		drm_map_list_entry_t *listentry;			\
+		TAILQ_FOREACH(listentry, dev->maplist, link) {		\
+			if ( listentry->map->offset == o ) {		\
+				dest = listentry->map;			\
+				break;					\
+			}						\
+		}							\
+	} while (0)

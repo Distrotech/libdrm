@@ -55,6 +55,34 @@
 #define DRIVER_PATCHLEVEL	0
 
 
+#ifdef __FreeBSD__
+static int tdfx_probe(device_t dev)
+{
+	const char *s = 0;
+
+	switch (pci_get_devid(dev)) {
+	case 0x0003121a:
+		s = "3Dfx Voodoo Banshee graphics accelerator";
+		break;
+		
+	case 0x0005121a:
+		s = "3Dfx Voodoo 3 graphics accelerator";
+		break;
+
+	case 0x0009121a:
+		s = "3Dfx Voodoo 4/5 graphics accelerator";
+		break;
+	}
+	
+	if (s) {
+		device_set_desc(dev, s);
+		return 0;
+	}
+	
+	return ENXIO;
+}
+#endif
+
 #include "drm_auth.h"
 #include "drm_bufs.h"
 #include "drm_context.h"
@@ -69,3 +97,7 @@
 #include "drm_proc.h"
 #include "drm_vm.h"
 #include "drm_stub.h"
+
+#ifdef __FreeBSD__
+DRIVER_MODULE(tdfx, pci, tdfx_driver, tdfx_devclass, 0, 0);
+#endif

@@ -30,9 +30,13 @@
  */
 
 #define __NO_VERSION__
+#ifdef __linux__
 #include <linux/config.h>
+#endif
 #include "drmP.h"
+#ifdef __linux__
 #include <linux/wrapper.h>
+#endif
 
 typedef struct drm_mem_stats {
 	const char	  *name;

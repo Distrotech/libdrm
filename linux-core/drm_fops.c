@@ -32,7 +32,9 @@
 
 #define __NO_VERSION__
 #include "drmP.h"
+#ifdef __linux__
 #include <linux/poll.h>
+#endif
 
 /* drm_open is called whenever a process opens /dev/drm. */
 
