@@ -344,6 +344,54 @@ void mach64_dump_engine_info( drm_mach64_private_t *dev_priv )
 	DRM_INFO( "\n" );
 }
 
+void mach64_dump_ring( drm_mach64_private_t *dev_priv )
+{
+	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring;
+	int i, i0, i1;
+	
+	DRM_INFO( "\n" );
+	
+	DRM_INFO(": ring head_addr: 0x%08x head: %d tail: %d\n", ring->head_addr, ring->head, ring->tail );
+	
+	if ( ring->head <= ring->tail ) {
+		i0 = ring->head;
+		i1 = ring->tail;
+	} else {
+		i0 = ring->tail;
+		i1 = ring->head;
+	}
+	
+	if ( (i0 = (i0 - 16) & 0xffffff0) < 0)
+		i0 = 0;
+	if ( (i1 = (i1 + 16) & 0xffffff0) > ring->size / sizeof(u32) )
+		i1 = ring->size / sizeof(u32);
+	for ( i = i0; i < i1; i += 4) {
+		DRM_INFO( "  0x%08x:  0x%08x 0x%08x 0x%08x 0x%08x%s%s\n",
+			ring->start_addr + i * sizeof(u32),
+			((u32*) ring->start)[i + 0],
+			((u32*) ring->start)[i + 1],
+			((u32*) ring->start)[i + 2], 
+			((u32*) ring->start)[i + 3],
+			i == ring->head ? " (head)" : "",
+			i == ring->tail ? " (tail)" : ""
+		);
+	}
+
+	DRM_INFO( "\n" );
+	DRM_INFO( "       BM_GUI_TABLE = 0x%08x\n", MACH64_READ( MACH64_BM_GUI_TABLE ) );
+	DRM_INFO( "\n" );
+	DRM_INFO( "BM_FRAME_BUF_OFFSET = 0x%08x\n", MACH64_READ( MACH64_BM_FRAME_BUF_OFFSET ) );
+	DRM_INFO( " BM_SYSTEM_MEM_ADDR = 0x%08x\n", MACH64_READ( MACH64_BM_SYSTEM_MEM_ADDR ) );
+	DRM_INFO( "         BM_COMMAND = 0x%08x\n", MACH64_READ( MACH64_BM_COMMAND ) );
+	DRM_INFO( "\n" );
+	DRM_INFO( "          BM_STATUS = 0x%08x\n", MACH64_READ( MACH64_BM_STATUS ) );
+	DRM_INFO( "           BUS_CNTL = 0x%08x\n", MACH64_READ( MACH64_BUS_CNTL ) );
+	DRM_INFO( "          FIFO_STAT = 0x%08x\n", MACH64_READ( MACH64_FIFO_STAT ) );
+	DRM_INFO( "           GUI_STAT = 0x%08x\n", MACH64_READ( MACH64_GUI_STAT ) );
+	DRM_INFO( "           SRC_CNTL = 0x%08x\n", MACH64_READ( MACH64_SRC_CNTL ) );
+}
+
+
 /* ================================================================
  * DMA test and initialization
  */
@@ -1301,6 +1349,13 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 			head = ring->head;
 
 			if ( head == tail ) {
+#if MACH64_EXTRA_CHECKING
+				if ( MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE ) {
+					DRM_ERROR( "Empty ring with non-idle engine!\n" );
+					mach64_dump_ring( dev_priv );
+					return NULL;
+				}
+#endif
 				/* last pass is complete, so release everything */
 				mach64_do_release_used_buffers( dev_priv );
 				DRM_DEBUG( "%s: idle engine, freed all buffers.\n", __FUNCTION__ );
@@ -1315,6 +1370,19 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 				ofs = entry->ring_ofs;
 				if ( (head < tail && (ofs < head || ofs >= tail)) ||
 				     (head > tail && (ofs < head && ofs >= tail)) ) {
+#if MACH64_EXTRA_CHECKING
+					int i;
+					
+					for ( i = head ; i != tail ; i = (i + 4) & ring->tail_mask ) {
+						u32 o1 = ((u32 *)ring->start)[i + 1];
+						u32 o2 = GETBUFADDR( entry->buf );
+						if ( o1 == o2 ) {
+							DRM_ERROR ( "Attempting to free an used buffer: i=%d  buf=0x%08x (0x%08x)\n", i, o1, o2 );
+							mach64_dump_ring( dev_priv );
+							return NULL;
+						}
+					}
+#endif
 					/* found a processed buffer */
 					entry->buf->pending = 0;
 					list_del(ptr);
@@ -1325,6 +1393,7 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 			}
 			udelay( 1 );
 		}
+		mach64_dump_ring( dev_priv );
 		DRM_ERROR( "timeout waiting for buffers: ring head_addr: 0x%08x head: %d tail: %d\n", ring->head_addr, ring->head, ring->tail );
 		return NULL;
 	}
@@ -1387,7 +1456,11 @@ static int mach64_dma_get_buffers( drm_device_t *dev, drm_dma_t *d )
 
 	for ( i = d->granted_count ; i < d->request_count ; i++ ) {
 		buf = mach64_freelist_get( dev_priv );
+#if MACH64_EXTRA_CHECKING
+		if ( !buf ) return -EFAULT;
+#else
 		if ( !buf ) return -EAGAIN;
+#endif
 
 		buf->pid = current->pid;
 
