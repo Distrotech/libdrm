@@ -253,6 +253,7 @@ extern int mach64_dma_vertex( struct inode *inode, struct file *filp,
 #define MACH64_SCALE_3D_CNTL			0x05fc
 #define MACH64_SCRATCH_REG0			0x0480
 #define MACH64_SCRATCH_REG1			0x0484
+#define MACH64_SECONDARY_TEX_OFF		0x0778
 #define MACH64_SETUP_CNTL			0x0304
 #define MACH64_SRC_CNTL				0x05b4
 #	define MACH64_SRC_BM_ENABLE			(1 << 8)
@@ -269,6 +270,7 @@ extern int mach64_dma_vertex( struct inode *inode, struct file *filp,
 #define MACH64_SRC_WIDTH1			0x0590
 #define MACH64_SRC_Y_X				0x058c
 
+#define MACH64_TEX_0_OFF			0x05c0
 #define MACH64_TEX_CNTL				0x0774
 #define MACH64_TEX_SIZE_PITCH			0x0770
 #define MACH64_TIMER_CONFIG 			0x0428

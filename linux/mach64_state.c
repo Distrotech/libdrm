@@ -34,6 +34,89 @@
 
 
 /* ================================================================
+ * DMA hardware state programming functions
+ */
+
+static inline void mach64_emit_texture( drm_mach64_private_t *dev_priv )
+{
+	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
+	drm_mach64_context_regs_t *regs = &sarea_priv->context_state;
+	u32 offset = ((regs->tex_size_pitch & 0xf0) >> 2);
+
+	MACH64_WRITE( MACH64_TEX_SIZE_PITCH, regs->tex_size_pitch );
+	MACH64_WRITE( MACH64_TEX_CNTL, regs->tex_cntl );
+	MACH64_WRITE( MACH64_SECONDARY_TEX_OFF, regs->secondary_tex_off );
+	MACH64_WRITE( MACH64_TEX_0_OFF + offset, regs->tex_offset );
+}
+
+static inline void mach64_emit_state( drm_mach64_private_t *dev_priv )
+{
+	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
+	drm_mach64_context_regs_t *regs = &sarea_priv->context_state;
+	unsigned int dirty = sarea_priv->dirty;
+
+	DRM_DEBUG( "%s: dirty=0x%08x\n", __FUNCTION__, dirty );
+
+	if ( dirty & MACH64_UPLOAD_MISC ) {
+		MACH64_WRITE( MACH64_DP_MIX, regs->dp_mix );
+		MACH64_WRITE( MACH64_DP_SRC, regs->dp_src );
+		MACH64_WRITE( MACH64_CLR_CMP_CNTL, regs->clr_cmp_cntl );
+		MACH64_WRITE( MACH64_GUI_TRAJ_CNTL, regs->gui_traj_cntl );
+		sarea_priv->dirty &= ~MACH64_UPLOAD_MISC;
+	}
+
+	if ( dirty & MACH64_UPLOAD_DST_OFF_PITCH ) {
+		MACH64_WRITE( MACH64_DST_OFF_PITCH, regs->dst_off_pitch );
+		sarea_priv->dirty &= ~MACH64_UPLOAD_DST_OFF_PITCH;
+	}
+	if ( dirty & MACH64_UPLOAD_Z_OFF_PITCH ) {
+		MACH64_WRITE( MACH64_Z_OFF_PITCH, regs->z_off_pitch );
+		sarea_priv->dirty &= ~MACH64_UPLOAD_Z_OFF_PITCH;
+	}
+	if ( dirty & MACH64_UPLOAD_Z_ALPHA_CNTL ) {
+		MACH64_WRITE( MACH64_Z_CNTL, regs->z_cntl );
+		MACH64_WRITE( MACH64_ALPHA_TST_CNTL, regs->alpha_tst_cntl );
+		sarea_priv->dirty &= ~MACH64_UPLOAD_Z_ALPHA_CNTL;
+	}
+	if ( dirty & MACH64_UPLOAD_SCALE_3D_CNTL ) {
+		MACH64_WRITE( MACH64_SCALE_3D_CNTL, regs->scale_3d_cntl );
+		sarea_priv->dirty &= ~MACH64_UPLOAD_SCALE_3D_CNTL;
+	}
+	if ( dirty & MACH64_UPLOAD_DP_FOG_CLR ) {
+		MACH64_WRITE( MACH64_DP_FOG_CLR, regs->dp_fog_clr );
+		sarea_priv->dirty &= ~MACH64_UPLOAD_DP_FOG_CLR;
+	}
+	if ( dirty & MACH64_UPLOAD_DP_WRITE_MASK ) {
+		MACH64_WRITE( MACH64_DP_WRITE_MASK, regs->dp_write_mask );
+		sarea_priv->dirty &= ~MACH64_UPLOAD_DP_WRITE_MASK;
+	}
+	if ( dirty & MACH64_UPLOAD_DP_PIX_WIDTH ) {
+		MACH64_WRITE( MACH64_DP_PIX_WIDTH, regs->dp_pix_width );
+		sarea_priv->dirty &= ~MACH64_UPLOAD_DP_PIX_WIDTH;
+	}
+	if ( dirty & MACH64_UPLOAD_SETUP_CNTL ) {
+		MACH64_WRITE( MACH64_SETUP_CNTL, regs->setup_cntl );
+		sarea_priv->dirty &= ~MACH64_UPLOAD_SETUP_CNTL;
+	}
+
+	if ( dirty & MACH64_UPLOAD_TEXTURE ) {
+		mach64_emit_texture( dev_priv );
+		sarea_priv->dirty &= ~MACH64_UPLOAD_TEXTURE;
+	}
+
+	if ( dirty & MACH64_UPLOAD_CLIPRECTS ) {
+		MACH64_WRITE( MACH64_SC_LEFT_RIGHT, regs->sc_left_right );
+		MACH64_WRITE( MACH64_SC_TOP_BOTTOM, regs->sc_top_bottom );
+		sarea_priv->dirty &= ~MACH64_UPLOAD_CLIPRECTS;
+	}
+
+	/* FIXME: Is this really necessary? */
+	sarea_priv->dirty = 0;
+}
+
+
+
+/* ================================================================
  * DMA command dispatch functions
  */
 
@@ -316,9 +399,11 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 		buf_priv->dispatched = 1;
 
 		if ( sarea_priv->dirty & ~MACH64_UPLOAD_CLIPRECTS ) {
+#else
+		if ( sarea_priv->dirty ) {
+#endif
 			mach64_emit_state( dev_priv );
 		}
-#endif
 
 		do {
 #if 0
