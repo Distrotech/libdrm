@@ -135,7 +135,7 @@ int DRM(setunique)( DRM_OS_IOCTL )
 				  DRM_MEM_DRIVER);
 	if(!dev->devname) {
 		DRM(free)(dev->devname, sizeof(*dev->devname), DRM_MEM_DRIVER);
-		return -ENOMEM;
+		DRM_OS_RETURN(ENOMEM);
 	}
 	sprintf(dev->devname, "%s@%s", dev->name, dev->unique);
 
