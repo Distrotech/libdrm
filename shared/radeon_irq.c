@@ -48,6 +48,9 @@
  *
  * - Internally in cp_getbuffer, etc:
  *    - as above, but wait with lock held???
+ *
+ * NOTE: These functions are misleadingly named -- the irq's aren't
+ * tied to dma at all, this is just a hangover from dri prehistory.
  */
 
 void DRM(dma_service)( DRM_IRQ_ARGS )

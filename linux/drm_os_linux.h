@@ -15,8 +15,9 @@
 #define DRM_WRITEMEMORYBARRIER()	wmb()
 #define DRM_DEVICE	drm_file_t	*priv	= filp->private_data; \
 			drm_device_t	*dev	= priv->dev
-#define DRM_IRQ_ARGS		void *arg
-#define DRM_TASKQUEUE_ARGS	void *arg, int pending
+
+#define DRM_IRQ_ARGS	        int irq, void *arg, struct pt_regs *regs
+#define DRM_TASKQUEUE_ARGS	void *arg
 
 /* For data going from/to the kernel through the ioctl argument */
 #define DRM_COPY_FROM_USER_IOCTL(arg1, arg2, arg3)	\

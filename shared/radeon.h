@@ -105,7 +105,6 @@
  * DRM infrastructure takes care of reclaiming dma buffers.
  */
 #define DRIVER_PRERELEASE() do {					\
-	printk("%s\n", __FUNCTION__); \
 	if ( dev->dev_private ) {					\
 		drm_radeon_private_t *dev_priv = dev->dev_private;	\
 		if ( dev_priv->page_flipping ) {			\
@@ -150,13 +149,21 @@
       	RADEON_WRITE( RADEON_GEN_INT_CNTL, 0 );			\
 } while (0)
 
+/* #ifdef __linux__ */
+/* #define IWH(x) init_waitqueue_head(x) */
+/* #else */
+/* #define IWH(x) */
+/* #endif */
+
+#define IWH(x)
+
 #define DRIVER_POSTINSTALL() do {				\
 	drm_radeon_private_t *dev_priv =			\
 		(drm_radeon_private_t *)dev->dev_private;	\
 								\
    	atomic_set(&dev_priv->irq_received, 0);			\
    	atomic_set(&dev_priv->irq_emitted, 0);			\
-	init_waitqueue_head(&dev_priv->irq_queue);		\
+	IWH(&dev_priv->irq_queue);		\
 								\
 	/* Turn on SW_INT only */				\
    	RADEON_WRITE( RADEON_GEN_INT_CNTL,			\
