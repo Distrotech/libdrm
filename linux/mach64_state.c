@@ -486,7 +486,7 @@ u32 copy_and_verify( u32 *dst, u32 *src, u32 used)
 #if 0
 			/* This is an exact match of Mach64's Setup Engine register.
 			 */
-			if( (reg >= 0x0190 && reg <= 0x01c1) || (reg >= 0x01ca && reg >= 0x01cf) ) {
+			if( (reg >= 0x0190 && reg < 0x01c1) || (reg >= 0x01ca && reg <= 0x01cf) ) {
 #else
 			/* This is faster but it covers undefined addresses.
 			 * FIXME: It must be verified that these addresses can't compromise the
