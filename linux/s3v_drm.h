@@ -52,6 +52,17 @@
 #define S3V_BACK    0x2
 #define S3V_DEPTH   0x4
 
+/* s3v specific ioctls */
+#define DRM_IOCTL_S3V_INIT      	DRM_IOW( 0x60, drm_s3v_init_t)
+#define DRM_IOCTL_S3V_SIMPLE_LOCK   	DRM_IO(  0x6a)
+#define DRM_IOCTL_S3V_SIMPLE_FLUSH_LOCK DRM_IO(  0x6b)
+#define DRM_IOCTL_S3V_SIMPLE_UNLOCK 	DRM_IO(  0x6c)
+#define DRM_IOCTL_S3V_RESET     	DRM_IO(  0x61)
+#define DRM_IOCTL_S3V_STATUS        	DRM_IO(  0x62)
+/*
+#define DRM_IOCTL_S3V_COPY     		DRM_IOW( 0x6d, drm_s3v_copy_t)
+*/
+
 typedef struct _drm_s3v_init {
 	enum {
 		S3V_INIT_DMA = 0x01,

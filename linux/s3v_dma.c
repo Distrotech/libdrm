@@ -4,6 +4,7 @@
 
 #include "s3v.h"
 #include "drmP.h"
+#include "s3v_drm.h"
 #include "s3v_drv.h"
 
 #include <linux/timex.h>
