@@ -696,9 +696,10 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 	}
 
 	buf->used = vertex.count;
+#if 0
 	buf_priv->prim = vertex.prim;
 	buf_priv->discard = vertex.discard;
-
+#endif
 	mach64_dma_dispatch_vertex( dev, buf );
 
 	return 0;
