@@ -406,7 +406,7 @@ typedef struct drm_sg_mem {
 	void            *virtual;
 	int             pages;
 	struct page     **pagelist;
-#if defined(__alpha__) && (LINUX_VERSION_CODE >= 0x020400)
+#if defined(__alpha__)
 	dma_addr_t	*busaddr;
 #endif
 } drm_sg_mem_t;

@@ -318,11 +318,7 @@ int DRM(rmmap)( DRM_OS_IOCTL )
 
 #ifdef __linux__
 	for (pt = dev->vmalist, prev = NULL; pt; prev = pt, pt = pt->next) {
-#if LINUX_VERSION_CODE >= 0x020300
 		if (pt->vma->vm_private_data == map) found_maps++;
-#else
-		if (pt->vma->vm_pte == map) found_maps++;
-#endif
 	}
 #endif
 

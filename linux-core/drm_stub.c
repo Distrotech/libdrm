@@ -31,12 +31,6 @@
 #define __NO_VERSION__
 #include "drmP.h"
 
-#ifdef __linux__
-#if LINUX_VERSION_CODE < 0x020400
-#include "stubsupport-pre24.h"
-#endif
-#endif
-
 #define DRM_STUB_MAXCARDS 16	/* Enough for one machine */
 
 static struct drm_stub_list {
@@ -72,9 +66,7 @@ static int DRM(stub_open)(struct inode *inode, struct file *filp)
 }
 
 static struct file_operations DRM(stub_fops) = {
-#if LINUX_VERSION_CODE >= 0x020400
 	owner:   THIS_MODULE,
-#endif
 	open:	 DRM(stub_open)
 };
 

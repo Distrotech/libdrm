@@ -117,7 +117,6 @@
 #endif
 #ifndef DRIVER_FOPS
 #ifdef __linux__
-#if LINUX_VERSION_CODE >= 0x020400
 #define DRIVER_FOPS				\
 static struct file_operations	DRM(fops) = {	\
 	owner:   THIS_MODULE,			\
@@ -130,19 +129,6 @@ static struct file_operations	DRM(fops) = {	\
 	fasync:	 DRM(fasync),			\
 	poll:	 DRM(poll),			\
 }
-#else
-#define DRIVER_FOPS				\
-static struct file_operations	DRM(fops) = {	\
-	open:	 DRM(open),			\
-	flush:	 DRM(flush),			\
-	release: DRM(release),			\
-	ioctl:	 DRM(ioctl),			\
-	mmap:	 DRM(mmap),			\
-	read:	 DRM(read),			\
-	fasync:	 DRM(fasync),			\
-	poll:	 DRM(poll),			\
-}
-#endif
 #endif /* __linux__ */
 #ifdef __FreeBSD__
 #if DRM_LINUX
@@ -978,11 +964,6 @@ int DRM( open)(dev_t kdev, int flags, int fmt, struct proc *p)
 #endif
 
 	if ( !retcode ) {
-#ifdef __linux__
-#if LINUX_VERSION_CODE < 0x020333
-		MOD_INC_USE_COUNT; /* Needed before Linux 2.3.51 */
-#endif
-#endif
 		atomic_inc( &dev->counts[_DRM_STAT_OPENS] );
 		DRM_OS_SPINLOCK( &dev->count_lock );
 		if ( !dev->open_count++ ) {
@@ -1157,11 +1138,6 @@ int DRM( close)(dev_t kdev, int flags, int fmt, struct proc *p)
 	 * End inline drm_release
 	 */
 
-#ifdef __linux__
-#if LINUX_VERSION_CODE < 0x020333
-	MOD_DEC_USE_COUNT; /* Needed before Linux 2.3.51 */
-#endif
-#endif
 	atomic_inc( &dev->counts[_DRM_STAT_CLOSES] );
 	DRM_OS_SPINLOCK( &dev->count_lock );
 	if ( !--dev->open_count ) {
