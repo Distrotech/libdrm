@@ -590,8 +590,6 @@ static int __init drm_init( void )
 
 	DRIVER_PREINIT();
 
-	DRM(mem_init)();
-
 #if __REALLY_HAVE_AGP
 	DRM(agp_init)();
 #endif

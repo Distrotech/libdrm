@@ -89,11 +89,8 @@ void DRM(agp_enable)(unsigned long mode)
 
 /** 
  * Allocate AGP memory.
- * 
- * Not meant to be called directly.  Use agp_alloc() instead, which can provide
- * some debugging features.
  */
-agp_memory *DRM(agp_allocate_memory)(size_t pages, u32 type)
+agp_memory *DRM(agp_alloc)(size_t pages, u32 type)
 {
 	if (!drm_agp || !drm_agp->allocate_memory)
 		return NULL;
@@ -106,7 +103,7 @@ agp_memory *DRM(agp_allocate_memory)(size_t pages, u32 type)
  * Not meant to be called directly.  Use agp_free() instead, which can provide
  * some debugging features.
  */
-int DRM(agp_free_memory)(agp_memory *handle)
+int DRM(agp_free)(agp_memory *handle)
 {
 	if (!handle || !drm_agp || !drm_agp->free_memory) 
 		return 0;
@@ -120,7 +117,7 @@ int DRM(agp_free_memory)(agp_memory *handle)
  * Not meant to be called directly.  Use agp_bind() instead, which can provide
  * some debugging features.
  */
-int DRM(agp_bind_memory)(agp_memory *handle, off_t start)
+int DRM(agp_bind)(agp_memory *handle, off_t start)
 {
 	if (!handle || !drm_agp || !drm_agp->bind_memory) 
 		return -EINVAL;
@@ -133,7 +130,7 @@ int DRM(agp_bind_memory)(agp_memory *handle, off_t start)
  * Not meant to be called directly.  Use agp_unbind() instead, which can provide
  * some debugging features.
  */
-int DRM(agp_unbind_memory)(agp_memory *handle)
+int DRM(agp_unbind)(agp_memory *handle)
 {
 	if (!handle || !drm_agp || !drm_agp->unbind_memory)
 		return -EINVAL;
@@ -323,7 +320,7 @@ int DRM(agp_alloc_ioctl)(struct inode *inode, struct file *filp,
 	if (copy_to_user((drm_agp_buffer_t *)arg, &request, sizeof(request))) {
 		dev->agp->memory       = entry->next;
 		dev->agp->memory->prev = NULL;
-		DRM(agp_free)(memory, pages);
+		DRM(agp_free)(memory);
 		DRM(free)(entry, sizeof(*entry), DRM_MEM_AGPLISTS);
 		return -EFAULT;
 	}
@@ -453,7 +450,7 @@ int DRM(agp_free_ioctl)(struct inode *inode, struct file *filp,
 	if (entry->prev) entry->prev->next = entry->next;
 	else             dev->agp->memory  = entry->next;
 	if (entry->next) entry->next->prev = entry->prev;
-	DRM(agp_free)(entry->memory, entry->pages);
+	DRM(agp_free)(entry->memory);
 	DRM(free)(entry, sizeof(*entry), DRM_MEM_AGPLISTS);
 	return 0;
 }
@@ -542,7 +539,7 @@ void DRM(agp_cleanup_dev)(drm_device_t *dev)
 		for ( entry = dev->agp->memory ; entry ; entry = nexte ) {
 			nexte = entry->next;
 			if ( entry->bound ) DRM(agp_unbind)( entry->memory );
-			DRM(agp_free)( entry->memory, entry->pages );
+			DRM(agp_free)( entry->memory );
 			DRM(free)( entry, sizeof(*entry), DRM_MEM_AGPLISTS );
 		}
 		dev->agp->memory = NULL;

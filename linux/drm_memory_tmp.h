@@ -35,13 +35,6 @@
 #include <linux/config.h>
 #include "drmP.h"
 
-/**
- * Cut down version of drm_memory_debug.h, which used to be called
- * drm_memory.h.  If you want the debug functionality, change 0 to 1
- * below.
- */
-#define DEBUG_MEMORY 0
-
 /* Need the 4-argument version of vmap().  */
 #if __REALLY_HAVE_AGP && defined(VMAP_4_ARGS)
 
@@ -196,34 +189,6 @@ static inline void drm_ioremapfree(void *pt, unsigned long size, drm_device_t *d
 	iounmap(pt);
 }
 
-#if DEBUG_MEMORY
-#include "drm_memory_debug.h"
-#else
-
-/** No-op. */
-void DRM(mem_init)(void)
-{
-}
-
-/**
- * Called when "/proc/dri/%dev%/mem" is read.
- * 
- * \param buf output buffer.
- * \param start start of output data.
- * \param offset requested start offset.
- * \param len requested number of bytes.
- * \param eof whether there is no more data to return.
- * \param data private data.
- * \return number of written bytes.
- *
- * No-op. 
- */
-int DRM(mem_info)(char *buf, char **start, off_t offset,
-		  int len, int *eof, void *data)
-{
-	return 0;
-}
-
 /** Wrapper around kmalloc() */
 void *DRM(alloc)(size_t size, int area)
 {
@@ -327,32 +292,3 @@ void DRM(ioremapfree)(void *pt, unsigned long size, drm_device_t *dev)
 {
 	drm_ioremapfree(pt, size, dev);
 }
-
-#if __REALLY_HAVE_AGP
-/** Wrapper around agp_allocate_memory() */
-agp_memory *DRM(agp_alloc)(int pages, u32 type)
-{
-	return DRM(agp_allocate_memory)(pages, type);
-}
-
-/** Wrapper around agp_free_memory() */
-int DRM(agp_free)(agp_memory *handle, int pages)
-{
-	return DRM(agp_free_memory)(handle) ? 0 : -EINVAL;
-}
-
-/** Wrapper around agp_bind_memory() */
-int DRM(agp_bind)(agp_memory *handle, unsigned int start)
-{
-	return DRM(agp_bind_memory)(handle, start);
-}
-
-/** Wrapper around agp_unbind_memory() */
-int DRM(agp_unbind)(agp_memory *handle)
-{
-	return DRM(agp_unbind_memory)(handle);
-}
-#endif /* __REALLY_HAVE_AGP */
-
-
-#endif /* debug_memory */

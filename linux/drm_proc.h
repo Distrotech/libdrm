@@ -63,7 +63,6 @@ struct drm_proc_list {
 	int	   (*f)(char *, char **, off_t, int, int *, void *);	/**< proc callback*/
 } DRM(proc_list)[] = {
 	{ "name",    DRM(name_info)    },
-	{ "mem",     DRM(mem_info)     },
 	{ "vm",	     DRM(vm_info)      },
 	{ "clients", DRM(clients_info) },
 	{ "queues",  DRM(queues_info)  },

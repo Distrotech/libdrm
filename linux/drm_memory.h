@@ -39,8 +39,6 @@
 /** \name Prototypes */
 /*@{*/
 
-extern void	     DRM(mem_init)(void);
-extern int	     DRM(mem_info)(char *buf, char **start, off_t offset, int request, int *eof, void *data);
 extern void	     *DRM(alloc)(size_t size, int area);
 extern void	     *DRM(realloc)(void *oldpt, size_t oldsize, size_t size, int area);
 extern void	     DRM(free)(void *pt, size_t size, int area);
@@ -49,13 +47,6 @@ extern void	     DRM(free_pages)(unsigned long address, int order, int area);
 extern void	     *DRM(ioremap)(unsigned long offset, unsigned long size, drm_device_t *dev);
 extern void	     *DRM(ioremap_nocache)(unsigned long offset, unsigned long size, drm_device_t *dev);
 extern void	     DRM(ioremapfree)(void *pt, unsigned long size, drm_device_t *dev);
-
-#if __REALLY_HAVE_AGP
-extern agp_memory    *DRM(agp_alloc)(int pages, u32 type);
-extern int           DRM(agp_free)(agp_memory *handle, int pages);
-extern int           DRM(agp_bind)(agp_memory *handle, unsigned int start);
-extern int           DRM(agp_unbind)(agp_memory *handle);
-#endif
 
 /*@}*/
 
