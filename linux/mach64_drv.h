@@ -377,6 +377,23 @@ extern int mach64_dma_swap( struct inode *inode, struct file *filp,
 #define MMSELECT1(r)	(((((r) & 0xff) << 2) + DWMREG1))
 #define MMSELECT(r)	(ISMMREG0(r) ? MMSELECT0(r) : MMSELECT1(r))
 
+/* ================================================================
+ * Misc helper macros
+ */
+
+#define LOCK_TEST_WITH_RETURN( dev )					\
+do {									\
+	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||		\
+	     dev->lock.pid != current->pid ) {				\
+		DRM_ERROR( "%s called without lock held\n",		\
+			   __FUNCTION__ );				\
+		return -EINVAL;						\
+	}								\
+} while (0)
+
+/* ================================================================
+ * DMA macros
+ */
 
 #define DMA_FRAME_BUF_OFFSET	0
 #define DMA_SYS_MEM_ADDR	1

@@ -298,11 +298,7 @@ int mach64_dma_clear( struct inode *inode, struct file *filp,
 	drm_mach64_clear_t clear;
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
-	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||
-	     dev->lock.pid != current->pid ) {
-		DRM_ERROR( "mach64_cce_clear called without lock held\n" );
-		return -EINVAL;
-	}
+	LOCK_TEST_WITH_RETURN( dev );
 
 	if ( copy_from_user( &clear, (drm_mach64_clear_t *) arg,
 			     sizeof(clear) ) )
@@ -331,11 +327,7 @@ int mach64_dma_swap( struct inode *inode, struct file *filp,
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
-	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||
-	     dev->lock.pid != current->pid ) {
-		DRM_ERROR( "mach64_cce_swap called without lock held\n" );
-		return -EINVAL;
-	}
+	LOCK_TEST_WITH_RETURN( dev );
 
 	if ( sarea_priv->nbox > MACH64_NR_SAREA_CLIPRECTS )
 		sarea_priv->nbox = MACH64_NR_SAREA_CLIPRECTS;
