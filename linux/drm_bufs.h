@@ -682,7 +682,6 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 	 * with the new one.
 	 */
 	if (dma->page_count) {
-		DRM_INFO("%p %d\n", dma->pagelist, dma->page_count);
 		DRM(free)(dma->pagelist,
 			  dma->page_count * sizeof(*dma->pagelist),
 			  DRM_MEM_PAGES);
