@@ -27,6 +27,7 @@
  *   Gareth Hughes <gareth@valinux.com>
  *   Frank C. Earl <fearl@airmail.net>
  *   Leif Delgass <ldelgass@retinalburn.net>
+ *   José Fonseca <j_r_fonseca@yahoo.co.uk>
  */
 
 #include "mach64.h"
@@ -180,52 +181,43 @@ int mach64_wait_ring( drm_mach64_private_t *dev_priv, int n )
 }
 
 /* Wait until all DMA requests have been processed... */
-int mach64_do_wait_for_dma( drm_mach64_private_t *dev_priv )
+int mach64_do_dma_flush( drm_mach64_private_t *dev_priv )
 {
-	int i, ret;
+	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring;
+	int i;
 
-	/* Assume we timeout... */
-	ret = -EBUSY;
-
-	for ( i = 0 ; i < dev_priv->usec_timeout; i++ ) 
-	{
-		if ( list_empty(&dev_priv->dma_queue) )
-		{
-			ret = mach64_do_wait_for_idle( dev_priv );
-			break;
+	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
+		mach64_update_ring_snapshot( dev_priv );
+		if ( ring->head == ring->tail ) {
+			if (i > 0) {
+				DRM_DEBUG( "do_dma_idle: %d usecs\n", i );
+			}
+			return 0;
 		}
 		udelay( 1 );
 	}
 
-	if (ret != 0)
-		DRM_INFO( "do_wait_for_dma failed! GUI_STAT=0x%08x\n", MACH64_READ( MACH64_GUI_STAT ) );
-
-	return ret;
+	DRM_INFO( "%s failed! GUI_STAT=0x%08x\n", __FUNCTION__, 
+		   MACH64_READ( MACH64_GUI_STAT ) );
+	return -EBUSY;
 }
 
 int mach64_do_dma_idle( drm_mach64_private_t *dev_priv ) {
 	int ret;
-#if MACH64_NO_BATCH_DISPATCH
-	u32 reg;
-#endif
 
 	/* wait for completion */
-	if ( (ret = mach64_do_wait_for_idle( dev_priv )) < 0 ) {
+	if ( (ret = mach64_do_dma_flush( dev_priv )) < 0 ) {
 		DRM_ERROR( "%s failed BM_GUI_TABLE=0x%08x tail: %d\n", __FUNCTION__, 
 			   MACH64_READ(MACH64_BM_GUI_TABLE), dev_priv->ring.tail );
 		return ret;
 	}
-#if MACH64_NO_BATCH_DISPATCH
-	reg = MACH64_READ( MACH64_BUS_CNTL );
 	/* Disable bus-mastering, but keep block 1 registers enabled */
-	MACH64_WRITE( MACH64_BUS_CNTL, reg | MACH64_BUS_MASTER_DIS | MACH64_BUS_EXT_REG_EN );
+	MACH64_WRITE( MACH64_BUS_CNTL, MACH64_READ( MACH64_BUS_CNTL ) | MACH64_BUS_MASTER_DIS | MACH64_BUS_EXT_REG_EN );
 	MACH64_WRITE( MACH64_SRC_CNTL, 0 );
-	return 0;
-#else
+
 	/* clean up after pass */
 	mach64_do_release_used_buffers( dev_priv );
 	return 0;
-#endif
 }
 
 /* Reset the engine.  This will stop the DMA if it is running.
@@ -1038,40 +1030,34 @@ static int mach64_do_dispatch_pseudo_dma( drm_mach64_private_t *dev_priv )
 
 #endif /* MACH64_NO_BATCH_DISPATCH */
 
-int mach64_do_dma_flush( drm_mach64_private_t *dev_priv )
+int mach64_dma_start( drm_mach64_private_t *dev_priv )
 {
 #if MACH64_NO_BATCH_DISPATCH
 	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring;
 
-	UPDATE_RING_HEAD( dev_priv, ring );
-
-	if ( ring->tail != ring->head && 
-	     !(MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE) ) {
-
-		if (ring->head_addr < ring->start_addr ||
-		    ring->head_addr > ring->start_addr + (ring->size - 4*sizeof(u32))) {
-			DRM_ERROR("Bad address in BM_GUI_TABLE: 0x%08x\n", ring->head_addr);
-			return -EINVAL;
-		}
-
+	if ( (MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE) )
+		return 0;
+	
+	if ( !(MACH64_READ(MACH64_SRC_CNTL) & MACH64_SRC_BM_ENABLE) ) {
 		/* enable bus mastering and block 1 registers */
 		MACH64_WRITE( MACH64_BUS_CNTL, 
 			      ( MACH64_READ(MACH64_BUS_CNTL) & 
 				~MACH64_BUS_MASTER_DIS ) 
 			      | MACH64_BUS_EXT_REG_EN );
-		/* reset descriptor table ring head */
-		MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, 
-			      ( ring->head_addr	 | MACH64_CIRCULAR_BUF_SIZE_16KB ) );
 		/* enable GUI-master operation */
 		MACH64_WRITE( MACH64_SRC_CNTL, 
 			      MACH64_SRC_BM_ENABLE | MACH64_SRC_BM_SYNC |
 			      MACH64_SRC_BM_OP_SYSTEM_TO_REG );
-		/* kick off the transfer */
-		MACH64_WRITE( MACH64_DST_HEIGHT_WIDTH, 0 );
-		DRM_DEBUG( "%s: new dispatch: head_addr: 0x%08x head: %d tail: %d space: %d\n", 
-			   __FUNCTION__, 
-			   ring->head_addr, ring->head, ring->tail, ring->space);
 	}
+		
+	if ( ring->head_addr < ring->start_addr ||
+	 ring->head_addr > ring->start_addr + (ring->size - 4 * sizeof(u32)) ) {
+		DRM_ERROR("Bad address in BM_GUI_TABLE: 0x%08x\n", ring->head_addr);
+		return -EINVAL;
+	}
+
+	UPDATE_RING_HEAD( dev_priv, ring );
+
 	return 0;
 #else
 	DRM_DEBUG("%s\n", __FUNCTION__);
@@ -1211,8 +1197,7 @@ int mach64_dma_flush( struct inode *inode, struct file *filp,
 
 	VB_AGE_TEST_WITH_RETURN( dev_priv );
 
-	DMAFLUSH( dev_priv );
-	return 0;
+	return mach64_do_dma_flush( dev_priv );
 }
 
 int mach64_engine_reset( struct inode *inode, struct file *filp,
@@ -1303,11 +1288,8 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 	int t;
 
 	if ( list_empty(&dev_priv->free_list) ) {
-#if !MACH64_USE_BUFFER_AGING
 		u32 head, tail, ofs;
-#else
-		u32 done_age = 0;
-#endif
+
 		if ( list_empty( &dev_priv->pending ) ) {
 			/* All 3 lists should never be empty - this is here for debugging */
 			if ( list_empty( &dev_priv->dma_queue ) ) {
@@ -1320,16 +1302,8 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 			}
 		}
 
-#if MACH64_NO_BATCH_DISPATCH
-		/* Make sure we haven't gone idle */
-		mach64_do_dma_flush( dev_priv );
-#endif		
-
-#if !MACH64_USE_BUFFER_AGING
 		tail = ring->tail;
-#endif
 		for ( t = 0 ; t < dev_priv->usec_timeout ; t++ ) {
-#if !MACH64_USE_BUFFER_AGING
 			UPDATE_RING_HEAD( dev_priv, ring );
 			head = ring->head;
 
@@ -1339,16 +1313,12 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 				DRM_DEBUG( "%s: idle engine, freed all buffers.\n", __FUNCTION__ );
 				goto _freelist_entry_found;
 			}
-#else
-			done_age = MACH64_READ( MACH64_LAST_DISPATCH_REG );
-#endif
 			/* Look for a completed buffer and bail out of the loop 
 			 * as soon as we find one -- don't waste time trying
 			 * to free extra bufs here, leave that to do_release_used_buffers
 			 */
 			list_for_each_safe(ptr, tmp, &dev_priv->pending) {
 				entry = list_entry(ptr, drm_mach64_freelist_t, list);
-#if !MACH64_USE_BUFFER_AGING
 				ofs = entry->ring_ofs;
 				if ( (head < tail && (ofs < head || ofs >= tail)) ||
 				     (head > tail && (ofs < head && ofs >= tail)) ) {
@@ -1359,24 +1329,10 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 					DRM_DEBUG( "%s: freed processed buffer (head=%d tail=%d buf ring ofs=%d).\n", __FUNCTION__, head, tail, ofs );
 					goto _freelist_entry_found;
 				}
-#else
-				if (entry->age <= done_age && done_age > 0) {
-					/* found a processed buffer */
-					entry->buf->pending = 0;
-					list_del(ptr);
-					list_add_tail(ptr, &dev_priv->free_list);
-					DRM_DEBUG( "%s: freed processed buffer (buffer age: %d last dispatch reg: %d last_dispatch: %d\n", __FUNCTION__, entry->age, done_age, dev_priv->sarea_priv->last_dispatch );
-					goto _freelist_entry_found;
-				}
-#endif
 			}
 			udelay( 1 );
 		}
-#if !MACH64_USE_BUFFER_AGING
 		DRM_ERROR( "timeout waiting for buffers: ring head_addr: 0x%08x head: %d tail: %d last cmd ofs %d\n", ring->head_addr, ring->head, ring->tail, ring->last_cmd_ofs );
-#else
-		DRM_ERROR( "timeout waiting for buffers: last dispatch reg: %d last_dispatch: %d\n", done_age, dev_priv->sarea_priv->last_dispatch );
-#endif
 		return NULL;
 	}
 
@@ -1454,18 +1410,6 @@ static int mach64_dma_get_buffers( drm_device_t *dev, drm_dma_t *d )
 	return 0;
 }
 
-/*
-        Through some pretty thorough testing, it has been found that the 
-        RagePRO engine will pretty much ignore any "commands" sent
-        via the gui-master pathway that aren't gui operations (the register
-        gets set, but the actions that are normally associated with the setting
-        of those said registers doesn't happen.).  So, it's safe to send us
-        buffers of gui commands from userspace (altering the buffer in mid-
-        execution will at worst scribble all over the screen and pushing
-        bogus commands will have no apparent effect...)
-
-        FCE (03-08-2002)
-*/
 int mach64_dma_buffers( struct inode *inode, struct file *filp,
 			unsigned int cmd, unsigned long arg )
 {
