@@ -108,7 +108,7 @@ static int mach64_emit_cliprect( DRMFILE filp, drm_mach64_private_t *dev_priv,
 	return 0;
 }
 
-static inline int mach64_emit_state( DRMFILE filp, drm_mach64_private_t *dev_priv )
+static __inline__ int mach64_emit_state( DRMFILE filp, drm_mach64_private_t *dev_priv )
 {
 	drm_mach64_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	drm_mach64_context_regs_t *regs = &sarea_priv->context_state;
@@ -465,7 +465,7 @@ static int mach64_do_get_frames_queued( drm_mach64_private_t *dev_priv )
 /* Copy and verify a client submited buffer.
  * FIXME: Make an assembly optimized version
  */
-static inline int copy_and_verify_from_user( u32 *to, const u32 *from, unsigned long bytes )
+static __inline__ int copy_and_verify_from_user( u32 *to, const u32 *from, unsigned long bytes )
 {
 	unsigned long n = bytes; /* dwords remaining in buffer */
 
