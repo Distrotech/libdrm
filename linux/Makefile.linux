@@ -44,7 +44,7 @@ endif
 MACHINE := $(shell uname -m)
 
 # Modules for all architectures
-MODULE_LIST := gamma.o tdfx.o r128.o radeon.o mga.o sis.o
+MODULE_LIST := gamma.o tdfx.o mach64.o r128.o radeon.o mga.o sis.o
 
 # Modules only for ix86 architectures
 ifneq (,$(findstring 86,$(MACHINE)))
@@ -69,6 +69,10 @@ GAMMAHEADERS =  gamma.h gamma_context.h gamma_drm.h gamma_drv.h gamma_lists.h \
                 gamma_old_dma.h gamma_lock.h $(DRMHEADERS) $(DRMTEMPLATES)
 TDFXHEADERS =   tdfx.h $(DRMHEADERS) $(DRMTEMPLATES)
 TDFXSHARED =    tdfx.h
+MACH64HEADERS = mach64.h mach64_drv.h mach64_drm.h $(DRMHEADERS) \
+                $(DRMTEMPLATES)
+MACH64SHARED =  mach64.h mach64_drv.h mach64_drm.h mach64_dma.c mach64_irq.c \
+                mach64_state.c
 R128HEADERS =   r128.h r128_drv.h r128_drm.h $(DRMHEADERS) $(DRMTEMPLATES)
 R128SHARED =    r128.h r128_drv.h r128_drm.h r128_cce.c r128_state.c r128_irq.c
 RADEONHEADERS = radeon.h radeon_drv.h radeon_drm.h $(DRMHEADERS) \
@@ -84,7 +88,7 @@ I830HEADERS =   i830.h i830_drv.h i830_drm.h $(DRMHEADERS) $(DRMTEMPLATES)
 SISHEADERS=     sis.h sis_drv.h sis_drm.h $(DRMHEADERS)
 SISSHARED=      sis.h sis_drv.h sis_drm.h sis_ds.c sis_ds.h sis_mm.c
 
-SHAREDSRC = $(DRMSHARED) $(MGASHARED) $(R128SHARED) $(RADEONSHARED) \
+SHAREDSRC = $(DRMSHARED) $(MGASHARED) $(MACH64SHARED) $(R128SHARED) $(RADEONSHARED) \
 	$(SISSHARED) $(TDFXSHARED)
 
 PROGS = dristat drmstat
@@ -309,6 +313,7 @@ CONFIG_DRM_GAMMA := n
 CONFIG_DRM_TDFX := n
 CONFIG_DRM_MGA := n
 CONFIG_DRM_I810 := n
+CONFIG_DRM_MACH64 := n
 CONFIG_DRM_R128 := n
 CONFIG_DRM_RADEON := n
 CONFIG_DRM_I830 := n
@@ -322,6 +327,9 @@ CONFIG_DRM_GAMMA := m
 endif
 ifneq (,$(findstring tdfx,$(DRM_MODULES)))
 CONFIG_DRM_TDFX := m
+endif
+ifneq (,$(findstring mach64,$(DRM_MODULES)))
+CONFIG_DRM_MACH64 := m
 endif
 ifneq (,$(findstring r128,$(DRM_MODULES)))
 CONFIG_DRM_R128 := m
@@ -352,6 +360,7 @@ include $(DRMSRCDIR)/Makefile.kernel
 # Depencencies
 $(gamma-objs):	$(GAMMAHEADERS)
 $(tdfx-objs):	$(TDFXHEADERS)
+$(mach64-objs): $(MACH64HEADERS)
 $(r128-objs):	$(R128HEADERS)
 $(mga-objs):	$(MGAHEADERS)
 $(i810-objs):	$(I810HEADERS)
