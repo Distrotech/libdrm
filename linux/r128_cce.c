@@ -134,7 +134,9 @@ static int r128_do_pixcache_flush( drm_r128_private_t *dev_priv )
 		DRM_OS_DELAY( 1 );
 	}
 
+#if R128_FIFO_DEBUG
 	DRM_ERROR( "%s failed!\n", __FUNCTION__ );
+#endif
 	DRM_OS_RETURN( EBUSY );
 }
 
@@ -148,7 +150,9 @@ static int r128_do_wait_for_fifo( drm_r128_private_t *dev_priv, int entries )
 		DRM_OS_DELAY( 1 );
 	}
 
+#if R128_FIFO_DEBUG
 	DRM_ERROR( "%s failed!\n", __FUNCTION__ );
+#endif
 	DRM_OS_RETURN( EBUSY );
 }
 
@@ -167,7 +171,9 @@ int r128_do_wait_for_idle( drm_r128_private_t *dev_priv )
 		DRM_OS_DELAY( 1 );
 	}
 
+#if R128_FIFO_DEBUG
 	DRM_ERROR( "%s failed!\n", __FUNCTION__ );
+#endif
 	DRM_OS_RETURN( EBUSY );
 }
 

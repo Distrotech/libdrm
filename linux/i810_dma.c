@@ -1105,6 +1105,8 @@ int i810_dma_vertex( DRM_OS_IOCTL )
 	DRM_DEBUG("i810 dma vertex, idx %d used %d discard %d\n",
 		  vertex.idx, vertex.used, vertex.discard);
 
+	if(vertex.idx < 0 || vertex.idx > dma->buf_count) return -EINVAL;
+
 	i810_dma_dispatch_vertex( dev,
 				  dma->buflist[ vertex.idx ],
 				  vertex.discard, vertex.used );
@@ -1130,6 +1132,11 @@ int i810_clear_bufs( DRM_OS_IOCTL )
 		DRM_ERROR("i810_clear_bufs called without lock held\n");
 		DRM_OS_RETURN( EINVAL );
 	}
+
+ 	/* GH: Someone's doing nasty things... */
+ 	if (!dev->dev_private) {
+ 		return -EINVAL;
+ 	}
 
 	i810_dma_dispatch_clear( dev, clear.flags,
 				 clear.clear_color,
@@ -1214,7 +1221,7 @@ int i810_copybuf( DRM_OS_IOCTL )
 
    	DRM_OS_KRNFROMUSR( d, (drm_i810_copy_t *) data, sizeof(d) );
 
-	if(d.idx > dma->buf_count) DRM_OS_RETURN( EINVAL );
+        if(d.idx < 0 || d.idx > dma->buf_count) DRM_OS_RETURN(EINVAL);
 	buf = dma->buflist[ d.idx ];
    	buf_priv = buf->dev_private;
 	if (buf_priv->currently_mapped != I810_BUF_MAPPED) return -EPERM;
