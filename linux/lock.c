@@ -125,8 +125,8 @@ static int drm_flush_queue(drm_device_t *dev, int context)
 		add_wait_queue(&q->flush_queue, &entry);
 		atomic_inc(&q->block_count);
 		for (;;) {
-			if (!DRM_BUFCOUNT(&q->waitlist)) break;
 			current->state = TASK_INTERRUPTIBLE;
+			if (!DRM_BUFCOUNT(&q->waitlist)) break;
 			schedule();
 			if (signal_pending(current)) {
 				ret = -EINTR; /* Can't restart */

@@ -400,8 +400,8 @@ int drm_dma_enqueue(drm_device_t *dev, drm_dma_t *d)
 		add_wait_queue(&q->write_queue, &entry);
 		atomic_inc(&q->block_count);
 		for (;;) {
-			if (!atomic_read(&q->block_write)) break;
 			current->state = TASK_INTERRUPTIBLE;
+			if (!atomic_read(&q->block_write)) break;
 			schedule();
 			if (signal_pending(current)) {
 				atomic_dec(&q->use_count);

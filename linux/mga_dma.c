@@ -218,11 +218,11 @@ drm_buf_t *mga_freelist_get(drm_device_t *dev)
 	   	add_wait_queue(&dev_priv->buf_queue, &entry);
 		set_bit(MGA_IN_GETBUF, &dev_priv->dispatch_status);
 	   	for (;;) {
+			current->state = TASK_INTERRUPTIBLE;
 		   	mga_dma_schedule(dev, 0);
 			if(dev_priv->tail->age < dev_priv->last_prim_age)
 				break;
 		   	atomic_inc(&dev->total_sleeps);
-			current->state = TASK_INTERRUPTIBLE;
 		   	schedule();
 		   	if (signal_pending(current)) {
 				++return_null;
@@ -230,6 +230,7 @@ drm_buf_t *mga_freelist_get(drm_device_t *dev)
 			}
 		}
 		clear_bit(MGA_IN_GETBUF, &dev_priv->dispatch_status);
+		current->state = TASK_RUNNING;
 	   	remove_wait_queue(&dev_priv->buf_queue, &entry);
 		if (return_null) return NULL;
 	}
@@ -446,19 +447,20 @@ int mga_advance_primary(drm_device_t *dev)
    	if(test_and_set_bit(MGA_BUF_IN_USE, &prim_buffer->buffer_status)) {
 	   	add_wait_queue(&dev_priv->wait_queue, &entry);
 	   	for (;;) {
+			current->state = TASK_INTERRUPTIBLE;
 		   	mga_dma_schedule(dev, 0);
 		   	if(!test_and_set_bit(MGA_BUF_IN_USE,
 					     &prim_buffer->buffer_status))
 				break;
 		   	atomic_inc(&dev->total_sleeps);
 		   	atomic_inc(&dma->total_missed_sched);
-			current->state = TASK_INTERRUPTIBLE;
 		   	schedule();
 		   	if (signal_pending(current)) {
 			   	ret = -ERESTARTSYS;
 			   	break;
 			}
 		}
+		current->state = TASK_RUNNING;
 	   	remove_wait_queue(&dev_priv->wait_queue, &entry);
 	   	if(ret) return ret;
 	}
@@ -490,61 +492,51 @@ int mga_advance_primary(drm_device_t *dev)
 static inline int mga_decide_to_fire(drm_device_t *dev)
 {
    	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
-      	drm_device_dma_t  *dma	    = dev->dma;
 
    	if(test_bit(MGA_BUF_FORCE_FIRE, &dev_priv->next_prim->buffer_status)) {
-	   	atomic_inc(&dma->total_prio);
 	   	return 1;
 	}
 
 	if (test_bit(MGA_IN_GETBUF, &dev_priv->dispatch_status) &&
 	    dev_priv->next_prim->num_dwords) {
-	   	atomic_inc(&dma->total_prio);
 	   	return 1;
 	}
 
 	if (test_bit(MGA_IN_FLUSH, &dev_priv->dispatch_status) &&
 	    dev_priv->next_prim->num_dwords) {
-	   	atomic_inc(&dma->total_prio);
 	   	return 1;
 	}
 
    	if(atomic_read(&dev_priv->pending_bufs) <= MGA_NUM_PRIM_BUFS - 1) {
 		if(test_bit(MGA_BUF_SWAP_PENDING,
 			    &dev_priv->next_prim->buffer_status)) {
-			atomic_inc(&dma->total_dmas);
 			return 1;
 		}
 	}
 
    	if(atomic_read(&dev_priv->pending_bufs) <= MGA_NUM_PRIM_BUFS / 2) {
 		if(dev_priv->next_prim->sec_used >= MGA_DMA_BUF_NR / 8) {
-			atomic_inc(&dma->total_hit);
 			return 1;
 		}
 	}
 
    	if(atomic_read(&dev_priv->pending_bufs) >= MGA_NUM_PRIM_BUFS / 2) {
 		if(dev_priv->next_prim->sec_used >= MGA_DMA_BUF_NR / 4) {
-			atomic_inc(&dma->total_missed_free);
 			return 1;
 		}
 	}
 
-   	atomic_inc(&dma->total_tried);
    	return 0;
 }
 
 int mga_dma_schedule(drm_device_t *dev, int locked)
 {
       	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
-      	drm_device_dma_t  *dma	    = dev->dma;
 	int               retval    = 0;
 
    	if (!dev_priv) return -EBUSY;
 	
 	if (test_and_set_bit(0, &dev->dma_flag)) {
-		atomic_inc(&dma->total_missed_dma);
 		retval = -EBUSY;
 		goto sch_out_wakeup;
 	}
@@ -557,7 +549,6 @@ int mga_dma_schedule(drm_device_t *dev, int locked)
 
    	if (!locked &&
 	    !drm_lock_take(&dev->lock.hw_lock->lock, DRM_KERNEL_CONTEXT)) {
-	   	atomic_inc(&dma->total_missed_lock);
 	   	clear_bit(0, &dev->dma_flag);
 		retval = -EBUSY;
 		goto sch_out_wakeup;
@@ -905,11 +896,11 @@ static int mga_flush_queue(drm_device_t *dev)
 		set_bit(MGA_IN_FLUSH, &dev_priv->dispatch_status);
 		mga_dma_schedule(dev, 0);
    		for (;;) {
+			current->state = TASK_INTERRUPTIBLE;
 	   		if (!test_bit(MGA_IN_FLUSH,
 				      &dev_priv->dispatch_status))
 				break;
 		   	atomic_inc(&dev->total_sleeps);
-			current->state = TASK_INTERRUPTIBLE;
 	      		schedule();
 	      		if (signal_pending(current)) {
 		   		ret = -EINTR; /* Can't restart */
@@ -918,6 +909,7 @@ static int mga_flush_queue(drm_device_t *dev)
 		   		break;
 			}
 		}
+		current->state = TASK_RUNNING;
    		remove_wait_queue(&dev_priv->flush_queue, &entry);
 	}
    	return ret;
@@ -977,6 +969,7 @@ int mga_lock(struct inode *inode, struct file *filp, unsigned int cmd,
 	if (!ret) {
 		add_wait_queue(&dev->lock.lock_queue, &entry);
 		for (;;) {
+			current->state = TASK_INTERRUPTIBLE;
 			if (!dev->lock.hw_lock) {
 				/* Device has been unregistered */
 				ret = -EINTR;
@@ -992,13 +985,13 @@ int mga_lock(struct inode *inode, struct file *filp, unsigned int cmd,
 
 				/* Contention */
 			atomic_inc(&dev->total_sleeps);
-			current->state = TASK_INTERRUPTIBLE;
 			schedule();
 			if (signal_pending(current)) {
 				ret = -ERESTARTSYS;
 				break;
 			}
 		}
+		current->state = TASK_RUNNING;
 		remove_wait_queue(&dev->lock.lock_queue, &entry);
 	}
 

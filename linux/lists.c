@@ -202,9 +202,9 @@ drm_buf_t *drm_freelist_get(drm_freelist_t *bl, int block)
 		if (block) {
 			add_wait_queue(&bl->waiting, &entry);
 			for (;;) {
+				current->state = TASK_INTERRUPTIBLE;
 				if (!atomic_read(&bl->wfh)
 				    && (buf = drm_freelist_try(bl))) break;
-				current->state = TASK_INTERRUPTIBLE;
 				schedule();
 				if (signal_pending(current)) break;
 			}
