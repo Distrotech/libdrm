@@ -40,9 +40,9 @@
 #define DRIVER_DESC		"Matrox G200/G400"
 #define DRIVER_DATE		"20010624"
 
-#define DRIVER_MAJOR		3
+#define DRIVER_MAJOR		4
 #define DRIVER_MINOR		0
-#define DRIVER_PATCHLEVEL	2
+#define DRIVER_PATCHLEVEL	0
 
 #define DRIVER_IOCTLS							   \
 	[DRM_IOCTL_NR(DRM_IOCTL_DMA)]	      = { mga_dma_buffers, 1, 0 }, \
