@@ -39,3 +39,18 @@
 #include "compat-pre24.h"
 #endif
 #include <asm/pgalloc.h>
+
+#define __REALLY_HAVE_AGP	(__HAVE_AGP && (defined(CONFIG_AGP) || \
+						defined(CONFIG_AGP_MODULE)))
+#define __REALLY_HAVE_MTRR	(__HAVE_MTRR && defined(CONFIG_MTRR))
+
+#define DRM_OS_LOCK 	up(&dev->struct_sem)
+#define DRM_OS_UNLOCK 	down(&dev->struct_sem)
+#define DRM_OS_IOCTL	struct inode *inode, struct file *filp, unsigned int cmd, unsigned long data
+#define DRM_OS_DEVICE	drm_file_t	*priv	= filp->private_data; \
+			drm_device_t	*dev	= priv->dev
+#define DRM_OS_RETURN(v)	return -v;
+#define DRM_OS_COPYTO(arg1, arg2, arg3) \
+	copy_to_user( arg1, arg2, arg3) 
+#define DRM_OS_COPYFROM(arg1, arg2, arg3) \
+	copy_from_user( arg1, arg2, arg3)

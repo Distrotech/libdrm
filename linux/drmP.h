@@ -34,17 +34,6 @@
 
 #if defined(_KERNEL) || defined(__KERNEL__)
 
-/* There's undoubtably more of this file to into these OS dependent ones.
-#ifdef __linux__
-#include "drm_os_linux.h"
-#endif
-
-#ifdef __FreeBSD__
-#include "drm_os_freebsd.h"
-#endif
-
-#include "drm.h"
-
 /* DRM template customization defaults
  */
 #ifndef __HAVE_AGP
@@ -72,11 +61,16 @@
 #define __HAVE_DMA_HISTOGRAM	0
 #endif
 
-#define __REALLY_HAVE_AGP	(__HAVE_AGP && (defined(CONFIG_AGP) || \
-						defined(CONFIG_AGP_MODULE)))
-#define __REALLY_HAVE_MTRR	(__HAVE_MTRR && defined(CONFIG_MTRR))
+/* There's undoubtably more of this file to into these OS dependent ones.
+#ifdef __linux__
+#include "drm_os_linux.h"
+#endif
 
+#ifdef __FreeBSD__
+#include "drm_os_freebsd.h"
+#endif
 
+#include "drm.h"
 /* Begin the DRM...
  */
 

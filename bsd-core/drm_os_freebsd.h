@@ -19,9 +19,95 @@
 #endif
 
 #if __FreeBSD_version >= 400006
-#define DRM_AGP
+#define __REALLY_HAVE_AGP	1
 #endif
 
-#ifdef DRM_AGP
+#define __REALLY_HAVE_MTRR	0
+
+#if __REALLY_HAVE_AGP
 #include <pci/agpvar.h>
+#endif
+
+#define DRM_OS_LOCK	lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, curproc)
+#define DRM_OS_UNLOCK 	lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc)
+#define DRM_OS_IOCTL	dev_t kdev, u_long cmd, caddr_t data, int flags, struct proc *p
+#define DRM_OS_DEVICE	drm_file_t	*priv; \
+			drm_device_t	*dev	= kdev->si_drv1
+#define DRM_OS_RETURN(v)	return v;
+/* NOTE: To keep the same format as linux, we reverse arg1 and arg2 */
+#define DRM_OS_COPYTO(arg1, arg2, arg3) \
+	copyout( arg2, arg1, arg3 )
+#define DRM_OS_COPYFROM(arg1, arg2, arg3) \
+	copyin( arg2, arg1, arg3 )
+
+typedef u_int32_t atomic_t;
+typedef u_int32_t cycles_t;
+typedef u_int32_t spinlock_t;
+#define atomic_set(p, v)	(*(p) = (v))
+#define atomic_read(p)		(*(p))
+#define atomic_inc(p)		atomic_add_int(p, 1)
+#define atomic_dec(p)		atomic_subtract_int(p, 1)
+#define atomic_add(n, p)	atomic_add_int(p, n)
+#define atomic_sub(n, p)	atomic_subtract_int(p, n)
+
+/* Fake this */
+static __inline u_int32_t
+test_and_set_bit(int b, volatile u_int32_t *p)
+{
+	int s = splhigh();
+	u_int32_t m = 1<<b;
+	u_int32_t r = *p & m;
+	*p |= m;
+	splx(s);
+	return r;
+}
+
+static __inline void
+clear_bit(int b, volatile u_int32_t *p)
+{
+    atomic_clear_int(p + (b >> 5), 1 << (b & 0x1f));
+}
+
+static __inline void
+set_bit(int b, volatile u_int32_t *p)
+{
+    atomic_set_int(p + (b >> 5), 1 << (b & 0x1f));
+}
+
+static __inline int
+test_bit(int b, volatile u_int32_t *p)
+{
+    return p[b >> 5] & (1 << (b & 0x1f));
+}
+
+static __inline int
+find_first_zero_bit(volatile u_int32_t *p, int max)
+{
+    int b;
+
+    for (b = 0; b < max; b += 32) {
+	if (p[b >> 5] != ~0) {
+	    for (;;) {
+		if ((p[b >> 5] & (1 << (b & 0x1f))) == 0)
+		    return b;
+		b++;
+	    }
+	}
+    }
+    return max;
+}
+
+#define spldrm()		spltty()
+
+#define memset(p, v, s)		bzero(p, s)
+
+/*
+ * Fake out the module macros for versions of FreeBSD where they don't
+ * exist.
+ */
+#if __FreeBSD_version < 400002
+
+#define MODULE_VERSION(a,b)		struct __hack
+#define MODULE_DEPEND(a,b,c,d,e)	struct __hack
+
 #endif
