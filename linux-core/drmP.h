@@ -49,11 +49,6 @@
 #include <linux/file.h>
 #include <linux/pci.h>
 #include <linux/version.h>
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,1)
-#include <linux/wrapper.h>
-#endif
-
 #include <linux/sched.h>
 #include <linux/smp_lock.h>	/* For (un)lock_kernel */
 #include <linux/mm.h>
