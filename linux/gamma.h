@@ -1,4 +1,4 @@
-/* gamma.c -- 3dlabs GMX 2000 driver -*- linux-c -*-
+/* gamma.h -- 3dlabs GMX 2000 driver -*- linux-c -*-
  * Created: Mon Jan  4 08:58:31 1999 by gareth@valinux.com
  *
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
@@ -25,6 +25,7 @@
  *
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
+ *    Sven Luther <luther@dpt-info.u-strasbg.fr>
  */
 
 #ifndef __GAMMA_H__
@@ -42,10 +43,10 @@
 
 #define DRIVER_NAME		"gamma"
 #define DRIVER_DESC		"3DLabs gamma"
-#define DRIVER_DATE		"20010624"
+#define DRIVER_DATE		"20020704"
 
 #define DRIVER_MAJOR		2
-#define DRIVER_MINOR		0
+#define DRIVER_MINOR		1
 #define DRIVER_PATCHLEVEL	0
 
 #define DRIVER_IOCTLS							  \
@@ -87,8 +88,11 @@
 
 #define __HAVE_DMA_QUIESCENT		1
 #define DRIVER_DMA_QUIESCENT() do {					\
-	/* FIXME ! */ 							\
-	gamma_dma_quiescent_single(dev);					\
+	drm_gamma_private_t *dev_priv =					\
+				(drm_gamma_private_t *)dev->dev_private;\
+	if (dev_priv->num_rast == 2)					\
+		gamma_dma_quiescent_dual(dev);				\
+	else gamma_dma_quiescent_single(dev);				\
 	return 0;							\
 } while (0)
 
@@ -99,47 +103,84 @@
 #define DRIVER_PREINSTALL() do {					\
 	drm_gamma_private_t *dev_priv =					\
 				(drm_gamma_private_t *)dev->dev_private;\
-	while(GAMMA_READ(GAMMA_INFIFOSPACE) < 2);			\
-	GAMMA_WRITE( GAMMA_GCOMMANDMODE,	0x00000004 );		\
-	GAMMA_WRITE( GAMMA_GDMACONTROL,		0x00000000 );		\
+	switch (dev_priv->chip_type) {					\
+		case GAMMA_CHIP_IS_GAMMA :				\
+			while(GAMMA_READ(GAMMA_INFIFOSPACE) < 2);	\
+			GAMMA_WRITE( GAMMA_GCOMMANDMODE,	0x00000004 );	\
+			GAMMA_WRITE( GAMMA_GDMACONTROL,		0x00000000 );	\
+			break;						\
+	}								\
 } while (0)
 #define DRIVER_POSTINSTALL() do {					\
 	drm_gamma_private_t *dev_priv =					\
 				(drm_gamma_private_t *)dev->dev_private;\
-	while(GAMMA_READ(GAMMA_INFIFOSPACE) < 2);			\
-	while(GAMMA_READ(GAMMA_INFIFOSPACE) < 3);			\
-	GAMMA_WRITE( GAMMA_GINTENABLE,		0x00002001 );		\
-	GAMMA_WRITE( GAMMA_COMMANDINTENABLE,	0x00000008 );		\
-	GAMMA_WRITE( GAMMA_GDELAYTIMER,		0x00039090 );		\
+	switch (dev_priv->chip_type) {					\
+		case GAMMA_CHIP_IS_GAMMA :				\
+			while(GAMMA_READ(GAMMA_INFIFOSPACE) < 3);	\
+			GAMMA_WRITE( GAMMA_GINTENABLE,		0x00002001 );	\
+			GAMMA_WRITE( GAMMA_COMMANDINTENABLE,	0x00000008 );	\
+			GAMMA_WRITE( GAMMA_GDELAYTIMER,		0x00039090 );	\
+			break;						\
+		case GAMMA_CHIP_IS_PERMEDIA2 :				\
+			while(GAMMA_READ(GAMMA_INFIFOSPACE) < 1);	\
+			GAMMA_WRITE( GAMMA_INTENABLE,		0x00000081 );	\
+			break;						\
+		case GAMMA_CHIP_IS_PERMEDIA3 :				\
+			while(GAMMA_READ(GAMMA_INFIFOSPACE) < 1);	\
+			GAMMA_WRITE( GAMMA_INTENABLE,		0x00002081 );	\
+			break;						\
+	}								\
 } while (0)
 #else
 #define DRIVER_POSTINSTALL() do {					\
 	drm_gamma_private_t *dev_priv =					\
 				(drm_gamma_private_t *)dev->dev_private;\
-	while(GAMMA_READ(GAMMA_INFIFOSPACE) < 2);			\
-	while(GAMMA_READ(GAMMA_INFIFOSPACE) < 2);			\
-	GAMMA_WRITE( GAMMA_GINTENABLE,		0x00002000 );		\
-	GAMMA_WRITE( GAMMA_COMMANDINTENABLE,	0x00000004 );		\
+	switch (dev_priv->chip_type) {					\
+		case GAMMA_CHIP_IS_GAMMA :				\
+			while(GAMMA_READ(GAMMA_INFIFOSPACE) < 2);	\
+			GAMMA_WRITE( GAMMA_GINTENABLE,		0x00002000 );	\
+			GAMMA_WRITE( GAMMA_COMMANDINTENABLE,	0x00000004 );	\
+			break;						\
+		case GAMMA_CHIP_IS_PERMEDIA2 :				\
+			while(GAMMA_READ(GAMMA_INFIFOSPACE) < 1);	\
+			GAMMA_WRITE( GAMMA_INTENABLE,		0x00000081 );	\
+			break;						\
+		case GAMMA_CHIP_IS_PERMEDIA3 :				\
+			while(GAMMA_READ(GAMMA_INFIFOSPACE) < 1);	\
+			GAMMA_WRITE( GAMMA_INTENABLE,		0x00002081 );	\
+			break;						\
+	}								\
 } while (0)
 
 #define DRIVER_PREINSTALL() do {					\
 	drm_gamma_private_t *dev_priv =					\
 				(drm_gamma_private_t *)dev->dev_private;\
-	while(GAMMA_READ(GAMMA_INFIFOSPACE) < 2);			\
-	while(GAMMA_READ(GAMMA_INFIFOSPACE) < 2);			\
-	GAMMA_WRITE( GAMMA_GCOMMANDMODE,	GAMMA_QUEUED_DMA_MODE );\
-	GAMMA_WRITE( GAMMA_GDMACONTROL,		0x00000000 );\
+	switch (dev_priv->chip_type) {					\
+		case GAMMA_CHIP_IS_GAMMA :				\
+			while(GAMMA_READ(GAMMA_INFIFOSPACE) < 2);	\
+			GAMMA_WRITE( GAMMA_GCOMMANDMODE,	GAMMA_QUEUED_DMA_MODE );\
+			GAMMA_WRITE( GAMMA_GDMACONTROL,		0x00000000 );	\
+			break;						\
+	}								\
 } while (0)
 #endif
 
 #define DRIVER_UNINSTALL() do {						\
 	drm_gamma_private_t *dev_priv =					\
 				(drm_gamma_private_t *)dev->dev_private;\
-	while(GAMMA_READ(GAMMA_INFIFOSPACE) < 2);			\
-	while(GAMMA_READ(GAMMA_INFIFOSPACE) < 3);			\
-	GAMMA_WRITE( GAMMA_GDELAYTIMER,		0x00000000 );		\
-	GAMMA_WRITE( GAMMA_COMMANDINTENABLE,	0x00000000 );		\
-	GAMMA_WRITE( GAMMA_GINTENABLE,		0x00000000 );		\
+	switch (dev_priv->chip_type) {					\
+		case GAMMA_CHIP_IS_GAMMA :				\
+			while(GAMMA_READ(GAMMA_INFIFOSPACE) < 3);	\
+			GAMMA_WRITE( GAMMA_GDELAYTIMER,		0x00000000 );	\
+			GAMMA_WRITE( GAMMA_COMMANDINTENABLE,	0x00000000 );	\
+			GAMMA_WRITE( GAMMA_GINTENABLE,		0x00000000 );	\
+			break;						\
+		case GAMMA_CHIP_IS_PERMEDIA2 :				\
+		case GAMMA_CHIP_IS_PERMEDIA3 :				\
+			while(GAMMA_READ(GAMMA_INFIFOSPACE) < 1);	\
+			GAMMA_WRITE( GAMMA_INTENABLE,		0x00000000 );	\
+			break;						\
+	}								\
 } while (0)
 
 #define DRIVER_AGP_BUFFERS_MAP( dev )					\

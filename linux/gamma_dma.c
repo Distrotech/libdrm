@@ -26,6 +26,7 @@
  *
  * Authors:
  *    Rickard E. (Rik) Faith <faith@valinux.com>
+ *    Sven Luther <luther@dpt-info.u-strasbg.fr>
  *
  */
 
@@ -46,8 +47,17 @@ static inline void gamma_dma_dispatch(drm_device_t *dev, unsigned long address,
 				(drm_gamma_private_t *)dev->dev_private;
 	mb();
 	while ( GAMMA_READ(GAMMA_INFIFOSPACE) < 2);
-	GAMMA_WRITE(GAMMA_DMAADDRESS, address);
-	while (GAMMA_READ(GAMMA_GCOMMANDSTATUS) != 4);
+	switch (dev_priv->chip_type) {
+		case GAMMA_CHIP_IS_GAMMA :
+			GAMMA_WRITE(GAMMA_DMAADDRESS, address);
+			while (GAMMA_READ(GAMMA_GCOMMANDSTATUS) != 4);
+			break;
+		case GAMMA_CHIP_IS_PERMEDIA2 :
+		case GAMMA_CHIP_IS_PERMEDIA3 :
+			GAMMA_WRITE(GAMMA_DMAADDRESS, virt_to_phys((void *)address));
+			while (GAMMA_READ(GAMMA_DMACOUNT));
+			break;
+	}
 	GAMMA_WRITE(GAMMA_DMACOUNT, length / 4);
 }
 
@@ -114,10 +124,22 @@ void gamma_dma_service(int irq, void *device, struct pt_regs *regs)
 
 	atomic_inc(&dev->counts[6]); /* _DRM_STAT_IRQ */
 
-	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 3);
-	GAMMA_WRITE(GAMMA_GDELAYTIMER, 0xc350/2); /* 0x05S */
-	GAMMA_WRITE(GAMMA_GCOMMANDINTFLAGS, 8);
-	GAMMA_WRITE(GAMMA_GINTFLAGS, 0x2001);
+	switch (dev_priv->chip_type) {
+		case GAMMA_CHIP_IS_GAMMA :
+			while (GAMMA_READ(GAMMA_INFIFOSPACE) < 3);
+			GAMMA_WRITE(GAMMA_GDELAYTIMER, 0xc350/2); /* 0x05S */
+			GAMMA_WRITE(GAMMA_GCOMMANDINTFLAGS, 8);
+			GAMMA_WRITE(GAMMA_GINTFLAGS, 0x2001);
+			break;
+		case GAMMA_CHIP_IS_PERMEDIA2 :
+			while (GAMMA_READ(GAMMA_INFIFOSPACE) < 1);
+			GAMMA_WRITE(GAMMA_INTFLAGS, 0x0081);
+			break;
+		case GAMMA_CHIP_IS_PERMEDIA3 :
+			while (GAMMA_READ(GAMMA_INFIFOSPACE) < 1);
+			GAMMA_WRITE(GAMMA_INTFLAGS, 0x2081);
+			break;
+	}
 	if (gamma_dma_is_ready(dev)) {
 				/* Free previous buffer */
 		if (test_and_set_bit(0, &dev->dma_flag)) return;
@@ -141,6 +163,8 @@ static int gamma_do_dma(drm_device_t *dev, int locked)
 	drm_buf_t	 *buf;
 	int		 retcode = 0;
 	drm_device_dma_t *dma = dev->dma;
+	drm_gamma_private_t *dev_priv =
+				(drm_gamma_private_t *)dev->dev_private;
 #if DRM_DMA_HISTOGRAM
 	cycles_t	 dma_start, dma_stop;
 #endif
@@ -158,9 +182,20 @@ static int gamma_do_dma(drm_device_t *dev, int locked)
 	}
 
 	buf	= dma->next_buffer;
-	/* WE NOW ARE ON LOGICAL PAGES!! - using page table setup in dma_init */
-	/* So we pass the buffer index value into the physical page offset */
-	address = buf->idx << 12;
+
+	switch (dev_priv->chip_type) {
+		case GAMMA_CHIP_IS_GAMMA :
+			/* WE NOW ARE ON LOGICAL PAGES!! - using page table
+			 * setup in dma_init so we pass the buffer index value
+			 * into the physical page offset */
+			address = buf->idx << 12;
+		case GAMMA_CHIP_IS_PERMEDIA2 :
+		case GAMMA_CHIP_IS_PERMEDIA3 :
+		default :
+			/* Permedia3 does not support logical pages */
+			address = (unsigned long)buf->address;
+			break;
+	}
 	length	= buf->used;
 
 	DRM_DEBUG("context %d, buffer %d (%ld bytes)\n",
@@ -227,8 +262,13 @@ static int gamma_do_dma(drm_device_t *dev, int locked)
 	buf->time_dispatched = get_cycles();
 #endif
 
-	/* WE NOW ARE ON LOGICAL PAGES!!! - overriding address */
-	address = buf->idx << 12;
+
+	switch (dev_priv->chip_type) {
+		case GAMMA_CHIP_IS_GAMMA :
+			/* WE NOW ARE ON LOGICAL PAGES!!! - overriding address */
+			address = buf->idx << 12;
+			break;
+	}
 
 	gamma_dma_dispatch(dev, address, length);
 	gamma_free_buffer(dev, dma->this_buffer);
@@ -605,6 +645,9 @@ static int gamma_do_init_dma( drm_device_t *dev, drm_gamma_init_t *init )
 
 	memset( dev_priv, 0, sizeof(drm_gamma_private_t) );
 
+	dev_priv->chip_type = init->chip_type;	
+	dev_priv->num_rast = init->num_rast;	
+
 	list_for_each(list, &dev->maplist->head) {
 		drm_map_list_t *r_list = (drm_map_list_t *)list;
 		if( r_list->map &&
@@ -651,12 +694,26 @@ static int gamma_do_init_dma( drm_device_t *dev, drm_gamma_init_t *init )
 
 		buf = dma->buflist[GLINT_DRI_BUF_COUNT];
 
-		while (GAMMA_READ(GAMMA_INFIFOSPACE) < 1);
-		GAMMA_WRITE( GAMMA_GDMACONTROL, 0xe);
+
+		switch (dev_priv->chip_type) {
+			case GAMMA_CHIP_IS_GAMMA :
+				while (GAMMA_READ(GAMMA_INFIFOSPACE) < 1);
+				GAMMA_WRITE( GAMMA_GDMACONTROL, 0xe);
+				break;
+			case GAMMA_CHIP_IS_PERMEDIA2 :
+			case GAMMA_CHIP_IS_PERMEDIA3 :
+				while (GAMMA_READ(GAMMA_INFIFOSPACE) < 1);
+				GAMMA_WRITE( GAMMA_GDMACONTROL, 0x2);
+				break;
+		}
 	}
-	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 2);
-	GAMMA_WRITE( GAMMA_PAGETABLEADDR, virt_to_phys((void*)buf->address) );
-	GAMMA_WRITE( GAMMA_PAGETABLELENGTH, 2 );
+	switch (dev_priv->chip_type) {
+		case GAMMA_CHIP_IS_GAMMA :
+			while (GAMMA_READ(GAMMA_INFIFOSPACE) < 2);
+			GAMMA_WRITE( GAMMA_PAGETABLEADDR, virt_to_phys((void*)buf->address) );
+			GAMMA_WRITE( GAMMA_PAGETABLELENGTH, 2 );
+			break;
+	}
 
 	return 0;
 }

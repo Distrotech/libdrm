@@ -84,6 +84,13 @@ typedef struct drm_gamma_init {
 	unsigned int mmio2;
 	unsigned int mmio3;
 	unsigned int buffers_offset;
+	enum {
+		GAMMA_CHIP_IS_DELTA = 0x01,
+		GAMMA_CHIP_IS_GAMMA = 0x02,
+		GAMMA_CHIP_IS_PERMEDIA2 = 0x03,
+		GAMMA_CHIP_IS_PERMEDIA3 = 0x04
+	} chip_type;
+	int num_rast;
 } drm_gamma_init_t;
 
 #endif /* _GAMMA_DRM_H_ */

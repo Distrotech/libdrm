@@ -26,6 +26,7 @@
  *
  * Authors:
  *    Rickard E. (Rik) Faith <faith@valinux.com>
+ *    Sven Luther <luther@dpt-info.u-strasbg.fr>
  *
  */
 
@@ -40,6 +41,8 @@ typedef struct drm_gamma_private {
 	drm_map_t *mmio1;
 	drm_map_t *mmio2;
 	drm_map_t *mmio3;
+	int chip_type;
+	int num_rast;
 } drm_gamma_private_t;
 
 #define LOCK_TEST_WITH_RETURN( dev )					\
@@ -111,6 +114,8 @@ extern int  gamma_found(void);
 #define GAMMA_SYNC_TAG	       0x0188
 #define GAMMA_PAGETABLEADDR    0x0C00
 #define GAMMA_PAGETABLELENGTH  0x0C08
+#define GAMMA_INTENABLE        0x0008
+#define GAMMA_INTFLAGS         0x0010
 
 #define GAMMA_PASSTHROUGH	0x1FE
 #define GAMMA_DMAADDRTAG	0x530
