@@ -44,11 +44,12 @@
 drm_file_t *DRM(find_file_by_proc)(drm_device_t *dev, DRM_OS_STRUCTPROC *p)
 {
 #if __FreeBSD_version >= 500021
-	uid_t uid = p->p_ucred->cr_svuid;
+	uid_t uid = p->td_proc->p_ucred->cr_svuid;
+	pid_t pid = p->td_proc->p_pid;
 #else
 	uid_t uid = p->p_cred->p_svuid;
-#endif
 	pid_t pid = p->p_pid;
+#endif
 	drm_file_t *priv;
 
 	TAILQ_FOREACH(priv, &dev->files, link)
