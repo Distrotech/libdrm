@@ -13,9 +13,13 @@
 #include <sys/filio.h>
 #include <sys/sysctl.h>
 #include <sys/select.h>
+#include <sys/selinfo.h>
 #include <sys/bus.h>
 #if __FreeBSD_version >= 400005
 #include <sys/taskqueue.h>
+#endif
+#if __FreeBSD_version >= 500000
+#include <sys/mutex.h>
 #endif
 
 #if __FreeBSD_version >= 400006
@@ -36,8 +40,13 @@
 
 #define DRM_OS_LOCK	lockmgr(&dev->dev_lock, LK_EXCLUSIVE, 0, curproc)
 #define DRM_OS_UNLOCK 	lockmgr(&dev->dev_lock, LK_RELEASE, 0, curproc)
+#if __FreeBSD_version >= 500000
+#define DRM_OS_SPINLOCK(l)	mtx_lock(l)
+#define DRM_OS_SPINUNLOCK(u)	mtx_unlock(u);
+#else
 #define DRM_OS_SPINLOCK(l)	simple_lock(l)
 #define DRM_OS_SPINUNLOCK(u)	simple_unlock(u);
+#endif
 #define DRM_OS_IOCTL	dev_t kdev, u_long cmd, caddr_t data, int flags, struct proc *p
 #define DRM_OS_DEVICE	drm_file_t	*priv; \
 			drm_device_t	*dev	= kdev->si_drv1
@@ -165,6 +174,12 @@ find_first_zero_bit(volatile unsigned long *p, int max)
 
 #define DRM_PROC_LIMIT (PAGE_SIZE-80)
 
+#if __FreeBSD_version >= 500000
+#define DRM_SYSCTL_HANDLER_ARGS	(SYSCTL_HANDLER_ARGS)
+#else
+#define DRM_SYSCTL_HANDLER_ARGS	SYSCTL_HANDLER_ARGS
+#endif
+
 #define DRM_SYSCTL_PRINT(fmt, arg...)		\
   snprintf(buf, sizeof(buf), fmt, ##arg);	\
   error = SYSCTL_OUT(req, buf, strlen(buf));	\
@@ -248,7 +263,7 @@ extern d_ioctl_t	DRM(mapbufs);
 #endif
 
 /* Memory management support (drm_memory.h) */
-extern int		DRM(mem_info)SYSCTL_HANDLER_ARGS;
+extern int		DRM(mem_info)DRM_SYSCTL_HANDLER_ARGS;
 
 /* DMA support (drm_dma.h) */
 #if __HAVE_DMA_IRQ

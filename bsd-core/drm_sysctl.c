@@ -1,20 +1,20 @@
 SYSCTL_NODE(_hw, OID_AUTO, dri, CTLFLAG_RW, 0, "DRI Graphics");
 
-static int	   DRM(name_info)SYSCTL_HANDLER_ARGS;
-static int	   DRM(vm_info)SYSCTL_HANDLER_ARGS;
-static int	   DRM(clients_info)SYSCTL_HANDLER_ARGS;
-static int	   DRM(queues_info)SYSCTL_HANDLER_ARGS;
-static int	   DRM(bufs_info)SYSCTL_HANDLER_ARGS;
+static int	   DRM(name_info)DRM_SYSCTL_HANDLER_ARGS;
+static int	   DRM(vm_info)DRM_SYSCTL_HANDLER_ARGS;
+static int	   DRM(clients_info)DRM_SYSCTL_HANDLER_ARGS;
+static int	   DRM(queues_info)DRM_SYSCTL_HANDLER_ARGS;
+static int	   DRM(bufs_info)DRM_SYSCTL_HANDLER_ARGS;
 #if DRM_DEBUG_CODExx
-static int	   DRM(vma_info)SYSCTL_HANDLER_ARGS;
+static int	   DRM(vma_info)DRM_SYSCTL_HANDLER_ARGS;
 #endif
 #if DRM_DMA_HISTOGRAM
-static int	   DRM(histo_info)SYSCTL_HANDLER_ARGS;
+static int	   DRM(histo_info)DRM_SYSCTL_HANDLER_ARGS;
 #endif
 
 struct DRM(sysctl_list) {
 	const char *name;
-	int	   (*f) SYSCTL_HANDLER_ARGS;
+	int	   (*f) DRM_SYSCTL_HANDLER_ARGS;
 } DRM(sysctl_list)[] = {
 	{ "name",    DRM(name_info)    },
 	{ "mem",     DRM(mem_info)     },
@@ -102,7 +102,7 @@ int DRM(sysctl_cleanup)(drm_device_t *dev)
 	return 0;
 }
 
-static int DRM(name_info)SYSCTL_HANDLER_ARGS
+static int DRM(name_info)DRM_SYSCTL_HANDLER_ARGS
 {
 	drm_device_t *dev = arg1;
 	char buf[128];
@@ -120,7 +120,7 @@ static int DRM(name_info)SYSCTL_HANDLER_ARGS
 	return 0;
 }
 
-static int DRM(_vm_info)SYSCTL_HANDLER_ARGS
+static int DRM(_vm_info)DRM_SYSCTL_HANDLER_ARGS
 {
 	drm_device_t *dev = arg1;
 	drm_map_t    *map;
@@ -159,7 +159,7 @@ static int DRM(_vm_info)SYSCTL_HANDLER_ARGS
 	return 0;
 }
 
-static int DRM(vm_info)SYSCTL_HANDLER_ARGS
+static int DRM(vm_info)DRM_SYSCTL_HANDLER_ARGS
 {
 	drm_device_t *dev = arg1;
 	int	     ret;
@@ -172,7 +172,7 @@ static int DRM(vm_info)SYSCTL_HANDLER_ARGS
 }
 
 
-static int DRM(_queues_info)SYSCTL_HANDLER_ARGS
+static int DRM(_queues_info)DRM_SYSCTL_HANDLER_ARGS
 {
 	drm_device_t *dev = arg1;
 	int	     i;
@@ -210,7 +210,7 @@ static int DRM(_queues_info)SYSCTL_HANDLER_ARGS
 	return 0;
 }
 
-static int DRM(queues_info) SYSCTL_HANDLER_ARGS
+static int DRM(queues_info) DRM_SYSCTL_HANDLER_ARGS
 {
 	drm_device_t *dev = arg1;
 	int	     ret;
@@ -224,7 +224,7 @@ static int DRM(queues_info) SYSCTL_HANDLER_ARGS
 /* drm_bufs_info is called whenever a process reads
    hw.dri.0.bufs. */
 
-static int DRM(_bufs_info) SYSCTL_HANDLER_ARGS
+static int DRM(_bufs_info) DRM_SYSCTL_HANDLER_ARGS
 {
 	drm_device_t	 *dev = arg1;
 	drm_device_dma_t *dma = dev->dma;
@@ -260,7 +260,7 @@ static int DRM(_bufs_info) SYSCTL_HANDLER_ARGS
 	return 0;
 }
 
-static int DRM(bufs_info) SYSCTL_HANDLER_ARGS
+static int DRM(bufs_info) DRM_SYSCTL_HANDLER_ARGS
 {
 	drm_device_t *dev = arg1;
 	int	     ret;
@@ -272,7 +272,7 @@ static int DRM(bufs_info) SYSCTL_HANDLER_ARGS
 }
 
 
-static int DRM(_clients_info) SYSCTL_HANDLER_ARGS
+static int DRM(_clients_info) DRM_SYSCTL_HANDLER_ARGS
 {
 	drm_device_t *dev = arg1;
 	drm_file_t   *priv;
@@ -294,7 +294,7 @@ static int DRM(_clients_info) SYSCTL_HANDLER_ARGS
 	return 0;
 }
 
-static int DRM(clients_info)SYSCTL_HANDLER_ARGS
+static int DRM(clients_info)DRM_SYSCTL_HANDLER_ARGS
 {
 	drm_device_t *dev = arg1;
 	int	     ret;
@@ -307,7 +307,7 @@ static int DRM(clients_info)SYSCTL_HANDLER_ARGS
 
 #if DRM_DEBUG_CODExx
 
-static int DRM(_vma_info)SYSCTL_HANDLER_ARGS
+static int DRM(_vma_info)DRM_SYSCTL_HANDLER_ARGS
 {
 	drm_device_t	      *dev = arg1;
 	drm_vma_entry_t	      *pt;
@@ -379,7 +379,7 @@ static int DRM(_vma_info)SYSCTL_HANDLER_ARGS
 	return 0;
 }
 
-static int DRM(vma_info)SYSCTL_HANDLER_ARGS
+static int DRM(vma_info)DRM_SYSCTL_HANDLER_ARGS
 {
 	drm_device_t *dev = arg1;
 	int	     ret;
@@ -393,7 +393,7 @@ static int DRM(vma_info)SYSCTL_HANDLER_ARGS
 
 
 #if DRM_DMA_HISTOGRAM
-static int DRM(_histo_info)SYSCTL_HANDLER_ARGS
+static int DRM(_histo_info)DRM_SYSCTL_HANDLER_ARGS
 {
 	drm_device_t	 *dev = arg1;
 	drm_device_dma_t *dma = dev->dma;
@@ -508,7 +508,7 @@ static int DRM(_histo_info)SYSCTL_HANDLER_ARGS
 	return 0;
 }
 
-static int DRM(histo_info)SYSCTL_HANDLER_ARGS
+static int DRM(histo_info)DRM_SYSCTL_HANDLER_ARGS
 {
 	drm_device_t *dev = arg1;
 	int	     ret;
