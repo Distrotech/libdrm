@@ -1027,7 +1027,7 @@ int DRM( close)(dev_t kdev, int flags, int fmt, struct proc *p)
 	DRM_OS_SPINLOCK( &dev->count_lock );
 	if ( !--dev->open_count ) {
 		if ( atomic_read( &dev->ioctl_count ) || dev->blocked ) {
-			DRM_ERROR( "Device busy: %d %d\n",
+			DRM_ERROR( "Device busy: %ld %d\n",
 				   atomic_read( &dev->ioctl_count ),
 				   dev->blocked );
 			DRM_OS_SPINUNLOCK( &dev->count_lock );
@@ -1059,6 +1059,7 @@ int DRM( close)(dev_t kdev, int flags, int fmt, struct proc *p)
 int DRM(ioctl)( DRM_OS_IOCTL )
 {
 	DRM_OS_DEVICE;
+	int retcode = 0;
 	drm_ioctl_desc_t *ioctl;
 #ifdef __linux__
 	drm_ioctl_t *func;
@@ -1067,14 +1068,43 @@ int DRM(ioctl)( DRM_OS_IOCTL )
 	d_ioctl_t *func;
 #endif
 	int nr = DRM_IOCTL_NR(cmd);
-	int retcode = 0;
+
+#ifdef __FreeBSD__
+	priv = DRM(find_file_by_proc)(dev, p);
+	if (!priv) {
+		DRM_DEBUG("can't find authenticator\n");
+		return EINVAL;
+	}
+#endif
 
 	atomic_inc( &dev->ioctl_count );
 	atomic_inc( &dev->counts[_DRM_STAT_IOCTLS] );
 	++priv->ioctl_count;
 
 	DRM_DEBUG( "pid=%d, cmd=0x%02x, nr=0x%02x, dev 0x%x, auth=%d\n",
-		   current->pid, cmd, nr, dev->device, priv->authenticated );
+		 DRM_OS_CURRENTPID, cmd, nr, dev->device, priv->authenticated );
+
+#ifdef __FreeBSD__
+	switch (cmd) {
+	case FIONBIO:
+		atomic_dec(&dev->ioctl_count);
+		return 0;
+
+	case FIOASYNC:
+		atomic_dec(&dev->ioctl_count);
+		dev->flags |= FASYNC;
+		return 0;
+
+	case FIOSETOWN:
+		atomic_dec(&dev->ioctl_count);
+		return fsetown(*(int *)data, &dev->buf_sigio);
+
+	case FIOGETOWN:
+		atomic_dec(&dev->ioctl_count);
+		*(int *) data = fgetown(dev->buf_sigio);
+		return 0;
+	}
+#endif
 
 	if ( nr >= DRIVER_IOCTL_COUNT ) {
 		retcode = -EINVAL;
