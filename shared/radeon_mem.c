@@ -44,8 +44,7 @@ static struct mem_block *split_block(struct mem_block *p, int start, int size,
 {
 	/* Maybe cut off the start of an existing block */
 	if (start > p->start) {
-		struct mem_block *newblock = kmalloc(sizeof(*newblock),
-						     GFP_KERNEL);
+		struct mem_block *newblock = DRM_MALLOC(sizeof(*newblock));
 		if (!newblock) 
 			goto out;
 		newblock->start = start;
@@ -61,8 +60,7 @@ static struct mem_block *split_block(struct mem_block *p, int start, int size,
    
 	/* Maybe cut off the end of an existing block */
 	if (size < p->size) {
-		struct mem_block *newblock = kmalloc(sizeof(*newblock), 
-						     GFP_KERNEL);
+		struct mem_block *newblock = DRM_MALLOC(sizeof(*newblock));
 		if (!newblock)
 			goto out;
 		newblock->start = start + size;
@@ -146,12 +144,12 @@ static void print_heap( struct mem_block *heap )
  */
 static int init_heap(struct mem_block **heap, int start, int size)
 {
-	struct mem_block *blocks = kmalloc(sizeof(*blocks), GFP_KERNEL);
+	struct mem_block *blocks = DRM_MALLOC(sizeof(*blocks));
 
 	if (!blocks) 
 		return -ENOMEM;
 	
-	*heap = kmalloc(sizeof(**heap), GFP_KERNEL);
+	*heap = DRM_MALLOC(sizeof(**heap));
 	if (!*heap) {
 		kfree( blocks );
 		return -ENOMEM;
