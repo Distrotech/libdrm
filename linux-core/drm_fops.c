@@ -41,7 +41,7 @@
 #include <sys/signalvar.h>
 #include <sys/poll.h>
 
-drm_file_t *DRM(find_file_by_proc)(drm_device_t *dev, struct proc *p)
+drm_file_t *DRM(find_file_by_proc)(drm_device_t *dev, DRM_OS_STRUCTPROC *p)
 {
 #if __FreeBSD_version >= 500021
 	uid_t uid = p->p_ucred->cr_svuid;
@@ -66,7 +66,7 @@ int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 	kdev_t	     m = MINOR(inode->i_rdev);
 #endif /* __linux__ */
 #ifdef __FreeBSD__
-int DRM(open_helper)(dev_t kdev, int flags, int fmt, struct proc *p,
+int DRM(open_helper)(dev_t kdev, int flags, int fmt, DRM_OS_STRUCTPROC *p,
 		    drm_device_t *dev)
 {
 	int	     m = minor(kdev);
@@ -332,7 +332,7 @@ unsigned int DRM(poll)(struct file *filp, struct poll_table_struct *wait)
 }
 #endif /* __linux__ */
 #ifdef __FreeBSD__
-int DRM(poll)(dev_t kdev, int events, struct proc *p)
+int DRM(poll)(dev_t kdev, int events, DRM_OS_STRUCTPROC *p)
 {
 	drm_device_t  *dev    = kdev->si_drv1;
 	int           s;

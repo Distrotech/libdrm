@@ -926,7 +926,7 @@ int DRM(version)( DRM_OS_IOCTL )
 int DRM(open)( struct inode *inode, struct file *filp )
 #endif /* __linux__ */
 #ifdef __FreeBSD__
-int DRM( open)(dev_t kdev, int flags, int fmt, struct proc *p)
+int DRM( open)(dev_t kdev, int flags, int fmt, DRM_OS_STRUCTPROC *p)
 #endif /* __FreeBSD__ */
 {
 	drm_device_t *dev = NULL;
@@ -982,7 +982,7 @@ int DRM(release)( struct inode *inode, struct file *filp )
 	drm_device_t *dev;
 #endif /* __linux__ */
 #ifdef __FreeBSD__
-int DRM( close)(dev_t kdev, int flags, int fmt, struct proc *p)
+int DRM( close)(dev_t kdev, int flags, int fmt, DRM_OS_STRUCTPROC *p)
 {
 	drm_file_t *priv;
 	drm_device_t  *dev    = kdev->si_drv1;
@@ -1419,7 +1419,7 @@ SYSUNINIT(DRM( unregister), SI_SUB_KLD, SI_ORDER_MIDDLE, linux_ioctl_unregister_
  * Linux emulation IOCTL
  */
 static int
-DRM(linux_ioctl)(struct proc* p, struct linux_ioctl_args* args)
+DRM(linux_ioctl)(DRM_OS_STRUCTPROC *p, struct linux_ioctl_args* args)
 {
     struct file		*fp = p->p_fd->fd_ofiles[args->fd];
     u_long		cmd = args->cmd;
