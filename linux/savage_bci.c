@@ -42,11 +42,13 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 {
 	drm_savage_private_t *dev_priv;
 	u32 tmp;
-	DRM_INFO( "[drm] initializing bci ...\n" );
+	DRM_INFO( "initializing bci ...\n" );
 
 	dev_priv = DRM(alloc)( sizeof(drm_savage_private_t), DRM_MEM_DRIVER );
-	if ( dev_priv == NULL )
+	if ( dev_priv == NULL ) {
+		DRM_ERROR( "memory allocation for dev_priv failed!\n" );
 		return DRM_ERR(ENOMEM);
+	}
 
 	memset( dev_priv, 0, sizeof(drm_savage_private_t) );
 
@@ -62,14 +64,13 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 	dev_priv->usec_timeout = init->usec_timeout;
 	if ( dev_priv->usec_timeout < 1 ||
 	     dev_priv->usec_timeout > SAVAGE_MAX_USEC_TIMEOUT ) {
-		DRM_DEBUG( "TIMEOUT problem!\n" );
+		DRM_ERROR( "TIMEOUT problem!\n" );
 		dev->dev_private = (void *)dev_priv;
 		savage_do_cleanup_bci(dev);
 		return DRM_ERR(EINVAL);
 	}
 
 	dev_priv->do_boxes = 0;
-	dev_priv->bci_mode = init->bci_mode;
 
 	switch ( init->fb_bpp ) {
 	case 16:
@@ -104,6 +105,7 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 	dev_priv->depth_pitch_offset = (((dev_priv->depth_pitch/64) << 22) |
 					(dev_priv->depth_offset >> 10));
 
+	DRM_INFO( "looking for sarea ...\n" );
 	DRM_GETSAREA();
 	
 	if(!dev_priv->sarea) {
@@ -113,6 +115,7 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 		return DRM_ERR(EINVAL);
 	}
 
+	DRM_INFO( "looking for framebuffer ...\n" );
 	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
 	if(!dev_priv->fb) {
 		DRM_ERROR("could not find framebuffer!\n");
@@ -120,6 +123,8 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 		savage_do_cleanup_bci(dev);
 		return DRM_ERR(EINVAL);
 	}
+
+	DRM_INFO( "looking for mmio region ...\n" );
 	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
 	if(!dev_priv->mmio) {
 		DRM_ERROR("could not find mmio region!\n");
@@ -127,20 +132,17 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 		savage_do_cleanup_bci(dev);
 		return DRM_ERR(EINVAL);
 	}
-	DRM_FIND_MAP( dev_priv->bci_ring, init->ring_offset );
-	if(!dev_priv->bci_ring) {
-		DRM_ERROR("could not find bci ring region!\n");
+
+	DRM_INFO( "looking for bci region ...\n" );
+	DRM_FIND_MAP( dev_priv->bci, init->bci_offset );
+	if(!dev_priv->bci) {
+		DRM_ERROR("could not find bci region!\n");
 		dev->dev_private = (void *)dev_priv;
 		savage_do_cleanup_bci(dev);
 		return DRM_ERR(EINVAL);
 	}
-	DRM_FIND_MAP( dev_priv->ring_rptr, init->ring_rptr_offset );
-	if(!dev_priv->ring_rptr) {
-		DRM_ERROR("could not find ring read pointer!\n");
-		dev->dev_private = (void *)dev_priv;
-		savage_do_cleanup_bci(dev);
-		return DRM_ERR(EINVAL);
-	}
+/* FIXME: we do not support this right now */
+#if 0
 	DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
 	if(!dev_priv->buffers) {
 		DRM_ERROR("could not find dma buffer region!\n");
@@ -150,6 +152,7 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 	}
 
 	if ( !dev_priv->is_pci ) {
+		DRM_INFO( "looking for agp texture region ...\n" );
 		DRM_FIND_MAP( dev_priv->agp_textures,
 			      init->agp_textures_offset );
 		if(!dev_priv->agp_textures) {
@@ -160,33 +163,32 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 		}
 	}
 
+#endif
+
 	dev_priv->sarea_priv =
 		(drm_savage_sarea_t *)((u8 *)dev_priv->sarea->handle +
 				       init->sarea_priv_offset);
 
 	if ( !dev_priv->is_pci ) {
-		DRM_IOREMAP( dev_priv->bci_ring );
-		DRM_IOREMAP( dev_priv->ring_rptr );
+		/* FIXME: we do not support this right now */
+#if 0
+		DRM_IOREMAP( dev_priv->bci );
 		DRM_IOREMAP( dev_priv->buffers );
-		if(!dev_priv->bci_ring->handle ||
-		   !dev_priv->ring_rptr->handle ||
+		if(!dev_priv->bci->handle ||
 		   !dev_priv->buffers->handle) {
 			DRM_ERROR("could not find ioremap agp regions!\n");
 			dev->dev_private = (void *)dev_priv;
 			savage_do_cleanup_bci(dev);
 			return DRM_ERR(EINVAL);
 		}
+#endif
 	} else {
-		dev_priv->bci_ring->handle =
-			(void *)dev_priv->bci_ring->offset;
-		dev_priv->ring_rptr->handle =
-			(void *)dev_priv->ring_rptr->offset;
+		dev_priv->bci->handle =
+			(void *)dev_priv->bci->offset;
 		dev_priv->buffers->handle = (void *)dev_priv->buffers->offset;
 
-		DRM_DEBUG( "dev_priv->bci_ring->handle %p\n",
-			   dev_priv->bci_ring->handle );
-		DRM_DEBUG( "dev_priv->ring_rptr->handle %p\n",
-			   dev_priv->ring_rptr->handle );
+		DRM_DEBUG( "dev_priv->bci->handle %p\n",
+			   dev_priv->bci->handle );
 		DRM_DEBUG( "dev_priv->buffers->handle %p\n",
 			   dev_priv->buffers->handle );
 	}
@@ -211,20 +213,6 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 		   dev_priv->agp_vm_start );
 	DRM_DEBUG( "dev_priv->agp_buffers_offset 0x%lx\n",
 		   dev_priv->agp_buffers_offset );
-
-	dev_priv->ring.head = ((__volatile__ u32 *)
-			       dev_priv->ring_rptr->handle);
-
-	dev_priv->ring.start = (u32 *)dev_priv->bci_ring->handle;
-	dev_priv->ring.end = ((u32 *)dev_priv->bci_ring->handle
-			      + init->ring_size / sizeof(u32));
-	dev_priv->ring.size = init->ring_size;
-	dev_priv->ring.size_l2qw = DRM(order)( init->ring_size / 8 );
-
-	dev_priv->ring.tail_mask =
-		(dev_priv->ring.size / sizeof(u32)) - 1;
-
-	dev_priv->ring.high_mark = SAVAGE_RING_HIGH_MARK;
 
 #if __REALLY_HAVE_SG
 	if ( dev_priv->is_pci ) {
@@ -266,8 +254,6 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 	}
 #endif /* __REALLY_HAVE_SG */
 
-/* FIXME:	savage_bci_init_ring_buffer( dev, dev_priv ); */
-
 	dev_priv->last_buf = 0;
 
 	dev->dev_private = (void *)dev_priv;
@@ -279,15 +265,14 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 
 int savage_do_cleanup_bci( drm_device_t *dev )
 {
-	DRM_DEBUG( "\n" );
+	DRM_INFO( "cleaning up bci ...\n" );
 
 	if ( dev->dev_private ) {
 		drm_savage_private_t *dev_priv = dev->dev_private;
 
 		if ( !dev_priv->is_pci ) {
-			DRM_IOREMAPFREE( dev_priv->bci_ring );
-			DRM_IOREMAPFREE( dev_priv->ring_rptr );
-			DRM_IOREMAPFREE( dev_priv->buffers );
+			/* FIXME: DRM_IOREMAPFREE( dev_priv->bci ); */
+			/* FIXME: DRM_IOREMAPFREE( dev_priv->buffers ); */
 		} else {
 #if __REALLY_HAVE_SG
 			if (!DRM(ati_pcigart_cleanup)( dev,

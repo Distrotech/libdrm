@@ -38,19 +38,6 @@ typedef struct drm_savage_freelist {
    	struct drm_radeon_freelist *prev;
 } drm_savage_freelist_t;
 
-typedef struct drm_savage_ring_buffer {
-	u32 *start;
-	u32 *end;
-	int size;
-	int size_l2qw;
-
-	volatile u32 *head;
-	u32 tail;
-	u32 tail_mask;
-	int space;
-
-	int high_mark;
-} drm_savage_ring_buffer_t;
 
 typedef struct drm_savage_depth_clear_t {
 	u32 rb3d_cntl;
@@ -68,14 +55,12 @@ struct mem_block {
 };
 
 typedef struct drm_savage_private {
-	drm_savage_ring_buffer_t ring;
 	drm_savage_sarea_t *sarea_priv;
 
 	int agp_size;
 	u32 agp_vm_start;
 	unsigned long agp_buffers_offset;
 
-	int bci_mode;
 	int bci_running;
 
    	drm_savage_freelist_t *head;
@@ -85,8 +70,6 @@ typedef struct drm_savage_private {
 	int writeback_works;
 
 	int usec_timeout;
-
-	int is_r200;
 
 	int is_pci;
 	unsigned long phys_pci_gart;
@@ -126,8 +109,7 @@ typedef struct drm_savage_private {
 	drm_map_t *sarea;
 	drm_map_t *fb;
 	drm_map_t *mmio;
-	drm_map_t *bci_ring;
-	drm_map_t *ring_rptr;
+	drm_map_t *bci;
 	drm_map_t *buffers;
 	drm_map_t *agp_textures;
 

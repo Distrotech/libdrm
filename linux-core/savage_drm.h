@@ -157,9 +157,7 @@ typedef struct drm_savage_init {
 	} func;
 	unsigned long sarea_priv_offset;
 	int is_pci;
-	int bci_mode;
 	int agp_size;
-	int ring_size;
 	int usec_timeout;
 
 	unsigned int fb_bpp;
@@ -170,8 +168,7 @@ typedef struct drm_savage_init {
 
 	unsigned long fb_offset;
 	unsigned long mmio_offset;
-	unsigned long ring_offset;
-	unsigned long ring_rptr_offset;
+	unsigned long bci_offset;
 	unsigned long buffers_offset;
 	unsigned long agp_textures_offset;
 } drm_savage_init_t;
