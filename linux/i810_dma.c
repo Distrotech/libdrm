@@ -312,6 +312,7 @@ static int i810_wait_ring(drm_device_t *dev, int n)
    	drm_i810_ring_buffer_t *ring = &(dev_priv->ring);
    	int iters = 0;
    	unsigned long end;
+	unsigned int last_head = I810_READ(LP_RING + RING_HEAD) & HEAD_ADDR;
 
 	end = jiffies + (HZ*3);
    	while (ring->space < n) {
@@ -319,9 +320,11 @@ static int i810_wait_ring(drm_device_t *dev, int n)
 	
 	   	ring->head = I810_READ(LP_RING + RING_HEAD) & HEAD_ADDR;
 	   	ring->space = ring->head - (ring->tail+8);
+		if (ring->space < 0) ring->space += ring->Size;
 	   
-	   	if (ring->space < 0) ring->space += ring->Size;
-	   
+		if (ring->head != last_head)
+		   end = jiffies + (HZ*3);
+	  
 	   	iters++;
 		if((signed)(end - jiffies) <= 0) {
 		   	DRM_ERROR("space: %d wanted %d\n", ring->space, n);
@@ -853,7 +856,9 @@ static void i810_dma_service(int irq, void *device, struct pt_regs *regs)
    	temp = temp & ~(0x6000);
    	if(temp != 0) I810_WRITE16(I810REG_INT_IDENTITY_R, 
 				   temp); /* Clear all interrupts */
-   
+	else
+	   return;
+ 
    	queue_task(&dev->tq, &tq_immediate);
    	mark_bh(IMMEDIATE_BH);
 }
@@ -913,7 +918,7 @@ int i810_irq_install(drm_device_t *dev, int irq)
 				/* Install handler */
 	if ((retcode = request_irq(dev->irq,
 				   i810_dma_service,
-				   0,
+				   SA_SHIRQ,
 				   dev->devname,
 				   dev))) {
 		down(&dev->struct_sem);
@@ -933,6 +938,9 @@ int i810_irq_uninstall(drm_device_t *dev)
 {
 	int irq;
    	u16 temp;
+
+
+/*  	return 0; */
 
 	down(&dev->struct_sem);
 	irq	 = dev->irq;
@@ -992,10 +1000,15 @@ static inline void i810_dma_emit_flush(drm_device_t *dev)
    	RING_LOCALS;
 
    	i810_kernel_lost_context(dev);
+
    	BEGIN_LP_RING(2);
       	OUT_RING( CMD_REPORT_HEAD );
-   	OUT_RING( GFX_OP_USER_INTERRUPT );
+      	OUT_RING( GFX_OP_USER_INTERRUPT );
       	ADVANCE_LP_RING();
+
+/*  	i810_wait_ring( dev, dev_priv->ring.Size - 8 ); */
+/*     	atomic_set(&dev_priv->flush_done, 1); */
+/*     	wake_up_interruptible(&dev_priv->flush_queue); */
 }
 
 static inline void i810_dma_quiescent_emit(drm_device_t *dev)
@@ -1008,9 +1021,13 @@ static inline void i810_dma_quiescent_emit(drm_device_t *dev)
    	BEGIN_LP_RING(4);
    	OUT_RING( INST_PARSER_CLIENT | INST_OP_FLUSH | INST_FLUSH_MAP_CACHE );
    	OUT_RING( CMD_REPORT_HEAD );
-   	OUT_RING( GFX_OP_USER_INTERRUPT );
-   	OUT_RING( 0 );
+      	OUT_RING( 0 );
+      	OUT_RING( GFX_OP_USER_INTERRUPT );
    	ADVANCE_LP_RING();
+
+/*  	i810_wait_ring( dev, dev_priv->ring.Size - 8 ); */
+/*     	atomic_set(&dev_priv->flush_done, 1); */
+/*     	wake_up_interruptible(&dev_priv->flush_queue); */
 }
 
 static void i810_dma_quiescent(drm_device_t *dev)
