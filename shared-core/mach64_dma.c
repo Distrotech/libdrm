@@ -523,7 +523,7 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 		DRM_DEBUG( " data[%d] = 0x%08x\n", i, data[i] );
 	}
 
-	DRM_READMEMORYBARRIER();
+	DRM_READMEMORYBARRIER(dev_priv->mmio);
 
 	DRM_DEBUG( "waiting for idle...\n" );
 	if ( ( i = mach64_do_wait_for_idle( dev_priv ) ) ) {
