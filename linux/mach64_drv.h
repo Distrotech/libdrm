@@ -94,7 +94,7 @@ typedef struct drm_mach64_private {
 	/* DMA descriptor table (ring buffer) */
 	struct pci_pool *pool;   /* DMA memory pool */
 	drm_mach64_descriptor_ring_t ring;
-	
+
 	struct list_head free_list;     /* Free-list head  */
 	struct list_head placeholders;  /* Free-list placeholder list  */
 	struct list_head pending;    	/* Pending submission placeholder  */
@@ -143,9 +143,10 @@ extern int mach64_do_wait_for_idle( drm_mach64_private_t *dev_priv );
 extern int mach64_wait_ring( drm_mach64_private_t *dev_priv, int n );
 extern int mach64_do_release_used_buffers( drm_mach64_private_t *dev_priv );
 extern void mach64_dump_engine_info( drm_mach64_private_t *dev_priv );
+extern void mach64_dump_ring( drm_mach64_private_t *dev_priv );
 extern int mach64_do_engine_reset( drm_mach64_private_t *dev_priv );
 
-extern int mach64_dma_start( drm_mach64_private_t *dev_priv );
+extern void mach64_dma_start( drm_mach64_private_t *dev_priv );
 
 extern int mach64_do_dma_idle( drm_mach64_private_t *dev_priv );
 extern int mach64_do_dma_flush( drm_mach64_private_t *dev_priv );
@@ -456,15 +457,25 @@ extern int mach64_dma_blit( struct inode *inode, struct file *filp,
 
 #define UPDATE_RING_HEAD( dev_priv, ring )							\
 do {												\
-	int gui_active = MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE;			\
+	int gui_active;										\
+	/* Start BM if it's not already on */							\
+	/* FIXME: This should be done with a private variable to avoid using the BUS. */	\
+	if ( !(MACH64_READ(MACH64_SRC_CNTL) & MACH64_SRC_BM_ENABLE) )				\
+		mach64_dma_start( dev_priv );							\
+	/* GUI_ACTIVE must be read before BM_GUI_TABLE to correctly determine the ring head */	\
+	gui_active = MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE;				\
 	(ring)->head_addr = (MACH64_READ(MACH64_BM_GUI_TABLE) & 0xfffffff0);			\
 	if ( gui_active ) {									\
 		/* If not idle, BM_GUI_TABLE points one descriptor past the current head */	\
         	if ((ring)->head_addr == (ring)->start_addr)					\
-			(ring)->head_addr += (ring)->size - 4 * sizeof(u32);			\
-		else										\
-			(ring)->head_addr -= 4 * sizeof(u32);					\
+			(ring)->head_addr += (ring)->size;					\
+		(ring)->head_addr -= 4 * sizeof(u32);						\
 	}											\
+	if ( MACH64_EXTRA_CHECKING && ((ring)->head_addr < (ring)->start_addr ||		\
+	     (ring)->head_addr >= (ring)->start_addr + (ring)->size ) ) {			\
+		DRM_ERROR("Bad address in BM_GUI_TABLE: 0x%08x\n", (ring)->head_addr);		\
+		mach64_dump_ring( dev_priv );							\
+	} else {										\
 	(ring)->head = ((ring)->head_addr - (ring)->start_addr) / sizeof(u32);			\
         if ( !gui_active && (ring)->head != (ring)->tail ) {					\
 		/* reset descriptor table ring head */						\
@@ -475,6 +486,7 @@ do {												\
 		DRM_DEBUG( "%s: new dispatch: head_addr: 0x%08x head: %d tail: %d space: %d\n",	\
 			__FUNCTION__, 								\
 			(ring)->head_addr, (ring)->head, (ring)->tail, (ring)->space);		\
+	}											\
 	}											\
 } while (0)
 
@@ -523,7 +535,10 @@ do {											\
 
 /* Check for high water mark and flush if reached */
 /* FIXME: right now this is needed to ensure free buffers for state emits */
-#define RING_SPACE_TEST_WITH_RETURN( dev_priv )						 \
+/* CHECKME: I've disabled this as it isn't necessary - we already wait for free buffers */
+#define RING_SPACE_TEST_WITH_RETURN( dev_priv )						 
+
+#define RING_SPACE_TEST_WITH_RETURN_( dev_priv )					 \
 do {											 \
 	struct list_head *ptr;								 \
 	int ret, queued = 0;								 \
@@ -626,11 +641,11 @@ do {									\
 		DRM_INFO( "ADVANCE_RING() wr=0x%06x tail=0x%06x\n",	\
 			  write, tail );				\
 	}								\
-	ring[(write - 2) & mask] |= cpu_to_le32( DMA_EOL );		\
-	wmb();								\
+	mach64_flush_write_combine();					\
 	ring[(tail - 2) & mask] &= cpu_to_le32( ~DMA_EOL );		\
-	wmb();								\
+	mach64_flush_write_combine();					\
 	dev_priv->ring.tail = write;					\
+	UPDATE_RING_HEAD( dev_priv, &(dev_priv)->ring );		\
 } while (0)
 
 
@@ -735,11 +750,10 @@ do {											\
 											\
 	OUT_RING( APERTURE_OFFSET + MACH64_BM_ADDR );					\
 	OUT_RING( page );								\
-	OUT_RING( remainder | DMA_HOLD_OFFSET );					\
+	OUT_RING( remainder | DMA_HOLD_OFFSET | DMA_EOL );				\
 	OUT_RING( 0 );									\
 											\
 	ADVANCE_RING();									\
-	mach64_dma_start( dev_priv );							\
 } while(0)
 
 #define DMAADVANCEHOSTDATA( dev_priv )							\
@@ -807,11 +821,10 @@ do {											 \
 											 \
 	OUT_RING( APERTURE_OFFSET + MACH64_BM_HOSTDATA );				 \
 	OUT_RING( page );								 \
-	OUT_RING( remainder | DMA_HOLD_OFFSET );					 \
+	OUT_RING( remainder | DMA_HOLD_OFFSET | DMA_EOL );				 \
 	OUT_RING( 0 );									 \
 											 \
 	ADVANCE_RING();									 \
-	mach64_dma_start( dev_priv );							 \
 } while(0)
 
 #endif /* __MACH64_DRV_H__ */
