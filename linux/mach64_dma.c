@@ -93,8 +93,13 @@ static void scratch_reg0_test(drm_mach64_private_t *dev_priv )
 static void dump_engine_info( drm_mach64_private_t *dev_priv )
 {
 	DRM_INFO( "\n" );
-	DRM_INFO( "           AGP_BASE = 0x%08x\n", MACH64_READ( MACH64_AGP_BASE ) );
-	DRM_INFO( "           AGP_CNTL = 0x%08x\n", MACH64_READ( MACH64_AGP_CNTL ) );
+#if 0 /* disable while is_pci is not implemented */
+	if ( !dev_priv->is_pci)
+	{
+		DRM_INFO( "           AGP_BASE = 0x%08x\n", MACH64_READ( MACH64_AGP_BASE ) );
+		DRM_INFO( "           AGP_CNTL = 0x%08x\n", MACH64_READ( MACH64_AGP_CNTL ) );
+	}
+#endif
 	DRM_INFO( "     ALPHA_TST_CNTL = 0x%08x\n", MACH64_READ( MACH64_ALPHA_TST_CNTL ) );
 	DRM_INFO( "\n" );
 	DRM_INFO( "         BM_COMMAND = 0x%08x\n", MACH64_READ( MACH64_BM_COMMAND ) );
