@@ -515,7 +515,7 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 			break;
 		}
 	}
-#else
+#endif
 
 	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
 	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
@@ -771,7 +771,7 @@ int mga_dma_buffers( DRM_OS_IOCTL )
 		ret = 0;
 	}
 
-	DRM_OS_KRNTOUSR( data, &d, sizeof(d) );
+	DRM_OS_KRNTOUSR( (drm_dma_t *) data, d, sizeof(d) );
 
 	return ret;
 }

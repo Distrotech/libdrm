@@ -143,6 +143,7 @@ extern int mga_warp_init( drm_device_t *dev );
 #endif
 #if defined( __FreeBSD__ )
 #define mga_flush_write_combine()								\
+{												\
    	int xchangeDummy;									\
 	DRM_DEBUG("%s\n", __FUNCTION__);							\
    	__asm__ volatile(" push %%eax ; xchg %%eax, %0 ; pop %%eax" : : "m" (xchangeDummy));	\
@@ -641,7 +642,7 @@ do {									\
 
 /* Simple idle test.
  */
-static inline int mga_is_idle( drm_mga_private_t *dev_priv )
+static __inline__ int mga_is_idle( drm_mga_private_t *dev_priv )
 {
 	u32 status = MGA_READ( MGA_STATUS ) & MGA_ENGINE_IDLE_MASK;
 	return ( status == MGA_ENDPRDMASTS );

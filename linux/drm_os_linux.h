@@ -267,6 +267,7 @@ do {									\
 #define DRM_OS_DEVICE	drm_file_t	*priv	= filp->private_data; \
 			drm_device_t	*dev	= priv->dev
 #define DRM_OS_PRIV
+#define DRM_OS_DELAY(d)		udelay(d)
 #define DRM_OS_RETURN(v)	return -v;
 #define DRM_OS_CURRENTPID	current->pid
 #define DRM_OS_KRNTOUSR(arg1, arg2, arg3) \

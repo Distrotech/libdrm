@@ -127,8 +127,7 @@ static struct file_operations	DRM(fops) = {
 #include <sys/proc.h>
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
-#include <compat/linux/linux_ioctl.h>
-#include <dev/drm/drm_linux.h>
+#include "drm_linux.h"
 #endif
 
 static int DRM(init)(device_t nbdev);
