@@ -33,7 +33,6 @@
 #include "drm.h"
 #include "mach64_drm.h"
 #include "mach64_drv.h"
-#include "ati_pcigart.h"
 
 
 #define DRIVER_AUTHOR		"Gareth Hughes, Leif Delgass, José Fonseca"
@@ -72,6 +71,6 @@
 #include "drm_lock.h"
 #include "drm_memory.h"
 #include "drm_proc.h"
+#include "drm_pci.h"
 #include "drm_vm.h"
 #include "drm_stub.h"
-#include "drm_scatter.h"

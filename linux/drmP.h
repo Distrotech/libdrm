@@ -474,6 +474,16 @@ typedef struct drm_device_dma {
 	wait_queue_head_t waiting;	/* Processes waiting on free bufs  */
 } drm_device_dma_t;
 
+/**
+ * \brief PCI consistent memory block, for DMA.
+ */
+typedef struct drm_pci_mem {
+	struct list_head	list;		/**< \brief Linux list */
+	size_t			size;		/**< \brief size */
+	void			*cpuaddr;	/**< \brief kernel virtual address */
+	dma_addr_t		busaddr;	/**< \brief associated bus address */
+} drm_pci_mem_t;
+
 #if __REALLY_HAVE_AGP
 typedef struct drm_agp_mem {
 	unsigned long      handle;
@@ -607,6 +617,8 @@ typedef struct drm_device {
 	void		  *dev_private;
 	drm_sigdata_t     sigdata; /* For block_all_signals */
 	sigset_t          sigmask;
+
+	struct list_head  pci_mem;	/**< \brief PCI consistent memory */
 } drm_device_t;
 
 
@@ -831,6 +843,23 @@ extern int	     DRM(freelist_put)(drm_device_t *dev, drm_freelist_t *bl,
 extern drm_buf_t     *DRM(freelist_get)(drm_freelist_t *bl, int block);
 #endif
 #endif /* __HAVE_DMA */
+
+				/* PCI memory support (drm_pci.h) */
+extern void           *DRM(pci_alloc)(drm_device_t *dev, size_t size,
+				      dma_addr_t *busaddr);
+extern void           DRM(pci_free)(drm_device_t *dev, size_t size, void *cpuaddr,
+				    dma_addr_t busaddr);
+extern void           *DRM(pci_pool_create)(drm_device_t *dev, size_t size,
+					    size_t align);
+extern void           DRM(pci_pool_destroy)(drm_device_t *dev, void *entry);
+extern void           *DRM(pci_pool_alloc)(void *entry, dma_addr_t *busaddr);
+extern void           DRM(pci_pool_free)(void *entry, void *cpuaddr,
+					 dma_addr_t busaddr);
+extern int            DRM(pci_alloc_ioctl)(struct inode *inode, struct file *filp,
+					   unsigned int cmd, unsigned long arg);
+extern int            DRM(pci_free_ioctl)(struct inode *inode, struct file *filp,
+					  unsigned int cmd, unsigned long arg);
+extern void           DRM(pci_cleanup)(drm_device_t *dev);
 
 #if __REALLY_HAVE_AGP
 				/* AGP/GART support (drm_agpsupport.h) */

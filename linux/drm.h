@@ -365,6 +365,16 @@ typedef struct drm_scatter_gather {
 	unsigned long handle;	/* Used for mapping / unmapping */
 } drm_scatter_gather_t;
 
+/**
+ * \brief PCI consistent memory block, for DMA.
+ *
+ * \warning Not stable.
+ */
+typedef struct drm_pci_mem_ioctl {
+	unsigned long	size;		/**< \brief size */
+	unsigned long	busaddr;	/**< \brief associated bus address */
+} drm_pci_mem_ioctl_t;
+
 #define DRM_IOCTL_BASE			'd'
 #define DRM_IO(nr)			_IO(DRM_IOCTL_BASE,nr)
 #define DRM_IOR(nr,size)		_IOR(DRM_IOCTL_BASE,nr,size)

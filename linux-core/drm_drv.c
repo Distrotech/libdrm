@@ -650,6 +650,8 @@ static void __exit drm_cleanup( void )
 			dev->agp = NULL;
 		}
 #endif
+
+		DRM(pci_cleanup( dev ));
 	}
 	DRIVER_POSTCLEANUP();
 	kfree(DRM(minor));
