@@ -446,7 +446,6 @@ static inline void mga_dma_dispatch_tex_blit( drm_device_t *dev,
    	u16 y2;
     	PRIMLOCALS;
     
-   	length = length / sizeof(u32);
         y2 = length / 64;
  
 	PRIM_OVERFLOW(dev, dev_priv, 30);
@@ -455,7 +454,7 @@ static inline void mga_dma_dispatch_tex_blit( drm_device_t *dev,
       	dev_priv->last_sync_tag = mga_create_sync_tag(dev);
 
 	PRIMOUTREG( MGAREG_DSTORG, destOrg);
-	PRIMOUTREG( MGAREG_MACCESS, 0x00000002);
+	PRIMOUTREG( MGAREG_MACCESS, 0x00000000);
    	DRM_DEBUG("srcorg : %lx\n", bus_address | use_agp);
 	PRIMOUTREG( MGAREG_SRCORG, (u32) bus_address | use_agp);
 	PRIMOUTREG( MGAREG_AR5, 64);  
