@@ -177,7 +177,7 @@ int DRM(setsareactx)( DRM_OS_IOCTL )
 	drm_ctx_priv_map_t request;
 	drm_map_t *map = NULL;
 #ifdef __linux__
-	drm_map_list_t *r_list;
+	drm_map_list_t *r_list = NULL;
 	struct list_head *list;
 #endif /* __linux__ */
 #ifdef __FreeBSD__
