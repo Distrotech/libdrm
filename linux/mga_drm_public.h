@@ -232,8 +232,8 @@ typedef struct
 
 	/* LRU lists for texture memory in agp space and on the card
 	 */
-	mgaTexRegion texList[MGA_NR_TEX_REGIONS+1][MGA_NR_TEX_HEAPS];	
-	int texAge[MGA_NR_TEX_HEAPS];	      
+	mgaTexRegion texList[MGA_NR_TEX_HEAPS][MGA_NR_TEX_REGIONS+1];	
+	unsigned int texAge[MGA_NR_TEX_HEAPS];	      
 	
 	/* Mechanism to validate card state.
 	 */
