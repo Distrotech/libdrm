@@ -41,9 +41,9 @@
 #include "mach64_drv.h"
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,1)
-void DRM(dma_service)( DRM_IRQ_ARGS )
+void DRM(irq_handler)( DRM_IRQ_ARGS )
 #else
-irqreturn_t DRM(dma_service)( DRM_IRQ_ARGS )
+irqreturn_t DRM(irq_handler)( DRM_IRQ_ARGS )
 #endif
 {
 	drm_device_t *dev = (drm_device_t *) arg;
