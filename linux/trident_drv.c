@@ -32,7 +32,7 @@
 
 #define DRIVER_AUTHOR		"Alan Hourihane"
 
-#define DRIVER_NAME		"trident"
+#define DRIVER_NAME		"trident_dri"
 #define DRIVER_DESC		"Trident CyberBladeXP"
 #define DRIVER_DATE		"20010216"
 
@@ -41,6 +41,7 @@
 #define DRIVER_PATCHLEVEL	0
 
 #include "drm_auth.h"
+#include "drm_agpsupport.h"
 #include "drm_bufs.h"
 #include "drm_context.h"
 #include "drm_dma.h"

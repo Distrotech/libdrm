@@ -30,8 +30,9 @@
 #define __NO_VERSION__
 #include "radeon.h"
 #include "drmP.h"
-#include "radeon_drv.h"
 #include "drm.h"
+#include "radeon_drm.h"
+#include "radeon_drv.h"
 #include <linux/delay.h>
 
 
@@ -1060,6 +1061,16 @@ static int radeon_cp_dispatch_texture( drm_device_t *dev,
 	RADEON_WAIT_UNTIL_IDLE();
 
 	ADVANCE_RING();
+
+#ifdef __BIG_ENDIAN
+	/* The Mesa texture functions provide the data in little endian as the
+	 * chip wants it, but we need to compensate for the fact that the CP
+	 * ring gets byte-swapped
+	 */
+	BEGIN_RING( 2 );
+	OUT_RING_REG( RADEON_RBBM_GUICNTL, RADEON_HOST_DATA_SWAP_32BIT );
+	ADVANCE_RING();
+#endif
 
 	/* Make a copy of the parameters in case we have to update them
 	 * for a multi-pass texture blit.
