@@ -287,6 +287,8 @@ int mach64_do_engine_reset( drm_mach64_private_t *dev_priv )
 {
 	u32 bus_cntl, gen_test_cntl;
 
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
+
 	/* Kill off any outstanding DMA transfers.
 	 */
 	bus_cntl = MACH64_READ( MACH64_BUS_CNTL );
@@ -325,8 +327,8 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 	dev_priv = DRM(alloc)( sizeof(drm_mach64_private_t), DRM_MEM_DRIVER );
 	if ( dev_priv == NULL )
 		return -ENOMEM;
-	dev->dev_private = (void *) dev_priv;
-
+	dev->dev_private = (void *) dev_priv;	/* FIXME: Should this be done here? */
+	
 	memset( dev_priv, 0, sizeof(drm_mach64_private_t) );
 
 	dev_priv->fb_bpp		= init->fb_bpp;
@@ -357,16 +359,46 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 			break;
 		}
 	}
+	if(!dev_priv->sarea) {
+		dev->dev_private = (void *)dev_priv;
+	   	mach64_do_dma_cleanup(dev);
+	   	DRM_ERROR("can not find sarea!\n");
+	   	return -EINVAL;
+	}
+	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
+	if(!dev_priv->fb) {
+		dev->dev_private = (void *)dev_priv;
+	   	mach64_do_dma_cleanup(dev);
+	   	DRM_ERROR("can not find frame buffer map!\n");
+	   	return -EINVAL;
+	}
+	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
+	if(!dev_priv->mmio) {
+		dev->dev_private = (void *)dev_priv;
+	   	mach64_do_dma_cleanup(dev);
+	   	DRM_ERROR("can not find mmio map!\n");
+	   	return -EINVAL;
+	}
+	DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
+	if(!dev_priv->buffers) {
+		dev->dev_private = (void *)dev_priv;
+	   	mach64_do_dma_cleanup(dev);
+	   	DRM_ERROR("can not find dma buffer map!\n");
+	   	return -EINVAL;
+	}
 
 	dev_priv->sarea_priv = (drm_mach64_sarea_t *)
 		((u8 *)dev_priv->sarea->handle +
 		 init->sarea_priv_offset);
 
-	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
-	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
-	DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
-
 	DRM_IOREMAP( dev_priv->buffers );
+	if(!dev_priv->buffers->handle) {
+		dev->dev_private = (void *) dev_priv;
+	   	mach64_do_dma_cleanup(dev);
+	   	DRM_ERROR("can not ioremap virtual address for"
+			  " dma buffer\n");
+	   	return -ENOMEM;
+	}
 
 	DRM_INFO( "init->fb = 0x%08x\n", init->fb_offset );
 	DRM_INFO( "init->mmio_offset = 0x%08x\n", init->mmio_offset );
@@ -398,8 +430,9 @@ static int mach64_do_dma_cleanup( drm_device_t *dev )
 	if ( dev->dev_private ) {
 		drm_mach64_private_t *dev_priv = dev->dev_private;
 		
-		DRM_IOREMAPFREE( dev_priv->buffers );
-		
+		if(dev_priv->buffers->handle) {
+			DRM_IOREMAPFREE( dev_priv->buffers );
+		}
 		DRM(free)( dev_priv, sizeof(drm_mach64_private_t),
 			   DRM_MEM_DRIVER );
 		dev->dev_private = NULL;
@@ -415,6 +448,8 @@ int mach64_dma_init( struct inode *inode, struct file *filp,
 	drm_device_t *dev = priv->dev;
 	drm_mach64_init_t init;
 		
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
+
 	if ( copy_from_user( &init, (drm_mach64_init_t *)arg, sizeof(init) ) )
 		return -EFAULT;
 
