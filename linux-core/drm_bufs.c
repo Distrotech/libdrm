@@ -787,8 +787,6 @@ int DRM(addbufs_pci)( DRM_OS_IOCTL )
 int DRM(addbufs_sg)( DRM_OS_IOCTL )
 {
 	DRM_OS_DEVICE;
-	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_desc_t request;
 	drm_buf_entry_t *entry;

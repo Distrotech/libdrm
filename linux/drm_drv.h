@@ -148,6 +148,7 @@ static struct file_operations	DRM(fops) = {	\
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
 #include "drm_linux.h"
+#endif
 #endif /* __FreeBSD__ */
 #endif
 
@@ -156,11 +157,6 @@ static struct file_operations	DRM(fops) = {	\
  */
 #ifndef DRIVER_NUM_CARDS
 #define DRIVER_NUM_CARDS 1
-#endif
-
-#ifdef __linux__
-static drm_device_t	DRM(device);
-static int              DRM(minor);
 #endif
 
 #ifdef __FreeBSD__
@@ -177,7 +173,7 @@ MODULE_DEPEND(DRIVER_NAME, agp, 1, 1, 1);
 #if DRM_LINUX
 MODULE_DEPEND(DRIVER_NAME, linux, 1, 1, 1);
 #endif
-#endif /* __FreeBSD__
+#endif /* __FreeBSD__ */
 
 static drm_device_t	*DRM(device);
 static int		*DRM(minor);
@@ -265,6 +261,7 @@ static char *drm_opts = NULL;
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_PARM( drm_opts, "s" );
+#endif
 
 #ifdef __FreeBSD__
 static int DRM(probe)(device_t dev)
@@ -716,13 +713,12 @@ static int drm_count_cards(void)
  */
 #ifdef __linux__
 static int __init drm_init( void )
-{
 #endif
 #ifdef __FreeBSD__
 static int DRM(init)( device_t nbdev )
-{
 #endif
-
+{
+	drm_device_t *dev;
 	int i;
 #if __HAVE_CTX_BITMAP
 	int retcode;
