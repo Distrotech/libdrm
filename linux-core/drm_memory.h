@@ -459,19 +459,11 @@ void DRM(ioremapfree)(void *pt, unsigned long size)
 }
 
 #if __REALLY_HAVE_AGP
-#ifdef __linux__
 agp_memory *DRM(alloc_agp)(int pages, u32 type)
-#endif
-#ifdef __FreeBSD__
-void *DRM(alloc_agp)(int pages, u32 type)
-#endif
 {
-#ifdef __linux__
 	agp_memory *handle;
-#endif
 #ifdef __FreeBSD__
 	device_t dev = agp_find_device();
-	void *handle;
 
 	if (!dev)
 		return NULL;
@@ -496,12 +488,7 @@ void *DRM(alloc_agp)(int pages, u32 type)
 	return NULL;
 }
 
-#ifdef __linux__
 int DRM(free_agp)(agp_memory *handle, int pages)
-#endif
-#ifdef __FreeBSD__
-int DRM(free_agp)(void *handle, int pages)
-#endif
 {
 	int           alloc_count;
 	int           free_count;
@@ -536,12 +523,7 @@ int DRM(free_agp)(void *handle, int pages)
 	return retval;
 }
 
-#ifdef __linux__
 int DRM(bind_agp)(agp_memory *handle, unsigned int start)
-#endif
-#ifdef __FreeBSD__
-int DRM(bind_agp)(void *handle, unsigned int start)
-#endif
 {
 	int retcode = -EINVAL;
 #ifdef __FreeBSD__
@@ -579,12 +561,7 @@ int DRM(bind_agp)(void *handle, unsigned int start)
 	return retcode;
 }
 
-#ifdef __linux__
 int DRM(unbind_agp)(agp_memory *handle)
-#endif
-#ifdef __FreeBSD__
-int DRM(unbind_agp)(void *handle)
-#endif
 {
 	int alloc_count;
 	int free_count;
