@@ -45,7 +45,7 @@ mga-objs    := $(lib-objs) mga_drv.o    mga_dma.o    mga_context.o  \
 	       mga_bufs.o mga_state.o
 i810-objs   := $(lib-objs) i810_drv.o   i810_dma.o   i810_context.o i810_bufs.o
 mach64-objs := $(lib-objs) mach64_drv.o mach64_dma.o mach64_context.o \
-	       mach64_state.o
+	       mach64_bufs.o mach64_state.o
 
 obj-$(CONFIG_DRM_GAMMA)  += gamma.o  $(gamma-objs)
 obj-$(CONFIG_DRM_TDFX)   += tdfx.o   $(tdfx-objs)

@@ -50,6 +50,10 @@ typedef struct drm_mach64_private {
 	drm_map_t *mmio;
 } drm_mach64_private_t;
 
+typedef struct drm_mach64_buf_priv {
+	int age;
+} drm_mach64_buf_priv_t;
+
 
 				/* mach64_drv.c */
 extern int  mach64_version( struct inode *inode, struct file *filp,
@@ -61,6 +65,12 @@ extern int  mach64_ioctl( struct inode *inode, struct file *filp,
 extern int  mach64_lock( struct inode *inode, struct file *filp,
 			 unsigned int cmd, unsigned long arg );
 extern int  mach64_unlock( struct inode *inode, struct file *filp,
+			   unsigned int cmd, unsigned long arg );
+
+				/* mach64_bufs.c */
+extern int mach64_addbufs( struct inode *inode, struct file *filp,
+			   unsigned int cmd, unsigned long arg );
+extern int mach64_mapbufs( struct inode *inode, struct file *filp,
 			   unsigned int cmd, unsigned long arg );
 
 				/* mach64_context.c */

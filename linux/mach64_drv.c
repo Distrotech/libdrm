@@ -54,10 +54,10 @@ static drm_ioctl_desc_t		mach64_ioctls[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_AUTH_MAGIC)]    = { drm_authmagic,     1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_ADD_MAP)]       = { drm_addmap,        1, 1 },
 
-	[DRM_IOCTL_NR(DRM_IOCTL_ADD_BUFS)]      = { drm_addbufs,       1, 1 },
+	[DRM_IOCTL_NR(DRM_IOCTL_ADD_BUFS)]      = { mach64_addbufs,    1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_MARK_BUFS)]     = { drm_markbufs,      1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_INFO_BUFS)]     = { drm_infobufs,      1, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_MAP_BUFS)]      = { drm_mapbufs,       1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_MAP_BUFS)]      = { mach64_mapbufs,    1, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_FREE_BUFS)]     = { drm_freebufs,      1, 0 },
 
 	[DRM_IOCTL_NR(DRM_IOCTL_ADD_CTX)]       = { mach64_addctx,     1, 1 },
@@ -101,6 +101,9 @@ static drm_ioctl_desc_t		mach64_ioctls[] = {
 #define DRIVER_IOCTL_COUNT	DRM_ARRAY_SIZE( mach64_ioctls )
 
 #define HAVE_CTX_BITMAP		1
+
+#define HAVE_DMA		1
+#define HAVE_DMA_QUEUE		1
 
 
 #define TAG(x) mach64_##x
