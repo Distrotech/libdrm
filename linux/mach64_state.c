@@ -467,13 +467,15 @@ static int mach64_dma_dispatch_blit( drm_device_t *dev,
 	p = GETBUFPTR( buf );
 
 	dwords =  (blit->width * blit->height) >> dword_shift;
-	/* Add in a command for every 16 dwords */
-	dwords += ( ( dwords + 15 ) / 16 );
 	buf->used = dwords << 2;
 
-	/* Blit via the host data registers (gui-master)
-	 * Add state setup at the start of the buffer -- 
-	 * the client leaves space for this based on MACH64_HOSTDATA_BLIT_OFFSET
+	/* FIXME: Use a last buffer flag and reduce the state emitted for subsequent,
+	 * continuation buffers? 
+	 */
+
+	/* Blit via BM_HOSTDATA (gui-master) - like HOST_DATA[0-15], but doesn't require
+	 * a register command every 16 dwords.  State setup is added at the start of the 
+	 * buffer -- the client leaves space for this based on MACH64_HOSTDATA_BLIT_OFFSET
 	 */
 	DMAOUTREG( MACH64_Z_CNTL, 0 );
 	DMAOUTREG( MACH64_SCALE_3D_CNTL, 0 );
@@ -510,8 +512,8 @@ static int mach64_dma_dispatch_blit( drm_device_t *dev,
 	DRM_DEBUG( "%s: %d bytes\n", __FUNCTION__, buf->used );
 
 	/* Add the buffer to the queue */
-	DMAADVANCE( dev_priv );
-	
+	DMAADVANCEHOSTDATA( dev_priv );
+
 	dev_priv->sarea_priv->dirty |= (MACH64_UPLOAD_CONTEXT |
 					MACH64_UPLOAD_MISC);
 

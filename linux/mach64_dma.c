@@ -436,18 +436,18 @@ static int mach64_bm_dma_test( drm_device_t *dev )
 	/* fill up a buffer with sets of 3 consecutive writes starting with VERTEX_1_S */
 	count = 0;
 
-	data[count++] = cpu_to_le32(0x00020190); /* 1_90 = VERTEX_1_S */
+	data[count++] = cpu_to_le32(DMAREG(MACH64_VERTEX_1_S) | (2 << 16));
 	data[count++] = expected[0] = 0x11111111;
 	data[count++] = expected[1] = 0x22222222;
 	data[count++] = expected[2] = 0x33333333;
 
 	while (count < 1020) {
-		data[count++] = cpu_to_le32(0x00020190);
+		data[count++] = cpu_to_le32(DMAREG(MACH64_VERTEX_1_S) | (2 << 16));
 		data[count++] = 0x11111111;
 		data[count++] = 0x22222222;
 		data[count++] = 0x33333333;
 	}
-	data[count++] = cpu_to_le32(0x0000006d); /* SRC_CNTL */
+	data[count++] = cpu_to_le32(DMAREG(MACH64_SRC_CNTL) | (0 << 16));
 	data[count++] = 0;
 
 	DRM_DEBUG( "Preparing table ...\n" );

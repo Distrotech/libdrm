@@ -742,4 +742,76 @@ do {											\
 	mach64_dma_start( dev_priv );							\
 } while(0)
 
+#define DMAADVANCEHOSTDATA( dev_priv )							\
+do {											\
+	struct list_head *ptr;								\
+	drm_mach64_freelist_t *entry;							\
+	RING_LOCALS;									\
+											\
+	if ( MACH64_VERBOSE ) {								\
+		DRM_INFO( "DMAADVANCE() in %s\n", __FUNCTION__ );			\
+	}										\
+											\
+	if (list_empty(&dev_priv->placeholders)) {					\
+		DRM_ERROR( "%s: empty placeholder list in DMAADVANCE()\n",		\
+			   __FUNCTION__ );						\
+		return -EFAULT;								\
+	}										\
+											\
+        ptr = dev_priv->placeholders.next;						\
+	list_del(ptr);									\
+	entry = list_entry(ptr, drm_mach64_freelist_t, list);				\
+	entry->buf = buf;								\
+	entry->buf->pending = 1;							\
+	list_add_tail(ptr, &dev_priv->pending);						\
+											\
+	ADD_HOSTDATA_BUF_TO_RING( dev_priv, entry );					\
+} while (0)
+
+#define ADD_HOSTDATA_BUF_TO_RING( dev_priv, entry )					 \
+do {											 \
+	int bytes, pages, remainder;							 \
+	drm_buf_t *buf = entry->buf;							 \
+	u32 address, page;								 \
+	int i;										 \
+											 \
+	bytes = buf->used - MACH64_HOSTDATA_BLIT_OFFSET;				 \
+	pages = (bytes + DMA_CHUNKSIZE - 1) / DMA_CHUNKSIZE;				 \
+	address = GETBUFADDR( buf );							 \
+											 \
+	BEGIN_RING( 4 + pages * 4 );							 \
+											 \
+	OUT_RING( APERTURE_OFFSET + MACH64_BM_ADDR );					 \
+	OUT_RING( address );								 \
+	OUT_RING( MACH64_HOSTDATA_BLIT_OFFSET | DMA_HOLD_OFFSET );			 \
+	OUT_RING( 0 );									 \
+											 \
+	address += MACH64_HOSTDATA_BLIT_OFFSET;						 \
+											 \
+	for ( i = 0 ; i < pages-1 ; i++ ) {						 \
+		page = address + i * DMA_CHUNKSIZE;					 \
+		OUT_RING( APERTURE_OFFSET + MACH64_BM_HOSTDATA );			 \
+		OUT_RING( page );							 \
+		OUT_RING( DMA_CHUNKSIZE | DMA_HOLD_OFFSET );				 \
+		OUT_RING( 0 );								 \
+	}										 \
+											 \
+	/* generate the final descriptor for any remaining commands in this buffer */	 \
+	page = address + i * DMA_CHUNKSIZE;						 \
+	remainder = bytes - i * DMA_CHUNKSIZE;						 \
+											 \
+	/* Save dword offset of last descriptor for this buffer.			 \
+	 * This is needed to check for completion of the buffer in freelist_get		 \
+	 */										 \
+	entry->ring_ofs = RING_WRITE_OFS;						 \
+											 \
+	OUT_RING( APERTURE_OFFSET + MACH64_BM_HOSTDATA );				 \
+	OUT_RING( page );								 \
+	OUT_RING( remainder | DMA_HOLD_OFFSET );					 \
+	OUT_RING( 0 );									 \
+											 \
+	ADVANCE_RING();									 \
+	mach64_dma_start( dev_priv );							 \
+} while(0)
+
 #endif /* __MACH64_DRV_H__ */
