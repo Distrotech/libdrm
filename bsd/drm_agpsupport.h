@@ -31,6 +31,14 @@
 
 #include "drmP.h"
 
+#ifdef __FreeBSD__
+#include <vm/vm.h>
+#include <vm/pmap.h>
+#if __REALLY_HAVE_AGP
+#include <sys/agpio.h>
+#endif
+#endif
+
 int DRM(agp_info)(dev_t kdev, u_long cmd, caddr_t data,
 	     int flags, struct proc *p)
 {
@@ -80,6 +88,15 @@ int DRM(agp_release)(dev_t kdev, u_long cmd, caddr_t data,
 	dev->agp->acquired = 0;
 	return 0;
 	
+}
+
+void DRM(agp_do_release)(void)
+{
+	device_t agpdev;
+
+	agpdev = agp_find_device();
+	if (agpdev)
+		agp_release(agpdev);
 }
 
 int DRM(agp_enable)(dev_t kdev, u_long cmd, caddr_t data,
@@ -161,13 +178,21 @@ int DRM(agp_unbind)(dev_t kdev, u_long cmd, caddr_t data,
 	drm_device_t      *dev = kdev->si_drv1;
 	drm_agp_binding_t request;
 	drm_agp_mem_t     *entry;
+	int retcode;
 
 	if (!dev->agp || !dev->agp->acquired) return EINVAL;
 	request = *(drm_agp_binding_t *) data;
 	if (!(entry = DRM(agp_lookup_entry)(dev, (void *) request.handle)))
 		return EINVAL;
 	if (!entry->bound) return EINVAL;
-	return DRM(unbind_agp)(entry->handle);
+	retcode=DRM(unbind_agp)(entry->handle);
+	if (!retcode)
+	{
+		entry->bound=0;
+		return 0;
+	}
+	else
+		return retcode;
 }
 
 int DRM(agp_bind)(dev_t kdev, u_long cmd, caddr_t data,
@@ -183,20 +208,12 @@ int DRM(agp_bind)(dev_t kdev, u_long cmd, caddr_t data,
 	if (!dev->agp || !dev->agp->acquired)
 		return EINVAL;
 	request = *(drm_agp_binding_t *) data;
-
-	DRM_DEBUG("agp_bind:lookup\n");
 	if (!(entry = DRM(agp_lookup_entry)(dev, (void *) request.handle)))
 		return EINVAL;
-
-	DRM_DEBUG("agp_bind:page\n");
 	if (entry->bound) return EINVAL;
 	page = (request.offset + PAGE_SIZE - 1) / PAGE_SIZE;
-
-	DRM_DEBUG("agp_bind:bind it\n");
 	if ((retcode = DRM(bind_agp)(entry->handle, page)))
 		return retcode;
-
-	DRM_DEBUG("agp_bind:bound\n");
 	entry->bound = dev->agp->base + (page << PAGE_SHIFT);
 	return 0;
 }
@@ -269,12 +286,51 @@ drm_agp_head_t *DRM(agp_init)(void)
 
 void DRM(agp_uninit)(void)
 {
-	
 /* FIXME: What goes here */
 }
 
 
+agp_memory *DRM(agp_allocate_memory)(size_t pages, u32 type)
+{
+	device_t agpdev;
 
+	agpdev = agp_find_device();
+	if (!agpdev)
+		return NULL;
 
+	return agp_alloc_memory(agpdev, type, pages << AGP_PAGE_SHIFT);
+}
 
+int DRM(agp_free_memory)(agp_memory *handle)
+{
+	device_t agpdev;
 
+	agpdev = agp_find_device();
+	if (!agpdev || !handle)
+		return 0;
+
+	agp_free_memory(agpdev, handle);
+	return 1;
+}
+
+int DRM(agp_bind_memory)(agp_memory *handle, off_t start)
+{
+	device_t agpdev;
+
+	agpdev = agp_find_device();
+	if (!agpdev || !handle)
+		return EINVAL;
+
+	return agp_bind_memory(agpdev, handle, start * PAGE_SIZE);
+}
+
+int DRM(agp_unbind_memory)(agp_memory *handle)
+{
+	device_t agpdev;
+
+	agpdev = agp_find_device();
+	if (!agpdev || !handle)
+		return EINVAL;
+
+	return agp_unbind_memory(agpdev, handle);
+}
