@@ -71,6 +71,8 @@
  * 1.6 - Add static agp memory manager
  *       Add irq handler (won't be turned on unless X server knows to)
  *       Add irq ioctls and irq_active getparam.
+ *       Add wait command for cmdbuf ioctl
+ *       Add agp offset query for getparam
  */
 #define DRIVER_IOCTLS							     \
  [DRM_IOCTL_NR(DRM_IOCTL_DMA)]               = { radeon_cp_buffers,  1, 0 }, \

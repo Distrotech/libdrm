@@ -2172,6 +2172,9 @@ int radeon_cp_getparam( DRM_IOCTL_ARGS )
 		dev_priv->stats.last_clear_reads++;
 		value = GET_SCRATCH( 2 );
 		break;
+	case RADEON_PARAM_AGP_BASE:
+		value = dev_priv->agp_vm_start;
+		break;
 	default:
 		return DRM_ERR(EINVAL);
 	}

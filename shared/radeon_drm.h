@@ -513,11 +513,12 @@ typedef struct drm_radeon_indirect {
 /* 1.3: An ioctl to get parameters that aren't available to the 3d
  * client any other way.  
  */
-#define RADEON_PARAM_AGP_BUFFER_OFFSET   1
-#define RADEON_PARAM_LAST_FRAME          2
-#define RADEON_PARAM_LAST_DISPATCH       3
-#define RADEON_PARAM_LAST_CLEAR          4
-#define RADEON_PARAM_IRQ_ACTIVE          5
+#define RADEON_PARAM_AGP_BUFFER_OFFSET     1 /* card offset of 1st agp buffer */
+#define RADEON_PARAM_LAST_FRAME            2
+#define RADEON_PARAM_LAST_DISPATCH         3
+#define RADEON_PARAM_LAST_CLEAR            4
+#define RADEON_PARAM_IRQ_ACTIVE            5
+#define RADEON_PARAM_AGP_BASE              6 /* card offset of agp base */
 
 typedef struct drm_radeon_getparam {
 	int param;
