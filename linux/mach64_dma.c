@@ -727,23 +727,23 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 		}
 	}
 	if (!dev_priv->sarea) {
+		DRM_ERROR("can not find sarea!\n");
 		dev->dev_private = (void *)dev_priv;
 	   	mach64_do_cleanup_dma(dev);
-	   	DRM_ERROR("can not find sarea!\n");
 	   	return -EINVAL;
 	}
 	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
 	if (!dev_priv->fb) {
+		DRM_ERROR("can not find frame buffer map!\n");
 		dev->dev_private = (void *)dev_priv;
 	   	mach64_do_cleanup_dma(dev);
-	   	DRM_ERROR("can not find frame buffer map!\n");
 	   	return -EINVAL;
 	}
 	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
 	if (!dev_priv->mmio) {
+		DRM_ERROR("can not find mmio map!\n");
 		dev->dev_private = (void *)dev_priv;
 	   	mach64_do_cleanup_dma(dev);
-	   	DRM_ERROR("can not find mmio map!\n");
 	   	return -EINVAL;
 	}
 
@@ -754,25 +754,25 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 	if( !dev_priv->is_pci ) {
 	        DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
 		if ( !dev_priv->buffers ) {
+			DRM_ERROR( "can not find dma buffer map!\n" );
 			dev->dev_private = (void *)dev_priv;
 			mach64_do_cleanup_dma( dev );
-			DRM_ERROR( "can not find dma buffer map!\n" );
 			return -EINVAL;
 		}
 		DRM_IOREMAP( dev_priv->buffers );
 		if ( !dev_priv->buffers->handle ) {
-			dev->dev_private = (void *) dev_priv;
-			mach64_do_cleanup_dma( dev );
 			DRM_ERROR( "can not ioremap virtual address for"
 				   " dma buffer\n" );
+			dev->dev_private = (void *) dev_priv;
+			mach64_do_cleanup_dma( dev );
 			return -ENOMEM;
 		}
 		DRM_FIND_MAP( dev_priv->agp_textures,
 			      init->agp_textures_offset );
 		if (!dev_priv->agp_textures) {
+			DRM_ERROR("could not find agp texture region!\n");
 			dev->dev_private = (void *)dev_priv;
 			mach64_do_cleanup_dma( dev );
-			DRM_ERROR("could not find agp texture region!\n");
 			return -EINVAL;
 		}
 	}
@@ -789,16 +789,16 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 			DRM_INFO( "Setting FIFO size to 128 entries\n");
 			/* FIFO must be empty to change the FIFO depth */
 			if ((ret=mach64_do_wait_for_idle( dev_priv ))) {
-				mach64_do_cleanup_dma( dev );
 				DRM_ERROR("wait for idle failed before changing FIFO depth!\n");
+				mach64_do_cleanup_dma( dev );
 				return ret;
 			}
 			MACH64_WRITE( MACH64_GUI_CNTL, ( ( tmp & ~MACH64_CMDFIFO_SIZE_MASK ) \
 							 | MACH64_CMDFIFO_SIZE_128 ) );
 			/* need to read GUI_STAT for proper sync according to docs */
 			if ((ret=mach64_do_wait_for_idle( dev_priv ))) {
-				mach64_do_cleanup_dma( dev );
 				DRM_ERROR("wait for idle failed when changing FIFO depth!\n");
+				mach64_do_cleanup_dma( dev );
 				return ret;
 			}
 		}
@@ -849,8 +849,8 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 			dev_priv->driver_mode = MACH64_MODE_MMIO;
 			DRM_INFO( "DMA test failed (ret=%d), using pseudo-DMA mode\n", ret );
 #else
-			mach64_do_cleanup_dma( dev );
 			DRM_ERROR( "DMA test failed (ret=%d)\n", ret );
+			mach64_do_cleanup_dma( dev );
 			return -EIO;
 #endif
 		}
