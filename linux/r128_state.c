@@ -1514,7 +1514,7 @@ int r128_cce_indirect( DRM_OS_IOCTL )
 
 	if ( !dev_priv ) {
 		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 	}
 
 	DRM_OS_KRNFROMUSR( indirect, (drm_r128_indirect_t *) data,
@@ -1527,7 +1527,7 @@ int r128_cce_indirect( DRM_OS_IOCTL )
 	if ( indirect.idx < 0 || indirect.idx >= dma->buf_count ) {
 		DRM_ERROR( "buffer index %d (of %d max)\n",
 			   indirect.idx, dma->buf_count - 1 );
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 	}
 
 	buf = dma->buflist[indirect.idx];
@@ -1536,17 +1536,17 @@ int r128_cce_indirect( DRM_OS_IOCTL )
 	if ( buf->pid != DRM_OS_CURRENTPID ) {
 		DRM_ERROR( "process %d using buffer owned by %d\n",
 			   DRM_OS_CURRENTPID, buf->pid );
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 	}
 	if ( buf->pending ) {
 		DRM_ERROR( "sending pending buffer %d\n", indirect.idx );
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 	}
 
 	if ( indirect.start < buf->used ) {
 		DRM_ERROR( "reusing indirect: start=0x%x actual=0x%x\n",
 			   indirect.start, buf->used );
-		return -EINVAL;
+		DRM_OS_RETURN(EINVAL);
 	}
 
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );
