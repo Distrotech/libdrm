@@ -246,12 +246,6 @@ static int DRM(setup)( drm_device_t *dev )
 		dev->magiclist[i].tail = NULL;
 	}
 
-	dev->maplist = DRM(alloc)(sizeof(*dev->maplist),
-				  DRM_MEM_MAPS);
-	if(dev->maplist == NULL) return -ENOMEM;
-	memset(dev->maplist, 0, sizeof(*dev->maplist));
-	INIT_LIST_HEAD(&dev->maplist->head);
-
 	dev->ctxlist = DRM(alloc)(sizeof(*dev->ctxlist),
 				  DRM_MEM_CTXLIST);
 	if(dev->ctxlist == NULL) return -ENOMEM;
@@ -390,19 +384,8 @@ static int DRM(takedown)( drm_device_t *dev )
 				switch ( map->type ) {
 				case _DRM_REGISTERS:
 				case _DRM_FRAME_BUFFER:
-#if __OS_HAS_MTRR
-					if (dev->driver_features & DRIVER_USE_MTRR) {
-						if ( map->mtrr >= 0 ) {
-							int retcode;
-							retcode = mtrr_del( map->mtrr,
-									    map->offset,
-									    map->size );
-							DRM_DEBUG( "mtrr_del=%d\n", retcode );
-						}
-					}
-#endif
-					DRM(ioremapfree)( map->handle, map->size, dev );
-					break;
+					continue;
+					
 				case _DRM_SHM:
 					vfree(map->handle);
 					break;
@@ -425,8 +408,6 @@ static int DRM(takedown)( drm_device_t *dev )
 			list_del( list );
 			DRM(free)(r_list, sizeof(*r_list), DRM_MEM_MAPS);
  		}
-		DRM(free)(dev->maplist, sizeof(*dev->maplist), DRM_MEM_MAPS);
-		dev->maplist = NULL;
  	}
 
 	
@@ -510,6 +491,11 @@ static int drm_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev->pci_slot = PCI_SLOT(pdev->devfn);
 	dev->pci_func = PCI_FUNC(pdev->devfn);
 	dev->irq = pdev->irq;
+
+	dev->maplist = DRM(alloc)(sizeof(*dev->maplist), DRM_MEM_MAPS);
+	if(dev->maplist == NULL) return -ENOMEM;
+	memset(dev->maplist, 0, sizeof(*dev->maplist));
+	INIT_LIST_HEAD(&dev->maplist->head);
 
 	/* dev_priv_size can be changed by a driver in driver_register_fns */
 	dev->dev_priv_size = sizeof(u32);
@@ -658,6 +644,10 @@ static int __init drm_init( void )
  */
 static void __exit drm_cleanup( drm_device_t *dev )
 {
+	drm_map_t *map;
+	drm_map_list_t *r_list;
+	struct list_head *list, *list_next;
+	
 	DRM_DEBUG( "\n" );
 	if (!dev) {
 		DRM_ERROR("cleanup called no dev\n");
@@ -666,6 +656,44 @@ static void __exit drm_cleanup( drm_device_t *dev )
 
 	DRM(takedown)(dev);
 
+	if( dev->maplist ) {
+		list_for_each_safe( list, list_next, &dev->maplist->head ) {
+			r_list = (drm_map_list_t *)list;
+
+			if ( ( map = r_list->map ) ) {
+				switch ( map->type ) {
+				case _DRM_REGISTERS:
+					DRM(ioremapfree)( map->handle, map->size, dev );
+					break;
+					
+				case _DRM_FRAME_BUFFER:
+#if __OS_HAS_MTRR
+					if ( dev->driver_features & DRIVER_USE_MTRR) {
+						if ( map->mtrr >= 0 ) {
+							int retcode;
+							retcode = mtrr_del( map->mtrr,
+									    map->offset,
+									    map->size );
+							DRM_DEBUG( "mtrr_del=%d\n", retcode );
+						}
+					}
+#endif
+					break;
+					
+				case _DRM_SHM:
+				case _DRM_AGP:
+				case _DRM_SCATTER_GATHER:
+					DRM_DEBUG("Extra maplist item\n");
+					break;
+				}
+				DRM(free)(map, sizeof(*map), DRM_MEM_MAPS);
+			}
+			list_del( list );
+			DRM(free)(r_list, sizeof(*r_list), DRM_MEM_MAPS);
+ 		}
+		DRM(free)(dev->maplist, sizeof(*dev->maplist), DRM_MEM_MAPS);
+		dev->maplist = NULL;
+ 	}
 	if (DRM(fb_loaded)==0)
 		pci_disable_device(dev->pdev);
 
@@ -916,6 +944,7 @@ int DRM(release)( struct inode *inode, struct file *filp )
 
 				list_del( &pos->head );
 				DRM(free)( pos, sizeof(*pos), DRM_MEM_CTXLIST );
+                                --dev->ctx_count;
 			}
 		}
 	}

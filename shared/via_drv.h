@@ -27,6 +27,11 @@
 #include "via_drm.h"
 
 
+typedef struct drm_via_ring_buffer {
+        drm_map_t map;
+        char * virtual_start;
+} drm_via_ring_buffer_t;
+
 typedef struct drm_via_private {
         drm_via_sarea_t *sarea_priv;
         drm_map_t *sarea;
@@ -34,6 +39,13 @@ typedef struct drm_via_private {
         drm_map_t *mmio;
         unsigned long agpAddr;
         wait_queue_head_t decoder_queue[VIA_NR_XVMC_LOCKS];
+        char * dma_ptr;
+        unsigned int dma_low;
+        unsigned int dma_high;
+        unsigned int dma_offset;
+        uint32_t * last_pause_ptr;
+        volatile uint32_t * hw_addr_ptr;
+        drm_via_ring_buffer_t ring;
 } drm_via_private_t;
 
  
@@ -58,4 +70,7 @@ extern irqreturn_t via_driver_irq_handler( DRM_IRQ_ARGS );
 extern void via_driver_irq_preinstall( drm_device_t *dev );
 extern void via_driver_irq_postinstall( drm_device_t *dev );
 extern void via_driver_irq_uninstall( drm_device_t *dev );
+
+extern int via_dma_cleanup(drm_device_t *dev);
+
 #endif

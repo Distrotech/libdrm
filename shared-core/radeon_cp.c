@@ -1265,18 +1265,15 @@ int radeon_do_cleanup_cp( drm_device_t *dev )
 
 #if __OS_HAS_AGP
 	if (dev_priv->flags & CHIP_IS_AGP) {
-		if ( dev_priv->cp_ring != NULL )
-		{
+		if ( dev_priv->cp_ring != NULL ) {
 			drm_core_ioremapfree( dev_priv->cp_ring, dev );
 			dev_priv->cp_ring = NULL;
 		}
-		if ( dev_priv->ring_rptr != NULL )
-		{
+		if ( dev_priv->ring_rptr != NULL ) {
 			drm_core_ioremapfree( dev_priv->ring_rptr, dev );
 			dev_priv->ring_rptr = NULL;
 		}
-		if ( dev->agp_buffer_map != NULL )
-		{
+		if ( dev->agp_buffer_map != NULL ) {
 			drm_core_ioremapfree( dev->agp_buffer_map, dev );
 			dev->agp_buffer_map = NULL;
 		}
@@ -1431,7 +1428,6 @@ void radeon_do_release( drm_device_t *dev )
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	int ret;
-	DRM_DEBUG("dev_priv %ptr\n", dev_priv);
 
 	if (dev_priv) {
 
@@ -1768,7 +1764,6 @@ int radeon_preinit( struct drm_device *dev, unsigned long flags )
 	dev_priv = DRM(alloc)( sizeof(drm_radeon_private_t), DRM_MEM_DRIVER );
 	if ( dev_priv == NULL )
 		return DRM_ERR(ENOMEM);
-	DRM_DEBUG("dev_priv %ptr\n", dev_priv);
 
 	memset( dev_priv, 0, sizeof(drm_radeon_private_t) );
 	dev->dev_private = (void *)dev_priv;
