@@ -878,8 +878,9 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 		      dev_priv->sarea_priv->last_clear );
 
 	if ( dev_priv->is_pci ) {
-		dev_priv->phys_pci_gart = DRM(ati_pcigart_init)( dev );
-		if ( !dev_priv->phys_pci_gart ) {
+		if( !DRM(ati_pcigart_init)( dev,
+					    &dev_priv->phys_pci_gart,
+					    &dev_priv->bus_pci_gart) ) {
 			DRM_ERROR( "failed to init PCI GART!\n" );
 			DRM(free)( dev_priv, sizeof(*dev_priv),
 				   DRM_MEM_DRIVER );
@@ -895,7 +896,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 		/* set PCI GART page-table base address
 		 */
 		RADEON_WRITE( RADEON_AIC_PT_BASE,
-			      virt_to_bus( (void *)dev_priv->phys_pci_gart ) );
+			      dev_priv->bus_pci_gart);
 
 		/* set address range for PCI address translate
 		 */

@@ -66,15 +66,15 @@
 #include <linux/types.h>
 #include <linux/agp_backend.h>
 #endif
-#if LINUX_VERSION_CODE >= 0x020100 /* KERNEL_VERSION(2,1,0) */
 #include <linux/tqueue.h>
 #include <linux/poll.h>
-#endif
-#if LINUX_VERSION_CODE < 0x020400
-#include "compat-pre24.h"
-#endif
 #include <asm/pgalloc.h>
 #include "drm.h"
+
+/* page_to_bus for earlier kernels, not optimal in all cases */
+#ifndef page_to_bus
+#define page_to_bus(page)	((unsigned int)(virt_to_bus(page_address(page))))
+#endif
 
 /* DRM template customization defaults
  */
@@ -166,12 +166,7 @@ typedef struct wait_queue *wait_queue_head_t;
 #define _PAGE_PSE _PAGE_4M
 #endif
 
-				/* vm_offset changed to vm_pgoff in 2.3.25 */
-#if LINUX_VERSION_CODE < 0x020319
-#define VM_OFFSET(vma) ((vma)->vm_offset)
-#else
 #define VM_OFFSET(vma) ((vma)->vm_pgoff << PAGE_SHIFT)
-#endif
 
 				/* *_nopage return values defined in 2.3.26 */
 #ifndef NOPAGE_SIGBUS
@@ -392,6 +387,11 @@ do {									\
 
 typedef int drm_ioctl_t( struct inode *inode, struct file *filp,
 			 unsigned int cmd, unsigned long arg );
+
+typedef struct drm_pci_list {
+	u16 vendor;
+	u16 device;
+} drm_pci_list_t;
 
 typedef struct drm_ioctl_desc {
 	drm_ioctl_t	     *func;
@@ -619,6 +619,9 @@ typedef struct drm_sg_mem {
 	void            *virtual;
 	int             pages;
 	struct page     **pagelist;
+#if defined(__alpha__)
+	dma_addr_t	*busaddr;
+#endif
 } drm_sg_mem_t;
 
 typedef struct drm_sigdata {
@@ -710,6 +713,7 @@ typedef struct drm_device {
 	drm_agp_head_t    *agp;
 #endif
 #ifdef __alpha__
+	struct pci_dev *pdev;
 #if LINUX_VERSION_CODE < 0x020403
 	struct pci_controler *hose;
 #else
@@ -758,21 +762,6 @@ extern unsigned int  DRM(poll)(struct file *filp,
 			       struct poll_table_struct *wait);
 
 				/* Mapping support (drm_vm.h) */
-#if LINUX_VERSION_CODE < 0x020317
-extern unsigned long DRM(vm_nopage)(struct vm_area_struct *vma,
-				    unsigned long address,
-				    int write_access);
-extern unsigned long DRM(vm_shm_nopage)(struct vm_area_struct *vma,
-					unsigned long address,
-					int write_access);
-extern unsigned long DRM(vm_dma_nopage)(struct vm_area_struct *vma,
-					unsigned long address,
-					int write_access);
-extern unsigned long DRM(vm_sg_nopage)(struct vm_area_struct *vma,
-				       unsigned long address,
-				       int write_access);
-#else
-				/* Return type changed in 2.3.23 */
 extern struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
 				   unsigned long address,
 				   int write_access);
@@ -785,7 +774,6 @@ extern struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
 extern struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
 				      unsigned long address,
 				      int write_access);
-#endif
 extern void	     DRM(vm_open)(struct vm_area_struct *vma);
 extern void	     DRM(vm_close)(struct vm_area_struct *vma);
 extern void	     DRM(vm_shm_close)(struct vm_area_struct *vma);
@@ -1013,8 +1001,12 @@ extern int            DRM(sg_free)(struct inode *inode, struct file *filp,
 #endif
 
                                /* ATI PCIGART support (ati_pcigart.h) */
-extern unsigned long  DRM(ati_pcigart_init)(drm_device_t *dev);
-extern int            DRM(ati_pcigart_cleanup)(unsigned long address);
+extern int            DRM(ati_pcigart_init)(drm_device_t *dev,
+					    unsigned long *addr,
+					    dma_addr_t *bus_addr);
+extern int            DRM(ati_pcigart_cleanup)(drm_device_t *dev,
+					       unsigned long addr,
+					       dma_addr_t bus_addr);
 
 #endif /* __KERNEL__ */
 #endif
