@@ -519,7 +519,7 @@ static int mach64_dma_dispatch_vertex( drm_device_t *dev, int prim, void *buf,
 	int verify_failed = 0;
 	DMALOCALS;
 
-	DRM_DEBUG( "%s: buf=%p used=%ld nbox=%d\n",
+	DRM_DEBUG( "%s: buf=%p used=%lu nbox=%d\n",
 		   __FUNCTION__, buf, used, sarea_priv->nbox );
 
 	if ( used ) {
@@ -542,7 +542,7 @@ static int mach64_dma_dispatch_vertex( drm_device_t *dev, int prim, void *buf,
 				ret = mach64_emit_state( dev_priv );
 				if (ret < 0) return ret;
 			}
-		
+ 
 			do {
 				/* Emit the next cliprect */
 				if ( i < sarea_priv->nbox ) {
@@ -799,13 +799,18 @@ int mach64_dma_vertex( struct inode *inode, struct file *filp,
 			     sizeof(vertex) ) )
 		return -EFAULT;
 
-	DRM_DEBUG( "%s: pid=%d buf=%p used=%ld discard=%d\n",
+	DRM_DEBUG( "%s: pid=%d buf=%p used=%lu discard=%d\n",
 		   __FUNCTION__, current->pid,
 		   vertex.buf, vertex.used, vertex.discard );
 
 	if ( vertex.prim < 0 ||
 	     vertex.prim > MACH64_PRIM_POLYGON ) {
 		DRM_ERROR( "buffer prim %d\n", vertex.prim );
+		return -EINVAL;
+	}
+
+	if ( vertex.used > MACH64_BUFFER_SIZE ) {
+		DRM_ERROR( "Invalid vertex buffer size: %lu bytes\n", vertex.used );
 		return -EINVAL;
 	}
 
