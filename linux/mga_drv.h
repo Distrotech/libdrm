@@ -138,7 +138,7 @@ extern int  mga_dma_blit( DRM_OS_IOCTL );
 extern int mga_warp_install_microcode( drm_device_t *dev );
 extern int mga_warp_init( drm_device_t *dev );
 
-#define mga_flush_write_combine()	DRM_OS_READMEMORY_BARRIER
+#define mga_flush_write_combine()	DRM_OS_READMEMORYBARRIER
 
 #define MGA_BASE( reg )		((u32)(dev_priv->mmio->handle))
 #define MGA_ADDR( reg )		(MGA_BASE(reg) + reg)
