@@ -183,7 +183,7 @@ void DRM(vm_shm_close)(struct vm_area_struct *vma)
 			} else {
 				dev->vmalist = pt->next;
 			}
-			DRM(free)(pt, sizeof(*pt), DRM_MEM_VMAS);
+			drm_core_free(pt, sizeof(*pt), DRM_MEM_VMAS);
 		} else {
 			prev = pt;
 		}
@@ -214,7 +214,7 @@ void DRM(vm_shm_close)(struct vm_area_struct *vma)
 					DRM_DEBUG("mtrr_del = %d\n", retcode);
 				}
 #endif
-				DRM(ioremapfree)(map->handle, map->size, dev);
+				drm_core_ioremapfree(map, dev);
 				break;
 			case _DRM_SHM:
 				vfree(map->handle);
@@ -223,7 +223,7 @@ void DRM(vm_shm_close)(struct vm_area_struct *vma)
 			case _DRM_SCATTER_GATHER:
 				break;
 			}
-			DRM(free)(map, sizeof(*map), DRM_MEM_MAPS);
+			drm_core_free(map, sizeof(*map), DRM_MEM_MAPS);
 		}
 	}
 	up(&dev->struct_sem);
@@ -405,7 +405,7 @@ void DRM(vm_open)(struct vm_area_struct *vma)
 		  vma->vm_start, vma->vm_end - vma->vm_start);
 	atomic_inc(&dev->vma_count);
 
-	vma_entry = DRM(alloc)(sizeof(*vma_entry), DRM_MEM_VMAS);
+	vma_entry = drm_core_alloc(sizeof(*vma_entry), DRM_MEM_VMAS);
 	if (vma_entry) {
 		down(&dev->struct_sem);
 		vma_entry->vma	= vma;
@@ -442,7 +442,7 @@ void DRM(vm_close)(struct vm_area_struct *vma)
 			} else {
 				dev->vmalist = pt->next;
 			}
-			DRM(free)(pt, sizeof(*pt), DRM_MEM_VMAS);
+			drm_core_free(pt, sizeof(*pt), DRM_MEM_VMAS);
 			break;
 		}
 	}

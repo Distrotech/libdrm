@@ -60,7 +60,7 @@ int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 
 	DRM_DEBUG("pid = %d, minor = %d\n", current->pid, minor);
 
-	priv		    = DRM(alloc)(sizeof(*priv), DRM_MEM_FILES);
+	priv		    = drm_core_alloc(sizeof(*priv), DRM_MEM_FILES);
 	if(!priv) return -ENOMEM;
 
 	memset(priv, 0, sizeof(*priv));
@@ -111,7 +111,7 @@ int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 
 	return 0;
  out_free:
-	DRM(free)(priv, sizeof(*priv), DRM_MEM_FILES);
+	drm_core_free(priv, sizeof(*priv), DRM_MEM_FILES);
 	return ret;
 }
 

@@ -7,6 +7,7 @@
 # $XFree86: xc/programs/Xserver/hw/xfree86/os-support/linux/drm/kernel/Makefile.kernel,v 1.18 2003/08/16 17:59:17 dawes Exp $
 #
 
+drmcore-objs := 
 tdfx-objs   := tdfx_drv.o
 r128-objs   := r128_drv.o r128_cce.o r128_state.o r128_irq.o
 mga-objs    := mga_drv.o mga_dma.o mga_state.o mga_warp.o mga_irq.o 
@@ -41,9 +42,11 @@ obj-		:=
 export-objs     := via_mm.o
 endif
 
+drmcore-y := drm_bufs.o drm_memory.o drm_memory_debug.o drm_agpsupport.o drm_dma.o ati_pcigart.o drm_proc.o drmcore_exports.o
+obj-m += drmcore.o radeon.o
 obj-$(CONFIG_DRM_TDFX)	+= tdfx.o
-obj-$(CONFIG_DRM_R128)	+= r128.o
-obj-$(CONFIG_DRM_RADEON)+= radeon.o
+obj-$(CONFIG_DRM_R128)	+= r128.o 
+obj-$(CONFIG_DRM_RADEON)+= radeon.o drmcore.o
 obj-$(CONFIG_DRM_MGA)	+= mga.o
 obj-$(CONFIG_DRM_I810)	+= i810.o
 obj-$(CONFIG_DRM_I830)	+= i830.o

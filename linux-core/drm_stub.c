@@ -162,7 +162,7 @@ static int DRM(stub_getminor)(const char *name, struct file_operations *fops,
 	int i;
 
 	if (!DRM(stub_list)) {
-		DRM(stub_list) = DRM(alloc)(sizeof(*DRM(stub_list))
+		DRM(stub_list) = drm_core_alloc(sizeof(*DRM(stub_list))
 					    * DRM_STUB_MAXCARDS, DRM_MEM_STUB);
 		if(!DRM(stub_list)) return -1;
 		for (i = 0; i < DRM_STUB_MAXCARDS; i++) {
@@ -174,7 +174,7 @@ static int DRM(stub_getminor)(const char *name, struct file_operations *fops,
 		if (!DRM(stub_list)[i].fops) {
 			DRM(stub_list)[i].name = name;
 			DRM(stub_list)[i].fops = fops;
-			DRM(proc_init)(dev, i, DRM(stub_info).proc_root,
+			drm_proc_init(dev, i, DRM(stub_info).proc_root,
 							&DRM(stub_list)[i].dev_root);
 			(*DRM(stub_info).info_count)++;
 			DRM_DEBUG("info count increased %d\n", *DRM(stub_info).info_count);
@@ -200,7 +200,7 @@ static int DRM(stub_putminor)(int minor)
 	if (minor < 0 || minor >= DRM_STUB_MAXCARDS) return -1;
 	DRM(stub_list)[minor].name = NULL;
 	DRM(stub_list)[minor].fops = NULL;
-	DRM(proc_cleanup)(minor, DRM(stub_info).proc_root,
+	drm_proc_cleanup(minor, DRM(stub_info).proc_root,
 			  DRM(stub_list)[minor].dev_root);
 
 	(*DRM(stub_info).info_count)--;
@@ -213,7 +213,7 @@ static int DRM(stub_putminor)(int minor)
 	} else {
 		DRM_DEBUG("unregistering inter_module \n");
 		inter_module_unregister("drm");
-		DRM(free)(DRM(stub_list),
+		drm_core_free(DRM(stub_list),
 			  sizeof(*DRM(stub_list)) * DRM_STUB_MAXCARDS,
 			  DRM_MEM_STUB);
 		remove_proc_entry("dri", NULL);

@@ -98,14 +98,14 @@ int DRM(setunique)(struct inode *inode, struct file *filp,
 	if (!u.unique_len || u.unique_len > 1024) return -EINVAL;
 
 	dev->unique_len = u.unique_len;
-	dev->unique	= DRM(alloc)(u.unique_len + 1, DRM_MEM_DRIVER);
+	dev->unique	= drm_core_alloc(u.unique_len + 1, DRM_MEM_DRIVER);
 	if(!dev->unique) return -ENOMEM;
 	if (copy_from_user(dev->unique, u.unique, dev->unique_len))
 		return -EFAULT;
 
 	dev->unique[dev->unique_len] = '\0';
 
-	dev->devname = DRM(alloc)(strlen(dev->name) + strlen(dev->unique) + 2,
+	dev->devname = drm_core_alloc(strlen(dev->name) + strlen(dev->unique) + 2,
 				  DRM_MEM_DRIVER);
 	if (!dev->devname)
 		return -ENOMEM;
@@ -137,14 +137,14 @@ DRM(set_busid)(drm_device_t *dev)
 		return EBUSY;
 
 	dev->unique_len = 20;
-	dev->unique = DRM(alloc)(dev->unique_len + 1, DRM_MEM_DRIVER);
+	dev->unique = drm_core_alloc(dev->unique_len + 1, DRM_MEM_DRIVER);
 	if (dev->unique == NULL)
 		return ENOMEM;
 
 	snprintf(dev->unique, dev->unique_len, "pci:%04x:%02x:%02x.%d",
 		dev->pci_domain, dev->pci_bus, dev->pci_slot, dev->pci_func);
 
-	dev->devname = DRM(alloc)(strlen(dev->name) + dev->unique_len + 2,
+	dev->devname = drm_core_alloc(strlen(dev->name) + dev->unique_len + 2,
 				DRM_MEM_DRIVER);
 	if (dev->devname == NULL)
 		return ENOMEM;

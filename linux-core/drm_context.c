@@ -100,7 +100,7 @@ int DRM(ctxbitmap_next)( drm_device_t *dev )
 			if(dev->context_sareas) {
 				drm_map_t **ctx_sareas;
 
-				ctx_sareas = DRM(realloc)(dev->context_sareas,
+				ctx_sareas = drm_core_realloc(dev->context_sareas,
 						(dev->max_context - 1) * 
 						sizeof(*dev->context_sareas),
 						dev->max_context * 
@@ -115,7 +115,7 @@ int DRM(ctxbitmap_next)( drm_device_t *dev )
 				dev->context_sareas[bit] = NULL;
 			} else {
 				/* max_context == 1 at this point */
-				dev->context_sareas = DRM(alloc)(
+				dev->context_sareas = drm_core_alloc(
 						dev->max_context * 
 						sizeof(*dev->context_sareas),
 						DRM_MEM_MAPS);
@@ -148,7 +148,7 @@ int DRM(ctxbitmap_init)( drm_device_t *dev )
    	int temp;
 
 	down(&dev->struct_sem);
-	dev->ctx_bitmap = (unsigned long *) DRM(alloc)( PAGE_SIZE,
+	dev->ctx_bitmap = (unsigned long *) drm_core_alloc( PAGE_SIZE,
 							DRM_MEM_CTXBITMAP );
 	if ( dev->ctx_bitmap == NULL ) {
 		up(&dev->struct_sem);
@@ -178,11 +178,11 @@ int DRM(ctxbitmap_init)( drm_device_t *dev )
 void DRM(ctxbitmap_cleanup)( drm_device_t *dev )
 {
 	down(&dev->struct_sem);
-	if( dev->context_sareas ) DRM(free)( dev->context_sareas,
+	if( dev->context_sareas ) drm_core_free( dev->context_sareas,
 					     sizeof(*dev->context_sareas) * 
 					     dev->max_context,
 					     DRM_MEM_MAPS );
-	DRM(free)( (void *)dev->ctx_bitmap, PAGE_SIZE, DRM_MEM_CTXBITMAP );
+	drm_core_free( (void *)dev->ctx_bitmap, PAGE_SIZE, DRM_MEM_CTXBITMAP );
 	up(&dev->struct_sem);
 }
 
@@ -421,7 +421,7 @@ int DRM(addctx)( struct inode *inode, struct file *filp,
 			dev->fn_tbl.context_ctor(dev, ctx.handle);
 	}
 
-	ctx_entry = DRM(alloc)( sizeof(*ctx_entry), DRM_MEM_CTXLIST );
+	ctx_entry = drm_core_alloc( sizeof(*ctx_entry), DRM_MEM_CTXLIST );
 	if ( !ctx_entry ) {
 		DRM_DEBUG("out of memory\n");
 		return -ENOMEM;
@@ -564,7 +564,7 @@ int DRM(rmctx)( struct inode *inode, struct file *filp,
 		list_for_each_entry_safe( pos, n, &dev->ctxlist->head, head ) {
 			if ( pos->handle == ctx.handle ) {
 				list_del( &pos->head );
-				DRM(free)( pos, sizeof(*pos), DRM_MEM_CTXLIST );
+				drm_core_free( pos, sizeof(*pos), DRM_MEM_CTXLIST );
 				--dev->ctx_count;
 			}
 		}
