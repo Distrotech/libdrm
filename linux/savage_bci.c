@@ -40,8 +40,8 @@
 
 static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 {
-	drm_savage_private_t *dev_priv;
 	u32 tmp;
+	drm_savage_private_t *dev_priv;
 	DRM_INFO( "initializing bci ...\n" );
 
 	dev_priv = DRM(alloc)( sizeof(drm_savage_private_t), DRM_MEM_DRIVER );
@@ -126,7 +126,7 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 
 	DRM_INFO( "looking for mmio region ...\n" );
 	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
-	if(!dev_priv->mmio) {
+	if(!dev_priv->mmio->handle) {
 		DRM_ERROR("could not find mmio region!\n");
 		dev->dev_private = (void *)dev_priv;
 		savage_do_cleanup_bci(dev);
@@ -136,13 +136,12 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 	DRM_INFO( "looking for bci region ...\n" );
 	DRM_FIND_MAP( dev_priv->bci, init->bci_offset );
 	if(!dev_priv->bci) {
-		DRM_ERROR("could not find bci region!\n");
+		DRM_ERROR("could not find bci region\n");
 		dev->dev_private = (void *)dev_priv;
 		savage_do_cleanup_bci(dev);
 		return DRM_ERR(EINVAL);
 	}
-/* FIXME: we do not support this right now */
-#if 0
+
 	DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
 	if(!dev_priv->buffers) {
 		DRM_ERROR("could not find dma buffer region!\n");
@@ -163,15 +162,12 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 		}
 	}
 
-#endif
-
 	dev_priv->sarea_priv =
 		(drm_savage_sarea_t *)((u8 *)dev_priv->sarea->handle +
 				       init->sarea_priv_offset);
 
 	if ( !dev_priv->is_pci ) {
 		/* FIXME: we do not support this right now */
-#if 0
 		DRM_IOREMAP( dev_priv->bci );
 		DRM_IOREMAP( dev_priv->buffers );
 		if(!dev_priv->bci->handle ||
@@ -181,20 +177,20 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 			savage_do_cleanup_bci(dev);
 			return DRM_ERR(EINVAL);
 		}
-#endif
 	} else {
 		dev_priv->bci->handle =
 			(void *)dev_priv->bci->offset;
 		dev_priv->buffers->handle = (void *)dev_priv->buffers->offset;
 
-		DRM_DEBUG( "dev_priv->bci->handle %p\n",
+		DRM_INFO( "dev_priv->bci->handle %p\n",
 			   dev_priv->bci->handle );
-		DRM_DEBUG( "dev_priv->buffers->handle %p\n",
+		DRM_INFO( "dev_priv->buffers->handle %p\n",
 			   dev_priv->buffers->handle );
 	}
 
 
 	dev_priv->agp_size = init->agp_size;
+	dev_priv->agp_vm_start = 64*1024*1024;
 /* FIXME:	dev_priv->agp_vm_start = SAVAGE_READ( SAVAGE_CONFIG_APER_SIZE ); */
 #if __REALLY_HAVE_AGP
 	if ( !dev_priv->is_pci )
@@ -207,11 +203,11 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 						- dev->sg->handle
 						+ dev_priv->agp_vm_start);
 
-	DRM_DEBUG( "dev_priv->agp_size %d\n",
+	DRM_INFO( "dev_priv->agp_size %d\n",
 		   dev_priv->agp_size );
-	DRM_DEBUG( "dev_priv->agp_vm_start 0x%x\n",
+	DRM_INFO( "dev_priv->agp_vm_start 0x%x\n",
 		   dev_priv->agp_vm_start );
-	DRM_DEBUG( "dev_priv->agp_buffers_offset 0x%lx\n",
+	DRM_INFO( "dev_priv->agp_buffers_offset 0x%lx\n",
 		   dev_priv->agp_buffers_offset );
 
 #if __REALLY_HAVE_SG
@@ -260,6 +256,8 @@ static int savage_do_init_bci( drm_device_t *dev, drm_savage_init_t *init )
 
 /* FIXME:	savage_do_engine_reset( dev ); */
 
+	savage_do_bci_start( dev_priv );
+
 	return 0;
 }
 
@@ -288,6 +286,29 @@ int savage_do_cleanup_bci( drm_device_t *dev )
 	}
 
 	return 0;
+}
+
+int savage_do_bci_start( drm_savage_private_t *dev_priv )
+{
+	SAVAGE_WRITE( 0x48C18, SAVAGE_READ( 0x48C18 ) | 0x08 );
+	DRM_INFO( "BCI enabled.\n" );
+}
+
+int savage_do_bci_idle( drm_savage_private_t *dev_priv )
+{
+	int i;
+
+	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
+		if ( SAVAGE_READ(0x48C60) & 0x00020000 ) {
+			return 0;
+		}
+		DRM_UDELAY( 1 );
+	}
+
+	DRM_INFO( "timeout %d usec exeeded\n", dev_priv->usec_timeout );
+	DRM_INFO( "alternate status word: 0x%x\n", SAVAGE_READ( 0x48C60 ) );
+	DRM_INFO( "COB Pointers Register: 0x%x\n", SAVAGE_READ( 0x48C18 ) );
+	return DRM_ERR(EBUSY);
 }
 
 int savage_bci_init( DRM_IOCTL_ARGS )
@@ -405,4 +426,66 @@ int savage_bci_buffers( DRM_IOCTL_ARGS )
 	DRM_COPY_TO_USER_IOCTL( (drm_dma_t *)data, d, sizeof(d) );
 
 	return ret;
+}
+
+static __inline__ void savage_emit_clip_rect( drm_savage_private_t *dev_priv,
+					      drm_clip_rect_t *box )
+{
+	DRM_DEBUG( "   box:  x1=%d y1=%d  x2=%d y2=%d\n",
+			box->x1, box->y1, box->x2, box->y2 );
+
+	SAVAGE_WRITE( SAVAGE_DRAW_CONTROL_REG0, (box->y1 << 12) | box->x1 );
+	SAVAGE_WRITE( SAVAGE_DRAW_CONTROL_REG1, 0x05000000 | /* default */
+						(box->y1 << 12) | box->x1 );
+}
+
+static void savage_bci_dispatch_vertex( drm_device_t *dev,
+                                    	drm_buf_t *buf,
+					drm_clip_rect_t *boxes,
+					int nbox )
+{
+        drm_savage_private_t *dev_priv = dev->dev_private;
+	drm_clip_rect_t box;
+        int offset = buf->bus_address;
+        int i = 0;
+
+	if ( savage_do_bci_idle( dev_priv ) ) {
+		DRM_ERROR( "Waiting for idle failed!\n" );
+		return;
+	}
+
+	do {
+		/* Emit the next cliprect */
+		if ( i < nbox ) {
+			if ( DRM_COPY_FROM_USER_UNCHECKED( &box, &boxes[i], sizeof(box) ) )
+                       	        return;
+	
+       	                savage_emit_clip_rect( dev_priv, &box );
+               	}
+	
+                /* Emit the vertex buffer rendering commands */
+		SAVAGE_WRITE( SAVAGE_VERTEX_BUFFER_ADDR_REG, offset );
+
+		i++;
+	} while ( i < nbox );
+}
+
+int savage_bci_vertex( DRM_IOCTL_ARGS )
+{
+        DRM_DEVICE;
+        drm_savage_private_t *dev_priv = dev->dev_private;
+        drm_buf_t *buf;
+
+	/* FIXME: LOCK_TEST_WITH_RETURN( dev ); */
+
+        if ( !dev_priv ) {
+                DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
+                return DRM_ERR(EINVAL);
+        }
+
+	DRM_COPY_FROM_USER_IOCTL( buf, (drm_buf_t *)data, sizeof(buf) );
+
+	savage_bci_dispatch_vertex( dev, buf, NULL, 0 );
+
+        return 0;
 }

@@ -148,7 +148,8 @@ typedef struct {
 /* Savage specific ioctls
  * The device specific ioctl range is 0x40 to 0x79.
  */
-#define DRM_IOCTL_SAVAGE_BCI_INIT    DRM_IOW( 0x40, drm_savage_init_t)
+#define DRM_IOCTL_SAVAGE_BCI_INIT	DRM_IOW( 0x40, drm_savage_init_t)
+#define DRM_IOCTL_SAVAGE_VERTEX		DRM_IOW( 0x49, drm_buf_t)
 
 typedef struct drm_savage_init {
 	enum {

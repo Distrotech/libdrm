@@ -36,11 +36,16 @@
 
 /* General customization:
  */
+#define __HAVE_AGP		1
+#define __MUST_HAVE_AGP		0
 #define __HAVE_MTRR		1
 #define __HAVE_CTX_BITMAP	1
+#define __HAVE_SG		0
+#define __HAVE_PCI_DMA		1
 
-#define DRIVER_IOCTLS							     \
- [DRM_IOCTL_NR(DRM_IOCTL_DMA)]               = { savage_bci_buffers,  1, 0 }, \
- [DRM_IOCTL_NR(DRM_IOCTL_SAVAGE_BCI_INIT)]    = { savage_bci_init,     1, 1 }, 
+#define DRIVER_IOCTLS							\
+ [DRM_IOCTL_NR(DRM_IOCTL_DMA)]		= { savage_bci_buffers,	1, 0 },	\
+ [DRM_IOCTL_NR(DRM_IOCTL_SAVAGE_BCI_INIT)] = { savage_bci_init,	1, 1 },	\
+ [DRM_IOCTL_NR(DRM_IOCTL_SAVAGE_VERTEX)] = { savage_bci_vertex,	1, 0 }, \
 
 #endif

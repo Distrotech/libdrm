@@ -129,11 +129,18 @@ typedef struct drm_savage_buf_priv {
 /* Constants */
 #define SAVAGE_MAX_USEC_TIMEOUT		100000	/* 100 ms */
 
+#define SAVAGE_DRAW_CONTROL_REG0	0x00485e0 /* scissoring */
+#define SAVAGE_DRAW_CONTROL_REG1	0x00485e4
+#define SAVAGE_VERTEX_BUFFER_ADDR_REG	0x0048c20
+
 				/* savage_bci.c */
 extern int savage_bci_init( DRM_IOCTL_ARGS );
 extern int savage_bci_buffers( DRM_IOCTL_ARGS );
+extern int savage_bci_vertex( DRM_IOCTL_ARGS );
 
+extern int savage_do_bci_start( drm_savage_private_t *dev_priv );
 extern int savage_do_cleanup_bci( drm_device_t *dev );
+extern int savage_do_bci_idle( drm_savage_private_t *dev_priv );
 
 #define SAVAGE_RING_HIGH_MARK		128
 
