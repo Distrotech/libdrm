@@ -483,17 +483,11 @@ u32 copy_and_verify( u32 *dst, u32 *src, u32 used)
 		if( count <= used ) {
 			used -= count;
 			reg &= 0xffff;
-#if 0
-			/* This is an exact match of Mach64's Setup Engine register.
+
+			/* This is an exact match of Mach64's Setup Engine registers,
+			 * excluding SETUP_CNTL (1_C1).
 			 */
 			if( (reg >= 0x0190 && reg < 0x01c1) || (reg >= 0x01ca && reg <= 0x01cf) ) {
-#else
-			/* This is faster but it covers undefined addresses.
-			 * FIXME: It must be verified that these addresses can't compromise the
-			 * bus mastering or cause a DoS.
-			 */
-			if( (reg & 0xff80) == 0x0180 ) {
-#endif
 				*dst++ = data;
 				copied += 1 + count;
 				while( count-- ) {
