@@ -162,7 +162,7 @@ int DRM(setunique)( DRM_OS_IOCTL )
 		}
         } while(0);
 #endif
-#endif
+#endif /* __linux__ */
 
 	return 0;
 }

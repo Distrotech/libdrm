@@ -38,7 +38,7 @@
 #include <linux/poll.h>
 #include <asm/io.h>
 #include <linux/pci.h>
-#endif
+#endif /* __linux__ */
 
 #include "sis.h"
 #include "drmP.h"

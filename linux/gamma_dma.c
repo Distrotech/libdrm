@@ -34,7 +34,7 @@
 #define __NO_VERSION__
 #include <linux/interrupt.h>	/* For task queue support */
 #include <linux/delay.h>
-#endif
+#endif /* __linux__ */
 
 #include "gamma.h"
 #include "drmP.h"
@@ -455,7 +455,7 @@ static int gamma_dma_priority(drm_device_t *dev, drm_dma_t *d)
 #ifdef __linux__
 			add_wait_queue(&dev->context_wait, &entry);
 			current->state = TASK_INTERRUPTIBLE;
-#endif
+#endif /* __linux__ */
 			/* PRE: dev->last_context != buf->context */
 			DRM(context_switch)(dev, dev->last_context,
 					    buf->context);
@@ -524,7 +524,7 @@ static int gamma_dma_send_buffers(drm_device_t *dev, drm_dma_t *d)
 	drm_device_dma_t  *dma	    = dev->dma;
 #ifdef __linux__
 	DECLARE_WAITQUEUE(entry, current);
-#endif
+#endif /* __linux__ */
 
 	if (d->flags & _DRM_DMA_BLOCK) {
 		last_buf = dma->buflist[d->send_indices[d->send_count-1]];

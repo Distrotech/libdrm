@@ -37,7 +37,7 @@
 #define DRM(x) sisdrv_##x
 #else
 #define DRM(x) sis_##x
-#endif
+#endif /* __linux__ */
 
 /* General customization:
  */

@@ -36,7 +36,7 @@
 #ifdef __linux__
 #include <linux/interrupt.h>	/* For task queue support */
 #include <linux/delay.h>
-#endif
+#endif /* __linux__ */
 
 #define R128_FIFO_DEBUG		0
 

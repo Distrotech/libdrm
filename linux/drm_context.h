@@ -386,7 +386,7 @@ int DRM(rmctx)( DRM_OS_IOCTL )
 	if ( ctx.handle == DRM_KERNEL_CONTEXT + 1 ) {
 		priv->remove_auth_on_close = 1;
 	}
-#endif
+#endif /* __linux__ */
 	if ( ctx.handle != DRM_KERNEL_CONTEXT ) {
 		DRM(ctxbitmap_free)( dev, ctx.handle );
 	}

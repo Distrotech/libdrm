@@ -100,7 +100,7 @@ static int __init gamma_options( char *str )
 
 __setup( DRIVER_NAME "=", gamma_options );
 #endif
-#endif
+#endif /* __linux__ */
 
 #include "drm_fops.h"
 #include "drm_init.h"

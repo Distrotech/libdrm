@@ -33,18 +33,11 @@
 #ifdef __linux__
 #define __NO_VERSION__
 #include <linux/interrupt.h>	/* For task queue support */
-#endif
+#endif /* __linux__ */
 
 #include "i810.h"
 #include "drmP.h"
 #include "i810_drv.h"
-
-/* in case we don't have a 2.3.99-pre6 kernel or later: */
-#ifdef __linux__
-#ifndef VM_DONTCOPY
-#define VM_DONTCOPY 0
-#endif
-#endif
 
 #define I810_BUF_FREE		2
 #define I810_BUF_CLIENT		1
@@ -148,7 +141,7 @@ static struct file_operations i810_buffer_fops = {
 	fasync:	 DRM(fasync),
       	poll:	 DRM(poll),
 };
-#endif
+#endif /* __linux__ */
 
 int i810_mmap_buffers(struct file *filp, struct vm_area_struct *vma)
 {

@@ -113,6 +113,6 @@ int DRM(cpu_valid)(void)
 #if defined(__sparc__) && !defined(__sparc_v9__)
 	return 0; /* No cmpxchg before v9 sparc. */
 #endif
-#endif
+#endif /* __linux__ */
 	return 1;
 }
