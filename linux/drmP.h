@@ -118,6 +118,7 @@ typedef struct drm_device drm_device_t;
 #include "drm_bufs.h"
 #include "drm_lock.h"
 #include "drm_dma.h"
+#include "drm_vm.h"
 
 
 /***********************************************************************/
@@ -438,63 +439,10 @@ typedef struct drm_file {
 	unsigned long     lock_count;
 } drm_file_t;
 
-/** Wait queue */
-typedef struct drm_queue {
-	atomic_t	  use_count;	/**< Outstanding uses (+1) */
-	atomic_t	  finalization;	/**< Finalization in progress */
-	atomic_t	  block_count;	/**< Count of processes waiting */
-	atomic_t	  block_read;	/**< Queue blocked for reads */
-	wait_queue_head_t read_queue;	/**< Processes waiting on block_read */
-	atomic_t	  block_write;	/**< Queue blocked for writes */
-	wait_queue_head_t write_queue;	/**< Processes waiting on block_write */
-#if 1
-	atomic_t	  total_queued;	/**< Total queued statistic */
-	atomic_t	  total_flushed;/**< Total flushes statistic */
-	atomic_t	  total_locks;	/**< Total locks statistics */
-#endif
-	drm_ctx_flags_t	  flags;	/**< Context preserving and 2D-only */
-	drm_waitlist_t	  waitlist;	/**< Pending buffers */
-	wait_queue_head_t flush_queue;	/**< Processes waiting until flush */
-} drm_queue_t;
-
-/**
- * DMA data.
- */
-typedef struct drm_device_dma {
-
-	drm_buf_entry_t	  bufs[DRM_MAX_ORDER+1];	/**< buffers, grouped by their size order */
-	int		  buf_count;	/**< total number of buffers */
-	drm_buf_t	  **buflist;	/**< Vector of pointers into drm_device_dma::bufs */
-	int		  seg_count;
-	int		  page_count;	/**< number of pages */
-	unsigned long	  *pagelist;	/**< page list */
-	unsigned long	  byte_count;
-	enum {
-		_DRM_DMA_USE_AGP = 0x01,
-		_DRM_DMA_USE_SG  = 0x02
-	} flags;
-
-	/** \name DMA support */
-	/*@{*/
-	drm_buf_t	  *this_buffer;	/**< Buffer being sent */
-	drm_buf_t	  *next_buffer; /**< Selected buffer to send */
-	drm_queue_t	  *next_queue;	/**< Queue from which buffer selected*/
-	wait_queue_head_t waiting;	/**< Processes waiting on free bufs */
-	/*@}*/
-} drm_device_dma_t;
-
 typedef struct drm_sigdata {
 	int           context;
 	drm_hw_lock_t *lock;
 } drm_sigdata_t;
-
-/**
- * Mappings list
- */
-typedef struct drm_map_list {
-	struct list_head	head;	/**< list head */
-	drm_map_t		*map;	/**< mapping */
-} drm_map_list_t;
 
 typedef drm_map_t drm_local_map_t;
 
@@ -637,28 +585,6 @@ extern int	     DRM(open_helper)(struct inode *inode, struct file *filp,
 				      drm_device_t *dev);
 extern int	     DRM(flush)(struct file *filp);
 extern int	     DRM(fasync)(int fd, struct file *filp, int on);
-
-				/* Mapping support (drm_vm.h) */
-extern struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
-				   unsigned long address,
-				   int write_access);
-extern struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
-				       unsigned long address,
-				       int write_access);
-extern struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
-				       unsigned long address,
-				       int write_access);
-extern struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
-				      unsigned long address,
-				      int write_access);
-extern void	     DRM(vm_open)(struct vm_area_struct *vma);
-extern void	     DRM(vm_close)(struct vm_area_struct *vma);
-extern void	     DRM(vm_shm_close)(struct vm_area_struct *vma);
-extern int	     DRM(mmap_dma)(struct file *filp,
-				   struct vm_area_struct *vma);
-extern int	     DRM(mmap)(struct file *filp, struct vm_area_struct *vma);
-extern unsigned int  DRM(poll)(struct file *filp, struct poll_table_struct *wait);
-extern ssize_t       DRM(read)(struct file *filp, char *buf, size_t count, loff_t *off);
 
 				/* Memory management support (drm_memory.h) */
 extern void	     DRM(mem_init)(void);

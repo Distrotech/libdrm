@@ -50,6 +50,6 @@
 #include "drm_lock_tmp.h"
 #include "drm_memory.h"
 #include "drm_proc.h"
-#include "drm_vm.h"
+#include "drm_vm_tmp.h"
 #include "drm_stub.h"
 #include "drm_sg_tmp.h"
