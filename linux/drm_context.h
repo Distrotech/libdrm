@@ -468,7 +468,12 @@ int DRM(context_switch_complete)(drm_device_t *dev, int new)
 
 #endif
 	clear_bit(0, &dev->context_flag);
+#ifdef __linux__
 	wake_up_interruptible(&dev->context_wait);
+#endif
+#ifdef __FreeBSD__
+	wakeup( &dev->context_wait );
+#endif
 
 	return 0;
 }
@@ -480,10 +485,10 @@ static int DRM(init_queue)(drm_device_t *dev, drm_queue_t *q, drm_ctx_t *ctx)
 	if (atomic_read(&q->use_count) != 1
 	    || atomic_read(&q->finalization)
 	    || atomic_read(&q->block_count)) {
-		DRM_ERROR("New queue is already in use: u%d f%d b%d\n",
-			  atomic_read(&q->use_count),
-			  atomic_read(&q->finalization),
-			  atomic_read(&q->block_count));
+		DRM_ERROR("New queue is already in use: u%ld f%ld b%ld\n",
+			  (unsigned long)atomic_read(&q->use_count),
+			  (unsigned long)atomic_read(&q->finalization),
+			  (unsigned long)atomic_read(&q->block_count));
 	}
 
 	atomic_set(&q->finalization,  0);
@@ -494,9 +499,16 @@ static int DRM(init_queue)(drm_device_t *dev, drm_queue_t *q, drm_ctx_t *ctx)
 	atomic_set(&q->total_flushed, 0);
 	atomic_set(&q->total_locks,   0);
 
+#ifdef __linux__
 	init_waitqueue_head(&q->write_queue);
 	init_waitqueue_head(&q->read_queue);
 	init_waitqueue_head(&q->flush_queue);
+#endif
+#ifdef __FreeBSD__
+	q->write_queue = 0;
+	q->read_queue = 0;
+	q->flush_queue = 0;
+#endif
 
 	q->flags = ctx->flags;
 

@@ -40,6 +40,8 @@
 #endif
 #include <asm/pgalloc.h>
 
+#define DRM_TIME_SLICE	      (HZ/20)  /* Time slice for GLXContexts	  */
+
 				/* Wait queue declarations changed in 2.3.1 */
 #ifndef DECLARE_WAITQUEUE
 #define DECLARE_WAITQUEUE(w,c) struct wait_queue w = { c, NULL }

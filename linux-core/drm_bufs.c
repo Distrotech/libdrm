@@ -33,6 +33,14 @@
 #ifdef __linux__
 #include <linux/vmalloc.h>
 #endif
+#ifdef __FreeBSD__
+#include <machine/param.h>
+#include <sys/mman.h>
+#include <vm/vm.h>
+#include <vm/pmap.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_map.h>
+#endif
 #include "drmP.h"
 
 #ifndef __HAVE_PCI_DMA
@@ -998,8 +1006,12 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 	drm_device_dma_t *dma = dev->dma;
 	int retcode = 0;
 	const int zero = 0;
-	unsigned long virtual;
-	unsigned long address;
+#ifdef __linux__
+	unsigned long virtual, address;
+#endif
+#ifdef __FreeBSD__
+	vm_offset_t virtual, address;
+#endif
 	drm_buf_map_t request;
 	int i;
 
@@ -1021,7 +1033,7 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 			drm_map_t *map = DRIVER_AGP_BUFFERS_MAP( dev );
 
 			if ( !map ) {
-				retcode = -EINVAL;
+				retcode = EINVAL;
 				goto done;
 			}
 
@@ -1031,18 +1043,26 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 #else
 			down_write( &current->mm->mmap_sem );
 #endif
-#endif
 
 			virtual = do_mmap( filp, 0, map->size,
 					   PROT_READ | PROT_WRITE,
 					   MAP_SHARED,
 					   (unsigned long)map->offset );
-#ifdef __linux__
 #if LINUX_VERSION_CODE <= 0x020402
 			up( &current->mm->mmap_sem );
 #else
 			up_write( &current->mm->mmap_sem );
 #endif
+#endif
+
+#ifdef __FreeBSD__
+			retcode = vm_mmap(&p->p_vmspace->vm_map,
+					  &virtual,
+					  round_page(dma->byte_count),
+					  PROT_READ|PROT_WRITE, VM_PROT_ALL,
+					  MAP_SHARED,
+					  SLIST_FIRST(&kdev->si_hlist),
+					  (unsigned long)map->offset );
 #endif
 		} else {
 #ifdef __linux__
@@ -1051,24 +1071,37 @@ int DRM(mapbufs)( DRM_OS_IOCTL )
 #else
 			down_write( &current->mm->mmap_sem );
 #endif
-#endif
 
 			virtual = do_mmap( filp, 0, dma->byte_count,
 					   PROT_READ | PROT_WRITE,
 					   MAP_SHARED, 0 );
-#ifdef __linux__
 #if LINUX_VERSION_CODE <= 0x020402
 			up( &current->mm->mmap_sem );
 #else
 			up_write( &current->mm->mmap_sem );
 #endif
 #endif
+#ifdef __FreeBSD__
+			retcode = vm_mmap(&p->p_vmspace->vm_map,
+					  &virtual,
+					  round_page(dma->byte_count),
+					  PROT_READ|PROT_WRITE, VM_PROT_ALL,
+					  MAP_SHARED,
+					  SLIST_FIRST(&kdev->si_hlist),
+					  0);
+#endif
 		}
+#ifdef __linux__
 		if ( virtual > -1024UL ) {
 			/* Real error */
 			retcode = (signed long)virtual;
 			goto done;
 		}
+#endif
+#ifdef __FreeBSD__
+		if (retcode)
+			goto done;
+#endif
 		request.virtual = (void *)virtual;
 
 		for ( i = 0 ; i < dma->buf_count ; i++ ) {

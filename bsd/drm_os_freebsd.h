@@ -28,6 +28,8 @@
 #include <pci/agpvar.h>
 #endif
 
+#define DRM_TIME_SLICE	      (hz/20)  /* Time slice for GLXContexts	  */
+
 #define DRM_DEV_MODE	(S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)
 #define DRM_DEV_UID	0
 #define DRM_DEV_GID	0
@@ -235,6 +237,9 @@ extern d_ioctl_t	DRM(finish);
 extern d_ioctl_t	DRM(addmap);
 extern d_ioctl_t	DRM(rmmap);
 #if __HAVE_DMA
+extern d_ioctl_t	DRM(addbufs_agp);
+extern d_ioctl_t	DRM(addbufs_pci);
+extern d_ioctl_t	DRM(addbufs_sg);
 extern d_ioctl_t	DRM(addbufs);
 extern d_ioctl_t	DRM(infobufs);
 extern d_ioctl_t	DRM(markbufs);

@@ -58,8 +58,7 @@ extern void gamma_dma_quiescent_dual(drm_device_t *dev);
 
 				/* gamma_dma.c */
 extern int  gamma_dma_schedule(drm_device_t *dev, int locked);
-extern int  gamma_dma(struct inode *inode, struct file *filp,
-		      unsigned int cmd, unsigned long arg);
+extern int  gamma_dma( DRM_OS_IOCTL );
 extern int  gamma_find_devices(void);
 extern int  gamma_found(void);
 

@@ -82,7 +82,6 @@
 #define DRM_RESERVED_CONTEXTS 1	 /* Change drm_resctx if changed	  */
 #define DRM_LOOPING_LIMIT     5000000
 #define DRM_BSZ		      1024 /* Buffer size for /dev/drm? output	  */
-#define DRM_TIME_SLICE	      (HZ/20)  /* Time slice for GLXContexts	  */
 #define DRM_LOCK_SLICE	      1	/* Time slice for lock, in jiffies	  */
 
 #define DRM_FLAG_DEBUG	  0x01

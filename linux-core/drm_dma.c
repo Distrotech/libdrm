@@ -188,9 +188,17 @@ void DRM(free_buffer)(drm_device_t *dev, drm_buf_t *buf)
 	buf->time_completed = get_cycles();
 #endif
 
+#ifdef __linux__
 	if ( __HAVE_DMA_WAITQUEUE && waitqueue_active(&buf->dma_wait)) {
 		wake_up_interruptible(&buf->dma_wait);
 	}
+#endif
+#ifdef __FreeBSD__
+	if ( buf->dma_wait ) {
+		wakeup( &buf->dma_wait );
+		buf->dma_wait = 0;
+	}
+#endif
 #if __HAVE_DMA_FREELIST
 	else {
 		drm_device_dma_t *dma = dev->dma;

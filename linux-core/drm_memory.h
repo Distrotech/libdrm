@@ -310,7 +310,7 @@ unsigned long DRM(alloc_pages)(int order, int area)
 #ifdef __linux__
 	unsigned long address;
 #endif
-#ifdef __FreeBSD_
+#ifdef __FreeBSD__
 	vm_offset_t address;
 #endif
 	unsigned long bytes	  = PAGE_SIZE << order;
