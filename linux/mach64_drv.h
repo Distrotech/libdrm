@@ -71,9 +71,6 @@ typedef struct drm_mach64_descriptor_ring {
 	u32 tail_mask;      /* mask used to wrap ring */
 	int space;          /* number of free bytes in ring */
 
-	int last_cmd_ofs;   /* dword offset of DMA_COMMAND in the ring tail descriptor */
-	u32 last_cmd;       /* data in DMA_COMMAND in the ring tail descriptor */
-
 	int high_mark;      /* high water mark in bytes */
 } drm_mach64_descriptor_ring_t;
 
@@ -463,7 +460,7 @@ do {												\
 	if ( gui_active ) {									\
 		/* If not idle, BM_GUI_TABLE points one descriptor past the current head */	\
         	if ((ring)->head_addr == (ring)->start_addr)					\
-			(ring)->head_addr += (ring)->size - 4 * sizeof(u32)*4;			\
+			(ring)->head_addr += (ring)->size - 4 * sizeof(u32);			\
 		else										\
 			(ring)->head_addr -= 4 * sizeof(u32);					\
 	}											\
@@ -516,9 +513,6 @@ do {											\
 		DRM_ERROR( "ring space check failed!\n" );				\
 		DRM_INFO( "ring: head addr: 0x%08x head: %d tail: %d space: %d\n", 	\
 			ring->head_addr, ring->head, ring->tail, ring->space );		\
-		DRM_INFO( "last cmd: 0x%08x cmd ofs: %d\n", 	\
-			ring->last_cmd, ring->last_cmd_ofs );		\
-											\
 		return -EBUSY;								\
 	}										\
  __ring_space_done:									\
@@ -744,7 +738,7 @@ do {											\
 	OUT_RING( 0 );									\
 											\
 	ADVANCE_RING();									\
-	mach64_dma_start( dev_priv );								\
+	mach64_dma_start( dev_priv );							\
 } while(0)
 
 #endif /* __MACH64_DRV_H__ */

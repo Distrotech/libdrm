@@ -38,7 +38,6 @@
 
 int mach64_handle_dma( drm_mach64_private_t *dev_priv );
 int mach64_do_complete_blit( drm_mach64_private_t *dev_priv );
-int mach64_do_wait_for_dma( drm_mach64_private_t *dev_priv );
 
 static DECLARE_WAIT_QUEUE_HEAD(read_wait);
 
@@ -261,8 +260,6 @@ int mach64_do_engine_reset( drm_mach64_private_t *dev_priv )
 		      ( ring->head_addr | MACH64_CIRCULAR_BUF_SIZE_16KB ) );
 	ring->head = ring->tail = 0;
 	ring->space = ring->size;
-	ring->last_cmd_ofs = ring->tail_mask - 1;
-	ring->last_cmd = 0;
 
 	return 0;
 }
@@ -681,11 +678,7 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 		dev_priv->ring.head = dev_priv->ring.tail = 0;
 		dev_priv->ring.tail_mask = (dev_priv->ring.size / sizeof(u32)) - 1;
 		dev_priv->ring.space = dev_priv->ring.size;
-		/* This is actually not needed with 128 buffers, since it's 
-		 * not possible to fill the ring */
 		dev_priv->ring.high_mark = 128;
-		dev_priv->ring.last_cmd_ofs = dev_priv->ring.tail_mask - 1;
-		dev_priv->ring.last_cmd = 0;
 
 		/* setup physical address and size of descriptor table */
 		MACH64_WRITE( MACH64_BM_GUI_TABLE_CMD, 
@@ -705,7 +698,7 @@ static int mach64_do_dma_init( drm_device_t *dev, drm_mach64_init_t *init )
 	MACH64_WRITE( MACH64_LAST_DISPATCH_REG, dev_priv->sarea_priv->last_dispatch );
 #endif
 
-	/* Set up the freelist, empty (placeholder), pending, and DMA request queues... */
+	/* Set up the freelist, placeholder list, pending, and DMA request queues... */
 	mach64_init_freelist( dev );
 	
 	return 0;
@@ -1051,7 +1044,7 @@ int mach64_dma_start( drm_mach64_private_t *dev_priv )
 	}
 		
 	if ( ring->head_addr < ring->start_addr ||
-	 ring->head_addr > ring->start_addr + (ring->size - 4 * sizeof(u32)) ) {
+	     ring->head_addr > ring->start_addr + (ring->size - 4 * sizeof(u32)) ) {
 		DRM_ERROR("Bad address in BM_GUI_TABLE: 0x%08x\n", ring->head_addr);
 		return -EINVAL;
 	}
@@ -1332,7 +1325,7 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 			}
 			udelay( 1 );
 		}
-		DRM_ERROR( "timeout waiting for buffers: ring head_addr: 0x%08x head: %d tail: %d last cmd ofs %d\n", ring->head_addr, ring->head, ring->tail, ring->last_cmd_ofs );
+		DRM_ERROR( "timeout waiting for buffers: ring head_addr: 0x%08x head: %d tail: %d\n", ring->head_addr, ring->head, ring->tail );
 		return NULL;
 	}
 
@@ -1415,12 +1408,9 @@ int mach64_dma_buffers( struct inode *inode, struct file *filp,
 {
         drm_file_t *priv = filp->private_data;
         drm_device_t *dev = priv->dev;
-	drm_mach64_private_t *dev_priv = dev->dev_private;
-        drm_device_dma_t *dma = dev->dma;
+	drm_device_dma_t *dma = dev->dma;
 	drm_dma_t d;
         int ret = 0;
-	int i;
-	drm_buf_t *buf;
 
         LOCK_TEST_WITH_RETURN( dev );
 
@@ -1429,48 +1419,36 @@ int mach64_dma_buffers( struct inode *inode, struct file *filp,
                 return -EFAULT;
         }
 
-        /* Queue up buffers sent to us...
-        */
-        if ( d.send_count > 0 ) 
+        /* Please don't send us buffers.
+	 */
+        if ( d.send_count != 0 ) 
         {
-		for (i = 0; i < d.send_count ; i++)
-		{
-			buf = dma->buflist[d.send_indices[i]];
-			if (buf->pending) {
-				DRM_ERROR( "sending pending buffer %d\n", d.send_indices[i] );
-				return -EINVAL;
-			}
-			/* Add buf to queue */
-			DMAADVANCE( dev_priv );
-		}
-        }
-        else
-        {
-                /* Send the caller as many as they ask for, so long as we
-                   have them in hand to give...
-                */
-                if ( d.request_count < 0 || d.request_count > dma->buf_count ) 
-                {
-                        DRM_ERROR( "Process %d trying to get %d buffers (of %d max)\n",
-                                current->pid, d.request_count, dma->buf_count );
-                        ret = -EINVAL;
-                }
-                else
-                {
-                        d.granted_count = 0;
+		DRM_ERROR( "Process %d trying to send %d buffers via drmDMA\n",
+			   current->pid, d.send_count );
+		return -EINVAL;
+	}
 
-                        if ( d.request_count ) 
-                        {
-                                ret = mach64_dma_get_buffers( dev, &d );
-                        }
-
-                        if ( copy_to_user( (drm_dma_t *)arg, &d, sizeof(d) ) )
-                        {
-                                ret = -EFAULT;
-                        }
-                }
-        }
+	/* We'll send you buffers.
+	 */
+	if ( d.request_count < 0 || d.request_count > dma->buf_count ) 
+	{
+		DRM_ERROR( "Process %d trying to get %d buffers (of %d max)\n",
+			   current->pid, d.request_count, dma->buf_count );
+		ret = -EINVAL;
+	}
         
+	d.granted_count = 0;
+
+	if ( d.request_count ) 
+	{
+		ret = mach64_dma_get_buffers( dev, &d );
+	}
+
+	if ( copy_to_user( (drm_dma_t *)arg, &d, sizeof(d) ) )
+	{
+		ret = -EFAULT;
+	}
+
         return ret;
 }
 
