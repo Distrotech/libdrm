@@ -90,6 +90,7 @@ int DRM(vblank_wait)(drm_device_t *dev, unsigned int *sequence)
 void DRM(driver_irq_preinstall)( drm_device_t *dev ) {
 	drm_mach64_private_t *dev_priv =
 		(drm_mach64_private_t *)dev->dev_private;
+
 	u32 status = MACH64_READ( MACH64_CRTC_INT_CNTL );
 
 	DRM_DEBUG("before install CRTC_INT_CTNL: 0x%08x\n", status );
@@ -114,13 +115,14 @@ void DRM(driver_irq_postinstall)( drm_device_t *dev ) {
 void DRM(driver_irq_uninstall)( drm_device_t *dev ) {
 	drm_mach64_private_t *dev_priv =
 		(drm_mach64_private_t *)dev->dev_private;
-	if ( dev_priv ) {
-	    /* Disable and clear VBLANK interrupt */
-	    MACH64_WRITE( MACH64_CRTC_INT_CNTL, 
-			  (MACH64_READ( MACH64_CRTC_INT_CNTL ) & ~MACH64_CRTC_VBLANK_INT_EN) 
-			  | MACH64_CRTC_VBLANK_INT );
+	if ( !dev_priv )
+		return;
 
-	    DRM_DEBUG("after uninstall CRTC_INT_CTNL: 0x%08x\n", 
-		      MACH64_READ( MACH64_CRTC_INT_CNTL ));
-	}
+	/* Disable and clear VBLANK interrupt */
+	MACH64_WRITE( MACH64_CRTC_INT_CNTL, 
+		      (MACH64_READ( MACH64_CRTC_INT_CNTL ) & ~MACH64_CRTC_VBLANK_INT_EN) 
+		      | MACH64_CRTC_VBLANK_INT );
+
+	DRM_DEBUG("after uninstall CRTC_INT_CTNL: 0x%08x\n", 
+		  MACH64_READ( MACH64_CRTC_INT_CNTL ));
 }

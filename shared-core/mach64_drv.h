@@ -736,7 +736,7 @@ do {											\
 			mach64_update_ring_snapshot( dev_priv );			\
 			if ( ring->space >= ring->high_mark )				\
 				goto __ring_space_done;					\
-			DRM_UDELAY( 1 );							\
+			DRM_UDELAY( 1 );						\
 		}									\
 		DRM_ERROR( "ring space check failed!\n" );				\
 		DRM_INFO( "ring: head addr: 0x%08x head: %d tail: %d space: %d\n", 	\

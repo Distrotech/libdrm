@@ -956,12 +956,19 @@ int mach64_do_cleanup_dma( drm_device_t *dev )
 {
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
+#if _HAVE_DMA_IRQ
+	/* Make sure interrupts are disabled here because the uninstall ioctl
+	 * may not have been called from userspace and after dev_private
+	 * is freed, it's too late.
+	 */
+	if ( dev->irq ) DRM(irq_uninstall)(dev);
+#endif
+
 	if ( dev->dev_private ) {
 		drm_mach64_private_t *dev_priv = dev->dev_private;
 
 		/* Discard the allocations for the descriptor table... */
-		if ( (dev->pdev != NULL) && 
-		     (dev_priv->ring.start != NULL) && dev_priv->ring.handle ) {
+		if ( (dev_priv->ring.start != NULL) && dev_priv->ring.handle ) {
 			DRM_DEBUG( "freeing dma descriptor ring\n" );
 			pci_free_consistent( dev->pdev, dev_priv->ring.size, 
 					     dev_priv->ring.start, dev_priv->ring.handle );
@@ -1193,7 +1200,8 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 						u32 o2 = GETBUFADDR( entry->buf );
 
 						if ( o1 == o2 ) {
-							DRM_ERROR ( "Attempting to free used buffer: i=%d  buf=0x%08x\n", i, o1 );
+							DRM_ERROR ( "Attempting to free used buffer: "
+								    "i=%d  buf=0x%08x\n", i, o1 );
 							mach64_dump_ring_info( dev_priv );
 							return NULL;
 						}
@@ -1204,14 +1212,16 @@ drm_buf_t *mach64_freelist_get( drm_mach64_private_t *dev_priv )
 					list_del(ptr);
 					entry->buf->used = 0;
 					list_add_tail(ptr, &dev_priv->placeholders);
-					DRM_DEBUG( "%s: freed processed buffer (head=%d tail=%d buf ring ofs=%d).\n", __FUNCTION__, head, tail, ofs );
+					DRM_DEBUG( "%s: freed processed buffer (head=%d tail=%d "
+						   "buf ring ofs=%d).\n", __FUNCTION__, head, tail, ofs );
 					return entry->buf;
 				}
 			}
 			DRM_UDELAY( 1 );
 		}
 		mach64_dump_ring_info( dev_priv );
-		DRM_ERROR( "timeout waiting for buffers: ring head_addr: 0x%08x head: %d tail: %d\n", ring->head_addr, ring->head, ring->tail );
+		DRM_ERROR( "timeout waiting for buffers: ring head_addr: 0x%08x head: %d tail: %d\n", 
+			   ring->head_addr, ring->head, ring->tail );
 		return NULL;
 	}
 
