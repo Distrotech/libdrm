@@ -190,15 +190,26 @@ int mach64_wait_ring( drm_mach64_private_t *dev_priv, int n )
 static int mach64_ring_idle( drm_mach64_private_t *dev_priv )
 {
 	drm_mach64_descriptor_ring_t *ring = &dev_priv->ring;
+	u32 head;
 	int i;
 
-	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
+	head = ring->head;
+	i = 0;
+	while ( i < dev_priv->usec_timeout ) {
 		mach64_update_ring_snapshot( dev_priv );
-		if ( ring->head == ring->tail ) {
-			if (i > 0) {
-				DRM_DEBUG( "mach64_ring_idle: %d usecs\n", i );
+		if ( ring->head == ring->tail && !(MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE) ) {
+			if ( !(MACH64_READ(MACH64_GUI_STAT) & MACH64_GUI_ACTIVE) ) {
+				if (i > 0) {
+					DRM_DEBUG( "mach64_ring_idle: %d usecs\n", i );
+				}
+				return 0;
 			}
-			return 0;
+		} 
+		if ( ring->head == head ) {
+			++i;
+		} else {
+			head = ring->head;
+			i = 0;
 		}
 		udelay( 1 );
 	}
