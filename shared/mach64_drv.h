@@ -791,10 +791,7 @@ do {									\
 	((u32 *)(__buf)->address) : 					\
 	((u32 *)((char *)dev_priv->buffers->handle + (__buf)->offset)))
 
-#define GETBUFADDR( __buf )				\
-((dev_priv->is_pci) ? 					\
-	((u32)DRM_VTOPHYS((void *)(__buf)->address)) : 	\
-	((u32)(__buf)->bus_address))
+#define GETBUFADDR( __buf ) ((u32)(__buf)->bus_address)
 
 #define GETRINGOFFSET() (_entry->ring_ofs)
 
