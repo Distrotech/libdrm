@@ -61,6 +61,9 @@
 #define __HAVE_DMA_HISTOGRAM	0
 #endif
 
+#define DRM_DEBUG_CODE 0	  /* Include debugging code (if > 1, then
+				     also include looping detection. */
+
 /* There's undoubtably more of this file to go into these OS dependent ones. */
 #ifdef __linux__
 #include "drm_os_linux.h"
@@ -73,9 +76,6 @@
 #include "drm.h"
 
 /* Begin the DRM... */
-
-#define DRM_DEBUG_CODE 0	  /* Include debugging code (if > 1, then
-				     also include looping detection. */
 
 #define DRM_HASH_SIZE	      16 /* Size of key hash table		  */
 #define DRM_KERNEL_CONTEXT    0	 /* Change drm_resctx if changed	  */
