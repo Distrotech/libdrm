@@ -1023,16 +1023,20 @@ int radeon_do_cleanup_cp( drm_device_t *dev )
 	if ( dev->dev_private ) {
 		drm_radeon_private_t *dev_priv = dev->dev_private;
 
+#if __REALLY_HAVE_SG
 		if ( !dev_priv->is_pci ) {
+#endif
 			DRM_IOREMAPFREE( dev_priv->cp_ring );
 			DRM_IOREMAPFREE( dev_priv->ring_rptr );
 			DRM_IOREMAPFREE( dev_priv->buffers );
+#if __REALLY_HAVE_SG
 		} else {
 			if (!DRM(ati_pcigart_cleanup)( dev,
 						dev_priv->phys_pci_gart,
 						dev_priv->bus_pci_gart ))
 				DRM_ERROR( "failed to cleanup PCI GART!\n" );
 		}
+#endif
 
 		DRM(free)( dev->dev_private, sizeof(drm_radeon_private_t),
 			   DRM_MEM_DRIVER );

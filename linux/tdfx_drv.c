@@ -105,6 +105,7 @@ static drm_pci_list_t DRM(idlist)[] = {
 #include "drm_drawable.h"
 #include "drm_drv.h"
 
+#ifdef __linux__
 #ifndef MODULE
 /* DRM(options) is called by the kernel to parse command-line options
  * passed via the boot-loader (e.g., LILO).  It calls the insmod option
@@ -122,6 +123,7 @@ static int __init tdfx_options( char *str )
 }
 
 __setup( DRIVER_NAME "=", tdfx_options );
+#endif
 #endif
 
 #include "drm_fops.h"

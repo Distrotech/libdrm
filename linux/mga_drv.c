@@ -93,6 +93,7 @@ drm_chipinfo_t DRM(devicelist)[] = {
 #include "drm_drawable.h"
 #include "drm_drv.h"
 
+#ifdef __linux__
 #ifndef MODULE
 /* DRM(options) is called by the kernel to parse command-line options
  * passed via the boot-loader (e.g., LILO).  It calls the insmod option
@@ -111,7 +112,7 @@ static int __init mga_options( char *str )
 
 __setup( DRIVER_NAME "=", mga_options );
 #endif
-
+#endif
 
 #include "drm_fops.h"
 #include "drm_init.h"

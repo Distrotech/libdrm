@@ -182,7 +182,9 @@ static drm_device_t	*DRM(device);
 static int		*DRM(minor);
 static int		DRM(numdevs) = 0;
 
+#ifdef __linux__
 DRIVER_FOPS;
+#endif
 
 static drm_ioctl_desc_t		  DRM(ioctls)[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_VERSION)]       = { DRM(version),     0, 0 },
@@ -759,7 +761,7 @@ static int DRM(init)( device_t nbdev )
 #endif
 #ifdef __FreeBSD__
 		/* FIXME??? - multihead !!! */
-		*dev = device_get_softc(nbdev);
+		dev = device_get_softc(nbdev);
 #endif
 		memset( (void *)dev, 0, sizeof(*dev) );
 #ifdef __linux__
@@ -895,8 +897,8 @@ static void DRM(cleanup)(device_t nbdev)
 #endif
 	}
 	DRIVER_POSTCLEANUP();
-	kfree(DRM(minor));
-	kfree(DRM(device));
+	DRM_OS_FREE(DRM(minor));
+	DRM_OS_FREE(DRM(device));
 	DRM(numdevs) = 0;
 }
 

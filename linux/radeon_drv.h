@@ -84,7 +84,9 @@ typedef struct drm_radeon_private {
 	int usec_timeout;
 	int is_pci;
 	unsigned long phys_pci_gart;
+#if __REALLY_HAVE_SG
 	dma_addr_t bus_pci_gart;
+#endif
 
 	atomic_t idle_count;
 
