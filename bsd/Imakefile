@@ -21,11 +21,11 @@ LinkFileList(tdfxinc, $(LINUXDRM)/tdfx.h $(LINUXDRM)/tdfx_drv.c, tdfx, .)
 
 LinkFileList(r128inc, $(LINUXDRM)/r128.h $(LINUXDRM)/r128_cce.c $(LINUXDRM)/r128_drv.c $(LINUXDRM)/r128_drv.h $(LINUXDRM)/r128_state.c, r128, .)
 
-LinkFileList(radeoninc, $(LINUXDRM)/radeon.h $(LINUXDRM)/radeon_context.c $(LINUXDRM)/radeon_drv.h $(LINUXDRM)/radeon_bufs.c $(LINUXDRM)/radeon_cp.c $(LINUXDRM)/radeon_drv.c $(LINUXDRM)/radeon_state.c, radeon, .)
+LinkFileList(radeoninc, $(LINUXDRM)/radeon.h $(LINUXDRM)/radeon_drv.h $(LINUXDRM)/radeon_bufs.c $(LINUXDRM)/radeon_cp.c $(LINUXDRM)/radeon_drv.c $(LINUXDRM)/radeon_state.c, radeon, .)
 
 LinkFileList(i810inc, $(LINUXDRM)/i810.h $(LINUXDRM)/i810_dma.c $(LINUXDRM)/i810_drv.c $(LINUXDRM)/i810_drv.h, i810, .)
 
-LinkFileList(sisinc, $(LINUXDRM)/sis_context.c $(LINUXDRM)/sis_drv.c $(LINUXDRM)/sis_drv.h $(LINUXDRM)/sis_ds.h $(LINUXDRM)/sis_ds.c $(LINUXDRM)/sis_mm.c, sis, .)
+LinkFileList(sisinc, $(LINUXDRM)/sis.h $(LINUXDRM)/sis_drv.c $(LINUXDRM)/sis_drv.h $(LINUXDRM)/sis_drm.h, sis, .)
 
 LinkSourceFile(ati_pcigart.h,$(XF86OSSRC)/linux/drm/kernel)
 LinkSourceFile(drm_auth.h,$(XF86OSSRC)/linux/drm/kernel)

@@ -1,7 +1,7 @@
 # $FreeBSD$
 
 KMOD	= sis
-SRCS    = sis_context.c sis_drv.c sis_ds.c sis_mm.c
+SRCS    = sis_drv.c
 SRCS   += device_if.h bus_if.h pci_if.h
 CFLAGS += ${DEBUG_FLAGS} -I..
 KERN    = /usr/src/sys

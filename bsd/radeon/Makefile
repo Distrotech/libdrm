@@ -1,7 +1,7 @@
 # $FreeBSD$
 
 KMOD	= radeon
-SRCS    = radeon_bufs.c radeon_context.c radeon_cp.c radeon_drv.c radeon_state.c
+SRCS    = radeon_bufs.c radeon_cp.c radeon_drv.c radeon_state.c
 SRCS   += device_if.h bus_if.h pci_if.h
 CFLAGS += ${DEBUG_FLAGS} -I..
 KERN    = /usr/src/sys
