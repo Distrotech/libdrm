@@ -543,7 +543,7 @@ static int mach64_dma_dispatch_vertex( drm_device_t *dev,
 
 						--fifo;
 						/* data is already little-endian */
-						MACH64_DEREF(reg) = *p++;
+						MACH64_WRITE(reg, le32_to_cpu(*p++));
 						used--;
 						
 						reg += 4;
