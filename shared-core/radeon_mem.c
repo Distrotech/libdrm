@@ -174,6 +174,9 @@ void radeon_mem_release( struct mem_block *heap )
 	int pid = DRM_CURRENTPID;
 	struct mem_block *p;
 
+	if (!heap || !heap->next)
+		return;
+
 	for (p = heap->next ; p != heap ; p = p->next) {
 		if (p->pid == pid) 
 			p->pid = 0;
@@ -198,6 +201,9 @@ void radeon_mem_release( struct mem_block *heap )
 void radeon_mem_takedown( struct mem_block **heap )
 {
 	struct mem_block *p;
+	
+	if (!*heap)
+		return;
 
 	for (p = (*heap)->next ; p != *heap ; ) {
 		struct mem_block *q = p;
