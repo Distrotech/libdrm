@@ -198,7 +198,7 @@ int DRM(addmap)( DRM_OS_IOCTL )
 #ifdef __alpha__
 		map->offset += dev->hose->mem_space->start;
 #endif
-		map->offset = map->offset + dev->agp->base;
+		map->offset += dev->agp->base;
 		map->mtrr   = dev->agp->agp_mtrr; /* for getmap */
 		break;
 #endif
@@ -248,7 +248,7 @@ int DRM(addmap)( DRM_OS_IOCTL )
 			DRM_OS_RETURN(EFAULT);
 #endif
 #ifdef __FreeBSD__
-		((drm_map_t *)data)->handle = (void *)map;
+		((drm_map_t *)data)->handle = (void *)map->offset;
 #endif
 	}
 	return 0;

@@ -1170,7 +1170,7 @@ int DRM(lock)( DRM_OS_IOCTL )
         }
 
         DRM_DEBUG( "%d (pid %d) requests lock (0x%08x), flags = 0x%08x\n",
-		   lock.context, current->pid,
+		   lock.context, DRM_OS_CURRENTPID,
 		   dev->lock.hw_lock->lock, lock.flags );
 
 #if __HAVE_DMA_QUEUE
