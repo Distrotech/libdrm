@@ -47,7 +47,7 @@
 
 # **** End of SMP/MODVERSIONS detection
 
-MODS =		gamma.o tdfx.o r128.o radeon.o
+MODS =		gamma.o tdfx.o r128.o radeon.o mach64.o
 LIBS =
 
 DRMTEMPLATES =	drm_auth.h drm_bufs.h drm_context.h drm_dma.h drm_drawable.h \
@@ -67,6 +67,8 @@ R128HEADERS =	r128.h r128_drv.h r128_drm.h $(DRMHEADERS) $(DRMTEMPLATES)
 RADEONOBJS =	radeon_drv.o radeon_cp.o radeon_state.o
 RADEONHEADERS =	radeon.h radeon_drv.h radeon_drm.h $(DRMHEADERS) \
 		$(DRMTEMPLATES)
+MACH64OBJS=	mach64_drv.o mach64_dma.o mach64_state.o
+MACH64HEADERS=  mach64_drv.h mach64_drm.h $(DRMHEADERS) $(DRMTEMPLATES)
 
 INC =		/usr/include
 
@@ -239,6 +241,11 @@ r128.o: $(R128OBJS) $(LIBS)
 radeon_drv.o: radeon_drv.c
 	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
 radeon.o: $(RADEONOBJS) $(LIBS)
+	$(LD) -r $^ -o $@
+
+mach64_drv.o: mach64_drv.c
+	$(CC) $(MODCFLAGS) -DEXPORT_SYMTAB -I$(TREE) -c $< -o $@
+mach64.o: $(MACH64OBJS) $(LIBS)
 	$(LD) -r $^ -o $@
 
 ifeq ($(AGP),1)
