@@ -454,8 +454,8 @@ static void mach64_dma_dispatch_vertex( drm_device_t *dev,
 							
 							fifo = 16;
 						}
-						else
-							--fifo;
+
+						--fifo;
 						
 						MACH64_WRITE( reg, *p++ );
 						used--;
