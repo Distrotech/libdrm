@@ -33,7 +33,6 @@
 #define __NO_VERSION__
 #include "drmP.h"
 #include "mga_drv.h"
-#include "mgareg_flags.h"
 #include "drm.h"
 
 static void mgaEmitClipRect( drm_mga_private_t *dev_priv, 

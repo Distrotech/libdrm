@@ -37,7 +37,6 @@
 #include "i810_drv.h"
 
 #include <linux/interrupt.h>	/* For task queue support */
-#include <linux/time.h>		/* For do_gettimeofday    */
 
 #define I810_BUF_FREE		1
 #define I810_BUF_USED		0
@@ -60,7 +59,7 @@
 		DRM_DEBUG("BEGIN_LP_RING(%d) in %s\n",	\
 			  n, __FUNCTION__);		\
 	if (dev_priv->ring.space < n*4) 		\
-		i810_wait_ring(dev, n*4, 0);		\
+		i810_wait_ring(dev, n*4);		\
 	dev_priv->ring.space -= n*4;			\
 	outring = dev_priv->ring.tail;			\
 	ringmask = dev_priv->ring.tail_mask;		\
@@ -207,21 +206,14 @@ static int i810_dma_cleanup(drm_device_t *dev)
    	return 0;
 }
 
-static int __gettimeinmillis(void)
-{
-	return (jiffies / HZ) * 1000 + (jiffies % HZ) * (1000 / HZ);
-}
-
-static int i810_wait_ring(drm_device_t *dev, int n, int timeout_millis)
+static int i810_wait_ring(drm_device_t *dev, int n)
 {
    	drm_i810_private_t *dev_priv = dev->dev_private;
    	drm_i810_ring_buffer_t *ring = &(dev_priv->ring);
    	int iters = 0;
-   	int startTime = 0;
-   	int curTime = 0;
-   
-      	if (timeout_millis == 0) timeout_millis = 3000;
-      
+   	unsigned long end;
+
+	end = jiffies + (HZ*3);
    	while (ring->space < n) {
 	   	int i;
 	
@@ -231,10 +223,7 @@ static int i810_wait_ring(drm_device_t *dev, int n, int timeout_millis)
 	   	if (ring->space < 0) ring->space += ring->Size;
 	   
 	   	iters++;
-	   	curTime = __gettimeinmillis();
-	   	if (startTime == 0 || curTime < startTime /*wrap case*/) {
-		   	startTime = curTime;
-	   	} else if (curTime - startTime > timeout_millis) {
+		if((signed)(end - jiffies) <= 0) {
 		   	DRM_ERROR("space: %d wanted %d\n", ring->space, n);
 		   	DRM_ERROR("lockup\n");
 		   	goto out_wait_ring;
@@ -655,10 +644,7 @@ static void i810_dma_quiescent(drm_device_t *dev)
 {
       	DECLARE_WAITQUEUE(entry, current);
   	drm_i810_private_t *dev_priv = (drm_i810_private_t *)dev->dev_private;
-   	int startTime = 0;
-   	int curTime = 0;
-      	int timeout_millis = 3000;
-      
+	unsigned long end;      
 
    	if(dev_priv == NULL) {
 	   	return;
@@ -666,13 +652,12 @@ static void i810_dma_quiescent(drm_device_t *dev)
       	atomic_set(&dev_priv->flush_done, 0);
    	current->state = TASK_INTERRUPTIBLE;
    	add_wait_queue(&dev_priv->flush_queue, &entry);
+   	end = jiffies + (HZ*3);
+   
    	for (;;) {
 	      	i810_dma_quiescent_emit(dev);
 	   	if (atomic_read(&dev_priv->flush_done) == 1) break;
-	   	curTime = __gettimeinmillis();
-	   	if (startTime == 0 || curTime < startTime /*wrap case*/) {
-		   	startTime = curTime;
-	   	} else if (curTime - startTime > timeout_millis) {
+		if((signed)(end - jiffies) <= 0) {
 		   	DRM_ERROR("lockup\n");
 		   	break;
 		}	   
@@ -692,11 +677,8 @@ static int i810_flush_queue(drm_device_t *dev)
 {
    	DECLARE_WAITQUEUE(entry, current);
   	drm_i810_private_t *dev_priv = (drm_i810_private_t *)dev->dev_private;
-   	int ret = 0;
-   	int startTime = 0;
-   	int curTime = 0;
-      	int timeout_millis = 3000;
-      
+	unsigned long end;
+   	int ret = 0;      
 
    	if(dev_priv == NULL) {
 	   	return 0;
@@ -704,13 +686,11 @@ static int i810_flush_queue(drm_device_t *dev)
       	atomic_set(&dev_priv->flush_done, 0);
    	current->state = TASK_INTERRUPTIBLE;
    	add_wait_queue(&dev_priv->flush_queue, &entry);
+   	end = jiffies + (HZ*3);
    	for (;;) {
 	      	i810_dma_emit_flush(dev);
 	   	if (atomic_read(&dev_priv->flush_done) == 1) break;
-	   	curTime = __gettimeinmillis();
-	   	if (startTime == 0 || curTime < startTime /*wrap case*/) {
-		   	startTime = curTime;
-	   	} else if (curTime - startTime > timeout_millis) {
+		if((signed)(end - jiffies) <= 0) {
 		   	DRM_ERROR("lockup\n");
 		   	break;
 		}	   

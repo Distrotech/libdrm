@@ -93,7 +93,7 @@
 #define DRM_MEM_BOUNDAGP  17
 #define DRM_MEM_CTXBITMAP 18
 
-#define DRM_MAX_CTXBITMAP (PAGE_SIZE * 4 * 8)
+#define DRM_MAX_CTXBITMAP (PAGE_SIZE * 8)
 
 				/* Backward compatibility section */
 				/* _PAGE_WT changed to _PAGE_PWT in 2.2.6 */

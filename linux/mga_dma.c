@@ -34,7 +34,6 @@
 #define __NO_VERSION__
 #include "drmP.h"
 #include "mga_drv.h"
-#include "mgareg_flags.h"
 
 #include <linux/interrupt.h>	/* For task queue support */
 
@@ -169,32 +168,23 @@ static void mga_freelist_cleanup(drm_device_t *dev)
    	dev_priv->head = dev_priv->tail = NULL;
 }
 
-static int __gettimeinmillis(void)
-{
-	return (jiffies / HZ) * 1000 + (jiffies % HZ) * (1000 / HZ);
-}
-
 /* Frees dispatch lock */
 static inline void mga_dma_quiescent(drm_device_t *dev)
 {
-      	drm_device_dma_t  *dma	    = dev->dma;
-    	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
-       	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
-    	__volatile__ unsigned int *status = 
-      		(__volatile__ unsigned int *)dev_priv->status_page;
-   	int startTime = 0;
-   	int curTime = 0;
-   	int timeout_millis = 3000;
-   	int i;
- 
+	drm_device_dma_t  *dma      = dev->dma;
+	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
+	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
+	__volatile__ unsigned int *status =
+		(__volatile__ unsigned int *)dev_priv->status_page;
+   	unsigned long end;
+	int i;
+
+	end = jiffies + (HZ*3);
     	while(1) {
 		if(!test_and_set_bit(0, &dev_priv->dispatch_lock)) {
 			break;
 		}
-		curTime = __gettimeinmillis();
-		if (startTime == 0 || curTime < startTime /*wrap case*/) {
-			startTime = curTime;
-		} else if (curTime - startTime > timeout_millis) {
+	   	if((signed)(end - jiffies) <= 0) {
 			DRM_ERROR("irqs: %d wanted %d\n", 
 				  atomic_read(&dev->total_irq), 
 				  atomic_read(&dma->total_lost));
@@ -203,14 +193,10 @@ static inline void mga_dma_quiescent(drm_device_t *dev)
 		}
 		for (i = 0 ; i < 2000 ; i++) mga_delay();
 	}
-	startTime = 0;
-   
+	end = jiffies + (HZ*3);
     	DRM_DEBUG("quiescent status : %x\n", MGA_READ(MGAREG_STATUS));
     	while((MGA_READ(MGAREG_STATUS) & 0x00030001) != 0x00020000) {
-		curTime = __gettimeinmillis();
-		if (startTime == 0 || curTime < startTime /*wrap case*/) {
-			startTime = curTime;
-		} else if (curTime - startTime > timeout_millis) {
+		if((signed)(end - jiffies) <= 0) {
 			DRM_ERROR("irqs: %d wanted %d\n", 
 				  atomic_read(&dev->total_irq), 
 				  atomic_read(&dma->total_lost));
@@ -223,10 +209,9 @@ static inline void mga_dma_quiescent(drm_device_t *dev)
 		  dev_priv->last_sync_tag);
     	sarea_priv->dirty |= MGA_DMA_FLUSH;
 
- out_status:
+out_status:
     	clear_bit(0, &dev_priv->dispatch_lock);
-
- out_nolock:
+out_nolock:
 }
 
 #define FREELIST_INITIAL (MGA_DMA_BUF_NR * 2)
@@ -432,9 +417,7 @@ void mga_fire_primary(drm_device_t *dev, drm_mga_prim_buf_t *prim)
       	drm_device_dma_t  *dma	    = dev->dma;
        	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
  	int use_agp = PDEA_pagpxfer_enable;
-      	int startTime = 0;
-   	int curTime = 0;
-   	int timeout_millis = 3000;
+	unsigned long end;
    	int i;
    	int next_idx;
        	PRIMLOCALS;
@@ -455,13 +438,11 @@ void mga_fire_primary(drm_device_t *dev, drm_mga_prim_buf_t *prim)
    	PRIMOUTREG( MGAREG_SOFTRAP, 0);
     	PRIMFINISH(prim);
 
+	end = jiffies + (HZ*3);
     	if(sarea_priv->dirty & MGA_DMA_FLUSH) {
 		DRM_DEBUG("Dma top flush\n");	   
 		while((MGA_READ(MGAREG_STATUS) & 0x00030001) != 0x00020000) {
-			curTime = __gettimeinmillis();
-			if (startTime == 0 || curTime < startTime /*wrap*/) {
-				startTime = curTime;
-			} else if (curTime - startTime > timeout_millis) {
+			if((signed)(end - jiffies) <= 0) {
 				DRM_ERROR("irqs: %d wanted %d\n", 
 					  atomic_read(&dev->total_irq), 
 					  atomic_read(&dma->total_lost));
@@ -476,10 +457,7 @@ void mga_fire_primary(drm_device_t *dev, drm_mga_prim_buf_t *prim)
 	} else {
 		DRM_DEBUG("Status wait\n");
 		while((MGA_READ(MGAREG_STATUS) & 0x00020001) != 0x00020000) {
-			curTime = __gettimeinmillis();
-			if (startTime == 0 || curTime < startTime /*wrap*/) {
-				startTime = curTime;
-			} else if (curTime - startTime > timeout_millis) {
+			if((signed)(end - jiffies) <= 0) {
 				DRM_ERROR("irqs: %d wanted %d\n", 
 					  atomic_read(&dev->total_irq), 
 					  atomic_read(&dma->total_lost));
@@ -497,7 +475,6 @@ void mga_fire_primary(drm_device_t *dev, drm_mga_prim_buf_t *prim)
 	atomic_inc(&dma->total_lost);
        	MGA_WRITE(MGAREG_PRIMADDRESS, phys_head | TT_GENERAL);
  	MGA_WRITE(MGAREG_PRIMEND, (phys_head + num_dwords * 4) | use_agp);
-   	DRM_DEBUG("Primarys at fire\n");
    	prim->num_dwords = 0;
     
    	next_idx = prim->idx + 1;
@@ -511,6 +488,7 @@ void mga_fire_primary(drm_device_t *dev, drm_mga_prim_buf_t *prim)
 	prim->num_dwords = 0;
 	prim->sec_used = 0;
 	clear_bit(0, &prim->in_use);
+   	wake_up_interruptible(&dev_priv->wait_queue);
 	clear_bit(0, &prim->swap_pending);
 	clear_bit(0, &dev_priv->dispatch_lock);
 	atomic_dec(&dev_priv->pending_bufs);
@@ -696,6 +674,7 @@ static void mga_dma_service(int irq, void *device, struct pt_regs *regs)
     	last_prim_buffer->num_dwords = 0;
     	last_prim_buffer->sec_used = 0;
       	clear_bit(0, &last_prim_buffer->in_use);
+   	wake_up_interruptible(&dev_priv->wait_queue);
       	clear_bit(0, &last_prim_buffer->swap_pending);
       	clear_bit(0, &dev_priv->dispatch_lock);
       	atomic_dec(&dev_priv->pending_bufs);
@@ -707,10 +686,8 @@ static void mga_dma_service(int irq, void *device, struct pt_regs *regs)
 static void mga_dma_task_queue(void *device)
 {
    	drm_device_t *dev = (drm_device_t *) device;
-   	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
 
 	mga_dma_schedule(dev, 0);
-      	wake_up_interruptible(&dev_priv->wait_queue);
 }
 
 int mga_dma_cleanup(drm_device_t *dev)
@@ -1014,12 +991,11 @@ static int mga_flush_queue(drm_device_t *dev)
    		add_wait_queue(&dev_priv->flush_queue, &entry);
    		for (;;) {
 		   	mga_dma_schedule(dev, 0);
-	   		if (atomic_read(&dev_priv->in_flush) == 0 ||
-			    dev_priv->next_prim->num_dwords == 0) 
+	   		if (atomic_read(&dev_priv->in_flush) == 0) 
 				break;
 		   	atomic_inc(&dev->total_sleeps);
 		   	DRM_DEBUG("Schedule in flush_queue\n");
-	      		schedule_timeout(HZ/60);
+	      		schedule_timeout(HZ*3);
 	      		if (signal_pending(current)) {
 		   		ret = -EINTR; /* Can't restart */
 		   		break;

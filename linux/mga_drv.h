@@ -280,21 +280,9 @@ drm_mga_prim_buf_t *tmp_buf = 					\
 	}								\
 }while (0)
 
-#define MGA_CLEAR_CMD (DC_opcod_trap | DC_arzero_enable | 		\
-		       DC_sgnzero_enable | DC_shftzero_enable | 	\
-		       (0xC << DC_bop_SHIFT) | DC_clipdis_enable | 	\
-		       DC_solid_enable | DC_transc_enable)
-	  
-
-#define MGA_COPY_CMD (DC_opcod_bitblt | DC_atype_rpl | DC_linear_xy |	\
-		      DC_solid_disable | DC_arzero_disable | 		\
-		      DC_sgnzero_enable | DC_shftzero_enable | 		\
-		      (0xC << DC_bop_SHIFT) | DC_bltmod_bfcol | 	\
-		      DC_pattern_disable | DC_transc_disable | 		\
-		      DC_clipdis_enable)				\
-
 /* A reduced set of the mga registers.
  */
+
 #define MGAREG_MGA_EXEC 			0x0100
 #define MGAREG_ALPHACTRL 			0x2c7c
 #define MGAREG_AR0 				0x1c60
@@ -367,5 +355,41 @@ drm_mga_prim_buf_t *tmp_buf = 					\
 #define MGAREG_YDSTORG				0x1c94
 #define MGAREG_YTOP 				0x1c98
 #define MGAREG_ZORG 				0x1c0c
+
+#define DC_atype_rstr				0x10
+#define DC_atype_blk				0x40
+#define PDEA_pagpxfer_enable			0x2
+#define WIA_wmode_suspend			0x0
+#define WIA_wmode_start 			0x3
+#define WIA_wagp_agp				0x4
+#define DC_opcod_trap				0x4
+#define DC_arzero_enable			0x1000
+#define DC_sgnzero_enable			0x2000
+#define DC_shftzero_enable			0x4000
+#define DC_bop_SHIFT				16
+#define DC_clipdis_enable			0x80000000
+#define DC_solid_enable				0x800
+#define DC_transc_enable			0x40000000
+#define DC_opcod_bitblt 			0x8
+#define DC_atype_rpl				0x0
+#define DC_linear_xy				0x0
+#define DC_solid_disable			0x0
+#define DC_arzero_disable			0x0
+#define DC_bltmod_bfcol				0x4000000
+#define DC_pattern_disable			0x0
+#define DC_transc_disable			0x0
+
+#define MGA_CLEAR_CMD (DC_opcod_trap | DC_arzero_enable | 		\
+		       DC_sgnzero_enable | DC_shftzero_enable | 	\
+		       (0xC << DC_bop_SHIFT) | DC_clipdis_enable | 	\
+		       DC_solid_enable | DC_transc_enable)
+	  
+
+#define MGA_COPY_CMD (DC_opcod_bitblt | DC_atype_rpl | DC_linear_xy |	\
+		      DC_solid_disable | DC_arzero_disable | 		\
+		      DC_sgnzero_enable | DC_shftzero_enable | 		\
+		      (0xC << DC_bop_SHIFT) | DC_bltmod_bfcol | 	\
+		      DC_pattern_disable | DC_transc_disable | 		\
+		      DC_clipdis_enable)				\
 
 #endif
