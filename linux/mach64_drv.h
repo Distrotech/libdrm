@@ -640,10 +640,10 @@ do {									\
 #define DMALOCALS  drm_buf_t *buf = NULL; u32 *p; int outcount = 0
 
 #define GETBUFPTR( _buf )							\
-(dev_priv->is_pci) ? ((u32 *)(_buf)->address) : ((u32 *)((char *)dev_priv->buffers->handle + (_buf)->offset))
+((dev_priv->is_pci) ? ((u32 *)(_buf)->address) : ((u32 *)((char *)dev_priv->buffers->handle + (_buf)->offset)))
 
 #define GETBUFADDR( _buf )							\
-(dev_priv->is_pci) ? ((u32)virt_to_bus((void *)(_buf)->address)) : ((u32)(_buf)->bus_address)
+((dev_priv->is_pci) ? ((u32)virt_to_bus((void *)(_buf)->address)) : ((u32)(_buf)->bus_address))
 
 /* FIXME: use a private set of smaller buffers for state emits, clears, and swaps? */
 #define DMAGETPTR( dev_priv, n )					\
