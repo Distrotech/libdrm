@@ -369,6 +369,11 @@ void mach64_dump_engine_info( drm_mach64_private_t *dev_priv )
 	DRM_INFO( "           PAT_REG0 = 0x%08x\n", MACH64_READ( MACH64_PAT_REG0 ) );
 	DRM_INFO( "           PAT_REG1 = 0x%08x\n", MACH64_READ( MACH64_PAT_REG1 ) );
 	DRM_INFO( "\n" );
+	DRM_INFO( "            SC_LEFT = 0x%08x\n", MACH64_READ( MACH64_SC_LEFT ) );
+	DRM_INFO( "           SC_RIGHT = 0x%08x\n", MACH64_READ( MACH64_SC_RIGHT ) );
+	DRM_INFO( "             SC_TOP = 0x%08x\n", MACH64_READ( MACH64_SC_TOP ) );
+	DRM_INFO( "          SC_BOTTOM = 0x%08x\n", MACH64_READ( MACH64_SC_BOTTOM ) );
+	DRM_INFO( "\n" );
 	DRM_INFO( "      SCALE_3D_CNTL = 0x%08x\n", MACH64_READ( MACH64_SCALE_3D_CNTL ) );
 	DRM_INFO( "       SCRATCH_REG0 = 0x%08x\n", MACH64_READ( MACH64_SCRATCH_REG0 ) );
 	DRM_INFO( "       SCRATCH_REG1 = 0x%08x\n", MACH64_READ( MACH64_SCRATCH_REG1 ) );

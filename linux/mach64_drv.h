@@ -321,7 +321,11 @@ extern int mach64_get_param( struct inode *inode, struct file *filp,
 #define MACH64_PAT_REG0				0x0680
 #define MACH64_PAT_REG1				0x0684
 
+#define MACH64_SC_LEFT                          0x06a0
+#define MACH64_SC_RIGHT                         0x06a4
 #define MACH64_SC_LEFT_RIGHT                    0x06a8
+#define MACH64_SC_TOP                           0x06ac
+#define MACH64_SC_BOTTOM                        0x06b0
 #define MACH64_SC_TOP_BOTTOM                    0x06b4
 
 #define MACH64_SCALE_3D_CNTL			0x05fc
@@ -383,6 +387,10 @@ extern int mach64_get_param( struct inode *inode, struct file *filp,
 #define MACH64_Z_CNTL				0x054c
 #define MACH64_Z_OFF_PITCH			0x0548
 
+#define MACH64_CRTC_VLINE_CRNT_VLINE		0x0410
+#	define MACH64_CRTC_VLINE_MASK		        0x000007ff
+#	define MACH64_CRTC_CRNT_VLINE_MASK		0x07ff0000
+#define MACH64_CRTC_OFF_PITCH			0x0414
 #define MACH64_CRTC_INT_CNTL			0x0418
 #	define MACH64_CRTC_VBLANK_INT_EN		(1 << 1)
 #	define MACH64_CRTC_VBLANK_INT			(1 << 2)
