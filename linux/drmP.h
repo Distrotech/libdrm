@@ -48,8 +48,12 @@
 #include <linux/init.h>
 #include <linux/file.h>
 #include <linux/pci.h>
-#include <linux/wrapper.h>
 #include <linux/version.h>
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,1)
+#include <linux/wrapper.h>
+#endif
+
 #include <linux/sched.h>
 #include <linux/smp_lock.h>	/* For (un)lock_kernel */
 #include <linux/mm.h>
@@ -797,8 +801,13 @@ extern int           DRM(control)( struct inode *inode, struct file *filp,
 				   unsigned int cmd, unsigned long arg );
 extern int           DRM(irq_install)( drm_device_t *dev, int irq );
 extern int           DRM(irq_uninstall)( drm_device_t *dev );
-extern void          DRM(dma_service)( int irq, void *device,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,1)
+extern void   DRM(dma_service)( int irq, void *device,
 				       struct pt_regs *regs );
+#else
+extern irqreturn_t   DRM(dma_service)( int irq, void *device,
+				       struct pt_regs *regs );
+#endif
 extern void          DRM(driver_irq_preinstall)( drm_device_t *dev );
 extern void          DRM(driver_irq_postinstall)( drm_device_t *dev );
 extern void          DRM(driver_irq_uninstall)( drm_device_t *dev );

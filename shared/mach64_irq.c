@@ -40,7 +40,11 @@
 #include "mach64_drm.h"
 #include "mach64_drv.h"
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,1)
 void DRM(dma_service)( DRM_IRQ_ARGS )
+#else
+irqreturn_t DRM(dma_service)( DRM_IRQ_ARGS )
+#endif
 {
 	drm_device_t *dev = (drm_device_t *) arg;
 	drm_mach64_private_t *dev_priv = 
@@ -65,6 +69,11 @@ void DRM(dma_service)( DRM_IRQ_ARGS )
 	    DRM_WAKEUP(&dev->vbl_queue);
 	    DRM(vbl_send_signals)( dev );
 	}
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,1)
+	return;
+#else
+	return IRQ_HANDLED;
+#endif
 }
 
 int DRM(vblank_wait)(drm_device_t *dev, unsigned int *sequence)
