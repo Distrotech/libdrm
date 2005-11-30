@@ -577,11 +577,11 @@ extern int           drmAgpRelease(int fd);
 extern int           drmAgpEnable(int fd, unsigned long mode);
 extern int           drmAgpAlloc(int fd, unsigned long size,
 				 unsigned long type, unsigned long *address,
-				 drm_handle_t *handle);
-extern int           drmAgpFree(int fd, drm_handle_t handle);
-extern int 	     drmAgpBind(int fd, drm_handle_t handle,
+				 unsigned long *handle);
+extern int           drmAgpFree(int fd, unsigned long handle);
+extern int 	     drmAgpBind(int fd, unsigned long handle,
 				unsigned long offset);
-extern int           drmAgpUnbind(int fd, drm_handle_t handle);
+extern int           drmAgpUnbind(int fd, unsigned long handle);
 
 /* AGP/GART info: authenticated client and/or X */
 extern int           drmAgpVersionMajor(int fd);
@@ -596,8 +596,8 @@ extern unsigned int  drmAgpDeviceId(int fd);
 
 /* PCI scatter/gather support: X server (root) only */
 extern int           drmScatterGatherAlloc(int fd, unsigned long size,
-					   drm_handle_t *handle);
-extern int           drmScatterGatherFree(int fd, drm_handle_t handle);
+					   unsigned long *handle);
+extern int           drmScatterGatherFree(int fd, unsigned long handle);
 
 extern int           drmWaitVBlank(int fd, drmVBlankPtr vbl);
 
