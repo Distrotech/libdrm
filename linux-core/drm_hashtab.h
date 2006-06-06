@@ -1,6 +1,6 @@
 /**************************************************************************
  * 
- * Copyright 2006 Tungsten Graphics, Inc., Bismarck, ND., USA.
+ * Copyright 2006 Tungsten Graphics, Inc., Bismack, ND. USA.
  * All Rights Reserved.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -35,29 +35,30 @@
 #ifndef DRM_HASHTAB_H
 #define DRM_HASHTAB_H
 
-typedef struct drm_hash_item {
-	struct list_head head;
-	unsigned long key;
+typedef struct drm_hash_item{
+        struct hlist_node head;
+        unsigned long key;
 } drm_hash_item_t;
 
-typedef struct drm_open_hash {
-	unsigned int size;
-	unsigned int order;
-	unsigned int fill;
-	struct list_head *table;
+typedef struct drm_open_hash{
+        unsigned int size;
+        unsigned int order;
+        unsigned int fill;
+        struct hlist_head *table;
 } drm_open_hash_t;
 
-extern int drm_ht_create(drm_open_hash_t * ht, unsigned int order);
-extern int drm_ht_insert_item(drm_open_hash_t * ht, drm_hash_item_t * item);
-extern int drm_ht_just_insert_please(drm_open_hash_t * ht,
-				     drm_hash_item_t * item, unsigned long seed,
-				     int bits);
-extern int drm_ht_find_item(drm_open_hash_t * ht, unsigned long key,
-			    drm_hash_item_t ** item);
 
-extern void drm_ht_verbose_list(drm_open_hash_t * ht, unsigned long key);
-extern int drm_ht_remove_key(drm_open_hash_t * ht, unsigned long key);
-extern int drm_ht_remove_item(drm_open_hash_t * ht, drm_hash_item_t * item);
-extern void drm_ht_remove(drm_open_hash_t * ht);
+extern int drm_ht_create(drm_open_hash_t *ht, unsigned int order);
+extern int drm_ht_insert_item(drm_open_hash_t *ht, drm_hash_item_t *item);
+extern int drm_ht_just_insert_please(drm_open_hash_t *ht, drm_hash_item_t *item,
+                              unsigned long seed, int bits);
+extern int drm_ht_find_item(drm_open_hash_t *ht, unsigned long key, drm_hash_item_t **item);
+
+extern void drm_ht_verbose_list(drm_open_hash_t *ht, unsigned long key);
+extern int drm_ht_remove_key(drm_open_hash_t *ht, unsigned long key);
+extern int drm_ht_remove_item(drm_open_hash_t *ht, drm_hash_item_t *item);
+extern void drm_ht_remove(drm_open_hash_t *ht);
+
 
 #endif
+
