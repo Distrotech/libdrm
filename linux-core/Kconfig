@@ -104,4 +104,8 @@ config DRM_MACH64
 	  If M is selected, the module will be called mach64.  AGP support for
 	  this card is strongly suggested (unless you have a PCI version).
 
-
+config DRM_XGI
+	tristate "XGI Volari"
+	depends on DRM && PCI
+	help
+	  Choose this option if you have an XGI Volari card.

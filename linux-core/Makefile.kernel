@@ -29,6 +29,7 @@ via-objs    := via_irq.o via_drv.o via_map.o via_mm.o via_dma.o via_verifier.o \
 		via_video.o via_dmablit.o 
 mach64-objs := mach64_drv.o mach64_dma.o mach64_irq.o mach64_state.o 
 nv-objs := nv_drv.o
+xgi-objs := xgi_drv.o xgi_mm.o
 
 ifeq ($(CONFIG_COMPAT),y)
 drm-objs    += drm_ioc32.o
@@ -52,3 +53,4 @@ obj-$(CONFIG_DRM_SAVAGE)+= savage.o
 obj-$(CONFIG_DRM_VIA)   += via.o
 obj-$(CONFIG_DRM_MACH64)+= mach64.o
 obj-$(CONFIG_DRM_NV)    += nv.o
+obj-$(CONFIG_DRM_XGI)   += xgi.o
