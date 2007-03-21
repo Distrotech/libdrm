@@ -50,9 +50,10 @@
  *      - Support vertical blank on secondary display pipe
  * 1.8: New ioctl for ARB_Occlusion_Query
  * 1.9: Usable page flipping and triple buffering
+ * 1.10: Hardware Zone Rendering support
  */
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		9
+#define DRIVER_MINOR		10
 #define DRIVER_PATCHLEVEL	0
 
 #if defined(__linux__)
@@ -298,6 +299,7 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 #define NOPID                   0x2094
 #define LP_RING     		0x2030
 #define HP_RING     		0x2040
+#define HWB_RING		0x2400
 #define RING_TAIL      		0x00
 #define TAIL_ADDR		0x001FFFF8
 #define RING_HEAD      		0x04
@@ -315,6 +317,12 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 #define RING_VALID_MASK     	0x00000001
 #define RING_VALID          	0x00000001
 #define RING_INVALID        	0x00000000
+
+#define BINCTL			0x2420
+#define BINSCENE		0x2428
+#define BMP_BUFFER		0x2430
+#define BMP_GET			0x2438
+#define BMP_PUT			0x2440
 
 #define GFX_OP_SCISSOR         ((0x3<<29)|(0x1c<<24)|(0x10<<19))
 #define SC_UPDATE_SCISSOR       (0x1<<1)

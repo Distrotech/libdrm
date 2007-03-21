@@ -711,6 +711,45 @@ static int i915_cmdbuffer(DRM_IOCTL_ARGS)
 	return 0;
 }
 
+static int i915_hwz_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz)
+{
+	return 0;
+}
+
+static int i915_hwz_free(drm_device_t *dev, drm_i915_hwz_t *hwz)
+{
+	return 0;
+}
+
+static int i915_hwz_render(drm_device_t *dev, drm_i915_hwz_t *hwz)
+{
+	return 0;
+}
+
+static int i915_hwz(DRM_IOCTL_ARGS)
+{
+	DRM_DEVICE;
+	drm_i915_hwz_t hwz;
+
+	DRM_COPY_FROM_USER_IOCTL(hwz, (drm_i915_hwz_t __user *) data,
+				 sizeof(hwz));
+
+	switch (hwz.op) {
+	case DRM_I915_HWZ_RENDER:
+		DRM_INFO("i915 hwz render\n"
+			  /*, batch.start, batch.used, batch.num_cliprects*/);
+		LOCK_TEST_WITH_RETURN(dev, filp);
+		return i915_hwz_render(dev, &hwz);
+	case DRM_I915_HWZ_ALLOC:
+		return i915_hwz_alloc(dev, &hwz);
+	case DRM_I915_HWZ_FREE:
+		return i915_hwz_free(dev, &hwz);
+	default:
+		DRM_ERROR("Invalid op 0x%x\n", hwz.op);
+		return DRM_ERR(EINVAL);
+	}
+}
+
 static int i915_do_cleanup_pageflip(drm_device_t * dev)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
@@ -930,6 +969,7 @@ drm_ioctl_desc_t i915_ioctls[] = {
 	[DRM_IOCTL_NR(DRM_I915_GET_VBLANK_PIPE)] = { i915_vblank_pipe_get, DRM_AUTH },
 	[DRM_IOCTL_NR(DRM_I915_VBLANK_SWAP)] = {i915_vblank_swap, DRM_AUTH},
 	[DRM_IOCTL_NR(DRM_I915_MMIO)] = {i915_mmio, DRM_AUTH},
+	[DRM_IOCTL_NR(DRM_I915_HWZ)] = {i915_hwz, DRM_AUTH},
 };
 
 int i915_max_ioctl = DRM_ARRAY_SIZE(i915_ioctls);
