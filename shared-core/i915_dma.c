@@ -711,13 +711,101 @@ static int i915_cmdbuffer(DRM_IOCTL_ARGS)
 	return 0;
 }
 
+#define BMP_SIZE PAGE_SIZE
+#define BMP_POOL_SIZE ((BMP_SIZE - 32) / 4)
+
+static int i915_bmp_alloc(drm_device_t *dev)
+{
+	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
+	int i;
+	u32 *ring;
+
+	dev_priv->bmp = drm_pci_alloc(dev, BMP_SIZE, PAGE_SIZE, 0xffffffff);
+
+	if (!dev_priv->bmp) {
+		DRM_ERROR("Failed to allocate BMP ring buffer\n");
+		return DRM_ERR(ENOMEM);
+	}
+
+	dev_priv->bmp_pool = drm_calloc(1, BMP_POOL_SIZE *
+					sizeof(drm_dma_handle_t*),
+					DRM_MEM_DRIVER);
+
+	if (!dev_priv->bmp_pool) {
+		DRM_ERROR("Failed to allocate BMP pool\n");
+		drm_pci_free(dev, dev_priv->bmp);
+		dev_priv->bmp = NULL;
+		return DRM_ERR(ENOMEM);
+	}
+
+	for (i = 0, ring = dev_priv->bmp->vaddr; i < BMP_POOL_SIZE; i++) {
+		dev_priv->bmp_pool[i] = drm_pci_alloc(dev, PAGE_SIZE, PAGE_SIZE,
+						      0xffffffff);
+
+		if (!dev_priv->bmp_pool[i]) {
+			DRM_INFO("Failed to allocate page %d for BMP pool\n",
+				 i);
+			break;
+		}
+
+		ring[i] = dev_priv->bmp_pool[i]->busaddr >> PAGE_SHIFT;
+	}
+
+	I915_WRITE(BMP_PUT, (i / 8) << BMP_OFFSET_SHIFT);
+	I915_WRITE(BMP_GET, 0 << BMP_OFFSET_SHIFT);
+
+	I915_WRITE(BMP_BUFFER, dev_priv->bmp->busaddr | BMP_PAGE_SIZE_4K |
+		   ((BMP_SIZE / PAGE_SIZE - 1) << BMP_BUFFER_SIZE_SHIFT) |
+		   BMP_ENABLE);
+
+	return 0;
+}
+
+#define BIN_WIDTH 64
+#define BIN_HEIGHT 32
+
 static int i915_hwz_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz)
 {
+	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
+	int bin_h = (hwz->height + BIN_HEIGHT - 1) / BIN_HEIGHT;
+
+	if (8 * hwz->pitch / BIN_WIDTH * bin_h > PAGE_SIZE) {
+		DRM_ERROR("HWZ area too big\n");
+		return DRM_ERR(EINVAL);
+	}
+
+	if (!dev_priv->bmp && i915_bmp_alloc(dev)) {
+		DRM_ERROR("Failed to allocate BMP\n");
+		return DRM_ERR(ENOMEM);
+	}
+
 	return 0;
 }
 
 static int i915_hwz_free(drm_device_t *dev, drm_i915_hwz_t *hwz)
 {
+	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
+
+	if (dev_priv->bmp_pool) {
+		int i;
+
+		for (i = 0; i < BMP_POOL_SIZE; i++) {
+			if (!dev_priv->bmp_pool[i])
+				break;
+
+			drm_pci_free(dev, dev_priv->bmp_pool[i]);
+		}
+
+		drm_free(dev_priv->bmp_pool, BMP_POOL_SIZE *
+			 sizeof(drm_dma_handle_t*), DRM_MEM_DRIVER);
+		dev_priv->bmp_pool = NULL;
+	}
+
+	if (dev_priv->bmp) {
+		drm_pci_free(dev, dev_priv->bmp);
+		dev_priv->bmp = NULL;
+	}
+
 	return 0;
 }
 

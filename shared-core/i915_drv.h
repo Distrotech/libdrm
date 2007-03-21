@@ -131,6 +131,8 @@ typedef struct drm_i915_private {
 	spinlock_t swaps_lock;
 	drm_i915_vbl_swap_t vbl_swaps;
 	unsigned int swaps_pending;
+
+	drm_dma_handle_t *bmp, **bmp_pool;
 } drm_i915_private_t;
 
 enum intel_chip_family {
@@ -320,9 +322,15 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 
 #define BINCTL			0x2420
 #define BINSCENE		0x2428
+
 #define BMP_BUFFER		0x2430
+#define BMP_PAGE_SIZE_4K	(0 << 10)
+#define BMP_BUFFER_SIZE_SHIFT	1
+#define BMP_ENABLE		(1 << 0)
+
 #define BMP_GET			0x2438
 #define BMP_PUT			0x2440
+#define BMP_OFFSET_SHIFT	5
 
 #define GFX_OP_SCISSOR         ((0x3<<29)|(0x1c<<24)|(0x10<<19))
 #define SC_UPDATE_SCISSOR       (0x1<<1)

@@ -324,6 +324,7 @@ typedef struct drm_i915_mmio {
 
 typedef struct drm_i915_hwz {
 	unsigned int op;
+	unsigned short width, pitch, height;
 } drm_i915_hwz_t;
 
 #endif				/* _I915_DRM_H_ */
