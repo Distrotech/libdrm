@@ -761,6 +761,31 @@ static int i915_bmp_alloc(drm_device_t *dev)
 	return 0;
 }
 
+static void i915_bmp_free(drm_device_t *dev)
+{
+	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
+
+	if (dev_priv->bmp_pool) {
+		int i;
+
+		for (i = 0; i < BMP_POOL_SIZE; i++) {
+			if (!dev_priv->bmp_pool[i])
+				break;
+
+			drm_pci_free(dev, dev_priv->bmp_pool[i]);
+		}
+
+		drm_free(dev_priv->bmp_pool, BMP_POOL_SIZE *
+			 sizeof(drm_dma_handle_t*), DRM_MEM_DRIVER);
+		dev_priv->bmp_pool = NULL;
+	}
+
+	if (dev_priv->bmp) {
+		drm_pci_free(dev, dev_priv->bmp);
+		dev_priv->bmp = NULL;
+	}
+}
+
 #define BIN_WIDTH 64
 #define BIN_HEIGHT 32
 
@@ -784,28 +809,6 @@ static int i915_hwz_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz)
 
 static int i915_hwz_free(drm_device_t *dev, drm_i915_hwz_t *hwz)
 {
-	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
-
-	if (dev_priv->bmp_pool) {
-		int i;
-
-		for (i = 0; i < BMP_POOL_SIZE; i++) {
-			if (!dev_priv->bmp_pool[i])
-				break;
-
-			drm_pci_free(dev, dev_priv->bmp_pool[i]);
-		}
-
-		drm_free(dev_priv->bmp_pool, BMP_POOL_SIZE *
-			 sizeof(drm_dma_handle_t*), DRM_MEM_DRIVER);
-		dev_priv->bmp_pool = NULL;
-	}
-
-	if (dev_priv->bmp) {
-		drm_pci_free(dev, dev_priv->bmp);
-		dev_priv->bmp = NULL;
-	}
-
 	return 0;
 }
 
@@ -1026,6 +1029,7 @@ void i915_driver_lastclose(drm_device_t * dev)
 	if (dev->dev_private) {
 		drm_i915_private_t *dev_priv = dev->dev_private;
 		i915_do_cleanup_pageflip(dev);
+		i915_bmp_free(dev);
 		i915_mem_takedown(&(dev_priv->agp_heap));
 	}
 	i915_dma_cleanup(dev);
