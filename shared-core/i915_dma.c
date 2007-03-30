@@ -711,6 +711,10 @@ static int i915_cmdbuffer(DRM_IOCTL_ARGS)
 	return 0;
 }
 
+#define BIN_WIDTH 64
+#define BIN_HEIGHT 32
+#define BIN_HMASK ~(BIN_HEIGHT - 1)
+
 #define BMP_SIZE PAGE_SIZE
 #define BMP_POOL_SIZE ((BMP_SIZE - 32) / 4)
 
@@ -786,15 +790,57 @@ static void i915_bmp_free(drm_device_t *dev)
 	}
 }
 
-#define BIN_WIDTH 64
-#define BIN_HEIGHT 32
+static int i915_bpl_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz,
+			  int bins_per_row, int bin_rows)
+{
+	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
+	int i, bpl_size = (8 * bin_rows * bins_per_row + PAGE_SIZE - 1) &
+			PAGE_MASK;
+
+	for (i = 0; i < hwz->num_buffers; i++) {
+		if (dev_priv->bpl[i])
+			continue;
+
+		dev_priv->bpl[i] = drm_pci_alloc(dev, bpl_size, PAGE_SIZE,
+						 0xffffffff);
+
+		if (!dev_priv->bpl[i]) {
+			DRM_ERROR("Failed to allocate BPL %d\n", i);
+			return DRM_ERR(ENOMEM);
+		}
+	}
+
+	return 0;
+}
+
+static void i915_bpl_free(drm_device_t *dev)
+{
+	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
+	int i;
+
+	for (i = 0; i < 3; i++) {
+		if (!dev_priv->bpl[i])
+			return;
+
+		drm_pci_free(dev, dev_priv->bpl[i]);
+
+		dev_priv->bpl[i] = NULL;
+	}
+}
 
 static int i915_hwz_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
-	int bin_h = (hwz->height + BIN_HEIGHT - 1) / BIN_HEIGHT;
+	int bin_rows = ((hwz->y2 + BIN_HEIGHT - 1) & BIN_HMASK) -
+			(hwz->y1 & BIN_HMASK);
+	int bins_per_row = hwz->pitch / BIN_WIDTH;
 
-	if (8 * hwz->pitch / BIN_WIDTH * bin_h > PAGE_SIZE) {
+	if (hwz->num_buffers > 3) {
+		DRM_ERROR("Only up to 3 buffers allowed\n");
+		return DRM_ERR(EINVAL);
+	}
+
+	if (8 * bins_per_row * bin_rows > PAGE_SIZE) {
 		DRM_ERROR("HWZ area too big\n");
 		return DRM_ERR(EINVAL);
 	}
@@ -804,11 +850,19 @@ static int i915_hwz_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz)
 		return DRM_ERR(ENOMEM);
 	}
 
+	if (i915_bpl_alloc(dev, hwz, bins_per_row, bin_rows)) {
+		DRM_ERROR("Failed to allocate BPLs\n");
+		return DRM_ERR(ENOMEM);
+	}
+
 	return 0;
 }
 
-static int i915_hwz_free(drm_device_t *dev, drm_i915_hwz_t *hwz)
+static int i915_hwz_free(drm_device_t *dev)
 {
+	i915_bpl_free(dev);
+	i915_bmp_free(dev);
+
 	return 0;
 }
 
@@ -834,7 +888,7 @@ static int i915_hwz(DRM_IOCTL_ARGS)
 	case DRM_I915_HWZ_ALLOC:
 		return i915_hwz_alloc(dev, &hwz);
 	case DRM_I915_HWZ_FREE:
-		return i915_hwz_free(dev, &hwz);
+		return i915_hwz_free(dev);
 	default:
 		DRM_ERROR("Invalid op 0x%x\n", hwz.op);
 		return DRM_ERR(EINVAL);
@@ -1029,7 +1083,7 @@ void i915_driver_lastclose(drm_device_t * dev)
 	if (dev->dev_private) {
 		drm_i915_private_t *dev_priv = dev->dev_private;
 		i915_do_cleanup_pageflip(dev);
-		i915_bmp_free(dev);
+		i915_hwz_free(dev);
 		i915_mem_takedown(&(dev_priv->agp_heap));
 	}
 	i915_dma_cleanup(dev);
