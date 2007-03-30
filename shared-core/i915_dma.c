@@ -828,6 +828,59 @@ static void i915_bpl_free(drm_device_t *dev)
 	}
 }
 
+static void i915_bin_free(drm_device_t *dev)
+{
+	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
+	int i, j;
+
+	for (i = 0; i < 3; i++) {
+		if (!dev_priv->bins[i])
+			return;
+
+		for (j = 0; j < dev_priv->num_bins; j++)
+			drm_pci_free(dev, dev_priv->bins[i][j]);
+
+		drm_free(dev_priv->bins[i], dev_priv->num_bins *
+			 sizeof(drm_dma_handle_t*), DRM_MEM_DRIVER);
+		dev_priv->bins[i] = NULL;
+	}
+}
+
+static int i915_bin_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz, int bins)
+{
+	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
+	int i, j;
+
+	i915_bin_free(dev);
+
+	for (i = 0; i < hwz->num_buffers; i++) {
+		dev_priv->bins[i] = drm_calloc(1, bins *
+					       sizeof(drm_dma_handle_t*),
+					       DRM_MEM_DRIVER);
+
+		if (!dev_priv->bins[i]) {
+			DRM_ERROR("Failed to allocate bin pool %d\n", i);
+			return DRM_ERR(ENOMEM);
+		}
+
+		for (j = 0; j < bins; j++) {
+			dev_priv->bins[i][j] = drm_pci_alloc(dev, PAGE_SIZE,
+							     PAGE_SIZE,
+							     0xffffffff);
+
+			if (!dev_priv->bins[i][j]) {
+				DRM_ERROR("Failed to allocate page for bin %d "
+					  "of buffer %d\n", j, i);
+				return DRM_ERR(ENOMEM);
+			}
+		}
+	}
+
+	dev_priv->num_bins = bins;
+
+	return 0;
+}
+
 static int i915_hwz_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
@@ -855,11 +908,17 @@ static int i915_hwz_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz)
 		return DRM_ERR(ENOMEM);
 	}
 
+	if (i915_bin_alloc(dev, hwz, bins_per_row * bin_rows)) {
+		DRM_ERROR("Failed to allocate bins\n");
+		return DRM_ERR(ENOMEM);
+	}
+
 	return 0;
 }
 
 static int i915_hwz_free(drm_device_t *dev)
 {
+	i915_bin_free(dev);
 	i915_bpl_free(dev);
 	i915_bmp_free(dev);
 
