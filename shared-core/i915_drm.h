@@ -318,9 +318,10 @@ typedef struct drm_i915_mmio {
 
 /* Hardware Zone Rendering Support:
  */
-#define DRM_I915_HWZ_RENDER	1
+#define DRM_I915_HWZ_INIT	1
 #define DRM_I915_HWZ_ALLOC	2
-#define DRM_I915_HWZ_FREE	3
+#define DRM_I915_HWZ_RENDER	3
+#define DRM_I915_HWZ_FREE	4
 
 typedef struct drm_i915_hwz {
 	unsigned int op;

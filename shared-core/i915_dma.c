@@ -762,6 +762,8 @@ static int i915_bmp_alloc(drm_device_t *dev)
 		   ((BMP_SIZE / PAGE_SIZE - 1) << BMP_BUFFER_SIZE_SHIFT) |
 		   BMP_ENABLE);
 
+	DRM_INFO("BMP allocated and initialized\n");
+
 	return 0;
 }
 
@@ -788,6 +790,8 @@ static void i915_bmp_free(drm_device_t *dev)
 		drm_pci_free(dev, dev_priv->bmp);
 		dev_priv->bmp = NULL;
 	}
+
+	DRM_INFO("BMP freed\n");
 }
 
 static int i915_bpl_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz,
@@ -888,6 +892,11 @@ static int i915_hwz_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz)
 			(hwz->y1 & BIN_HMASK);
 	int bins_per_row = hwz->pitch / BIN_WIDTH;
 
+	if (!dev_priv->bmp) {
+		DRM_DEBUG("HWZ not initialized\n");
+		return DRM_ERR(EINVAL);
+	}
+
 	if (hwz->num_buffers > 3) {
 		DRM_ERROR("Only up to 3 buffers allowed\n");
 		return DRM_ERR(EINVAL);
@@ -896,11 +905,6 @@ static int i915_hwz_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz)
 	if (8 * bins_per_row * bin_rows > PAGE_SIZE) {
 		DRM_ERROR("HWZ area too big\n");
 		return DRM_ERR(EINVAL);
-	}
-
-	if (!dev_priv->bmp && i915_bmp_alloc(dev)) {
-		DRM_ERROR("Failed to allocate BMP\n");
-		return DRM_ERR(ENOMEM);
 	}
 
 	if (i915_bpl_alloc(dev, hwz, bins_per_row, bin_rows)) {
@@ -930,15 +934,45 @@ static int i915_hwz_render(drm_device_t *dev, drm_i915_hwz_t *hwz)
 	return 0;
 }
 
+static int i915_hwz_init(drm_device_t *dev, drm_i915_hwz_t *hwz)
+{
+	drm_i915_private_t *dev_priv = dev->dev_private;
+
+	if (dev_priv->bmp) {
+		DRM_DEBUG("Already initialized\n");
+		return DRM_ERR(EBUSY);
+	}
+
+	if (i915_bmp_alloc(dev)) {
+		DRM_ERROR("Failed to allocate BMP\n");
+		return DRM_ERR(ENOMEM);
+	}
+
+	DRM_INFO("HWZ initialized\n");
+
+	return 0;
+}
+
 static int i915_hwz(DRM_IOCTL_ARGS)
 {
 	DRM_DEVICE;
 	drm_i915_hwz_t hwz;
 
+	if (!dev->dev_private) {
+		DRM_ERROR("called with no initialization\n");
+		return DRM_ERR(EINVAL);
+	}
+
 	DRM_COPY_FROM_USER_IOCTL(hwz, (drm_i915_hwz_t __user *) data,
 				 sizeof(hwz));
 
 	switch (hwz.op) {
+	case DRM_I915_HWZ_INIT:
+		if (!priv->master) {
+			DRM_ERROR("Only master may initialize HWZ\n");
+			return DRM_ERR(EINVAL);
+		}
+		return i915_hwz_init(dev, &hwz);
 	case DRM_I915_HWZ_RENDER:
 		DRM_INFO("i915 hwz render\n"
 			  /*, batch.start, batch.used, batch.num_cliprects*/);
