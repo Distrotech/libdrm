@@ -132,7 +132,7 @@ typedef struct drm_i915_private {
 	drm_i915_vbl_swap_t vbl_swaps;
 	unsigned int swaps_pending;
 
-	unsigned int num_bins;
+	unsigned int num_bins, bins_inited[3];
 	drm_dma_handle_t *bmp, **bmp_pool, *bpl[3], **bins[3];
 } drm_i915_private_t;
 

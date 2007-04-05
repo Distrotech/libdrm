@@ -814,6 +814,8 @@ static int i915_bpl_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz,
 		}
 	}
 
+	DRM_INFO("Allocated %d BPLs of %d bytes\n", hwz->num_buffers, bpl_size);
+
 	return 0;
 }
 
@@ -847,6 +849,7 @@ static void i915_bin_free(drm_device_t *dev)
 		drm_free(dev_priv->bins[i], dev_priv->num_bins *
 			 sizeof(drm_dma_handle_t*), DRM_MEM_DRIVER);
 		dev_priv->bins[i] = NULL;
+		dev_priv->bins_inited[i] = FALSE;
 	}
 }
 
@@ -881,6 +884,8 @@ static int i915_bin_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz, int bins)
 	}
 
 	dev_priv->num_bins = bins;
+
+	DRM_INFO("Allocated %d times %d bins\n", hwz->num_buffers, bins);
 
 	return 0;
 }
@@ -929,8 +934,54 @@ static int i915_hwz_free(drm_device_t *dev)
 	return 0;
 }
 
+static int i915_bin_init(drm_device_t *dev, drm_i915_hwz_t *hwz, int i)
+{
+	drm_i915_private_t *dev_priv = dev->dev_private;
+	int w = hwz->x2 - hwz->x1, h = hwz->y2 - hwz->y1;
+	int bpl_row, bpl_rows = (h + 4 * BIN_HEIGHT - 1) / (4 * BIN_HEIGHT);
+	int bpl_cols = (w + BIN_WIDTH - 1) / BIN_WIDTH;
+	drm_dma_handle_t **bins = dev_priv->bins[i];
+
+	if (!bins) {
+		DRM_ERROR("Bins not allocated\n");
+		return DRM_ERR(EINVAL);
+	}
+
+	for (bpl_row = 0; bpl_row < bpl_rows; bpl_row++) {
+		int bpl_col;
+
+		for (bpl_col = 0; bpl_col < bpl_cols; bpl_row++) {
+			u64 *bpl = (u64*)dev_priv->bpl[i] +
+				4 * (bpl_row * hwz->pitch / BIN_WIDTH + bpl_col);
+			int j;
+
+			for (j = 0; j < 4; j++)
+				bpl[j] = bins[4 * (bpl_row * bpl_cols +
+						   bpl_col) + j]->busaddr;
+		}
+	}
+
+	DRM_INFO("BPL %d initialized for %d bins\n", i, bpl_row * bpl_cols);
+
+	return 0;
+}
+
 static int i915_hwz_render(drm_device_t *dev, drm_i915_hwz_t *hwz)
 {
+	drm_i915_private_t *dev_priv = dev->dev_private;
+	int i;
+
+	for (i = 0; i < hwz->num_buffers; i++) {
+		if (!dev_priv->bins_inited[i]) {
+			int ret = i915_bin_init(dev, hwz, i);
+
+			if (ret) {
+				DRM_ERROR("Failed to initialize  BPL %d\n", i);
+				return ret;
+			}
+		}
+	}
+
 	return 0;
 }
 
