@@ -325,12 +325,16 @@ typedef struct drm_i915_mmio {
 
 typedef struct drm_i915_hwz {
 	unsigned int op;
-	unsigned int num_buffers;
-	unsigned short x1;
-	unsigned short x2;
-	unsigned short pitch;
-	unsigned short y1;
-	unsigned short y2;
+	union {
+		struct {
+			unsigned int num_buffers;
+			unsigned short x1;
+			unsigned short x2;
+			unsigned short pitch;
+			unsigned short y1;
+			unsigned short y2;
+		} alloc;
+	};
 } drm_i915_hwz_t;
 
 #endif				/* _I915_DRM_H_ */
