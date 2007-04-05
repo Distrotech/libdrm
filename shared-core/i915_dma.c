@@ -99,6 +99,12 @@ static int i915_dma_cleanup(drm_device_t * dev)
 		if (dev_priv->ring.virtual_start) {
 			drm_core_ioremapfree(&dev_priv->ring.map, dev);
 		}
+		if (dev_priv->hwb_ring.virtual_start) {
+			drm_core_ioremapfree(&dev_priv->hwb_ring.map, dev);
+		}
+		if (dev_priv->hwz_ring.virtual_start) {
+			drm_core_ioremapfree(&dev_priv->hwz_ring.map, dev);
+		}
 
 		if (dev_priv->status_page_dmah) {
 			drm_pci_free(dev, dev_priv->status_page_dmah);
@@ -111,6 +117,33 @@ static int i915_dma_cleanup(drm_device_t * dev)
 
 		dev->dev_private = NULL;
 	}
+
+	return 0;
+}
+
+static int i915_init_ring(drm_device_t * dev, drm_i915_ring_buffer_t * ring,
+			  unsigned start, unsigned end, unsigned size, u32 reg)
+{
+	ring->Start = start;
+	ring->End = end;
+	ring->Size = size;
+	ring->tail_mask = ring->Size - 1;
+
+	ring->map.offset = start;
+	ring->map.size = size;
+	ring->map.type = 0;
+	ring->map.flags = 0;
+	ring->map.mtrr = 0;
+
+	drm_core_ioremap(&ring->map, dev);
+
+	if (ring->map.handle == NULL) {
+		DRM_ERROR("can not ioremap virtual address for ring buffer\n");
+		return DRM_ERR(ENOMEM);
+	}
+
+	ring->virtual_start = ring->map.handle;
+	ring->reg = reg;
 
 	return 0;
 }
@@ -140,29 +173,13 @@ static int i915_initialize(drm_device_t * dev,
 	dev_priv->sarea_priv = (drm_i915_sarea_t *)
 	    ((u8 *) dev_priv->sarea->handle + init->sarea_priv_offset);
 
-	dev_priv->ring.Start = init->ring_start;
-	dev_priv->ring.End = init->ring_end;
-	dev_priv->ring.Size = init->ring_size;
-	dev_priv->ring.tail_mask = dev_priv->ring.Size - 1;
-
-	dev_priv->ring.map.offset = init->ring_start;
-	dev_priv->ring.map.size = init->ring_size;
-	dev_priv->ring.map.type = 0;
-	dev_priv->ring.map.flags = 0;
-	dev_priv->ring.map.mtrr = 0;
-
-	drm_core_ioremap(&dev_priv->ring.map, dev);
-
-	if (dev_priv->ring.map.handle == NULL) {
+	if (i915_init_ring(dev, &dev_priv->ring, init->ring_start,
+			   init->ring_end, init->ring_size, LP_RING)) {
 		dev->dev_private = (void *)dev_priv;
 		i915_dma_cleanup(dev);
-		DRM_ERROR("can not ioremap virtual address for"
-			  " ring buffer\n");
+		DRM_ERROR("Failed to initialize LP ring buffer\n");
 		return DRM_ERR(ENOMEM);
 	}
-
-	dev_priv->ring.virtual_start = dev_priv->ring.map.handle;
-	dev_priv->ring.reg = LP_RING;
 
 	dev_priv->cpp = init->cpp;
 	dev_priv->sarea_priv->pf_current_page = 0;
@@ -999,6 +1016,18 @@ static int i915_hwz_init(drm_device_t *dev, drm_i915_hwz_t *hwz)
 
 	if (i915_bmp_alloc(dev)) {
 		DRM_ERROR("Failed to allocate BMP\n");
+		return DRM_ERR(ENOMEM);
+	}
+
+	if (i915_init_ring(dev, &dev_priv->hwb_ring, hwz->init.hwb_start,
+			   hwz->init.hwb_end, hwz->init.hwb_size, HWB_RING)) {
+		DRM_ERROR("Failed to initialize HWB ring buffer\n");
+		return DRM_ERR(ENOMEM);
+	}
+
+	if (i915_init_ring(dev, &dev_priv->hwz_ring, hwz->init.hwz_start,
+			   hwz->init.hwz_end, hwz->init.hwz_size, HP_RING)) {
+		DRM_ERROR("Failed to initialize HWZ ring buffer\n");
 		return DRM_ERR(ENOMEM);
 	}
 

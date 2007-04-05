@@ -96,6 +96,8 @@ typedef struct drm_i915_private {
 
 	drm_i915_sarea_t *sarea_priv;
 	drm_i915_ring_buffer_t ring;
+	drm_i915_ring_buffer_t hwb_ring;
+	drm_i915_ring_buffer_t hwz_ring;
 
 	drm_dma_handle_t *status_page_dmah;
 	void *hw_status_page;

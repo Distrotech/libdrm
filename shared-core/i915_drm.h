@@ -327,6 +327,14 @@ typedef struct drm_i915_hwz {
 	unsigned int op;
 	union {
 		struct {
+			unsigned int hwb_start;
+			unsigned int hwb_end;
+			unsigned int hwb_size;
+			unsigned int hwz_start;
+			unsigned int hwz_end;
+			unsigned int hwz_size;
+		} init;
+		struct {
 			unsigned int num_buffers;
 			unsigned short x1;
 			unsigned short x2;
