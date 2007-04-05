@@ -137,7 +137,7 @@ static void i915_emit_copy_blit(drm_device_t * dev,
 			cur_pages = 2048;
 		pages -= cur_pages;
 
-		BEGIN_LP_RING(6);
+		BEGIN_RING(&dev_priv->ring, 6);
 		OUT_RING(SRC_COPY_BLT_CMD | XY_SRC_COPY_BLT_WRITE_ALPHA |
 			 XY_SRC_COPY_BLT_WRITE_RGB);
 		OUT_RING((stride & 0xffff) | (0xcc << 16) | (1 << 24) |
@@ -146,7 +146,7 @@ static void i915_emit_copy_blit(drm_device_t * dev,
 		OUT_RING(dst_offset);
 		OUT_RING(stride & 0xffff);
 		OUT_RING(src_offset);
-		ADVANCE_LP_RING();
+		ADVANCE_RING();
 	}
 	return;
 }

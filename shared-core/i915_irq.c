@@ -215,7 +215,7 @@ static void i915_vblank_tasklet(drm_device_t *dev)
 			}
 
 			if (init_drawrect) {
-				BEGIN_LP_RING(6);
+				BEGIN_RING(&dev_priv->ring, 6);
 
 				OUT_RING(GFX_OP_DRAWRECT_INFO);
 				OUT_RING(0);
@@ -224,7 +224,7 @@ static void i915_vblank_tasklet(drm_device_t *dev)
 				OUT_RING(sarea_priv->width | sarea_priv->height << 16);
 				OUT_RING(0);
 
-				ADVANCE_LP_RING();
+				ADVANCE_RING();
 
 				sarea_priv->ctxOwner = DRM_KERNEL_CONTEXT;
 
@@ -246,7 +246,7 @@ static void i915_vblank_tasklet(drm_device_t *dev)
 				if (y1 >= y2)
 					continue;
 
-				BEGIN_LP_RING(8);
+				BEGIN_RING(&dev_priv->ring, 8);
 
 				OUT_RING(cmd);
 				OUT_RING(pitchropcpp);
@@ -257,7 +257,7 @@ static void i915_vblank_tasklet(drm_device_t *dev)
 				OUT_RING(pitchropcpp & 0xffff);
 				OUT_RING(offsets[back]);
 
-				ADVANCE_LP_RING();
+				ADVANCE_RING();
 			}
 		}
 	}
@@ -348,10 +348,10 @@ int i915_emit_irq(drm_device_t * dev)
 
 	i915_emit_breadcrumb(dev);
 
-	BEGIN_LP_RING(2);
+	BEGIN_RING(&dev_priv->ring, 2);
 	OUT_RING(0);
 	OUT_RING(GFX_OP_USER_INTERRUPT);
-	ADVANCE_LP_RING();
+	ADVANCE_RING();
 
 	return dev_priv->counter;
 

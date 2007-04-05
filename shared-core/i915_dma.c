@@ -42,10 +42,9 @@
  * the head pointer changes, so that EBUSY only happens if the ring
  * actually stalls for (eg) 3 seconds.
  */
-int i915_wait_ring(drm_device_t * dev, int n, const char *caller)
+int i915_wait_ring(drm_i915_private_t *dev_priv, drm_i915_ring_buffer_t *ring,
+		   int n, const char *caller)
 {
-	drm_i915_private_t *dev_priv = dev->dev_private;
-	drm_i915_ring_buffer_t *ring = &(dev_priv->ring);
 	u32 last_head = I915_READ(LP_RING + RING_HEAD) & HEAD_ADDR;
 	int i;
 
@@ -163,6 +162,7 @@ static int i915_initialize(drm_device_t * dev,
 	}
 
 	dev_priv->ring.virtual_start = dev_priv->ring.map.handle;
+	dev_priv->ring.reg = LP_RING;
 
 	dev_priv->cpp = init->cpp;
 	dev_priv->sarea_priv->pf_current_page = 0;
@@ -353,7 +353,7 @@ static int i915_emit_cmds(drm_device_t * dev, int __user * buffer, int dwords)
 	if ((dwords+1) * sizeof(int) >= dev_priv->ring.Size - 8)
 		return DRM_ERR(EINVAL);
 
-	BEGIN_LP_RING((dwords+1)&~1);
+	BEGIN_RING(&dev_priv->ring, (dwords+1)&~1);
 
 	for (i = 0; i < dwords;) {
 		int cmd, sz;
@@ -378,7 +378,7 @@ static int i915_emit_cmds(drm_device_t * dev, int __user * buffer, int dwords)
 	if (dwords & 1)
 		OUT_RING(0);
 
-	ADVANCE_LP_RING();
+	ADVANCE_RING();
 		
 	return 0;
 }
@@ -402,21 +402,21 @@ static int i915_emit_box(drm_device_t * dev,
 	}
 
 	if (IS_I965G(dev)) {
-		BEGIN_LP_RING(4);
+		BEGIN_RING(&dev_priv->ring, 4);
 		OUT_RING(GFX_OP_DRAWRECT_INFO_I965);
 		OUT_RING((box.x1 & 0xffff) | (box.y1 << 16));
 		OUT_RING(((box.x2 - 1) & 0xffff) | ((box.y2 - 1) << 16));
 		OUT_RING(DR4);
-		ADVANCE_LP_RING();
+		ADVANCE_RING();
 	} else {
-		BEGIN_LP_RING(6);
+		BEGIN_RING(&dev_priv->ring, 6);
 		OUT_RING(GFX_OP_DRAWRECT_INFO);
 		OUT_RING(DR1);
 		OUT_RING((box.x1 & 0xffff) | (box.y1 << 16));
 		OUT_RING(((box.x2 - 1) & 0xffff) | ((box.y2 - 1) << 16));
 		OUT_RING(DR4);
 		OUT_RING(0);
-		ADVANCE_LP_RING();
+		ADVANCE_RING();
 	}
 
 	return 0;
@@ -436,12 +436,12 @@ void i915_emit_breadcrumb(drm_device_t *dev)
 	if (dev_priv->counter > 0x7FFFFFFFUL)
 		 dev_priv->sarea_priv->last_enqueue = dev_priv->counter = 1;
 
-	BEGIN_LP_RING(4);
+	BEGIN_RING(&dev_priv->ring, 4);
 	OUT_RING(CMD_STORE_DWORD_IDX);
 	OUT_RING(20);
 	OUT_RING(dev_priv->counter);
 	OUT_RING(0);
-	ADVANCE_LP_RING();
+	ADVANCE_RING();
 }
 
 
@@ -455,12 +455,12 @@ int i915_emit_mi_flush(drm_device_t *dev, uint32_t flush)
 
 	i915_kernel_lost_context(dev);
 
-	BEGIN_LP_RING(4);
+	BEGIN_RING(&dev_priv->ring, 4);
 	OUT_RING(flush_cmd);
 	OUT_RING(0);
 	OUT_RING(0);
 	OUT_RING(0);
-	ADVANCE_LP_RING();
+	ADVANCE_RING();
 
 	return 0;
 }
@@ -529,17 +529,17 @@ static int i915_dispatch_batchbuffer(drm_device_t * dev,
 		}
 
 		if (dev_priv->use_mi_batchbuffer_start) {
-			BEGIN_LP_RING(2);
+			BEGIN_RING(&dev_priv->ring, 2);
 			OUT_RING(MI_BATCH_BUFFER_START | (2 << 6));
 			OUT_RING(batch->start | MI_BATCH_NON_SECURE);
-			ADVANCE_LP_RING();
+			ADVANCE_RING();
 		} else {
-			BEGIN_LP_RING(4);
+			BEGIN_RING(&dev_priv->ring, 4);
 			OUT_RING(MI_BATCH_BUFFER);
 			OUT_RING(batch->start | MI_BATCH_NON_SECURE);
 			OUT_RING(batch->start + batch->used - 4);
 			OUT_RING(0);
-			ADVANCE_LP_RING();
+			ADVANCE_RING();
 		}
 	}
 
@@ -588,7 +588,7 @@ static void i915_do_dispatch_flip(drm_device_t * dev, int pipe, int sync)
 	DRM_DEBUG("pipe=%d current_page=%d dspbase=0x%x\n", pipe, current_page,
 		  dspbase);
 
-	BEGIN_LP_RING(4);
+	BEGIN_RING(&dev_priv->ring, 4);
 	OUT_RING(sync ? 0 :
 		 (MI_WAIT_FOR_EVENT | (pipe ? MI_WAIT_FOR_PLANE_B_FLIP :
 				       MI_WAIT_FOR_PLANE_A_FLIP)));
@@ -596,7 +596,7 @@ static void i915_do_dispatch_flip(drm_device_t * dev, int pipe, int sync)
 		 (pipe ? DISPLAY_PLANE_B : DISPLAY_PLANE_A));
 	OUT_RING(dev_priv->sarea_priv->pitch * dev_priv->cpp);
 	OUT_RING(dspbase);
-	ADVANCE_LP_RING();
+	ADVANCE_RING();
 
 	dev_priv->sarea_priv->pf_current_page &= ~(0x3 << shift);
 	dev_priv->sarea_priv->pf_current_page |= next_page << shift;
@@ -629,7 +629,8 @@ static int i915_quiescent(drm_device_t * dev)
 	drm_i915_private_t *dev_priv = dev->dev_private;
 
 	i915_kernel_lost_context(dev);
-	return i915_wait_ring(dev, dev_priv->ring.Size - 8, __FUNCTION__);
+	return i915_wait_ring(dev_priv, &dev_priv->ring, dev_priv->ring.Size - 8,
+			      __FUNCTION__);
 }
 
 static int i915_flush_ioctl(DRM_IOCTL_ARGS)

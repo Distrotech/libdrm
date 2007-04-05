@@ -71,6 +71,7 @@ typedef struct _drm_i915_ring_buffer {
 	int tail;
 	int space;
 	drm_local_map_t map;
+	u32 reg;
 } drm_i915_ring_buffer_t;
 
 struct mem_block {
@@ -218,18 +219,20 @@ extern int i915_move(drm_buffer_object_t *bo, int evict,
 #define I915_VERBOSE 0
 
 #define RING_LOCALS	unsigned int outring, ringmask, outcount; \
+			drm_i915_ring_buffer_t *ringptr;	\
 			volatile char *virt;
 
-#define BEGIN_LP_RING(n) do {				\
+#define BEGIN_RING(ring, n) do {			\
+	ringptr = (ring);				\
 	if (I915_VERBOSE)				\
-		DRM_DEBUG("BEGIN_LP_RING(%d) in %s\n",	\
-	                         (n), __FUNCTION__);           \
-	if (dev_priv->ring.space < (n)*4)                      \
-		i915_wait_ring(dev, (n)*4, __FUNCTION__);      \
+		DRM_DEBUG("BEGIN_RING(%p, %d) in %s\n",	\
+			  ringptr, (n), __FUNCTION__);	\
+	if (ringptr->space < (n)*4)			\
+		i915_wait_ring(dev_priv, ringptr, (n)*4, __FUNCTION__);	\
 	outcount = 0;					\
-	outring = dev_priv->ring.tail;			\
-	ringmask = dev_priv->ring.tail_mask;		\
-	virt = dev_priv->ring.virtual_start;		\
+	outring = ringptr->tail;			\
+	ringmask = ringptr->tail_mask;			\
+	virt = ringptr->virtual_start;			\
 } while (0)
 
 #define OUT_RING(n) do {					\
@@ -240,14 +243,15 @@ extern int i915_move(drm_buffer_object_t *bo, int evict,
 	outring &= ringmask;					\
 } while (0)
 
-#define ADVANCE_LP_RING() do {						\
-	if (I915_VERBOSE) DRM_DEBUG("ADVANCE_LP_RING %x\n", outring);	\
-	dev_priv->ring.tail = outring;					\
-	dev_priv->ring.space -= outcount * 4;				\
-	I915_WRITE(LP_RING + RING_TAIL, outring);			\
+#define ADVANCE_RING() do {						\
+	if (I915_VERBOSE) DRM_DEBUG("ADVANCE_RING %x\n", outring);	\
+	ringptr->tail = outring;					\
+	ringptr->space -= outcount * 4;					\
+	I915_WRITE(ringptr->reg + RING_TAIL, outring);			\
 } while(0)
 
-extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
+extern int i915_wait_ring(drm_i915_private_t *dev_priv, drm_i915_ring_buffer_t
+			  *ring, int n, const char *caller);
 
 #define GFX_OP_USER_INTERRUPT 		((0<<29)|(2<<23))
 #define GFX_OP_BREAKPOINT_INTERRUPT	((0<<29)|(1<<23))
