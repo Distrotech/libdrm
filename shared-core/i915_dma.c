@@ -898,6 +898,8 @@ static int i915_bin_alloc(drm_device_t *dev, int bins)
 				return DRM_ERR(ENOMEM);
 			}
 		}
+
+		dev_priv->preamble_inited[i] = FALSE;
 	}
 
 	dev_priv->num_bins = bins;
@@ -967,6 +969,7 @@ static int i915_bin_init(drm_device_t *dev, int i)
 	int bpl_row, bpl_rows = (h + BIN_HEIGHT - 1) / BIN_HEIGHT;
 	int bpl_cols = (w + BIN_WIDTH - 1) / BIN_WIDTH;
 	drm_dma_handle_t **bins = dev_priv->bins[i];
+	unsigned preamble_inited = dev_priv->preamble_inited[i];
 
 	if (!bins) {
 		DRM_ERROR("Bins not allocated\n");
@@ -983,12 +986,39 @@ static int i915_bin_init(drm_device_t *dev, int i)
 			int j;
 
 			for (j = 0; j < (bpl_rows - bpl_row); j++) {
-				*bpl++ = bins[4 * (bpl_row * bpl_cols +
-						  bpl_col) + j]->busaddr;
+				drm_dma_handle_t *bin = bins[(bpl_row * bpl_cols +
+							      bpl_col) * 4 + j];
+
+				*bpl++ = bin->busaddr + 12;
 				*bpl++ = 1 << 2 | 1 << 0;
+
+				if (!preamble_inited) {
+					u32 *pre = bin->vaddr;
+					u32 ymin = max(dev_priv->bin_y1,
+						       (dev_priv->bin_y1 +
+						       (bpl_row + j) *
+							BIN_HEIGHT) &
+						       ~(BIN_HEIGHT - 1));
+					u32 xmin = max(dev_priv->bin_x1,
+						       (dev_priv->bin_x1 +
+							bpl_col * BIN_WIDTH) &
+						       ~(BIN_WIDTH - 1));
+					u32 ymax = min(dev_priv->bin_y2,
+						       ((ymin + BIN_HEIGHT - 1) &
+							~(BIN_HEIGHT - 1)) - 1);
+					u32 xmax = min(dev_priv->bin_x2,
+						       ((xmin + BIN_WIDTH - 1) &
+							~(BIN_HEIGHT - 1)) - 1);
+
+					*pre++ = GFX_OP_SCISSOR_INFO;
+					*pre++ = ymin << 16 | xmin;
+					*pre++ = ymax << 16 | xmax;
+				}
 			}
 		}
 	}
+
+	dev_priv->preamble_inited[i] = TRUE;
 
 	DRM_INFO("BPL %d initialized for %d bins\n", i, bpl_rows * bpl_cols);
 
