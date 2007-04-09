@@ -326,7 +326,7 @@ typedef struct drm_i915_mmio {
 typedef struct drm_i915_hwz {
 	unsigned int op;
 	union {
-		struct {
+		struct drm_i915_hwz_init {
 			unsigned int hwb_start;
 			unsigned int hwb_end;
 			unsigned int hwb_size;
@@ -334,7 +334,7 @@ typedef struct drm_i915_hwz {
 			unsigned int hwz_end;
 			unsigned int hwz_size;
 		} init;
-		struct {
+		struct drm_i915_hwz_alloc {
 			unsigned int num_buffers;
 			unsigned short x1;
 			unsigned short x2;
@@ -342,6 +342,8 @@ typedef struct drm_i915_hwz {
 			unsigned short y1;
 			unsigned short y2;
 		} alloc;
+		struct drm_i915_hwz_render {
+		} render;
 	};
 } drm_i915_hwz_t;
 

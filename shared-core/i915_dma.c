@@ -812,14 +812,13 @@ static void i915_bmp_free(drm_device_t *dev)
 	DRM_INFO("BMP freed\n");
 }
 
-static int i915_bpl_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz,
-			  int bins_per_row, int bin_rows)
+static int i915_bpl_alloc(drm_device_t *dev, int bins_per_row, int bin_rows)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	int i, bpl_size = (8 * bin_rows * bins_per_row + PAGE_SIZE - 1) &
 			PAGE_MASK;
 
-	for (i = 0; i < hwz->alloc.num_buffers; i++) {
+	for (i = 0; i < dev_priv->num_bpls; i++) {
 		if (dev_priv->bpl[i])
 			continue;
 
@@ -832,7 +831,7 @@ static int i915_bpl_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz,
 		}
 	}
 
-	DRM_INFO("Allocated %d BPLs of %d bytes\n", hwz->alloc.num_buffers,
+	DRM_INFO("Allocated %d BPLs of %d bytes\n", dev_priv->num_bpls,
 		 bpl_size);
 
 	return 0;
@@ -872,14 +871,14 @@ static void i915_bin_free(drm_device_t *dev)
 	}
 }
 
-static int i915_bin_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz, int bins)
+static int i915_bin_alloc(drm_device_t *dev, int bins)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	int i, j;
 
 	i915_bin_free(dev);
 
-	for (i = 0; i < hwz->alloc.num_buffers; i++) {
+	for (i = 0; i < dev_priv->num_bpls; i++) {
 		dev_priv->bins[i] = drm_calloc(1, bins *
 					       sizeof(drm_dma_handle_t*),
 					       DRM_MEM_DRIVER);
@@ -904,42 +903,50 @@ static int i915_bin_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz, int bins)
 
 	dev_priv->num_bins = bins;
 
-	DRM_INFO("Allocated %d times %d bins\n", hwz->alloc.num_buffers, bins);
+	DRM_INFO("Allocated %d times %d bins\n", dev_priv->num_bpls, bins);
 
 	return 0;
 }
 
-static int i915_hwz_alloc(drm_device_t *dev, drm_i915_hwz_t *hwz)
+static int i915_hwz_alloc(drm_device_t *dev, struct drm_i915_hwz_alloc *alloc)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
-	int bin_rows = ((hwz->alloc.y2 + BIN_HEIGHT - 1) & BIN_HMASK) -
-			(hwz->alloc.y1 & BIN_HMASK);
-	int bins_per_row = hwz->alloc.pitch / BIN_WIDTH;
+	int bin_rows = ((alloc->y2 + BIN_HEIGHT - 1) & BIN_HMASK) -
+			(alloc->y1 & BIN_HMASK);
+	int bins_per_row = alloc->pitch / BIN_WIDTH;
 
 	if (!dev_priv->bmp) {
 		DRM_DEBUG("HWZ not initialized\n");
 		return DRM_ERR(EINVAL);
 	}
 
-	if (hwz->alloc.num_buffers > 3) {
+	if (alloc->num_buffers > 3) {
 		DRM_ERROR("Only up to 3 buffers allowed\n");
 		return DRM_ERR(EINVAL);
 	}
+
+	dev_priv->num_bpls = alloc->num_buffers;
 
 	if (8 * bins_per_row * bin_rows > PAGE_SIZE) {
 		DRM_ERROR("HWZ area too big\n");
 		return DRM_ERR(EINVAL);
 	}
 
-	if (i915_bpl_alloc(dev, hwz, bins_per_row, bin_rows)) {
+	if (i915_bpl_alloc(dev, bins_per_row, bin_rows)) {
 		DRM_ERROR("Failed to allocate BPLs\n");
 		return DRM_ERR(ENOMEM);
 	}
 
-	if (i915_bin_alloc(dev, hwz, bins_per_row * bin_rows)) {
+	if (i915_bin_alloc(dev, bins_per_row * bin_rows)) {
 		DRM_ERROR("Failed to allocate bins\n");
 		return DRM_ERR(ENOMEM);
 	}
+
+	dev_priv->bin_x1 = alloc->x1;
+	dev_priv->bin_x2 = alloc->x2;
+	dev_priv->bin_pitch= alloc->pitch;
+	dev_priv->bin_y1 = alloc->y1;
+	dev_priv->bin_y2 = alloc->y2;
 
 	return 0;
 }
@@ -953,10 +960,11 @@ static int i915_hwz_free(drm_device_t *dev)
 	return 0;
 }
 
-static int i915_bin_init(drm_device_t *dev, drm_i915_hwz_t *hwz, int i)
+static int i915_bin_init(drm_device_t *dev, int i)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
-	int w = hwz->alloc.x2 - hwz->alloc.x1, h = hwz->alloc.y2 - hwz->alloc.y1;
+	int w = dev_priv->bin_x2 - dev_priv->bin_x1;
+	int h = dev_priv->bin_y2 - dev_priv->bin_y1;
 	int bpl_row, bpl_rows = (h + 4 * BIN_HEIGHT - 1) / (4 * BIN_HEIGHT);
 	int bpl_cols = (w + BIN_WIDTH - 1) / BIN_WIDTH;
 	drm_dma_handle_t **bins = dev_priv->bins[i];
@@ -971,7 +979,7 @@ static int i915_bin_init(drm_device_t *dev, drm_i915_hwz_t *hwz, int i)
 
 		for (bpl_col = 0; bpl_col < bpl_cols; bpl_row++) {
 			u64 *bpl = (u64*)dev_priv->bpl[i] +
-				4 * (bpl_row * hwz->alloc.pitch / BIN_WIDTH +
+				4 * (bpl_row * dev_priv->bin_pitch / BIN_WIDTH +
 				     bpl_col);
 			int j;
 
@@ -986,14 +994,14 @@ static int i915_bin_init(drm_device_t *dev, drm_i915_hwz_t *hwz, int i)
 	return 0;
 }
 
-static int i915_hwz_render(drm_device_t *dev, drm_i915_hwz_t *hwz)
+static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	int i;
 
-	for (i = 0; i < hwz->alloc.num_buffers; i++) {
+	for (i = 0; i < dev_priv->num_bpls; i++) {
 		if (!dev_priv->bins_inited[i]) {
-			int ret = i915_bin_init(dev, hwz, i);
+			int ret = i915_bin_init(dev, i);
 
 			if (ret) {
 				DRM_ERROR("Failed to initialize  BPL %d\n", i);
@@ -1005,7 +1013,7 @@ static int i915_hwz_render(drm_device_t *dev, drm_i915_hwz_t *hwz)
 	return 0;
 }
 
-static int i915_hwz_init(drm_device_t *dev, drm_i915_hwz_t *hwz)
+static int i915_hwz_init(drm_device_t *dev, struct drm_i915_hwz_init *init)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
 
@@ -1019,14 +1027,14 @@ static int i915_hwz_init(drm_device_t *dev, drm_i915_hwz_t *hwz)
 		return DRM_ERR(ENOMEM);
 	}
 
-	if (i915_init_ring(dev, &dev_priv->hwb_ring, hwz->init.hwb_start,
-			   hwz->init.hwb_end, hwz->init.hwb_size, HWB_RING)) {
+	if (i915_init_ring(dev, &dev_priv->hwb_ring, init->hwb_start,
+			   init->hwb_end, init->hwb_size, HWB_RING)) {
 		DRM_ERROR("Failed to initialize HWB ring buffer\n");
 		return DRM_ERR(ENOMEM);
 	}
 
-	if (i915_init_ring(dev, &dev_priv->hwz_ring, hwz->init.hwz_start,
-			   hwz->init.hwz_end, hwz->init.hwz_size, HP_RING)) {
+	if (i915_init_ring(dev, &dev_priv->hwz_ring, init->hwz_start,
+			   init->hwz_end, init->hwz_size, HP_RING)) {
 		DRM_ERROR("Failed to initialize HWZ ring buffer\n");
 		return DRM_ERR(ENOMEM);
 	}
@@ -1055,14 +1063,14 @@ static int i915_hwz(DRM_IOCTL_ARGS)
 			DRM_ERROR("Only master may initialize HWZ\n");
 			return DRM_ERR(EINVAL);
 		}
-		return i915_hwz_init(dev, &hwz);
+		return i915_hwz_init(dev, &hwz.init);
 	case DRM_I915_HWZ_RENDER:
 		DRM_INFO("i915 hwz render\n"
 			  /*, batch.start, batch.used, batch.num_cliprects*/);
 		LOCK_TEST_WITH_RETURN(dev, filp);
-		return i915_hwz_render(dev, &hwz);
+		return i915_hwz_render(dev, &hwz.render);
 	case DRM_I915_HWZ_ALLOC:
-		return i915_hwz_alloc(dev, &hwz);
+		return i915_hwz_alloc(dev, &hwz.alloc);
 	case DRM_I915_HWZ_FREE:
 		return i915_hwz_free(dev);
 	default:
