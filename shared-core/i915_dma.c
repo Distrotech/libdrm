@@ -964,7 +964,7 @@ static int i915_bin_init(drm_device_t *dev, int i)
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	int w = dev_priv->bin_x2 - dev_priv->bin_x1;
 	int h = dev_priv->bin_y2 - dev_priv->bin_y1;
-	int bpl_row, bpl_rows = (h + 4 * BIN_HEIGHT - 1) / (4 * BIN_HEIGHT);
+	int bpl_row, bpl_rows = (h + BIN_HEIGHT - 1) / BIN_HEIGHT;
 	int bpl_cols = (w + BIN_WIDTH - 1) / BIN_WIDTH;
 	drm_dma_handle_t **bins = dev_priv->bins[i];
 
@@ -973,22 +973,24 @@ static int i915_bin_init(drm_device_t *dev, int i)
 		return DRM_ERR(EINVAL);
 	}
 
-	for (bpl_row = 0; bpl_row < bpl_rows; bpl_row++) {
+	for (bpl_row = 0; bpl_row < bpl_rows; bpl_row += 4) {
 		int bpl_col;
 
-		for (bpl_col = 0; bpl_col < bpl_cols; bpl_row++) {
-			u64 *bpl = (u64*)dev_priv->bpl[i] +
-				4 * (bpl_row * dev_priv->bin_pitch / BIN_WIDTH +
+		for (bpl_col = 0; bpl_col < bpl_cols; bpl_col++) {
+			u32 *bpl = (u32*)dev_priv->bpl[i]->vaddr +
+				2 * (bpl_row * dev_priv->bin_pitch / BIN_WIDTH +
 				     bpl_col);
 			int j;
 
-			for (j = 0; j < 4; j++)
-				bpl[j] = bins[4 * (bpl_row * bpl_cols +
-						   bpl_col) + j]->busaddr;
+			for (j = 0; j < (bpl_rows - bpl_row); j++) {
+				*bpl++ = bins[4 * (bpl_row * bpl_cols +
+						  bpl_col) + j]->busaddr;
+				*bpl++ = 1 << 2 | 1 << 0;
+			}
 		}
 	}
 
-	DRM_INFO("BPL %d initialized for %d bins\n", i, bpl_row * bpl_cols);
+	DRM_INFO("BPL %d initialized for %d bins\n", i, bpl_rows * bpl_cols);
 
 	return 0;
 }
