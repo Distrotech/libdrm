@@ -867,7 +867,6 @@ static void i915_bin_free(drm_device_t *dev)
 		drm_free(dev_priv->bins[i], dev_priv->num_bins *
 			 sizeof(drm_dma_handle_t*), DRM_MEM_DRIVER);
 		dev_priv->bins[i] = NULL;
-		dev_priv->bins_inited[i] = FALSE;
 	}
 }
 
@@ -1000,13 +999,11 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	int i;
 
 	for (i = 0; i < dev_priv->num_bpls; i++) {
-		if (!dev_priv->bins_inited[i]) {
-			int ret = i915_bin_init(dev, i);
+		int ret = i915_bin_init(dev, i);
 
-			if (ret) {
-				DRM_ERROR("Failed to initialize  BPL %d\n", i);
-				return ret;
-			}
+		if (ret) {
+			DRM_ERROR("Failed to initialize  BPL %d\n", i);
+			return ret;
 		}
 	}
 
