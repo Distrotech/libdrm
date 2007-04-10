@@ -822,7 +822,7 @@ static int i915_bpl_alloc(drm_device_t *dev, int bins_per_row, int bin_rows)
 		if (dev_priv->bpl[i])
 			continue;
 
-		dev_priv->bpl[i] = drm_pci_alloc(dev, bpl_size, PAGE_SIZE,
+		dev_priv->bpl[i] = drm_pci_alloc(dev, bpl_size, 16 * 1024,
 						 0xffffffff);
 
 		if (!dev_priv->bpl[i]) {
