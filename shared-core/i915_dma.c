@@ -1028,18 +1028,47 @@ static int i915_bin_init(drm_device_t *dev, int i)
 static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
-	int i;
+	int ret, i;
+	unsigned int hwz_outring;
+	RING_LOCALS;
 
-	for (i = 0; i < dev_priv->num_bpls; i++) {
-		int ret = i915_bin_init(dev, i);
+	ret = i915_bin_init(dev, render->bpl_num);
 
-		if (ret) {
-			DRM_ERROR("Failed to initialize  BPL %d\n", i);
-			return ret;
-		}
+	if (ret) {
+		DRM_ERROR("Failed to initialize  BPL %d\n", render->bpl_num);
+		return ret;
 	}
 
-	return 0;
+	/* Prepare the Scene Render List */
+	BEGIN_RING(&dev_priv->hwz_ring, 2 * dev_priv->num_bins);
+
+	for (i = 0; i < dev_priv->num_bins; i++) {
+		OUT_RING(MI_BATCH_BUFFER_START);
+		OUT_RING(dev_priv->bins[render->bpl_num][i]->busaddr);
+	}
+
+	hwz_outring = outring;
+
+	/* Write the HWB command stream */
+	BEGIN_RING(&dev_priv->hwb_ring, 12);
+	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
+	OUT_RING(BINCTL);
+	OUT_RING(dev_priv->bpl[render->bpl_num]->busaddr);
+	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
+	OUT_RING(BINSCENE);
+	OUT_RING(((dev_priv->bin_y2 - dev_priv->bin_y1 + BIN_HEIGHT - 1) /
+		  BIN_HEIGHT - 1) << 16 |
+		 ((dev_priv->bin_x2 - dev_priv->bin_x1 + BIN_WIDTH - 1) /
+		  BIN_WIDTH - 1) << 10);
+	OUT_RING(MI_BATCH_BUFFER_START | (2 << 6));
+	OUT_RING(render->batch_start | MI_BATCH_NON_SECURE);
+	OUT_RING(CMD_MI_FLUSH | MI_END_SCENE);
+	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
+	OUT_RING(HP_RING + RING_TAIL);
+	OUT_RING(hwz_outring);
+	ADVANCE_RING();
+
+	return ret;
 }
 
 static int i915_hwz_init(drm_device_t *dev, struct drm_i915_hwz_init *init)

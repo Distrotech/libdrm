@@ -343,6 +343,8 @@ typedef struct drm_i915_hwz {
 			unsigned short y2;
 		} alloc;
 		struct drm_i915_hwz_render {
+			unsigned int bpl_num;
+			unsigned int batch_start;
 		} render;
 	};
 } drm_i915_hwz_t;

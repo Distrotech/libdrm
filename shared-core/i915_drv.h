@@ -266,6 +266,9 @@ extern int i915_wait_ring(drm_i915_private_t *dev_priv, drm_i915_ring_buffer_t
 #define MI_NO_WRITE_FLUSH    (1 << 2)
 #define MI_READ_FLUSH        (1 << 0)
 #define MI_EXE_FLUSH         (1 << 1)
+#define MI_END_SCENE         (1 << 4)
+
+#define CMD_MI_LOAD_REGISTER_IMM	((0x22 << 23)|0x1)
 
 #define BB1_START_ADDR_MASK   (~0x7)
 #define BB1_PROTECTED         (1<<0)
