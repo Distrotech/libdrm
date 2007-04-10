@@ -130,7 +130,7 @@ static void i915_emit_copy_blit(drm_device_t * dev,
 	if (!dev_priv)
 		return;
 
-	i915_kernel_lost_context(dev);
+	i915_kernel_lost_context(dev_priv, &dev_priv->ring);
 	while (pages > 0) {
 		cur_pages = pages;
 		if (cur_pages > 2048)

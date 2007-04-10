@@ -167,7 +167,7 @@ static void i915_vblank_tasklet(drm_device_t *dev)
 
 	spin_unlock(&dev_priv->swaps_lock);
 
-	i915_kernel_lost_context(dev);
+	i915_kernel_lost_context(dev_priv, &dev_priv->ring);
 
 	upper[0] = upper[1] = 0;
 	slice[0] = max(sarea_priv->pipeA_h / nhits, 1);
@@ -342,7 +342,7 @@ int i915_emit_irq(drm_device_t * dev)
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	RING_LOCALS;
 
-	i915_kernel_lost_context(dev);
+	i915_kernel_lost_context(dev_priv, &dev_priv->ring);
 
 	DRM_DEBUG("%s\n", __FUNCTION__);
 

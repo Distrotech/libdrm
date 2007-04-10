@@ -151,7 +151,8 @@ extern drm_ioctl_desc_t i915_ioctls[];
 extern int i915_max_ioctl;
 
 				/* i915_dma.c */
-extern void i915_kernel_lost_context(drm_device_t * dev);
+extern void i915_kernel_lost_context(drm_i915_private_t * dev_priv,
+				     drm_i915_ring_buffer_t *ring);
 extern int i915_driver_load(struct drm_device *, unsigned long flags);
 extern void i915_driver_lastclose(drm_device_t * dev);
 extern void i915_driver_preclose(drm_device_t * dev, DRMFILE filp);

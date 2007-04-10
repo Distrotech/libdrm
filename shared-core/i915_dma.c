@@ -68,11 +68,9 @@ int i915_wait_ring(drm_i915_private_t *dev_priv, drm_i915_ring_buffer_t *ring,
 	return DRM_ERR(EBUSY);
 }
 
-void i915_kernel_lost_context(drm_device_t * dev)
+void i915_kernel_lost_context(drm_i915_private_t * dev_priv,
+			      drm_i915_ring_buffer_t *ring)
 {
-	drm_i915_private_t *dev_priv = dev->dev_private;
-	drm_i915_ring_buffer_t *ring = &(dev_priv->ring);
-
 	ring->head = I915_READ(LP_RING + RING_HEAD) & HEAD_ADDR;
 	ring->tail = I915_READ(LP_RING + RING_TAIL) & TAIL_ADDR;
 	ring->space = ring->head - (ring->tail + 8);
@@ -470,7 +468,7 @@ int i915_emit_mi_flush(drm_device_t *dev, uint32_t flush)
 
 	flush_cmd |= flush;
 
-	i915_kernel_lost_context(dev);
+	i915_kernel_lost_context(dev_priv, &dev_priv->ring);
 
 	BEGIN_RING(&dev_priv->ring, 4);
 	OUT_RING(flush_cmd);
@@ -495,7 +493,7 @@ static int i915_dispatch_cmdbuffer(drm_device_t * dev,
 		return DRM_ERR(EINVAL);
 	}
 
-	i915_kernel_lost_context(dev);
+	i915_kernel_lost_context(dev_priv, &dev_priv->ring);
 
 	count = nbox ? nbox : 1;
 
@@ -533,7 +531,7 @@ static int i915_dispatch_batchbuffer(drm_device_t * dev,
 		return DRM_ERR(EINVAL);
 	}
 
-	i915_kernel_lost_context(dev);
+	i915_kernel_lost_context(dev_priv, &dev_priv->ring);
 
 	count = nbox ? nbox : 1;
 
@@ -645,7 +643,7 @@ static int i915_quiescent(drm_device_t * dev)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
 
-	i915_kernel_lost_context(dev);
+	i915_kernel_lost_context(dev_priv, &dev_priv->ring);
 	return i915_wait_ring(dev_priv, &dev_priv->ring, dev_priv->ring.Size - 8,
 			      __FUNCTION__);
 }
@@ -1040,6 +1038,8 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	}
 
 	/* Prepare the Scene Render List */
+	i915_kernel_lost_context(dev_priv, &dev_priv->hwz_ring);
+
 	BEGIN_RING(&dev_priv->hwz_ring, 2 * dev_priv->num_bins);
 
 	for (i = 0; i < dev_priv->num_bins; i++) {
@@ -1050,6 +1050,8 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	hwz_outring = outring;
 
 	/* Write the HWB command stream */
+	i915_kernel_lost_context(dev_priv, &dev_priv->hwb_ring);
+
 	BEGIN_RING(&dev_priv->hwb_ring, 12);
 	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
 	OUT_RING(BINCTL);
