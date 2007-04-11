@@ -137,7 +137,7 @@ typedef struct drm_i915_private {
 
 	unsigned int num_bpls, num_bins, preamble_inited[3];
 	drm_dma_handle_t *bmp, **bmp_pool, *bpl[3], **bins[3];
-	unsigned bin_x1, bin_x2, bin_pitch, bin_y1, bin_y2;
+	unsigned bin_x1, bin_x2, bin_cols, bin_pitch, bin_y1, bin_y2, bin_rows;
 } drm_i915_private_t;
 
 enum intel_chip_family {
