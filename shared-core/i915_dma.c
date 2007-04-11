@@ -1061,7 +1061,7 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	/* Write the HWB command stream */
 	i915_kernel_lost_context(dev_priv, &dev_priv->hwb_ring);
 
-	BEGIN_RING(&dev_priv->hwb_ring, 12);
+	BEGIN_RING(&dev_priv->hwb_ring, 18);
 	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
 	OUT_RING(BINCTL);
 	OUT_RING(dev_priv->bpl[render->bpl_num]->busaddr);
@@ -1071,6 +1071,14 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 		  BIN_HEIGHT - 1) << 16 |
 		 ((dev_priv->bin_x2 - dev_priv->bin_x1 + BIN_WIDTH - 1) /
 		  BIN_WIDTH - 1) << 10);
+	OUT_RING(CMD_OP_BIN_CONTROL);
+	OUT_RING(0x5 << 4 | 0x6);
+	OUT_RING((dev_priv->bin_y1 & BIN_HMASK) << 16 |
+		 (dev_priv->bin_x1 & BIN_WMASK));
+	OUT_RING((((dev_priv->bin_y2 + BIN_HEIGHT - 1) & BIN_HMASK) - 1) << 16 |
+		 (((dev_priv->bin_x2 + BIN_WIDTH - 1) & BIN_WMASK) - 1));
+	OUT_RING(dev_priv->bin_y1 << 16 | dev_priv->bin_x1);
+	OUT_RING((dev_priv->bin_y2 - 1) << 16 | (dev_priv->bin_x2 - 1));
 	OUT_RING(MI_BATCH_BUFFER_START | (2 << 6));
 	OUT_RING(render->batch_start | MI_BATCH_NON_SECURE);
 	OUT_RING(CMD_MI_FLUSH | MI_END_SCENE);
