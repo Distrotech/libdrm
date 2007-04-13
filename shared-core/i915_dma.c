@@ -989,9 +989,9 @@ static int i915_bin_init(drm_device_t *dev, int i)
 				num_bpls = 4;
 
 			for (j = 0; j < num_bpls; j++) {
-				drm_dma_handle_t *bin = bins[(bpl_row *
-							      dev_priv->bin_cols +
-							      bpl_col) + j];
+				drm_dma_handle_t *bin = bins[(bpl_row + j) *
+							     dev_priv->bin_cols +
+							     bpl_col];
 
 				*bpl++ = bin->busaddr + 12;
 				*bpl++ = 1 << 2 | 1 << 0;
@@ -1007,15 +1007,16 @@ static int i915_bin_init(drm_device_t *dev, int i)
 							bpl_col * BIN_WIDTH) &
 						       BIN_WMASK);
 					u32 ymax = min(dev_priv->bin_y2 - 1,
-						       ((ymin + BIN_HEIGHT - 1) &
+						       ((ymin + BIN_HEIGHT) &
 							BIN_HMASK) - 1);
 					u32 xmax = min(dev_priv->bin_x2 - 1,
-						       ((xmin + BIN_WIDTH - 1) &
+						       ((xmin + BIN_WIDTH) &
 							BIN_WMASK) - 1);
 
 					*pre++ = GFX_OP_SCISSOR_INFO;
 					*pre++ = ymin << 16 | xmin;
 					*pre++ = ymax << 16 | xmax;
+					*pre++ = MI_BATCH_BUFFER_END;
 				}
 			}
 		}
@@ -1033,7 +1034,6 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	int ret, i;
-	unsigned int hwz_outring;
 	RING_LOCALS;
 
 	DRM_INFO("i915 hwz render\n"
@@ -1046,9 +1046,38 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 		return ret;
 	}
 
-	/* Prepare the Scene Render List */
-	i915_kernel_lost_context(dev_priv, &dev_priv->hwz_ring);
+	{
+		u32 hwz_bpl, hwz_bin = (I915_READ(HP_RING + RING_HEAD) & HEAD_ADDR) / 4 / 2;
 
+		hwz_bpl = (1 + hwz_bin / dev_priv->num_bins) % dev_priv->num_bpls;
+		hwz_bin %= dev_priv->num_bins;
+
+		for (i = hwz_bin - 1; i <= hwz_bin; i++) {
+			int j;
+
+			DRM_INFO("BPL %d bin %d busaddr=0x%x phys=0x%lx contents:\n", hwz_bpl, i, dev_priv->bins[hwz_bpl][i]->busaddr,
+				 virt_to_phys(dev_priv->bins[hwz_bpl][i]->vaddr));
+
+			for (j = 0; j < 128; j++) {
+				u32 *data = dev_priv->bins[hwz_bpl][i]->vaddr + j * 8 * 4;
+
+				if (data[0] || data[1] || data[2] || data[3] ||
+				    data[4] || data[5] || data[6] || data[7])
+					DRM_INFO("%p: %8x %8x %8x %8x %8x %8x %8x %8x\n",
+						 data, data[0], data[1], data[2], data[3],
+						 data[4], data[5], data[6], data[7]);
+			}
+		}
+	}
+
+	if (/*(I915_READ(HWB_RING + RING_HEAD) & HEAD_ADDR) !=
+	      dev_priv->hwb_ring->head ||*/ dev_priv->hwb_ring.tail !=
+	    (I915_READ(HWB_RING + RING_TAIL) & TAIL_ADDR)) {
+		i915_kernel_lost_context(dev_priv, &dev_priv->hwb_ring);
+		i915_kernel_lost_context(dev_priv, &dev_priv->hwz_ring);
+	}
+
+	/* Prepare the Scene Render List */
 	BEGIN_RING(&dev_priv->hwz_ring, 2 * dev_priv->num_bins);
 
 	for (i = 0; i < dev_priv->num_bins; i++) {
@@ -1056,11 +1085,10 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 		OUT_RING(dev_priv->bins[render->bpl_num][i]->busaddr);
 	}
 
-	hwz_outring = outring;
+	dev_priv->hwz_ring.tail = outring;
+	dev_priv->hwz_ring.space -= outcount * 4;
 
 	/* Write the HWB command stream */
-	i915_kernel_lost_context(dev_priv, &dev_priv->hwb_ring);
-
 	BEGIN_RING(&dev_priv->hwb_ring, 18);
 	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
 	OUT_RING(BINCTL);
@@ -1084,9 +1112,9 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	OUT_RING(CMD_MI_FLUSH | MI_END_SCENE);
 	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
 	OUT_RING(HP_RING + RING_TAIL);
-	OUT_RING(hwz_outring);
+	OUT_RING(dev_priv->hwz_ring.tail);
 	ADVANCE_RING();
-
+msleep(100);
 	return ret;
 }
 
