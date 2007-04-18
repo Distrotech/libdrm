@@ -45,11 +45,11 @@
 int i915_wait_ring(drm_i915_private_t *dev_priv, drm_i915_ring_buffer_t *ring,
 		   int n, const char *caller)
 {
-	u32 last_head = I915_READ(LP_RING + RING_HEAD) & HEAD_ADDR;
+	u32 last_head = I915_READ(ring->reg + RING_HEAD) & HEAD_ADDR;
 	int i;
 
 	for (i = 0; i < 10000; i++) {
-		ring->head = I915_READ(LP_RING + RING_HEAD) & HEAD_ADDR;
+		ring->head = I915_READ(ring->reg + RING_HEAD) & HEAD_ADDR;
 		ring->space = ring->head - (ring->tail + 8);
 		if (ring->space < 0)
 			ring->space += ring->Size;
@@ -71,8 +71,8 @@ int i915_wait_ring(drm_i915_private_t *dev_priv, drm_i915_ring_buffer_t *ring,
 void i915_kernel_lost_context(drm_i915_private_t * dev_priv,
 			      drm_i915_ring_buffer_t *ring)
 {
-	ring->head = I915_READ(LP_RING + RING_HEAD) & HEAD_ADDR;
-	ring->tail = I915_READ(LP_RING + RING_TAIL) & TAIL_ADDR;
+	ring->head = I915_READ(ring->reg + RING_HEAD) & HEAD_ADDR;
+	ring->tail = I915_READ(ring->reg + RING_TAIL) & TAIL_ADDR;
 	ring->space = ring->head - (ring->tail + 8);
 	if (ring->space < 0)
 		ring->space += ring->Size;
