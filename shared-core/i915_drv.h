@@ -268,6 +268,7 @@ extern int i915_wait_ring(drm_i915_private_t *dev_priv, drm_i915_ring_buffer_t
 #define MI_READ_FLUSH        (1 << 0)
 #define MI_EXE_FLUSH         (1 << 1)
 #define MI_END_SCENE         (1 << 4)
+#define MI_SCENE_COUNT       (1 << 3)
 
 #define CMD_MI_LOAD_REGISTER_IMM	((0x22 << 23)|0x1)
 
@@ -332,8 +333,25 @@ extern int i915_wait_ring(drm_i915_private_t *dev_priv, drm_i915_ring_buffer_t
 #define RING_VALID          	0x00000001
 #define RING_INVALID        	0x00000000
 
+#define IPEIR			0x2088
+#define SCPD0			0x209c
+#define ESR			0x20b8
+#define DMA_FADD_S		0x20d4
+
+#define GFX_FLSH_CNTL		0x2170
+
 #define BINCTL			0x2420
+#define BC_MASK			(1 << 9)
 #define BINSCENE		0x2428
+#define BS_OP_LOAD		(1 << 8)
+#define BS_MASK			(1 << 22)
+
+#define BCPD			0x2480
+#define BMCD			0x2484
+#define BDCD			0x2488
+#define BPCD			0x248c
+#define BINSKPD			0x24f0
+#define HWBSKPD			0x24f4
 
 #define BMP_BUFFER		0x2430
 #define BMP_PAGE_SIZE_4K	(0 << 10)
