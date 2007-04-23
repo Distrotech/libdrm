@@ -779,8 +779,6 @@ static int i915_bmp_alloc(drm_device_t *dev)
 		   ((BMP_SIZE / PAGE_SIZE - 1) << BMP_BUFFER_SIZE_SHIFT) |
 		   BMP_ENABLE);
 
-	I915_WRITE(BINSCENE, BS_MASK | BS_OP_LOAD);
-
 	DRM_INFO("BMP allocated and initialized\n");
 
 	return 0;
@@ -1045,6 +1043,32 @@ static int i915_bin_init(drm_device_t *dev, int i)
 	return 0;
 }
 
+static int i915_hwb_idle(drm_i915_private_t *dev_priv)
+{
+	if (i915_wait_ring(dev_priv, &dev_priv->hwb_ring,
+			   dev_priv->hwb_ring.Size - 8,  __FUNCTION__)) {
+		DRM_INFO("Timeout waiting for HWB ring to go idle"
+			 ", HWZ head: %x tail: %x/%x HWB head: %x tail: %x/%x\n",
+			 I915_READ(HP_RING + RING_HEAD) & HEAD_ADDR,
+			 I915_READ(HP_RING + RING_TAIL) & HEAD_ADDR,
+			 dev_priv->hwz_ring.tail,
+			 I915_READ(HWB_RING + RING_HEAD) & HEAD_ADDR,
+			 I915_READ(HWB_RING + RING_TAIL) & HEAD_ADDR,
+			 dev_priv->hwb_ring.tail);
+		DRM_INFO("ESR: 0x%x DMA_FADD_S: 0x%x IPEIR: 0x%x SCPD0: 0x%x\n",
+			 I915_READ(ESR), I915_READ(DMA_FADD_S), I915_READ(IPEIR),
+			 I915_READ(SCPD0));
+		DRM_INFO("BCPD: 0x%x BMCD: 0x%x BDCD: 0x%x BPCD: 0x%x\n"
+			 "BINSCENE: 0x%x BINSKPD: 0x%x HWBSKPD: 0x%x\n", I915_READ(BCPD),
+			 I915_READ(BMCD), I915_READ(BDCD), I915_READ(BPCD),
+			 I915_READ(BINSCENE), I915_READ(BINSKPD), I915_READ(HWBSKPD));
+
+		return DRM_ERR(EBUSY);
+	}
+
+	return 0;
+}
+
 static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
@@ -1061,25 +1085,8 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 		i915_kernel_lost_context(dev_priv, &dev_priv->hwz_ring);
 	}
 
-	if (i915_wait_ring(dev_priv, &dev_priv->hwb_ring,
-			   dev_priv->hwb_ring.Size - 8,  __FUNCTION__)) {
+	if (i915_hwb_idle(dev_priv)) {
 		u32 hwz_bpl, hwz_bin = (I915_READ(HP_RING + RING_HEAD) & HEAD_ADDR) / 4 / 2;
-
-		DRM_INFO("Timeout waiting for HWB ring to go idle"
-			 ", HWZ head: %x tail: %x/%x HWB head: %x tail: %x/%x\n",
-			 I915_READ(HP_RING + RING_HEAD) & HEAD_ADDR,
-			 I915_READ(HP_RING + RING_TAIL) & HEAD_ADDR,
-			 dev_priv->hwz_ring.tail,
-			 I915_READ(HWB_RING + RING_HEAD) & HEAD_ADDR,
-			 I915_READ(HWB_RING + RING_TAIL) & HEAD_ADDR,
-			 dev_priv->hwb_ring.tail);
-		DRM_INFO("ESR: 0x%x DMA_FADD_S: 0x%x IPEIR: 0x%x SCPD0: 0x%x\n",
-			 I915_READ(ESR), I915_READ(DMA_FADD_S), I915_READ(IPEIR),
-			 I915_READ(SCPD0));
-		DRM_INFO("BCPD: 0x%x BMCD: 0x%x BDCD: 0x%x BPCD: 0x%x\n"
-			 "BINSCENE: 0x%x BINSKPD: 0x%x HWBSKPD: 0x%x\n", I915_READ(BCPD),
-			 I915_READ(BMCD), I915_READ(BDCD), I915_READ(BPCD),
-			 I915_READ(BINSCENE), I915_READ(BINSKPD), I915_READ(HWBSKPD));
 
 		hwz_bpl = (1 + hwz_bin / dev_priv->num_bins) % dev_priv->num_bpls;
 		hwz_bin %= dev_priv->num_bins;
@@ -1148,24 +1155,14 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	OUT_RING(render->batch_start | MI_BATCH_NON_SECURE);
 	ADVANCE_RING();
 
-	if (i915_wait_ring(dev_priv, &dev_priv->hwb_ring,
-			   dev_priv->hwb_ring.Size - 8,  __FUNCTION__)) {
-		DRM_INFO("Timeout waiting for HWB ring to go idle"
-			 ", HWZ head: %x tail: %x/%x HWB head: %x tail: %x/%x\n",
-			 I915_READ(HP_RING + RING_HEAD) & HEAD_ADDR,
-			 I915_READ(HP_RING + RING_TAIL) & HEAD_ADDR,
-			 dev_priv->hwz_ring.tail,
-			 I915_READ(HWB_RING + RING_HEAD) & HEAD_ADDR,
-			 I915_READ(HWB_RING + RING_TAIL) & HEAD_ADDR,
-			 dev_priv->hwb_ring.tail);
-		DRM_INFO("ESR: 0x%x DMA_FADD_S: 0x%x IPEIR: 0x%x SCPD0: 0x%x\n",
-			 I915_READ(ESR), I915_READ(DMA_FADD_S), I915_READ(IPEIR),
-			 I915_READ(SCPD0));
-		DRM_INFO("BCPD: 0x%x BMCD: 0x%x BDCD: 0x%x BPCD: 0x%x\n"
-			 "BINSCENE: 0x%x BINSKPD: 0x%x HWBSKPD: 0x%x\n", I915_READ(BCPD),
-			 I915_READ(BMCD), I915_READ(BDCD), I915_READ(BPCD),
-			 I915_READ(BINSCENE), I915_READ(BINSKPD), I915_READ(HWBSKPD));
-	}
+	i915_hwb_idle(dev_priv);
+
+	BEGIN_RING(&dev_priv->hwb_ring, 2);
+	OUT_RING(0);
+	OUT_RING(0);
+	ADVANCE_RING();
+
+	i915_hwb_idle(dev_priv);
 
 	BEGIN_RING(&dev_priv->hwb_ring, 4);
 	OUT_RING(CMD_MI_FLUSH | MI_END_SCENE | MI_SCENE_COUNT |
@@ -1181,6 +1178,7 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 static int i915_hwz_init(drm_device_t *dev, struct drm_i915_hwz_init *init)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
+	RING_LOCALS;
 
 	if (dev_priv->bmp) {
 		DRM_DEBUG("Already initialized\n");
@@ -1207,6 +1205,13 @@ static int i915_hwz_init(drm_device_t *dev, struct drm_i915_hwz_init *init)
 	DRM_INFO("Refreshing contexts of HWZ ring buffers\n");
 	i915_kernel_lost_context(dev_priv, &dev_priv->hwb_ring);
 	i915_kernel_lost_context(dev_priv, &dev_priv->hwz_ring);
+
+	I915_WRITE(BINSCENE, BS_MASK | BS_OP_LOAD);
+
+	BEGIN_RING(&dev_priv->hwb_ring, 2);
+	OUT_RING(CMD_MI_FLUSH);
+	OUT_RING(0);
+	ADVANCE_RING();
 
 	DRM_INFO("HWZ initialized\n");
 
