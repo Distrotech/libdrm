@@ -834,7 +834,7 @@ static int i915_bpl_alloc(drm_device_t *dev, int bin_pitch, int bin_rows)
 			DRM_ERROR("Failed to allocate BPL %d\n", i);
 			return DRM_ERR(ENOMEM);
 		}
-#if 0
+#if 0 /* Virtual BPL address */
 		if (dev_priv->bpl[i]->busaddr & (0x3 << 29)) {
 			DRM_ERROR("BPL %d bus address 0x%x high bits not 0\n",
 				  i, dev_priv->bpl[i]->busaddr);
@@ -866,10 +866,38 @@ static void i915_bpl_free(drm_device_t *dev)
 	}
 }
 
+static int i915_hwb_idle(drm_i915_private_t *dev_priv)
+{
+	if (i915_wait_ring(dev_priv, &dev_priv->hwb_ring,
+			   dev_priv->hwb_ring.Size - 8,  __FUNCTION__)) {
+		DRM_INFO("Timeout waiting for HWB ring to go idle"
+			 ", HWZ head: %x tail: %x/%x HWB head: %x tail: %x/%x\n",
+			 I915_READ(LP_RING + RING_HEAD) & HEAD_ADDR,
+			 I915_READ(LP_RING + RING_TAIL) & HEAD_ADDR,
+			 dev_priv->ring.tail,
+			 I915_READ(HWB_RING + RING_HEAD) & HEAD_ADDR,
+			 I915_READ(HWB_RING + RING_TAIL) & HEAD_ADDR,
+			 dev_priv->hwb_ring.tail);
+		DRM_INFO("ESR: 0x%x DMA_FADD_S: 0x%x IPEIR: 0x%x SCPD0: 0x%x\n",
+			 I915_READ(ESR), I915_READ(DMA_FADD_S), I915_READ(IPEIR),
+			 I915_READ(SCPD0));
+		DRM_INFO("BCPD: 0x%x BMCD: 0x%x BDCD: 0x%x BPCD: 0x%x\n"
+			 "BINSCENE: 0x%x BINSKPD: 0x%x HWBSKPD: 0x%x\n", I915_READ(BCPD),
+			 I915_READ(BMCD), I915_READ(BDCD), I915_READ(BPCD),
+			 I915_READ(BINSCENE), I915_READ(BINSKPD), I915_READ(HWBSKPD));
+
+		return DRM_ERR(EBUSY);
+	}
+
+	return 0;
+}
+
 static void i915_bin_free(drm_device_t *dev)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	int i, j;
+
+	i915_hwb_idle(dev_priv);
 
 	for (i = 0; i < 3; i++) {
 		if (!dev_priv->bins[i])
@@ -973,7 +1001,7 @@ static int i915_hwz_free(drm_device_t *dev)
 	return 0;
 }
 
-static int i915_bin_init(drm_device_t *dev, int i)
+static int i915_bin_init(drm_device_t *dev, int i, u32 DR1, u32 DR4)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	int bpl_row;
@@ -1002,7 +1030,7 @@ static int i915_bin_init(drm_device_t *dev, int i)
 							     dev_priv->bin_cols +
 							     bpl_col];
 
-				*bpl++ = bin->busaddr + 12;
+				*bpl++ = bin->busaddr + 20;
 				*bpl++ = 1 << 2 | 1 << 0;
 
 				if (!preamble_inited) {
@@ -1022,9 +1050,11 @@ static int i915_bin_init(drm_device_t *dev, int i)
 						       ((xmin + BIN_WIDTH) &
 							BIN_WMASK) - 1);
 
-					*pre++ = GFX_OP_SCISSOR_INFO;
+					*pre++ = GFX_OP_DRAWRECT_INFO;
+					*pre++ = DR1;
 					*pre++ = ymin << 16 | xmin;
 					*pre++ = ymax << 16 | xmax;
+					*pre++ = DR4;
 					*pre++ = MI_BATCH_BUFFER_END;
 				}
 			}
@@ -1043,36 +1073,11 @@ static int i915_bin_init(drm_device_t *dev, int i)
 	return 0;
 }
 
-static int i915_hwb_idle(drm_i915_private_t *dev_priv)
-{
-	if (i915_wait_ring(dev_priv, &dev_priv->hwb_ring,
-			   dev_priv->hwb_ring.Size - 8,  __FUNCTION__)) {
-		DRM_INFO("Timeout waiting for HWB ring to go idle"
-			 ", HWZ head: %x tail: %x/%x HWB head: %x tail: %x/%x\n",
-			 I915_READ(HP_RING + RING_HEAD) & HEAD_ADDR,
-			 I915_READ(HP_RING + RING_TAIL) & HEAD_ADDR,
-			 dev_priv->hwz_ring.tail,
-			 I915_READ(HWB_RING + RING_HEAD) & HEAD_ADDR,
-			 I915_READ(HWB_RING + RING_TAIL) & HEAD_ADDR,
-			 dev_priv->hwb_ring.tail);
-		DRM_INFO("ESR: 0x%x DMA_FADD_S: 0x%x IPEIR: 0x%x SCPD0: 0x%x\n",
-			 I915_READ(ESR), I915_READ(DMA_FADD_S), I915_READ(IPEIR),
-			 I915_READ(SCPD0));
-		DRM_INFO("BCPD: 0x%x BMCD: 0x%x BDCD: 0x%x BPCD: 0x%x\n"
-			 "BINSCENE: 0x%x BINSKPD: 0x%x HWBSKPD: 0x%x\n", I915_READ(BCPD),
-			 I915_READ(BMCD), I915_READ(BDCD), I915_READ(BPCD),
-			 I915_READ(BINSCENE), I915_READ(BINSKPD), I915_READ(HWBSKPD));
-
-		return DRM_ERR(EBUSY);
-	}
-
-	return 0;
-}
-
 static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	int ret, i;
+	u32 cache_mode_0 = I915_READ(Cache_Mode_0);
 	RING_LOCALS;
 
 	DRM_INFO("i915 hwz render, bpl_num = %d, batch_start = 0x%x\n",
@@ -1086,63 +1091,24 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	}
 
 	if (i915_hwb_idle(dev_priv)) {
-		u32 hwz_bpl, hwz_bin = (I915_READ(HP_RING + RING_HEAD) & HEAD_ADDR) / 4 / 2;
-
-		hwz_bpl = (1 + hwz_bin / dev_priv->num_bins) % dev_priv->num_bpls;
-		hwz_bin %= dev_priv->num_bins;
-
-		for (i = hwz_bin - 1; i <= hwz_bin; i++) {
-			int j;
-
-			DRM_INFO("BPL %d bin %d busaddr=0x%x phys=0x%lx contents:\n", hwz_bpl, i, dev_priv->bins[hwz_bpl][i]->busaddr,
-				 virt_to_phys(dev_priv->bins[hwz_bpl][i]->vaddr));
-
-			for (j = 0; j < 128; j++) {
-				u32 *data = dev_priv->bins[hwz_bpl][i]->vaddr + j * 8 * 4;
-
-				if (data[0] || data[1] || data[2] || data[3] ||
-				    data[4] || data[5] || data[6] || data[7])
-					DRM_INFO("%p: %8x %8x %8x %8x %8x %8x %8x %8x\n",
-						 data, data[0], data[1], data[2], data[3],
-						 data[4], data[5], data[6], data[7]);
-			}
-		}
-			 
 		return DRM_ERR(EBUSY);
 	}
 
-	ret = i915_bin_init(dev, render->bpl_num);
+	ret = i915_bin_init(dev, render->bpl_num, render->DR1, render->DR4);
 
 	if (ret) {
 		DRM_ERROR("Failed to initialize  BPL %d\n", render->bpl_num);
 		return ret;
 	}
 
-	/* Prepare the Scene Render List */
-	BEGIN_RING(&dev_priv->hwz_ring, 2 * dev_priv->num_bins + 2);
-
-	for (i = 0; i < dev_priv->num_bins; i++) {
-		OUT_RING(MI_BATCH_BUFFER_START);
-		OUT_RING(dev_priv->bins[render->bpl_num][i]->busaddr);
-	}
-
-	OUT_RING(CMD_MI_FLUSH | MI_END_SCENE | MI_SCENE_COUNT);
-	OUT_RING(0);
-
-	dev_priv->hwz_ring.tail = outring;
-	dev_priv->hwz_ring.space -= outcount * 4;
-
 	/* Write the HWB command stream */
-	BEGIN_RING(&dev_priv->hwb_ring, 14);
-	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
-	OUT_RING(BINSCENE);
-	OUT_RING(((dev_priv->bin_y2 - dev_priv->bin_y1 + BIN_HEIGHT - 1) /
-		  BIN_HEIGHT - 1) << 16 |
-		 ((dev_priv->bin_x2 - dev_priv->bin_x1 + BIN_WIDTH - 1) /
-		  BIN_WIDTH - 1) << 10 | BS_MASK);
-	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
-	OUT_RING(BINCTL);
-	OUT_RING(dev_priv->bpl[render->bpl_num]->busaddr | BC_MASK);
+	I915_WRITE(BINSCENE, ((dev_priv->bin_y2 - dev_priv->bin_y1 + BIN_HEIGHT
+			       - 1) / BIN_HEIGHT - 1) << 16 |
+		   ((dev_priv->bin_x2 - dev_priv->bin_x1 + BIN_WIDTH - 1) /
+		    BIN_WIDTH - 1) << 10 | BS_MASK);
+	I915_WRITE(BINCTL, dev_priv->bpl[render->bpl_num]->busaddr | BC_MASK);
+
+	BEGIN_RING(&dev_priv->hwb_ring, 8);
 	OUT_RING(CMD_OP_BIN_CONTROL);
 	OUT_RING(0x5 << 4 | 0x6);
 	OUT_RING((dev_priv->bin_y1 & BIN_HMASK) << 16 |
@@ -1155,22 +1121,81 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	OUT_RING(render->batch_start | MI_BATCH_NON_SECURE);
 	ADVANCE_RING();
 
+	/* Prepare the Scene Render List */
+	if (render->static_state_size) {
+		BEGIN_RING(&dev_priv->ring, 4);
+		OUT_RING(GFX_OP_LOAD_INDIRECT | (1<<8) | (1<<14) | 1);
+		OUT_RING((render->batch_start + render->static_state_offset) |
+			 (1<<1) | (1<<0));
+		OUT_RING(render->static_state_size - 1);
+		OUT_RING(0);
+		ADVANCE_RING();
+	}
+
+	BEGIN_RING(&dev_priv->ring, 2 * dev_priv->num_bins + 8);
+
+	OUT_RING(CMD_MI_FLUSH /*| MI_NO_WRITE_FLUSH*/);
+	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
+	OUT_RING(Cache_Mode_0);
+	OUT_RING((cache_mode_0 & ~0x20) | 0x201);
+
+	DRM_INFO("Setting Cache_Mode_0 to 0x%x for zone rendering\n",
+		 (cache_mode_0 & ~0x20) | 0x201);
+
+	for (i = 0; i < dev_priv->num_bins; i++) {
+		OUT_RING(MI_BATCH_BUFFER_START);
+		OUT_RING(dev_priv->bins[render->bpl_num][i]->busaddr);
+	}
+
+	OUT_RING(CMD_MI_FLUSH | MI_END_SCENE | MI_SCENE_COUNT);
+	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
+	OUT_RING(Cache_Mode_0);
+	OUT_RING(cache_mode_0);
+
+	DRM_INFO("Restoring Cache_Mode_0 to 0x%x\n", cache_mode_0);
+
+	dev_priv->ring.tail = outring;
+	dev_priv->ring.space -= outcount * 4;
+
 	i915_hwb_idle(dev_priv);
 
 	BEGIN_RING(&dev_priv->hwb_ring, 2);
-	OUT_RING(0);
-	OUT_RING(0);
-	ADVANCE_RING();
-
-	i915_hwb_idle(dev_priv);
-
-	BEGIN_RING(&dev_priv->hwb_ring, 4);
 	OUT_RING(CMD_MI_FLUSH | MI_END_SCENE | MI_SCENE_COUNT |
 		 MI_NO_WRITE_FLUSH);
-	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
-	OUT_RING(HP_RING + RING_TAIL);
-	OUT_RING(dev_priv->hwz_ring.tail);
+	OUT_RING(0);
 	ADVANCE_RING();
+
+	if (!i915_hwb_idle(dev_priv)) {
+		for (i = 0; i < dev_priv->num_bins; i++) {
+			u32 *bin = dev_priv->bins[render->bpl_num][i]->vaddr;
+			int k;
+
+			for (k = 6; k < 1024; k++) {
+				if (bin[k]) {
+					int j;
+
+					DRM_INFO("BPL %d bin %d busaddr=0x%x contents:\n",
+						 render->bpl_num, i,
+						 dev_priv->bins[render->bpl_num][i]->busaddr);
+
+					for (j = 0; j < 128; j++) {
+						u32 *data = dev_priv->bins[render->bpl_num][i]->vaddr +
+							j * 8 * 4;
+
+						if (data[0] || data[1] || data[2] || data[3] ||
+						    data[4] || data[5] || data[6] || data[7])
+							DRM_INFO("%p: %8x %8x %8x %8x %8x %8x %8x %8x\n",
+								 data, data[0], data[1], data[2], data[3],
+								 data[4], data[5], data[6], data[7]);
+					}
+
+					break;
+				}
+			}
+		}
+	}
+
+	I915_WRITE(LP_RING + RING_TAIL, dev_priv->ring.tail);
 
 	return ret;
 }

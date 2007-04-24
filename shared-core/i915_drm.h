@@ -345,6 +345,10 @@ typedef struct drm_i915_hwz {
 		struct drm_i915_hwz_render {
 			unsigned int bpl_num;
 			unsigned int batch_start;
+			int DR1;
+			int DR4;
+			unsigned int static_state_offset;
+			unsigned int static_state_size;
 		} render;
 	};
 } drm_i915_hwz_t;

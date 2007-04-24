@@ -338,6 +338,8 @@ extern int i915_wait_ring(drm_i915_private_t *dev_priv, drm_i915_ring_buffer_t
 #define ESR			0x20b8
 #define DMA_FADD_S		0x20d4
 
+#define Cache_Mode_0		0x2120
+
 #define GFX_FLSH_CNTL		0x2170
 
 #define BINCTL			0x2420
@@ -366,6 +368,8 @@ extern int i915_wait_ring(drm_i915_private_t *dev_priv, drm_i915_ring_buffer_t
 #define SC_UPDATE_SCISSOR       (0x1<<1)
 #define SC_ENABLE_MASK          (0x1<<0)
 #define SC_ENABLE               (0x1<<0)
+
+#define GFX_OP_LOAD_INDIRECT   ((0x3<<29)|(0x1d<<24)|(0x7<<16))
 
 #define GFX_OP_SCISSOR_INFO    ((0x3<<29)|(0x1d<<24)|(0x81<<16)|(0x1))
 #define SCI_YMIN_MASK      (0xffff<<16)
