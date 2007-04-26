@@ -364,6 +364,8 @@ extern int i915_wait_ring(drm_i915_private_t *dev_priv, drm_i915_ring_buffer_t
 #define BMP_PUT			0x2440
 #define BMP_OFFSET_SHIFT	5
 
+#define GFX_OP_RASTER_RULES    ((0x3<<29)|(0x7<<24))
+
 #define GFX_OP_SCISSOR         ((0x3<<29)|(0x1c<<24)|(0x10<<19))
 #define SC_UPDATE_SCISSOR       (0x1<<1)
 #define SC_ENABLE_MASK          (0x1<<0)
