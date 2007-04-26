@@ -284,7 +284,7 @@ irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 	pipea_stats = I915_READ(I915REG_PIPEASTAT);
 	pipeb_stats = I915_READ(I915REG_PIPEBSTAT);
 		
-	temp = I915_READ16(I915REG_INT_IDENTITY_R);
+	temp = I915_READ(I915REG_INT_IDENTITY_R);
 	temp &= (dev_priv->irq_enable_reg | USER_INT_FLAG);
 
 #if 0
@@ -293,7 +293,7 @@ irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 	if (temp == 0)
 		return IRQ_NONE;
 
-	I915_WRITE16(I915REG_INT_IDENTITY_R, temp);
+	I915_WRITE(I915REG_INT_IDENTITY_R, temp);
 
 	dev_priv->sarea_priv->last_dispatch = READ_BREADCRUMB(dev_priv);
 
@@ -363,7 +363,7 @@ void i915_user_irq_on(drm_i915_private_t *dev_priv)
 	spin_lock(&dev_priv->user_irq_lock);
 	if (dev_priv->irq_enabled && (++dev_priv->user_irq_refcount == 1)){
 		dev_priv->irq_enable_reg |= USER_INT_FLAG;
-		I915_WRITE16(I915REG_INT_ENABLE_R, dev_priv->irq_enable_reg);
+		I915_WRITE(I915REG_INT_ENABLE_R, dev_priv->irq_enable_reg);
 	}
 	spin_unlock(&dev_priv->user_irq_lock);
 
@@ -497,7 +497,7 @@ static void i915_enable_interrupt (drm_device_t *dev)
 	if (dev_priv->vblank_pipe & DRM_I915_VBLANK_PIPE_B)
 		dev_priv->irq_enable_reg |= VSYNC_PIPEB_FLAG;
 
-	I915_WRITE16(I915REG_INT_ENABLE_R, dev_priv->irq_enable_reg);
+	I915_WRITE(I915REG_INT_ENABLE_R, dev_priv->irq_enable_reg);
 	dev_priv->irq_enabled = 1;
 }
 
@@ -705,8 +705,8 @@ void i915_driver_irq_preinstall(drm_device_t * dev)
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 
 	I915_WRITE16(I915REG_HWSTAM, 0xeffe);
-	I915_WRITE16(I915REG_INT_MASK_R, 0x0);
-	I915_WRITE16(I915REG_INT_ENABLE_R, 0x0);
+	I915_WRITE(I915REG_INT_MASK_R, 0x0);
+	I915_WRITE(I915REG_INT_ENABLE_R, 0x0);
 }
 
 void i915_driver_irq_postinstall(drm_device_t * dev)
@@ -748,9 +748,9 @@ void i915_driver_irq_uninstall(drm_device_t * dev)
 
 	dev_priv->irq_enabled = 0;
 	I915_WRITE16(I915REG_HWSTAM, 0xffff);
-	I915_WRITE16(I915REG_INT_MASK_R, 0xffff);
-	I915_WRITE16(I915REG_INT_ENABLE_R, 0x0);
+	I915_WRITE(I915REG_INT_MASK_R, 0xffffffff);
+	I915_WRITE(I915REG_INT_ENABLE_R, 0x0);
 
-	temp = I915_READ16(I915REG_INT_IDENTITY_R);
-	I915_WRITE16(I915REG_INT_IDENTITY_R, temp);
+	temp = I915_READ(I915REG_INT_IDENTITY_R);
+	I915_WRITE(I915REG_INT_IDENTITY_R, temp);
 }
