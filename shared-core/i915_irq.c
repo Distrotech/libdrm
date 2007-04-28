@@ -389,7 +389,7 @@ static int wait_compare(struct drm_device *dev, void *priv)
 	return (READ_BREADCRUMB(dev_priv) >= irq_nr);
 }
 
-static int i915_wait_irq(drm_device_t * dev, int irq_nr)
+int i915_wait_irq(drm_device_t * dev, int irq_nr)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	int ret = 0;
@@ -448,54 +448,6 @@ int i915_driver_vblank_wait2(drm_device_t *dev, unsigned int *sequence)
 	return i915_driver_vblank_do_wait(dev, sequence, &dev->vbl_received2);
 }
 
-/* Needs the lock as it touches the ring.
- */
-int i915_irq_emit(DRM_IOCTL_ARGS)
-{
-	DRM_DEVICE;
-	drm_i915_private_t *dev_priv = dev->dev_private;
-	drm_i915_irq_emit_t emit;
-	int result;
-
-	LOCK_TEST_WITH_RETURN(dev, filp);
-
-	if (!dev_priv) {
-		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
-		return DRM_ERR(EINVAL);
-	}
-
-	DRM_COPY_FROM_USER_IOCTL(emit, (drm_i915_irq_emit_t __user *) data,
-				 sizeof(emit));
-
-	result = i915_emit_irq(dev);
-
-	if (DRM_COPY_TO_USER(emit.irq_seq, &result, sizeof(int))) {
-		DRM_ERROR("copy_to_user\n");
-		return DRM_ERR(EFAULT);
-	}
-
-	return 0;
-}
-
-/* Doesn't need the hardware lock.
- */
-int i915_irq_wait(DRM_IOCTL_ARGS)
-{
-	DRM_DEVICE;
-	drm_i915_private_t *dev_priv = dev->dev_private;
-	drm_i915_irq_wait_t irqwait;
-
-	if (!dev_priv) {
-		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
-		return DRM_ERR(EINVAL);
-	}
-
-	DRM_COPY_FROM_USER_IOCTL(irqwait, (drm_i915_irq_wait_t __user *) data,
-				 sizeof(irqwait));
-
-	return i915_wait_irq(dev, irqwait.irq_seq);
-}
-
 static void i915_enable_interrupt (drm_device_t *dev)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
@@ -512,92 +464,59 @@ static void i915_enable_interrupt (drm_device_t *dev)
 
 /* Set the vblank monitor pipe
  */
-int i915_vblank_pipe_set(DRM_IOCTL_ARGS)
+int i915_vblank_pipe_set(struct drm_device *dev, drm_i915_vblank_pipe_t *pipe)
 {
-	DRM_DEVICE;
 	drm_i915_private_t *dev_priv = dev->dev_private;
-	drm_i915_vblank_pipe_t pipe;
 
-	if (!dev_priv) {
-		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
-		return DRM_ERR(EINVAL);
-	}
-
-	DRM_COPY_FROM_USER_IOCTL(pipe, (drm_i915_vblank_pipe_t __user *) data,
-				 sizeof(pipe));
-
-	if (pipe.pipe & ~(DRM_I915_VBLANK_PIPE_A|DRM_I915_VBLANK_PIPE_B)) {
+	if (pipe->pipe & ~(DRM_I915_VBLANK_PIPE_A|DRM_I915_VBLANK_PIPE_B)) {
 		DRM_ERROR("%s called with invalid pipe 0x%x\n", 
-			  __FUNCTION__, pipe.pipe);
+			  __FUNCTION__, pipe->pipe);
 		return DRM_ERR(EINVAL);
 	}
 
-	dev_priv->vblank_pipe = pipe.pipe;
+	dev_priv->vblank_pipe = pipe->pipe;
 
-	i915_enable_interrupt (dev);
+	i915_enable_interrupt(dev);
 
 	return 0;
 }
 
-int i915_vblank_pipe_get(DRM_IOCTL_ARGS)
+int i915_vblank_pipe_get(struct drm_device *dev, drm_i915_vblank_pipe_t *pipe)
 {
-	DRM_DEVICE;
 	drm_i915_private_t *dev_priv = dev->dev_private;
-	drm_i915_vblank_pipe_t pipe;
 	u16 flag;
 
-	if (!dev_priv) {
-		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
-		return DRM_ERR(EINVAL);
-	}
-
 	flag = I915_READ(I915REG_INT_ENABLE_R);
-	pipe.pipe = 0;
+	pipe->pipe = 0;
 	if (flag & VSYNC_PIPEA_FLAG)
-		pipe.pipe |= DRM_I915_VBLANK_PIPE_A;
+		pipe->pipe |= DRM_I915_VBLANK_PIPE_A;
 	if (flag & VSYNC_PIPEB_FLAG)
-		pipe.pipe |= DRM_I915_VBLANK_PIPE_B;
-	DRM_COPY_TO_USER_IOCTL((drm_i915_vblank_pipe_t __user *) data, pipe,
-				 sizeof(pipe));
+		pipe->pipe |= DRM_I915_VBLANK_PIPE_B;
 	return 0;
 }
 
 /**
  * Schedule buffer swap at given vertical blank.
  */
-int i915_vblank_swap(DRM_IOCTL_ARGS)
+int i915_vblank_swap(struct drm_device *dev, drm_i915_vblank_swap_t *swap,
+		     DRMFILE filp)
 {
-	DRM_DEVICE;
 	drm_i915_private_t *dev_priv = dev->dev_private;
-	drm_i915_vblank_swap_t swap;
 	drm_i915_vbl_swap_t *vbl_swap;
 	unsigned int pipe, seqtype, curseq;
 	unsigned long irqflags;
 	struct list_head *list;
 
-	if (!dev_priv) {
-		DRM_ERROR("%s called with no initialization\n", __func__);
-		return DRM_ERR(EINVAL);
-	}
-
-	if (dev_priv->sarea_priv->rotation) {
-		DRM_DEBUG("Rotation not supported\n");
-		return DRM_ERR(EINVAL);
-	}
-
-	DRM_COPY_FROM_USER_IOCTL(swap, (drm_i915_vblank_swap_t __user *) data,
-				 sizeof(swap));
-
-	if (swap.seqtype & ~(_DRM_VBLANK_RELATIVE | _DRM_VBLANK_ABSOLUTE |
+	if (swap->seqtype & ~(_DRM_VBLANK_RELATIVE | _DRM_VBLANK_ABSOLUTE |
 			     _DRM_VBLANK_SECONDARY | _DRM_VBLANK_NEXTONMISS |
 			     _DRM_VBLANK_FLIP)) {
-		DRM_ERROR("Invalid sequence type 0x%x\n", swap.seqtype);
+		DRM_ERROR("Invalid sequence type 0x%x\n", swap->seqtype);
 		return DRM_ERR(EINVAL);
 	}
 
-	pipe = (swap.seqtype & _DRM_VBLANK_SECONDARY) ? 1 : 0;
+	pipe = (swap->seqtype & _DRM_VBLANK_SECONDARY) ? 1 : 0;
 
-	seqtype = swap.seqtype & (_DRM_VBLANK_RELATIVE | _DRM_VBLANK_ABSOLUTE);
+	seqtype = swap->seqtype & (_DRM_VBLANK_RELATIVE | _DRM_VBLANK_ABSOLUTE);
 
 	if (!(dev_priv->vblank_pipe & (1 << pipe))) {
 		DRM_ERROR("Invalid pipe %d\n", pipe);
@@ -606,9 +525,9 @@ int i915_vblank_swap(DRM_IOCTL_ARGS)
 
 	spin_lock_irqsave(&dev->drw_lock, irqflags);
 
-	if (!drm_get_drawable_info(dev, swap.drawable)) {
+	if (!drm_get_drawable_info(dev, swap->drawable)) {
 		spin_unlock_irqrestore(&dev->drw_lock, irqflags);
-		DRM_DEBUG("Invalid drawable ID %d\n", swap.drawable);
+		DRM_DEBUG("Invalid drawable ID %d\n", swap->drawable);
 		return DRM_ERR(EINVAL);
 	}
 
@@ -617,33 +536,33 @@ int i915_vblank_swap(DRM_IOCTL_ARGS)
 	curseq = atomic_read(pipe ? &dev->vbl_received2 : &dev->vbl_received);
 
 	if (seqtype == _DRM_VBLANK_RELATIVE)
-		swap.sequence += curseq;
+		swap->sequence += curseq;
 
-	if ((curseq - swap.sequence) <= (1<<23)) {
-		if (swap.seqtype & _DRM_VBLANK_NEXTONMISS) {
-			swap.sequence = curseq + 1;
+	if ((curseq - swap->sequence) <= (1<<23)) {
+		if (swap->seqtype & _DRM_VBLANK_NEXTONMISS) {
+			swap->sequence = curseq + 1;
 		} else {
 			DRM_DEBUG("Missed target sequence\n");
 			return DRM_ERR(EINVAL);
 		}
 	}
 
-	if (swap.seqtype & _DRM_VBLANK_FLIP) {
-		swap.sequence--;
+	if (swap->seqtype & _DRM_VBLANK_FLIP) {
+		swap->sequence--;
 
-		if ((curseq - swap.sequence) <= (1<<23)) {
+		if ((curseq - swap->sequence) <= (1<<23)) {
 			drm_drawable_info_t *drw;
 
 			LOCK_TEST_WITH_RETURN(dev, filp);
 
 			spin_lock_irqsave(&dev->drw_lock, irqflags);
 
-			drw = drm_get_drawable_info(dev, swap.drawable);
+			drw = drm_get_drawable_info(dev, swap->drawable);
 
 			if (!drw) {
 				spin_unlock_irqrestore(&dev->drw_lock, irqflags);
 				DRM_DEBUG("Invalid drawable ID %d\n",
-					  swap.drawable);
+					  swap->drawable);
 				return DRM_ERR(EINVAL);
 			}
 
@@ -660,10 +579,10 @@ int i915_vblank_swap(DRM_IOCTL_ARGS)
 	list_for_each(list, &dev_priv->vbl_swaps.head) {
 		vbl_swap = list_entry(list, drm_i915_vbl_swap_t, head);
 
-		if (vbl_swap->drw_id == swap.drawable &&
+		if (vbl_swap->drw_id == swap->drawable &&
 		    vbl_swap->pipe == pipe &&
-		    vbl_swap->sequence == swap.sequence) {
-			vbl_swap->flip = (swap.seqtype & _DRM_VBLANK_FLIP);
+		    vbl_swap->sequence == swap->sequence) {
+			vbl_swap->flip = (swap->seqtype & _DRM_VBLANK_FLIP);
 			spin_unlock_irqrestore(&dev_priv->swaps_lock, irqflags);
 			DRM_DEBUG("Already scheduled\n");
 			return 0;
@@ -686,13 +605,13 @@ int i915_vblank_swap(DRM_IOCTL_ARGS)
 
 	DRM_DEBUG("\n");
 
-	vbl_swap->drw_id = swap.drawable;
+	vbl_swap->drw_id = swap->drawable;
 	vbl_swap->pipe = pipe;
-	vbl_swap->sequence = swap.sequence;
-	vbl_swap->flip = (swap.seqtype & _DRM_VBLANK_FLIP);
+	vbl_swap->sequence = swap->sequence;
+	vbl_swap->flip = (swap->seqtype & _DRM_VBLANK_FLIP);
 
 	if (vbl_swap->flip)
-		swap.sequence++;
+		swap->sequence++;
 
 	spin_lock_irqsave(&dev_priv->swaps_lock, irqflags);
 
@@ -700,10 +619,6 @@ int i915_vblank_swap(DRM_IOCTL_ARGS)
 	dev_priv->swaps_pending++;
 
 	spin_unlock_irqrestore(&dev_priv->swaps_lock, irqflags);
-
-	DRM_COPY_TO_USER_IOCTL((drm_i915_vblank_swap_t __user *) data, swap,
-			       sizeof(swap));
-
 	return 0;
 }
 
