@@ -1273,14 +1273,46 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	return ret;
 }
 
+#define PRIV1_ORDER 8
+#define PRIV1_SIZE ((1 << PRIV1_ORDER) * PAGE_SIZE)
+
 static int i915_hwz_init(drm_device_t *dev, struct drm_i915_hwz_init *init)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
+	int ret;
 	RING_LOCALS;
+
+	if (!dev_priv) {
+		DRM_ERROR("called without initialization\n");
+		return DRM_ERR(EINVAL);
+	}
 
 	if (dev_priv->bmp) {
 		DRM_DEBUG("Already initialized\n");
 		return DRM_ERR(EBUSY);
+	}
+
+	dev_priv->priv1_addr = __get_free_pages(__GFP_NOFAIL | __GFP_HIGH,
+						PRIV1_ORDER);
+
+	if (!dev_priv->priv1_addr) {
+		DRM_ERROR("Failed to get %lu bytes of physically "
+			  "contiguous memory for PRIV1 type\n", PRIV1_SIZE);
+		return DRM_ERR(ENOMEM);
+	} else
+		DRM_INFO("PRIV1 virtual 0x%lx physical 0x%lx\n",
+			 dev_priv->priv1_addr,
+			 virt_to_phys((void*)dev_priv->priv1_addr));
+
+	dev_priv->priv1_order = PRIV1_ORDER;
+
+	ret = drm_bo_init_mm(dev, DRM_BO_MEM_PRIV1,
+			     virt_to_phys((void*)dev_priv->priv1_addr)
+			     >> PAGE_SHIFT, (1 << dev_priv->priv1_order));
+
+	if (ret) {
+		DRM_ERROR("Failed to initialize PRIV1 memory manager\n");
+		return ret;
 	}
 
 	if (i915_bmp_alloc(dev)) {
@@ -1539,6 +1571,11 @@ void i915_driver_lastclose(drm_device_t * dev)
 		i915_do_cleanup_pageflip(dev);
 		i915_hwz_free(dev);
 		i915_mem_takedown(&(dev_priv->agp_heap));
+
+		if (dev_priv->priv1_addr) {
+			free_pages(dev_priv->priv1_addr, dev_priv->priv1_order);
+			dev_priv->priv1_addr = 0;
+		}
 	}
 	i915_dma_cleanup(dev);
 }

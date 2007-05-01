@@ -67,6 +67,8 @@ int i915_invalidate_caches(drm_device_t * dev, uint32_t flags)
 int i915_init_mem_type(drm_device_t * dev, uint32_t type,
 		       drm_mem_type_manager_t * man)
 {
+	drm_i915_private_t *dev_priv = dev->dev_private;
+
 	switch (type) {
 	case DRM_BO_MEM_LOCAL:
 		man->flags = _DRM_FLAG_MEMTYPE_MAPPABLE |
@@ -99,6 +101,19 @@ int i915_init_mem_type(drm_device_t * dev, uint32_t type,
 		    _DRM_FLAG_MEMTYPE_FIXED | _DRM_FLAG_NEEDS_IOREMAP;
 		man->drm_bus_maptype = _DRM_AGP;
 		break;
+	case DRM_BO_MEM_PRIV1:
+		if (!dev_priv) {
+			DRM_ERROR("called without initialization\n");
+			return DRM_ERR(EINVAL);
+		}
+		man->io_offset = 0;
+		man->io_size = (1 << dev_priv->priv1_order) << PAGE_SHIFT;
+		man->io_addr = (void*)dev_priv->priv1_addr;
+		man->io_addr -= virt_to_phys(man->io_addr);
+		man->flags =  _DRM_FLAG_MEMTYPE_MAPPABLE |
+			_DRM_FLAG_MEMTYPE_FIXED;
+		man->drm_bus_maptype = _DRM_AGP/*TTM*/;
+		break;
 	default:
 		DRM_ERROR("Unsupported memory type %u\n", (unsigned)type);
 		return -EINVAL;
@@ -109,6 +124,7 @@ int i915_init_mem_type(drm_device_t * dev, uint32_t type,
 uint32_t i915_evict_mask(drm_buffer_object_t *bo)
 {
 	switch (bo->mem.mem_type) {
+	case DRM_BO_MEM_PRIV1:
 	case DRM_BO_MEM_LOCAL:
 	case DRM_BO_MEM_TT:
 		return DRM_BO_FLAG_MEM_LOCAL;
@@ -156,6 +172,9 @@ static int i915_move_blit(drm_buffer_object_t * bo,
 {
 	drm_bo_mem_reg_t *old_mem = &bo->mem;
 	int dir = 0;
+
+	if (new_mem->mem_type == DRM_BO_MEM_PRIV1)
+		return DRM_ERR(EINVAL);
 
 	if ((old_mem->mem_type == new_mem->mem_type) &&
 	    (new_mem->mm_node->start <
@@ -222,7 +241,8 @@ int i915_move(drm_buffer_object_t * bo,
 {
 	drm_bo_mem_reg_t *old_mem = &bo->mem;
 
-	if (old_mem->mem_type == DRM_BO_MEM_LOCAL) {
+	if (old_mem->mem_type == DRM_BO_MEM_LOCAL || old_mem->mem_type ==
+	    DRM_BO_MEM_PRIV1) {
 		return drm_bo_move_memcpy(bo, evict, no_wait, new_mem);
 	} else if (new_mem->mem_type == DRM_BO_MEM_LOCAL) {
 		if (i915_move_flip(bo, evict, no_wait, new_mem))

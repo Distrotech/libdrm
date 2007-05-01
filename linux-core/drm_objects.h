@@ -426,6 +426,8 @@ typedef struct drm_bo_driver {
 
 extern int drm_bo_ioctl(DRM_IOCTL_ARGS);
 extern int drm_mm_init_ioctl(DRM_IOCTL_ARGS);
+extern int drm_bo_init_mm(struct drm_device * dev, unsigned type,
+			  unsigned long p_offset, unsigned long p_size);
 extern int drm_bo_driver_finish(struct drm_device *dev);
 extern int drm_bo_driver_init(struct drm_device *dev);
 extern int drm_bo_pci_offset(struct drm_device *dev,
