@@ -1,8 +1,8 @@
 /**************************************************************************
- * 
+ *
  * Copyright (c) 2006-2007 Tungsten Graphics, Inc., Cedar Park, TX., USA
  * All Rights Reserved.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -14,15 +14,15 @@
  * The above copyright notice and this permission notice (including the
  * next paragraph) shall be included in all copies or substantial portions
  * of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL
  * THE COPYRIGHT HOLDERS, AUTHORS AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM,
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE 
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
  * USE OR OTHER DEALINGS IN THE SOFTWARE.
- * 
+ *
  **************************************************************************/
 /*
  * Authors: Thomas Hellström <thomas-at-tungstengraphics-dot-com>
@@ -240,11 +240,17 @@ int drm_user_object_ref(drm_file_t * priv, uint32_t user_token,
 {
 	drm_device_t *dev = priv->head->dev;
 	drm_user_object_t *uo;
+	drm_hash_item_t *hash;
 	int ret;
 
 	mutex_lock(&dev->struct_mutex);
-	uo = drm_lookup_user_object(priv, user_token);
-	if (!uo || (uo->type != type)) {
+	ret = drm_ht_find_item(&dev->object_hash, user_token, &hash);
+	if (ret) {
+		DRM_ERROR("Could not find user object to reference.\n");
+		goto out_err;
+	}
+	uo = drm_hash_entry(hash, drm_user_object_t, hash);
+	if (uo->type != type) {
 		ret = -EINVAL;
 		goto out_err;
 	}
@@ -253,7 +259,6 @@ int drm_user_object_ref(drm_file_t * priv, uint32_t user_token,
 		goto out_err;
 	mutex_unlock(&dev->struct_mutex);
 	*object = uo;
-	DRM_ERROR("Referenced an object\n");
 	return 0;
       out_err:
 	mutex_unlock(&dev->struct_mutex);
@@ -281,7 +286,6 @@ int drm_user_object_unref(drm_file_t * priv, uint32_t user_token,
 	}
 	drm_remove_ref_object(priv, ro);
 	mutex_unlock(&dev->struct_mutex);
-	DRM_ERROR("Unreferenced an object\n");
 	return 0;
       out_err:
 	mutex_unlock(&dev->struct_mutex);

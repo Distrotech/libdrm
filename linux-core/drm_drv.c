@@ -15,8 +15,6 @@
  * #define DRIVER_DESC		"Matrox G200/G400"
  * #define DRIVER_DATE		"20001127"
  *
- * #define DRIVER_IOCTL_COUNT	DRM_ARRAY_SIZE( mga_ioctls )
- *
  * #define drm_x		mga_##x
  * \endcode
  */
@@ -127,7 +125,7 @@ static drm_ioctl_desc_t drm_ioctls[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_UPDATE_DRAW)] = {drm_update_drawable_info, DRM_AUTH|DRM_MASTER|DRM_ROOT_ONLY},
 };
 
-#define DRIVER_IOCTL_COUNT	ARRAY_SIZE( drm_ioctls )
+#define DRM_CORE_IOCTL_COUNT	ARRAY_SIZE( drm_ioctls )
 
 
 /**
@@ -442,7 +440,7 @@ void drm_exit(struct drm_driver *driver)
 EXPORT_SYMBOL(drm_exit);
 
 /** File operations structure */
-static struct file_operations drm_stub_fops = {
+static const struct file_operations drm_stub_fops = {
 	.owner = THIS_MODULE,
 	.open = drm_stub_open
 };
@@ -591,21 +589,20 @@ int drm_ioctl(struct inode *inode, struct file *filp,
 		  current->pid, cmd, nr, (long)old_encode_dev(priv->head->device),
 		  priv->authenticated);
 
-	if (nr >= DRIVER_IOCTL_COUNT && 
-	    (nr < DRM_COMMAND_BASE || nr >= DRM_COMMAND_END))
+	if ((nr >= DRM_CORE_IOCTL_COUNT) &&
+	    ((nr < DRM_COMMAND_BASE) || (nr >= DRM_COMMAND_END)))
 		goto err_i1;
 	if ((nr >= DRM_COMMAND_BASE) && (nr < DRM_COMMAND_END)
 		&& (nr < DRM_COMMAND_BASE + dev->driver->num_ioctls))
 			ioctl = &dev->driver->ioctls[nr - DRM_COMMAND_BASE];
-	else if (nr >= DRM_COMMAND_END || nr < DRM_COMMAND_BASE)	
+	else if ((nr >= DRM_COMMAND_END) || (nr < DRM_COMMAND_BASE))
 		ioctl = &drm_ioctls[nr];
-	else 
+	else
 		goto err_i1;
 
-
-
 	func = ioctl->func;
-	if ((nr == DRM_IOCTL_NR(DRM_IOCTL_DMA)) && dev->driver->dma_ioctl)	/* Local override? */
+	/* is there a local override? */
+	if ((nr == DRM_IOCTL_NR(DRM_IOCTL_DMA)) && dev->driver->dma_ioctl)
 		func = dev->driver->dma_ioctl;
 
 	if (!func) {
@@ -625,3 +622,45 @@ err_i1:
 	return retcode;
 }
 EXPORT_SYMBOL(drm_ioctl);
+
+int drm_wait_on(drm_device_t *dev, wait_queue_head_t *queue, int timeout,
+		int (*fn)(drm_device_t *dev, void *priv), void *priv)
+{
+	DECLARE_WAITQUEUE(entry, current);
+	unsigned long end = jiffies + (timeout);
+	int ret = 0;
+	add_wait_queue(queue, &entry);
+
+	for (;;) {
+		__set_current_state(TASK_INTERRUPTIBLE);
+		if ((*fn)(dev, priv))
+			break;
+		if (time_after_eq(jiffies, end)) {
+			ret = -EBUSY;
+			break;
+		}
+		schedule_timeout((HZ/100 > 1) ? HZ/100 : 1);
+		if (signal_pending(current)) {
+			ret = -EINTR;
+			break;
+		}
+	}
+	__set_current_state(TASK_RUNNING);
+	remove_wait_queue(queue, &entry);
+	return ret;
+}
+EXPORT_SYMBOL(drm_wait_on);
+
+drm_local_map_t *drm_getsarea(struct drm_device *dev)
+{
+	drm_map_list_t *entry;
+
+	list_for_each_entry(entry, &dev->maplist->head, head) {
+		if (entry->map && entry->map->type == _DRM_SHM &&
+		    (entry->map->flags & _DRM_CONTAINS_LOCK)) {
+			return entry->map;
+		}
+	}
+	return NULL;
+}
+EXPORT_SYMBOL(drm_getsarea);

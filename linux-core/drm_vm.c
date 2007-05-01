@@ -516,8 +516,7 @@ static int drm_mmap_dma(struct file *filp, struct vm_area_struct *vma)
 		return -EINVAL;
 	}
 
-	if (!capable(CAP_SYS_ADMIN) &&
-	    (dma->flags & _DRM_DMA_USE_PCI_RO)) {
+	if (!capable(CAP_SYS_ADMIN) && (dma->flags & _DRM_DMA_USE_PCI_RO)) {
 		vma->vm_flags &= ~(VM_WRITE | VM_MAYWRITE);
 #if defined(__i386__) || defined(__x86_64__)
 		pgprot_val(vma->vm_page_prot) &= ~_PAGE_RW;
@@ -596,13 +595,12 @@ static int drm_mmap_locked(struct file *filp, struct vm_area_struct *vma)
 	    )
 		return drm_mmap_dma(filp, vma);
 
-	if (drm_ht_find_item(&dev->map_hash, vma->vm_pgoff , &hash)) {
+	if (drm_ht_find_item(&dev->map_hash, vma->vm_pgoff, &hash)) {
 		DRM_ERROR("Could not find map\n");
 		return -EINVAL;
 	}
 
-	map = drm_hash_entry(hash,drm_map_list_t, hash)->map;
-
+	map = drm_hash_entry(hash, drm_map_list_t, hash)->map;
 	if (!map || ((map->flags & _DRM_RESTRICTED) && !capable(CAP_SYS_ADMIN)))
 		return -EPERM;
 
@@ -647,16 +645,11 @@ static int drm_mmap_locked(struct file *filp, struct vm_area_struct *vma)
 		vma->vm_page_prot = drm_io_prot(map->type, vma);
 #ifdef __sparc__
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+#endif
 		if (io_remap_pfn_range(vma, vma->vm_start,
-					(map->offset + offset) >>PAGE_SHIFT,
+					(map->offset + offset) >> PAGE_SHIFT,
 					vma->vm_end - vma->vm_start,
 					vma->vm_page_prot))
-#else
-		if (remap_pfn_range(vma, vma->vm_start,
-				     (map->offset + offset) >> PAGE_SHIFT,
-				     vma->vm_end - vma->vm_start,
-				     vma->vm_page_prot))
-#endif
 			return -EAGAIN;
 		DRM_DEBUG("   Type = %d; start = 0x%lx, end = 0x%lx,"
 			  " offset = 0x%lx\n",
@@ -684,7 +677,7 @@ static int drm_mmap_locked(struct file *filp, struct vm_area_struct *vma)
 		vma->vm_private_data = (void *)map;
 		vma->vm_flags |= VM_RESERVED;
 		break;
-	case _DRM_TTM: 
+	case _DRM_TTM:
 		return drm_bo_mmap_locked(vma, filp, map);
 	default:
 		return -EINVAL;	/* This should never happen. */
@@ -732,24 +725,24 @@ EXPORT_SYMBOL(drm_mmap);
  */
 
 #ifdef DRM_FULL_MM_COMPAT
-static unsigned long drm_bo_vm_nopfn(struct vm_area_struct *vma, 
+static unsigned long drm_bo_vm_nopfn(struct vm_area_struct *vma,
 				     unsigned long address)
 {
 	drm_buffer_object_t *bo = (drm_buffer_object_t *) vma->vm_private_data;
 	unsigned long page_offset;
 	struct page *page = NULL;
-	drm_ttm_t *ttm; 
+	drm_ttm_t *ttm;
 	drm_device_t *dev;
 	unsigned long pfn;
 	int err;
 	unsigned long bus_base;
 	unsigned long bus_offset;
 	unsigned long bus_size;
-	int ret = NOPFN_REFAULT;
-	
-	if (address > vma->vm_end) 
+	unsigned long ret = NOPFN_REFAULT;
+
+	if (address > vma->vm_end)
 		return NOPFN_SIGBUS;
-		
+
 	err = mutex_lock_interruptible(&bo->mutex);
 	if (err)
 		return NOPFN_REFAULT;
@@ -766,8 +759,8 @@ static unsigned long drm_bo_vm_nopfn(struct vm_area_struct *vma,
 	 */
 
 	if (!(bo->mem.flags & DRM_BO_FLAG_MAPPABLE)) {
-		uint32_t new_mask = bo->mem.mask | 
-			DRM_BO_FLAG_MAPPABLE | 
+		uint32_t new_mask = bo->mem.mask |
+			DRM_BO_FLAG_MAPPABLE |
 			DRM_BO_FLAG_FORCE_MAPPABLE;
 		err = drm_bo_move_buffer(bo, new_mask, 0, 0);
 		if (err) {
@@ -777,7 +770,7 @@ static unsigned long drm_bo_vm_nopfn(struct vm_area_struct *vma,
 	}
 
 	dev = bo->dev;
-	err = drm_bo_pci_offset(dev, &bo->mem, &bus_base, &bus_offset, 
+	err = drm_bo_pci_offset(dev, &bo->mem, &bus_base, &bus_offset,
 				&bus_size);
 
 	if (err) {
@@ -802,9 +795,11 @@ static unsigned long drm_bo_vm_nopfn(struct vm_area_struct *vma,
 			goto out_unlock;
 		}
 		pfn = page_to_pfn(page);
-		vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
+		vma->vm_page_prot = (bo->mem.flags & DRM_BO_FLAG_CACHED) ?
+			vm_get_page_prot(vma->vm_flags) :
+			drm_io_prot(_DRM_TTM, vma);
 	}
-	
+
 	err = vm_insert_pfn(vma, address, pfn);
 	if (err) {
 		ret = (err != -EAGAIN) ? NOPFN_OOM : NOPFN_REFAULT;
@@ -903,6 +898,6 @@ int drm_bo_mmap_locked(struct vm_area_struct *vma,
 	drm_bo_vm_open_locked(vma);
 #ifdef DRM_ODD_MM_COMPAT
 	drm_bo_map_bound(vma);
-#endif		
+#endif
 	return 0;
 }

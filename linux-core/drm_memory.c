@@ -47,7 +47,7 @@ static struct {
 
 static inline size_t drm_size_align(size_t size) {
 
-	register size_t tmpSize = 4;
+	size_t tmpSize = 4;
 	if (size > PAGE_SIZE)
 		return PAGE_ALIGN(size);
 
@@ -61,17 +61,17 @@ int drm_alloc_memctl(size_t size)
 {
 	int ret;
 	unsigned long a_size = drm_size_align(size);
- 
+
 	spin_lock(&drm_memctl.lock);
-	ret = ((drm_memctl.cur_used + a_size) > drm_memctl.high_threshold) ? 
+	ret = ((drm_memctl.cur_used + a_size) > drm_memctl.high_threshold) ?
 		-ENOMEM : 0;
-	if (!ret) 
+	if (!ret)
 		drm_memctl.cur_used += a_size;
 	spin_unlock(&drm_memctl.lock);
 	return ret;
 }
 EXPORT_SYMBOL(drm_alloc_memctl);
-	
+
 void drm_free_memctl(size_t size)
 {
 	unsigned long a_size = drm_size_align(size);
@@ -84,14 +84,14 @@ EXPORT_SYMBOL(drm_free_memctl);
 
 void drm_query_memctl(drm_u64_t *cur_used,
 		      drm_u64_t *low_threshold,
-		      drm_u64_t *high_threshold) 
+		      drm_u64_t *high_threshold)
 {
 	spin_lock(&drm_memctl.lock);
 	*cur_used = drm_memctl.cur_used;
 	*low_threshold = drm_memctl.low_threshold;
 	*high_threshold = drm_memctl.high_threshold;
 	spin_unlock(&drm_memctl.lock);
-}	
+}
 EXPORT_SYMBOL(drm_query_memctl);
 
 void drm_init_memctl(size_t p_low_threshold,
@@ -213,6 +213,49 @@ void drm_free_pages(unsigned long address, int order, int area)
 }
 
 #if __OS_HAS_AGP
+static void *agp_remap(unsigned long offset, unsigned long size,
+			      drm_device_t * dev)
+{
+	unsigned long *phys_addr_map, i, num_pages =
+	    PAGE_ALIGN(size) / PAGE_SIZE;
+	struct drm_agp_mem *agpmem;
+	struct page **page_map;
+	void *addr;
+
+	size = PAGE_ALIGN(size);
+
+#ifdef __alpha__
+	offset -= dev->hose->mem_space->start;
+#endif
+
+	for (agpmem = dev->agp->memory; agpmem; agpmem = agpmem->next)
+		if (agpmem->bound <= offset
+		    && (agpmem->bound + (agpmem->pages << PAGE_SHIFT)) >=
+		    (offset + size))
+			break;
+	if (!agpmem)
+		return NULL;
+
+	/*
+	 * OK, we're mapping AGP space on a chipset/platform on which memory accesses by
+	 * the CPU do not get remapped by the GART.  We fix this by using the kernel's
+	 * page-table instead (that's probably faster anyhow...).
+	 */
+	/* note: use vmalloc() because num_pages could be large... */
+	page_map = vmalloc(num_pages * sizeof(struct page *));
+	if (!page_map)
+		return NULL;
+
+	phys_addr_map =
+	    agpmem->memory->memory + (offset - agpmem->bound) / PAGE_SIZE;
+	for (i = 0; i < num_pages; ++i)
+		page_map[i] = pfn_to_page(phys_addr_map[i] >> PAGE_SHIFT);
+	addr = vmap(page_map, num_pages, VM_IOREMAP, PAGE_AGP);
+	vfree(page_map);
+
+	return addr;
+}
+
 /** Wrapper around agp_allocate_memory() */
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,11)
 DRM_AGP_MEM *drm_alloc_agp(drm_device_t *dev, int pages, u32 type)
@@ -243,7 +286,15 @@ int drm_unbind_agp(DRM_AGP_MEM * handle)
 {
 	return drm_agp_unbind_memory(handle);
 }
+
+#else  /* __OS_HAS_AGP*/
+static void *agp_remap(unsigned long offset, unsigned long size,
+		       drm_device_t * dev)
+{
+	return NULL;
+}
 #endif				/* agp */
+
 #endif				/* debug_memory */
 
 void drm_core_ioremap(struct drm_map *map, struct drm_device *dev)

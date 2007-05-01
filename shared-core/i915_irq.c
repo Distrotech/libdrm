@@ -294,6 +294,8 @@ irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 		return IRQ_NONE;
 
 	I915_WRITE(I915REG_INT_IDENTITY_R, temp);
+	(void) I915_READ(I915REG_INT_IDENTITY_R);
+	DRM_READMEMORYBARRIER();
 
 	dev_priv->sarea_priv->last_dispatch = READ_BREADCRUMB(dev_priv);
 
@@ -374,11 +376,18 @@ void i915_user_irq_off(drm_i915_private_t *dev_priv)
 	spin_lock(&dev_priv->user_irq_lock);
 	if (dev_priv->irq_enabled && (--dev_priv->user_irq_refcount == 0)) {
 		//		dev_priv->irq_enable_reg &= ~USER_INT_FLAG;
-		//		I915_WRITE16(I915REG_INT_ENABLE_R, dev_priv->irq_enable_reg);
+		//		I915_WRITE(I915REG_INT_ENABLE_R, dev_priv->irq_enable_reg);
 	}
 	spin_unlock(&dev_priv->user_irq_lock);
 }
 		
+static int wait_compare(struct drm_device *dev, void *priv)
+{
+	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
+	int irq_nr = (u64)priv;
+
+	return (READ_BREADCRUMB(dev_priv) >= irq_nr);
+}
 
 static int i915_wait_irq(drm_device_t * dev, int irq_nr)
 {
@@ -394,8 +403,8 @@ static int i915_wait_irq(drm_device_t * dev, int irq_nr)
 	dev_priv->sarea_priv->perf_boxes |= I915_BOX_WAIT;
 	
 	i915_user_irq_on(dev_priv);
-	DRM_WAIT_ON(ret, dev_priv->irq_queue, 3 * DRM_HZ,
-		    READ_BREADCRUMB(dev_priv) >= irq_nr);
+	ret = drm_wait_on(dev, &dev_priv->irq_queue, 3 * DRM_HZ, wait_compare,
+			  (void *)(u64)irq_nr);
 	i915_user_irq_off(dev_priv);
 
 	if (ret == DRM_ERR(EBUSY)) {

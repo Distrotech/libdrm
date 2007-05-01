@@ -34,7 +34,7 @@
 
 #define DRIVER_MAJOR		0
 #define DRIVER_MINOR		0
-#define DRIVER_PATCHLEVEL	4
+#define DRIVER_PATCHLEVEL	6
 
 #define NOUVEAU_FAMILY   0x0000FFFF
 #define NOUVEAU_FLAGS    0xFFFF0000
@@ -61,6 +61,7 @@ struct nouveau_object
 {
 	struct nouveau_object *next;
 	struct nouveau_object *prev;
+	int channel;
 
 	struct mem_block *instance;
 	uint32_t          ht_loc;
@@ -98,6 +99,33 @@ struct nouveau_config {
 	} cmdbuf;
 };
 
+struct nouveau_engine_func {
+	struct {
+		int	(*Init)(drm_device_t *dev);
+		void	(*Takedown)(drm_device_t *dev);
+	} Mc;
+
+	struct {
+		int	(*Init)(drm_device_t *dev);
+		void	(*Takedown)(drm_device_t *dev);
+	} Timer;
+
+	struct {
+		int	(*Init)(drm_device_t *dev);
+		void	(*Takedown)(drm_device_t *dev);
+	} Fb;
+
+	struct {
+		int	(*Init)(drm_device_t *dev);
+		void	(*Takedown)(drm_device_t *dev);
+	} Graph;
+
+	struct {
+		int	(*Init)(drm_device_t *dev);
+		void	(*Takedown)(drm_device_t *dev);
+	} Fifo;
+};
+
 typedef struct drm_nouveau_private {
 	/* the card type, takes NV_* as values */
 	int card_type;
@@ -109,15 +137,10 @@ typedef struct drm_nouveau_private {
 	drm_local_map_t *fb;
 	drm_local_map_t *ramin; /* NV40 onwards */
 
-	//TODO: Remove me, I'm bogus :)
-	int      cur_fifo;
-
-	struct nouveau_object *fb_obj;
-	int               cmdbuf_ch_size;
-	struct mem_block* cmdbuf_alloc;
-
 	int fifo_alloc_count;
 	struct nouveau_fifo fifos[NV_MAX_FIFO_NUMBER];
+
+	struct nouveau_engine_func Engine;
 
 	/* RAMIN configuration, RAMFC, RAMHT and RAMRO offsets */
 	uint32_t ramin_size;
@@ -160,6 +183,7 @@ extern int nouveau_unload(struct drm_device *dev);
 extern int nouveau_ioctl_getparam(DRM_IOCTL_ARGS);
 extern int nouveau_ioctl_setparam(DRM_IOCTL_ARGS);
 extern void nouveau_wait_for_idle(struct drm_device *dev);
+extern int nouveau_ioctl_card_init(DRM_IOCTL_ARGS);
 
 /* nouveau_mem.c */
 extern uint64_t          nouveau_mem_fb_amount(struct drm_device *dev);
@@ -170,8 +194,7 @@ extern struct mem_block* nouveau_mem_alloc(struct drm_device *dev, int alignment
 extern void              nouveau_mem_free(struct drm_device* dev, struct mem_block*);
 extern int               nouveau_mem_init(struct drm_device *dev);
 extern void              nouveau_mem_close(struct drm_device *dev);
-extern int               nouveau_instmem_init(struct drm_device *dev,
-					      uint32_t offset);
+extern int               nouveau_instmem_init(struct drm_device *dev);
 extern struct mem_block* nouveau_instmem_alloc(struct drm_device *dev,
 					       uint32_t size, uint32_t align);
 extern void              nouveau_instmem_free(struct drm_device *dev,
@@ -185,16 +208,20 @@ extern void              nouveau_instmem_w32(drm_nouveau_private_t *dev_priv,
 /* nouveau_fifo.c */
 extern int  nouveau_fifo_init(drm_device_t *dev);
 extern int  nouveau_fifo_number(drm_device_t *dev);
+extern int  nouveau_fifo_ctx_size(drm_device_t *dev);
 extern void nouveau_fifo_cleanup(drm_device_t *dev, DRMFILE filp);
-extern int  nouveau_fifo_id_get(drm_device_t *dev, DRMFILE filp);
+extern int  nouveau_fifo_owner(drm_device_t *dev, DRMFILE filp, int channel);
 extern void nouveau_fifo_free(drm_device_t *dev, int channel);
 
 /* nouveau_object.c */
-extern void nouveau_object_cleanup(drm_device_t *dev, DRMFILE filp);
+extern void nouveau_object_cleanup(drm_device_t *dev, int channel);
 extern struct nouveau_object *
-nouveau_dma_object_create(drm_device_t *dev, int class,
+nouveau_object_gr_create(drm_device_t *dev, int channel, int class);
+extern struct nouveau_object *
+nouveau_object_dma_create(drm_device_t *dev, int channel, int class,
 			  uint32_t offset, uint32_t size,
 			  int access, int target);
+extern void nouveau_object_free(drm_device_t *dev, struct nouveau_object *obj);
 extern int  nouveau_ioctl_object_init(DRM_IOCTL_ARGS);
 extern int  nouveau_ioctl_dma_object_init(DRM_IOCTL_ARGS);
 extern uint32_t nouveau_chip_instance_get(drm_device_t *dev, struct mem_block *mem);
@@ -205,30 +232,59 @@ extern void        nouveau_irq_preinstall(drm_device_t*);
 extern void        nouveau_irq_postinstall(drm_device_t*);
 extern void        nouveau_irq_uninstall(drm_device_t*);
 
+/* nv04_fb.c */
+extern int  nv04_fb_init(drm_device_t *dev);
+extern void nv04_fb_takedown(drm_device_t *dev);
+
+/* nv10_fb.c */
+extern int  nv10_fb_init(drm_device_t *dev);
+extern void nv10_fb_takedown(drm_device_t *dev);
+
+/* nv40_fb.c */
+extern int  nv40_fb_init(drm_device_t *dev);
+extern void nv40_fb_takedown(drm_device_t *dev);
+
 /* nv04_graph.c */
 extern void nouveau_nv04_context_switch(drm_device_t *dev);
 extern int nv04_graph_init(drm_device_t *dev);
+extern void nv04_graph_takedown(drm_device_t *dev);
 extern int nv04_graph_context_create(drm_device_t *dev, int channel);
 
 /* nv10_graph.c */
 extern void nouveau_nv10_context_switch(drm_device_t *dev);
 extern int nv10_graph_init(drm_device_t *dev);
+extern void nv10_graph_takedown(drm_device_t *dev);
 extern int nv10_graph_context_create(drm_device_t *dev, int channel);
 
 /* nv20_graph.c */
 extern void nouveau_nv20_context_switch(drm_device_t *dev);
 extern int nv20_graph_init(drm_device_t *dev);
+extern void nv20_graph_takedown(drm_device_t *dev);
 extern int nv20_graph_context_create(drm_device_t *dev, int channel);
 
 /* nv30_graph.c */
 extern int nv30_graph_init(drm_device_t *dev);
+extern void nv30_graph_takedown(drm_device_t *dev);
 extern int nv30_graph_context_create(drm_device_t *dev, int channel);
 
 /* nv40_graph.c */
 extern int  nv40_graph_init(drm_device_t *dev);
+extern void nv40_graph_takedown(drm_device_t *dev);
 extern int  nv40_graph_context_create(drm_device_t *dev, int channel);
 extern void nv40_graph_context_save_current(drm_device_t *dev);
 extern void nv40_graph_context_restore(drm_device_t *dev, int channel);
+
+/* nv04_mc.c */
+extern int  nv04_mc_init(drm_device_t *dev);
+extern void nv04_mc_takedown(drm_device_t *dev);
+
+/* nv40_mc.c */
+extern int  nv40_mc_init(drm_device_t *dev);
+extern void nv40_mc_takedown(drm_device_t *dev);
+
+/* nv04_timer.c */
+extern int  nv04_timer_init(drm_device_t *dev);
+extern void nv04_timer_takedown(drm_device_t *dev);
 
 extern long nouveau_compat_ioctl(struct file *filp, unsigned int cmd,
 				unsigned long arg);

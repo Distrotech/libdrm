@@ -1,8 +1,8 @@
 /**************************************************************************
- * 
+ *
  * Copyright (c) 2006-2007 Tungsten Graphics, Inc., Cedar Park, TX., USA
  * All Rights Reserved.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -10,19 +10,19 @@
  * distribute, sub license, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice (including the
  * next paragraph) shall be included in all copies or substantial portions
  * of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL
  * THE COPYRIGHT HOLDERS, AUTHORS AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM,
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE 
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
  * USE OR OTHER DEALINGS IN THE SOFTWARE.
- * 
+ *
  **************************************************************************/
 /*
  * Authors: Thomas Hellström <thomas-at-tungstengraphics-dot-com>
@@ -101,7 +101,7 @@ static struct page *drm_ttm_alloc_page(void)
 }
 
 /*
- * Change caching policy for the linear kernel map 
+ * Change caching policy for the linear kernel map
  * for range of pages in a ttm.
  */
 
@@ -154,7 +154,7 @@ int drm_destroy_ttm(drm_ttm_t * ttm)
 
 	be = ttm->be;
 	if (be) {
-		be->destroy(be);
+		be->func->destroy(be);
 		ttm->be = NULL;
 	}
 
@@ -222,7 +222,7 @@ static int drm_ttm_populate(drm_ttm_t * ttm)
 		if (!page)
 			return -ENOMEM;
 	}
-	be->populate(be, ttm->num_pages, ttm->pages);
+	be->func->populate(be, ttm->num_pages, ttm->pages);
 	ttm->state = ttm_unbound;
 	return 0;
 }
@@ -281,7 +281,7 @@ void drm_ttm_evict(drm_ttm_t * ttm)
 	int ret;
 
 	if (ttm->state == ttm_bound) {
-		ret = be->unbind(be);
+		ret = be->func->unbind(be);
 		BUG_ON(ret);
 	}
 
@@ -293,7 +293,7 @@ void drm_ttm_fixup_caching(drm_ttm_t * ttm)
 
 	if (ttm->state == ttm_evicted) {
 		drm_ttm_backend_t *be = ttm->be;
-		if (be->needs_ub_cache_adjust(be)) {
+		if (be->func->needs_ub_cache_adjust(be)) {
 			drm_set_caching(ttm, 0);
 		}
 		ttm->state = ttm_unbound;
@@ -329,7 +329,7 @@ int drm_bind_ttm(drm_ttm_t * ttm, int cached, unsigned long aper_offset)
 		drm_set_caching(ttm, DRM_TTM_PAGE_UNCACHED);
 	}
 
-	if ((ret = be->bind(be, aper_offset, cached))) {
+	if ((ret = be->func->bind(be, aper_offset, cached))) {
 		ttm->state = ttm_evicted;
 		DRM_ERROR("Couldn't bind backend.\n");
 		return ret;

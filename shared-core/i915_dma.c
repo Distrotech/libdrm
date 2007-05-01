@@ -34,7 +34,8 @@
 #define IS_I965G(dev)  (dev->pci_device == 0x2972 || \
 			dev->pci_device == 0x2982 || \
 			dev->pci_device == 0x2992 || \
-			dev->pci_device == 0x29A2)
+			dev->pci_device == 0x29A2 || \
+			dev->pci_device == 0x2A02)
 
 
 /* Really want an OS-independent resettable timer.  Would like to have
@@ -152,7 +153,7 @@ static int i915_initialize(drm_device_t * dev,
 {
 	memset(dev_priv, 0, sizeof(drm_i915_private_t));
 
-	DRM_GETSAREA();
+	dev_priv->sarea = drm_getsarea(dev);
 	if (!dev_priv->sarea) {
 		DRM_ERROR("can not find sarea!\n");
 		dev->dev_private = (void *)dev_priv;
@@ -210,9 +211,6 @@ static int i915_initialize(drm_device_t * dev,
 	I915_WRITE(0x02080, dev_priv->dma_status_page);
 	DRM_DEBUG("Enabled hardware status page\n");
 	dev->dev_private = (void *)dev_priv;
-#ifdef I915_HAVE_BUFFER
-	drm_bo_driver_init(dev);
-#endif
 	return 0;
 }
 
@@ -661,7 +659,6 @@ static int i915_batchbuffer(DRM_IOCTL_ARGS)
 {
 	DRM_DEVICE;
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
-	u32 *hw_status = dev_priv->hw_status_page;
 	drm_i915_sarea_t *sarea_priv = (drm_i915_sarea_t *)
 	    dev_priv->sarea_priv;
 	drm_i915_batchbuffer_t batch;
@@ -687,7 +684,7 @@ static int i915_batchbuffer(DRM_IOCTL_ARGS)
 
 	ret = i915_dispatch_batchbuffer(dev, &batch);
 
-	sarea_priv->last_dispatch = (int)hw_status[5];
+	sarea_priv->last_dispatch = READ_BREADCRUMB(dev_priv);
 	return ret;
 }
 
@@ -695,7 +692,6 @@ static int i915_cmdbuffer(DRM_IOCTL_ARGS)
 {
 	DRM_DEVICE;
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
-	u32 *hw_status = dev_priv->hw_status_page;
 	drm_i915_sarea_t *sarea_priv = (drm_i915_sarea_t *)
 	    dev_priv->sarea_priv;
 	drm_i915_cmdbuffer_t cmdbuf;
@@ -723,7 +719,7 @@ static int i915_cmdbuffer(DRM_IOCTL_ARGS)
 		return ret;
 	}
 
-	sarea_priv->last_dispatch = (int)hw_status[5];
+	sarea_priv->last_dispatch = READ_BREADCRUMB(dev_priv);
 	return 0;
 }
 
@@ -1625,4 +1621,12 @@ int i915_max_ioctl = DRM_ARRAY_SIZE(i915_ioctls);
 int i915_driver_device_is_agp(drm_device_t * dev)
 {
 	return 1;
+}
+
+int i915_driver_firstopen(struct drm_device *dev)
+{
+#ifdef I915_HAVE_BUFFER
+	drm_bo_driver_init(dev);
+#endif
+	return 0;
 }

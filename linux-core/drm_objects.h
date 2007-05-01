@@ -1,8 +1,8 @@
 /**************************************************************************
- * 
+ *
  * Copyright (c) 2006-2007 Tungsten Graphics, Inc., Cedar Park, TX., USA
  * All Rights Reserved.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -10,7 +10,7 @@
  * distribute, sub license, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice (including the
  * next paragraph) shall be included in all copies or substantial portions
  * of the Software.
@@ -19,8 +19,8 @@
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL
  * THE COPYRIGHT HOLDERS, AUTHORS AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM,
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE 
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
  * USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  **************************************************************************/
@@ -222,22 +222,20 @@ extern int drm_fence_ioctl(DRM_IOCTL_ARGS);
  * The ttm backend GTT interface. (In our case AGP).
  * Any similar type of device (PCIE?)
  * needs only to implement these functions to be usable with the "TTM" interface.
- * The AGP backend implementation lives in drm_agpsupport.c 
+ * The AGP backend implementation lives in drm_agpsupport.c
  * basically maps these calls to available functions in agpgart.
  * Each drm device driver gets an
- * additional function pointer that creates these types, 
+ * additional function pointer that creates these types,
  * so that the device can choose the correct aperture.
- * (Multiple AGP apertures, etc.) 
+ * (Multiple AGP apertures, etc.)
  * Most device drivers will let this point to the standard AGP implementation.
  */
 
 #define DRM_BE_FLAG_NEEDS_FREE     0x00000001
 #define DRM_BE_FLAG_BOUND_CACHED   0x00000002
 
-typedef struct drm_ttm_backend {
-	void *private;
-	uint32_t flags;
-	uint32_t drm_map_type;
+struct drm_ttm_backend;
+typedef struct drm_ttm_backend_func {
 	int (*needs_ub_cache_adjust) (struct drm_ttm_backend * backend);
 	int (*populate) (struct drm_ttm_backend * backend,
 			 unsigned long num_pages, struct page ** pages);
@@ -246,6 +244,13 @@ typedef struct drm_ttm_backend {
 		     unsigned long offset, int cached);
 	int (*unbind) (struct drm_ttm_backend * backend);
 	void (*destroy) (struct drm_ttm_backend * backend);
+} drm_ttm_backend_func_t;
+
+
+typedef struct drm_ttm_backend {
+	uint32_t flags;
+	int mem_type;
+	drm_ttm_backend_func_t *func;
 } drm_ttm_backend_t;
 
 typedef struct drm_ttm {
@@ -275,7 +280,7 @@ extern void drm_ttm_fixup_caching(drm_ttm_t * ttm);
 extern struct page *drm_ttm_get_page(drm_ttm_t * ttm, int index);
 
 /*
- * Destroy a ttm. The user normally calls drmRmMap or a similar IOCTL to do this, 
+ * Destroy a ttm. The user normally calls drmRmMap or a similar IOCTL to do this,
  * which calls this function iff there are no vmas referencing it anymore. Otherwise it is called
  * when the last vma exits.
  */
