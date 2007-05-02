@@ -152,7 +152,7 @@ int i915_init_mem_type(drm_device_t * dev, uint32_t type,
 		man->io_addr -= virt_to_phys(man->io_addr);
 		man->flags =  _DRM_FLAG_MEMTYPE_MAPPABLE |
 			_DRM_FLAG_MEMTYPE_FIXED;
-		man->drm_bus_maptype = _DRM_AGP/*TTM*/;
+		man->drm_bus_maptype = _DRM_TTM;
 		break;
 	default:
 		DRM_ERROR("Unsupported memory type %u\n", (unsigned)type);
