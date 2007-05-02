@@ -135,8 +135,16 @@ typedef struct drm_i915_private {
 	drm_i915_vbl_swap_t vbl_swaps;
 	unsigned int swaps_pending;
 
+#define VIRTUAL_BPL 0
+
+#if VIRTUAL_BPL
+	drm_buffer_object_t *bpl[3];
+#else
+	drm_dma_handle_t *bpl[3];
+#endif
+
 	unsigned int num_bpls, num_bins, preamble_inited[3];
-	drm_dma_handle_t *bmp, **bmp_pool, *bpl[3], **bins[3];
+	drm_dma_handle_t *bmp, **bmp_pool, **bins[3];
 	unsigned bin_x1, bin_x2, bin_cols, bin_pitch, bin_y1, bin_y2, bin_rows;
 
 	unsigned long priv1_addr;
