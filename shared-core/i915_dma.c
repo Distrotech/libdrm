@@ -1313,8 +1313,7 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 
 		BEGIN_RING(&dev_priv->ring, 4);
 		OUT_RING(GFX_OP_LOAD_INDIRECT | (1<<8) | (0<<14) | 1);
-		OUT_RING((render->batch_start + render->static_state_offset) |
-			 (1<<1) | (1<<0));
+		OUT_RING(render->static_state_offset | (1<<1) | (1<<0));
 		OUT_RING(render->static_state_size - 1);
 		OUT_RING(0);
 		ADVANCE_RING();
