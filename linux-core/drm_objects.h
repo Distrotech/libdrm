@@ -429,10 +429,17 @@ typedef struct drm_bo_driver {
  * buffer objects (drm_bo.c)
  */
 
-extern int drm_bo_ioctl(DRM_IOCTL_ARGS);
-extern int drm_mm_init_ioctl(DRM_IOCTL_ARGS);
 extern int drm_bo_init_mm(struct drm_device * dev, unsigned type,
 			  unsigned long p_offset, unsigned long p_size);
+extern int drm_buffer_object_validate(drm_buffer_object_t * bo,
+				      int move_unfenced, int no_wait);
+extern int drm_buffer_object_create(struct drm_device *dev, unsigned long size,
+				    drm_bo_type_t type, uint32_t mask,
+				    uint32_t hint, uint32_t page_alignment,
+				    unsigned long buffer_start,
+				    drm_buffer_object_t ** buf_obj);
+extern int drm_bo_ioctl(DRM_IOCTL_ARGS);
+extern int drm_mm_init_ioctl(DRM_IOCTL_ARGS);
 extern int drm_bo_driver_finish(struct drm_device *dev);
 extern int drm_bo_driver_init(struct drm_device *dev);
 extern int drm_bo_pci_offset(struct drm_device *dev,
@@ -461,6 +468,10 @@ extern int drm_bo_move_buffer(drm_buffer_object_t * bo, uint32_t new_mem_flags,
  * drm_bo_move.c
  */
 
+extern int drm_mem_reg_ioremap(struct drm_device * dev, drm_bo_mem_reg_t * mem,
+			       void **virtual);
+extern void drm_mem_reg_iounmap(struct drm_device * dev, drm_bo_mem_reg_t * mem,
+				void *virtual);
 extern int drm_bo_move_ttm(drm_buffer_object_t * bo,
 			   int evict, int no_wait, drm_bo_mem_reg_t * new_mem);
 extern int drm_bo_move_memcpy(drm_buffer_object_t * bo,

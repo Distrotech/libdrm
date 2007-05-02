@@ -494,6 +494,7 @@ void drm_bo_usage_deref_locked(drm_buffer_object_t * bo)
 		drm_bo_destroy_locked(bo);
 	}
 }
+EXPORT_SYMBOL(drm_bo_usage_deref_locked);
 
 static void drm_bo_base_deref_locked(drm_file_t * priv, drm_user_object_t * uo)
 {
@@ -1351,8 +1352,8 @@ static int drm_bo_check_fake(drm_device_t * dev, drm_bo_mem_reg_t * mem)
  * bo locked.
  */
 
-static int drm_buffer_object_validate(drm_buffer_object_t * bo,
-				      int move_unfenced, int no_wait)
+int drm_buffer_object_validate(drm_buffer_object_t * bo, int move_unfenced,
+			       int no_wait)
 {
 	drm_device_t *dev = bo->dev;
 	drm_buffer_manager_t *bm = &dev->bm;
@@ -1456,6 +1457,7 @@ static int drm_buffer_object_validate(drm_buffer_object_t * bo,
 
 	return 0;
 }
+EXPORT_SYMBOL(drm_buffer_object_validate);
 
 static int drm_bo_handle_validate(drm_file_t * priv, uint32_t handle,
 				  uint32_t flags, uint32_t mask, uint32_t hint,
@@ -1624,6 +1626,7 @@ int drm_buffer_object_create(drm_device_t *dev,
 	drm_bo_usage_deref_unlocked(bo);
 	return ret;
 }
+EXPORT_SYMBOL(drm_buffer_object_create);
 
 static int drm_bo_add_user_object(drm_file_t * priv, drm_buffer_object_t * bo,
 				  int shareable)

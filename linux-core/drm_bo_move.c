@@ -128,6 +128,7 @@ int drm_mem_reg_ioremap(drm_device_t * dev, drm_bo_mem_reg_t * mem,
 	*virtual = addr;
 	return 0;
 }
+EXPORT_SYMBOL(drm_mem_reg_ioremap);
 
 /**
  * \c Unmap mapping obtained using drm_bo_ioremap
@@ -150,6 +151,7 @@ void drm_mem_reg_iounmap(drm_device_t * dev, drm_bo_mem_reg_t * mem,
 		iounmap(virtual);
 	}
 }
+EXPORT_SYMBOL(drm_mem_reg_iounmap);
 
 static int drm_copy_io_page(void *dst, void *src, unsigned long page)
 {
