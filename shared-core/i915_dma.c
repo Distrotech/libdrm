@@ -811,14 +811,13 @@ static int i915_bmp_alloc(drm_device_t *dev)
 
 #define BPL_ALIGN (16 * 1024)
 
-static int i915_bpl_alloc(drm_device_t *dev, int bin_pitch, int bin_rows)
+static int i915_bpl_alloc(drm_device_t *dev, int num_bins)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
-	int i, bpl_size = (8 * bin_rows * bin_pitch + PAGE_SIZE - 1) &
-		PAGE_MASK;
+	int i, bpl_size = (8 * num_bins + PAGE_SIZE - 1) & PAGE_MASK;
 
-	if (bin_pitch <= 0 || bin_rows <= 0) {
-		DRM_ERROR("Invalid bin pitch=%d rows=%d\n", bin_pitch, bin_rows);
+	if (num_bins <= 0) {
+		DRM_ERROR("Invalid num_bins=%d\n", num_bins);
 		return DRM_ERR(EINVAL);
 	}
 
@@ -1081,8 +1080,8 @@ static int i915_bin_alloc(drm_device_t *dev, int bins)
 static int i915_hwz_alloc(drm_device_t *dev, struct drm_i915_hwz_alloc *alloc)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
-	int bin_rows = ((((alloc->y2 + BIN_HEIGHT - 1) & BIN_HMASK) -
-			 (alloc->y1 & BIN_HMASK)) / BIN_HEIGHT + 3) & ~3;
+	int bin_rows = (((alloc->y2 + BIN_HEIGHT - 1) & BIN_HMASK) -
+			 (alloc->y1 & BIN_HMASK)) / BIN_HEIGHT;
 	int bin_cols = (((alloc->x2 + BIN_WIDTH - 1) & BIN_WMASK) -
 			(alloc->x1 & BIN_WMASK)) / BIN_WIDTH;
 	int ret;
@@ -1104,14 +1103,14 @@ static int i915_hwz_alloc(drm_device_t *dev, struct drm_i915_hwz_alloc *alloc)
 
 	if (dev_priv->num_bpls != alloc->num_buffers ||
 	    dev_priv->bin_rows != bin_rows ||
-	    dev_priv->bin_rows != bin_rows) {
+	    dev_priv->bin_cols != bin_cols) {
 		i915_bin_free(dev);
 		i915_bpl_free(dev);
 	}
 
 	dev_priv->num_bpls = alloc->num_buffers;
 
-	ret = i915_bpl_alloc(dev, bin_cols, bin_rows);
+	ret = i915_bpl_alloc(dev, bin_cols * ((bin_rows + 3) & ~3));
 
 	if (ret) {
 		DRM_ERROR("Failed to allocate BPLs\n");
