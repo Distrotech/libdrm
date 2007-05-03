@@ -82,6 +82,36 @@ void i915_kernel_lost_context(drm_i915_private_t * dev_priv,
 		dev_priv->sarea_priv->perf_boxes |= I915_BOX_RING_EMPTY;
 }
 
+#define BMP_SIZE PAGE_SIZE
+#define BMP_POOL_SIZE ((BMP_SIZE - 32) / 4)
+
+static void i915_bmp_free(drm_device_t *dev)
+{
+	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
+
+	if (dev_priv->bmp_pool) {
+		int i;
+
+		for (i = 0; i < BMP_POOL_SIZE; i++) {
+			if (!dev_priv->bmp_pool[i])
+				break;
+
+			drm_pci_free(dev, dev_priv->bmp_pool[i]);
+		}
+
+		drm_free(dev_priv->bmp_pool, BMP_POOL_SIZE *
+			 sizeof(drm_dma_handle_t*), DRM_MEM_DRIVER);
+		dev_priv->bmp_pool = NULL;
+	}
+
+	if (dev_priv->bmp) {
+		drm_pci_free(dev, dev_priv->bmp);
+		dev_priv->bmp = NULL;
+	}
+
+	DRM_INFO("BMP freed\n");
+}
+
 static int i915_dma_cleanup(drm_device_t * dev)
 {
 	/* Make sure interrupts are disabled here because the uninstall ioctl
@@ -110,6 +140,8 @@ static int i915_dma_cleanup(drm_device_t * dev)
 			/* Need to rewrite hardware status page */
 			I915_WRITE(0x02080, 0x1ffff000);
 		}
+
+		i915_bmp_free(dev);
 
 		drm_free(dev->dev_private, sizeof(drm_i915_private_t),
 			 DRM_MEM_DRIVER);
@@ -728,9 +760,6 @@ static int i915_cmdbuffer(DRM_IOCTL_ARGS)
 #define BIN_HMASK ~(BIN_HEIGHT - 1)
 #define BIN_WMASK ~(BIN_WIDTH - 1)
 
-#define BMP_SIZE PAGE_SIZE
-#define BMP_POOL_SIZE ((BMP_SIZE - 32) / 4)
-
 static int i915_bmp_alloc(drm_device_t *dev)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
@@ -778,33 +807,6 @@ static int i915_bmp_alloc(drm_device_t *dev)
 	DRM_INFO("BMP allocated and initialized\n");
 
 	return 0;
-}
-
-static void i915_bmp_free(drm_device_t *dev)
-{
-	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
-
-	if (dev_priv->bmp_pool) {
-		int i;
-
-		for (i = 0; i < BMP_POOL_SIZE; i++) {
-			if (!dev_priv->bmp_pool[i])
-				break;
-
-			drm_pci_free(dev, dev_priv->bmp_pool[i]);
-		}
-
-		drm_free(dev_priv->bmp_pool, BMP_POOL_SIZE *
-			 sizeof(drm_dma_handle_t*), DRM_MEM_DRIVER);
-		dev_priv->bmp_pool = NULL;
-	}
-
-	if (dev_priv->bmp) {
-		drm_pci_free(dev, dev_priv->bmp);
-		dev_priv->bmp = NULL;
-	}
-
-	DRM_INFO("BMP freed\n");
 }
 
 #define BPL_ALIGN (16 * 1024)
@@ -1124,7 +1126,6 @@ static int i915_hwz_free(drm_device_t *dev)
 {
 	i915_bin_free(dev);
 	i915_bpl_free(dev);
-	i915_bmp_free(dev);
 
 	return 0;
 }
@@ -1636,7 +1637,7 @@ void i915_driver_lastclose(drm_device_t * dev)
 	if (dev->dev_private) {
 		drm_i915_private_t *dev_priv = dev->dev_private;
 		i915_do_cleanup_pageflip(dev);
-		i915_hwz_free(dev);
+		i915_bmp_free(dev);
 		i915_mem_takedown(&(dev_priv->agp_heap));
 
 		if (dev_priv->priv1_addr) {
@@ -1652,6 +1653,7 @@ void i915_driver_preclose(drm_device_t * dev, DRMFILE filp)
 	if (dev->dev_private) {
 		drm_i915_private_t *dev_priv = dev->dev_private;
 		i915_mem_release(dev, filp, dev_priv->agp_heap);
+		i915_hwz_free(dev);
 	}
 }
 
