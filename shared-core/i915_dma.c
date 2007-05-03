@@ -889,8 +889,11 @@ static void i915_bpl_free(drm_device_t *dev)
 	}
 }
 
+#define DEBUG_HWZ 0
+
 static void i915_bpl_print(drm_device_t *dev, int i)
 {
+#if DEBUG_HWZ
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	u32 *bpl_vaddr;
 	int bpl_row;
@@ -926,40 +929,46 @@ static void i915_bpl_print(drm_device_t *dev, int i)
 			DRM_DEBUG(" %8p(0x%08x, 0x%08x)", bpl, bpl[0], bpl[1]);
 		}
 
-		DRM_INFO("\n");
+		DRM_DEBUG("\n");
 	}
 #if VIRTUAL_BPL
 	drm_mem_reg_iounmap(dev, &dev_priv->bpl[i]->mem, bpl_vaddr);
 #endif
+
+#endif /* DEBUG_HWZ */
 }
 
 static int i915_hwb_idle(drm_device_t *dev, unsigned bpl_num)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
-	int i, ret = 0, firsttime = 1;
+#if DEBUG_HWZ
+	int i, firsttime = 1;
+#endif
+	int ret = 0;
 
 	if (i915_wait_ring(dev_priv, &dev_priv->hwb_ring,
 			   dev_priv->hwb_ring.Size - 8,  __FUNCTION__)) {
-		DRM_INFO("Timeout waiting for HWB ring to go idle"
-			 ", PRB head: %x tail: %x/%x HWB head: %x tail: %x/%x\n",
-			 I915_READ(LP_RING + RING_HEAD) & HEAD_ADDR,
-			 I915_READ(LP_RING + RING_TAIL) & HEAD_ADDR,
-			 dev_priv->ring.tail,
-			 I915_READ(HWB_RING + RING_HEAD) & HEAD_ADDR,
-			 I915_READ(HWB_RING + RING_TAIL) & HEAD_ADDR,
-			 dev_priv->hwb_ring.tail);
-		DRM_INFO("ESR: 0x%x DMA_FADD_S: 0x%x IPEIR: 0x%x SCPD0: 0x%x "
-			 "IIR: 0x%x\n", I915_READ(ESR), I915_READ(DMA_FADD_S),
-			 I915_READ(IPEIR), I915_READ(SCPD0),
-			 I915_READ(I915REG_INT_IDENTITY_R));
-		DRM_INFO("BCPD: 0x%x BMCD: 0x%x BDCD: 0x%x BPCD: 0x%x\n"
-			 "BINSCENE: 0x%x BINSKPD: 0x%x HWBSKPD: 0x%x\n", I915_READ(BCPD),
-			 I915_READ(BMCD), I915_READ(BDCD), I915_READ(BPCD),
-			 I915_READ(BINSCENE), I915_READ(BINSKPD), I915_READ(HWBSKPD));
+		DRM_ERROR("Timeout waiting for HWB ring to go idle"
+			  ", PRB head: %x tail: %x/%x HWB head: %x tail: %x/%x\n",
+			  I915_READ(LP_RING + RING_HEAD) & HEAD_ADDR,
+			  I915_READ(LP_RING + RING_TAIL) & HEAD_ADDR,
+			  dev_priv->ring.tail,
+			  I915_READ(HWB_RING + RING_HEAD) & HEAD_ADDR,
+			  I915_READ(HWB_RING + RING_TAIL) & HEAD_ADDR,
+			  dev_priv->hwb_ring.tail);
+		DRM_ERROR("ESR: 0x%x DMA_FADD_S: 0x%x IPEIR: 0x%x SCPD0: 0x%x "
+			  "IIR: 0x%x\n", I915_READ(ESR), I915_READ(DMA_FADD_S),
+			  I915_READ(IPEIR), I915_READ(SCPD0),
+			  I915_READ(I915REG_INT_IDENTITY_R));
+		DRM_ERROR("BCPD: 0x%x BMCD: 0x%x BDCD: 0x%x BPCD: 0x%x\n"
+			  "BINSCENE: 0x%x BINSKPD: 0x%x HWBSKPD: 0x%x\n", I915_READ(BCPD),
+			  I915_READ(BMCD), I915_READ(BDCD), I915_READ(BPCD),
+			  I915_READ(BINSCENE), I915_READ(BINSKPD), I915_READ(HWBSKPD));
 
 		ret = DRM_ERR(EBUSY);
 	}
 
+#if DEBUG_HWZ
 	if (ret)
 		bpl_num = (bpl_num - 1) % dev_priv->num_bpls;
 
@@ -981,9 +990,9 @@ static int i915_hwb_idle(drm_device_t *dev, unsigned bpl_num)
 			if (bin[k]) {
 				int j;
 
-				DRM_INFO("BPL %d bin %d busaddr=0x%x non-empty:\n",
-					 bpl_num, i,
-					 dev_priv->bins[bpl_num][i]->busaddr);
+				DRM_DEBUG("BPL %d bin %d busaddr=0x%x non-empty:\n",
+					  bpl_num, i,
+					  dev_priv->bins[bpl_num][i]->busaddr);
 
 				if (!firsttime)
 					break;
@@ -994,9 +1003,9 @@ static int i915_hwb_idle(drm_device_t *dev, unsigned bpl_num)
 
 					if (data[0] || data[1] || data[2] || data[3] ||
 					    data[4] || data[5] || data[6] || data[7])
-						DRM_INFO("%p: %8x %8x %8x %8x %8x %8x %8x %8x\n",
-							 data, data[0], data[1], data[2], data[3],
-							 data[4], data[5], data[6], data[7]);
+						DRM_DEBUG("%p: %8x %8x %8x %8x %8x %8x %8x %8x\n",
+							  data, data[0], data[1], data[2], data[3],
+							  data[4], data[5], data[6], data[7]);
 				}
 
 				firsttime = 0;
@@ -1005,6 +1014,7 @@ static int i915_hwb_idle(drm_device_t *dev, unsigned bpl_num)
 			}
 		}
 	}
+#endif
 
 	return ret;
 }
@@ -1223,8 +1233,8 @@ static int i915_bin_init(drm_device_t *dev, int i, u32 DR1, u32 DR4)
 
 	i915_bpl_print(dev, i);
 
-	DRM_INFO("BPL %d initialized for %d bins\n", i, dev_priv->bin_rows *
-		 dev_priv->bin_cols);
+	DRM_DEBUG("BPL %d initialized for %d bins\n", i, dev_priv->bin_rows *
+		  dev_priv->bin_cols);
 
 	return 0;
 }
@@ -1234,10 +1244,19 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	int ret, i;
 	u32 cache_mode_0 = I915_READ(Cache_Mode_0);
+	int static_state_off = render->static_state_offset -
+		virt_to_phys((void*)dev_priv->priv1_addr);
 	RING_LOCALS;
 
 	DRM_INFO("i915 hwz render, bpl_num = %d, batch_start = 0x%x\n",
 		 render->bpl_num, render->batch_start);
+
+	if (static_state_off < 0 || render->static_state_size <= 0 ||
+	    static_state_off + 4 * render->static_state_size >
+	    ((1 << dev_priv->priv1_order) * PAGE_SIZE)) {
+	  	DRM_ERROR("Invalid static indirect state\n");
+		return DRM_ERR(EINVAL);
+	}
 
 	if (dev_priv->hwb_ring.tail != (I915_READ(HWB_RING + RING_TAIL)
 					& TAIL_ADDR)) {
@@ -1307,28 +1326,33 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 
 	ADVANCE_RING();
 
+#if DEBUG_HWZ
+	i915_hwb_idle(dev, render->bpl_num);
+#endif
+
+	BEGIN_RING(&dev_priv->hwb_ring, 2);
+	OUT_RING(CMD_MI_FLUSH | MI_END_SCENE | MI_SCENE_COUNT |
+		 MI_NO_WRITE_FLUSH);
+	OUT_RING(0);
+	ADVANCE_RING();
+
 	/* Prepare the Scene Render List */
-	if (render->static_state_size) {
-		DRM_INFO("Emitting %d DWORDs of static indirect state\n",
-			 render->static_state_size);
+	DRM_DEBUG("Emitting %d DWORDs of static indirect state\n",
+		  render->static_state_size);
 
-		BEGIN_RING(&dev_priv->ring, 4);
-		OUT_RING(GFX_OP_LOAD_INDIRECT | (1<<8) | (0<<14) | 1);
-		OUT_RING(render->static_state_offset | (1<<1) | (1<<0));
-		OUT_RING(render->static_state_size - 1);
-		OUT_RING(0);
-		ADVANCE_RING();
-	}
+	BEGIN_RING(&dev_priv->ring, 2 * dev_priv->num_bins + 12);
 
-	BEGIN_RING(&dev_priv->ring, 2 * dev_priv->num_bins + 8);
-
+	OUT_RING(GFX_OP_LOAD_INDIRECT | (1<<8) | (0<<14) | 1);
+	OUT_RING(render->static_state_offset | (1<<1) | (1<<0));
+	OUT_RING(render->static_state_size - 1);
+	OUT_RING(0);
 	OUT_RING(CMD_MI_FLUSH /*| MI_NO_WRITE_FLUSH*/);
 	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
 	OUT_RING(Cache_Mode_0);
 	OUT_RING((cache_mode_0 & ~0x20) | 0x201);
 
-	DRM_INFO("Setting Cache_Mode_0 to 0x%x for zone rendering\n",
-		 (cache_mode_0 & ~0x20) | 0x201);
+	DRM_DEBUG("Setting Cache_Mode_0 to 0x%x for zone rendering\n",
+		  (cache_mode_0 & ~0x20) | 0x201);
 
 	for (i = 0; i < dev_priv->num_bins; i++) {
 		OUT_RING(MI_BATCH_BUFFER_START);
@@ -1340,22 +1364,11 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	OUT_RING(Cache_Mode_0);
 	OUT_RING(cache_mode_0);
 
-	DRM_INFO("Restoring Cache_Mode_0 to 0x%x\n", cache_mode_0);
-
-	dev_priv->ring.tail = outring;
-	dev_priv->ring.space -= outcount * 4;
+	DRM_DEBUG("Restoring Cache_Mode_0 to 0x%x\n", cache_mode_0);
 
 	i915_hwb_idle(dev, render->bpl_num);
 
-	BEGIN_RING(&dev_priv->hwb_ring, 2);
-	OUT_RING(CMD_MI_FLUSH | MI_END_SCENE | MI_SCENE_COUNT |
-		 MI_NO_WRITE_FLUSH);
-	OUT_RING(0);
 	ADVANCE_RING();
-
-	i915_hwb_idle(dev, render->bpl_num);
-
-	I915_WRITE(LP_RING + RING_TAIL, dev_priv->ring.tail);
 
 	return ret;
 }
