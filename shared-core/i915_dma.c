@@ -451,7 +451,7 @@ void i915_emit_breadcrumb(drm_device_t *dev)
 
 	BEGIN_RING(&dev_priv->ring, 4);
 	OUT_RING(CMD_STORE_DWORD_IDX);
-	OUT_RING(20);
+	OUT_RING(16 << 2);
 	OUT_RING(dev_priv->counter);
 	OUT_RING(0);
 	ADVANCE_RING();
