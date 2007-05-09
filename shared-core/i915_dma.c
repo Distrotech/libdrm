@@ -1242,7 +1242,6 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	int ret, i;
-	u32 cache_mode_0 = I915_READ(Cache_Mode_0);
 	int static_state_off = render->static_state_offset -
 		virt_to_phys((void*)dev_priv->priv1_addr);
 	RING_LOCALS;
@@ -1348,10 +1347,7 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	OUT_RING(CMD_MI_FLUSH /*| MI_NO_WRITE_FLUSH*/);
 	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
 	OUT_RING(Cache_Mode_0);
-	OUT_RING((cache_mode_0 & ~0x20) | 0x201);
-
-	DRM_DEBUG("Setting Cache_Mode_0 to 0x%x for zone rendering\n",
-		  (cache_mode_0 & ~0x20) | 0x201);
+	OUT_RING(0x221 << 16 | 0x201);
 
 	for (i = 0; i < dev_priv->num_bins; i++) {
 		OUT_RING(MI_BATCH_BUFFER_START);
@@ -1361,9 +1357,7 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	OUT_RING(CMD_MI_FLUSH | MI_END_SCENE | MI_SCENE_COUNT);
 	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
 	OUT_RING(Cache_Mode_0);
-	OUT_RING(cache_mode_0);
-
-	DRM_DEBUG("Restoring Cache_Mode_0 to 0x%x\n", cache_mode_0);
+	OUT_RING(0x221 << 16 | 0x20);
 
 	i915_hwb_idle(dev, render->bpl_num);
 
