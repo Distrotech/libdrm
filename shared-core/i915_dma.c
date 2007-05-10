@@ -811,13 +811,19 @@ static int i915_bmp_alloc(drm_device_t *dev)
 
 #define BPL_ALIGN (16 * 1024)
 
-static int i915_bpl_alloc(drm_device_t *dev, int num_bins)
+static int i915_bpl_alloc(drm_device_t *dev,
+			  struct drm_i915_driver_file_fields *filp_priv,
+			  int num_bins)
 {
-	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	int i, bpl_size = (8 * num_bins + PAGE_SIZE - 1) & PAGE_MASK;
 
 	if (num_bins <= 0) {
 		DRM_ERROR("Invalid num_bins=%d\n", num_bins);
+		return DRM_ERR(EINVAL);
+	}
+
+	if (!filp_priv) {
+		DRM_ERROR("No driver storage associated with file handle\n");
 		return DRM_ERR(EINVAL);
 	}
 
@@ -827,8 +833,8 @@ static int i915_bpl_alloc(drm_device_t *dev, int num_bins)
 		bpl_size = BPL_ALIGN;
 #endif
 
-	for (i = 0; i < dev_priv->num_bpls; i++) {
-		if (dev_priv->bpl[i])
+	for (i = 0; i < filp_priv->num_bpls; i++) {
+		if (filp_priv->bpl[i])
 			continue;
 #if VIRTUAL_BPL
 		if (drm_buffer_object_create(dev, bpl_size, drm_bo_type_kernel,
@@ -836,75 +842,78 @@ static int i915_bpl_alloc(drm_device_t *dev, int num_bins)
 					     DRM_BO_FLAG_MEM_TT,
 					     DRM_BO_HINT_DONT_FENCE,
 					     BPL_ALIGN / PAGE_SIZE, 0,
-					     &dev_priv->bpl[i]))
-			dev_priv->bpl[i] = NULL;
+					     &filp_priv->bpl[i]))
+			filp_priv->bpl[i] = NULL;
 #else
-		dev_priv->bpl[i] = drm_pci_alloc(dev, bpl_size, BPL_ALIGN,
-						 0xffffffff);
+		filp_priv->bpl[i] = drm_pci_alloc(dev, bpl_size, BPL_ALIGN,
+						  0xffffffff);
 #endif
-		if (!dev_priv->bpl[i]) {
+		if (!filp_priv->bpl[i]) {
 			DRM_ERROR("Failed to allocate BPL %d\n", i);
 			return DRM_ERR(ENOMEM);
 		}
 #if VIRTUAL_BPL
-		if (dev_priv->bpl[i]->offset & (0x7 << 29)) {
+		if (filp_priv->bpl[i]->offset & (0x7 << 29)) {
 			DRM_ERROR("BPL %d bus address 0x%lx high bits not 0\n",
-				  i, dev_priv->bpl[i]->offset);
+				  i, filp_priv->bpl[i]->offset);
 			mutex_lock(&dev->struct_mutex);
-			drm_bo_usage_deref_locked(dev_priv->bpl[i]);
+			drm_bo_usage_deref_locked(filp_priv->bpl[i]);
 			mutex_unlock(&dev->struct_mutex);
-			dev_priv->bpl[i] = NULL;
+			filp_priv->bpl[i] = NULL;
 			return DRM_ERR(ENOMEM);
 		}
 
-		DRM_INFO("BPL %d offset=0x%lx\n", i, dev_priv->bpl[i]->offset);
+		DRM_INFO("BPL %d offset=0x%lx\n", i, filp_priv->bpl[i]->offset);
 #endif
 	}
 
-	DRM_INFO("Allocated %d BPLs of %d bytes\n", dev_priv->num_bpls,
+	DRM_INFO("Allocated %d BPLs of %d bytes\n", filp_priv->num_bpls,
 		 bpl_size);
 
 	return 0;
 }
 
-static void i915_bpl_free(drm_device_t *dev)
+static void i915_bpl_free(drm_device_t *dev,
+			  struct drm_i915_driver_file_fields *filp_priv)
 {
-	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	int i;
 
+	if (!filp_priv)
+		return;
+
 	for (i = 0; i < 3; i++) {
-		if (!dev_priv->bpl[i])
+		if (!filp_priv->bpl[i])
 			return;
 
 #if VIRTUAL_BPL
 		mutex_lock(&dev->struct_mutex);
-		drm_bo_usage_deref_locked(dev_priv->bpl[i]);
+		drm_bo_usage_deref_locked(filp_priv->bpl[i]);
 		mutex_unlock(&dev->struct_mutex);
 #else
-		drm_pci_free(dev, dev_priv->bpl[i]);
+		drm_pci_free(dev, filp_priv->bpl[i]);
 #endif
 
-		dev_priv->bpl[i] = NULL;
+		filp_priv->bpl[i] = NULL;
 	}
 }
 
 #define DEBUG_HWZ 0
 
-static void i915_bpl_print(drm_device_t *dev, int i)
+static void i915_bpl_print(drm_device_t *dev,
+			   struct drm_i915_driver_file_fields *filp_priv, int i)
 {
 #if DEBUG_HWZ
-	drm_i915_private_t *dev_priv = dev->dev_private;
 	u32 *bpl_vaddr;
 	int bpl_row;
 #if VIRTUAL_BPL
 	int ret;
 #endif
 
-	if (!dev_priv->bpl[i])
+	if (!filp_priv || !filp_priv->bpl[i])
 		return;
 
 #if VIRTUAL_BPL
-	ret = drm_mem_reg_ioremap(dev, &dev_priv->bpl[i]->mem,
+	ret = drm_mem_reg_ioremap(dev, &filp_priv->bpl[i]->mem,
 				  (void*)&bpl_vaddr);
 
 	if (ret) {
@@ -912,32 +921,34 @@ static void i915_bpl_print(drm_device_t *dev, int i)
 		return;
 	}
 #else
-	bpl_vaddr = dev_priv->bpl[i]->vaddr;
+	bpl_vaddr = filp_priv->bpl[i]->vaddr;
 #endif
 
 	DRM_DEBUG("BPL %d contents:\n", i);
 
-	for (bpl_row = 0; bpl_row < dev_priv->bin_rows; bpl_row++) {
+	for (bpl_row = 0; bpl_row < filp_priv->bin_rows; bpl_row++) {
 		int bpl_col;
 
 		DRM_DEBUG("Row %d:", bpl_row);
 
-		for (bpl_col = 0; bpl_col < dev_priv->bin_cols; bpl_col++) {
+		for (bpl_col = 0; bpl_col < filp_priv->bin_cols; bpl_col++) {
 			u32 *bpl = (u32*)bpl_vaddr +
-			  2 * (bpl_row * dev_priv->bin_cols + bpl_col);
+				2 * (bpl_row * filp_priv->bin_cols + bpl_col);
 			DRM_DEBUG(" %8p(0x%08x, 0x%08x)", bpl, bpl[0], bpl[1]);
 		}
 
 		DRM_DEBUG("\n");
 	}
 #if VIRTUAL_BPL
-	drm_mem_reg_iounmap(dev, &dev_priv->bpl[i]->mem, bpl_vaddr);
+	drm_mem_reg_iounmap(dev, &filp_priv->bpl[i]->mem, bpl_vaddr);
 #endif
 
 #endif /* DEBUG_HWZ */
 }
 
-static int i915_hwb_idle(drm_device_t *dev, unsigned bpl_num)
+static int i915_hwb_idle(drm_device_t *dev,
+			 struct drm_i915_driver_file_fields *filp_priv,
+			 unsigned bpl_num)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
 #if DEBUG_HWZ
@@ -968,22 +979,25 @@ static int i915_hwb_idle(drm_device_t *dev, unsigned bpl_num)
 	}
 
 #if DEBUG_HWZ
-	if (ret)
-		bpl_num = (bpl_num - 1) % dev_priv->num_bpls;
-
-	i915_bpl_print(dev, bpl_num);
-
-       	if (!dev_priv->preamble_inited[bpl_num])
+	if (!filp_priv)
 		return ret;
 
-	for (i = 0; i < dev_priv->num_bins; i++) {
+	if (ret)
+		bpl_num = (bpl_num - 1) % filp_priv->num_bpls;
+
+	i915_bpl_print(dev, filp_priv, bpl_num);
+
+       	if (!filp_priv->preamble_inited[bpl_num])
+		return ret;
+
+	for (i = 0; i < filp_priv->num_bins; i++) {
 		u32 *bin;
 		int k;
 
-		if (!dev_priv->bins[bpl_num] || !dev_priv->bins[bpl_num][i])
+		if (!filp_priv->bins[bpl_num] || !filp_priv->bins[bpl_num][i])
 			continue;
 
-		bin = dev_priv->bins[bpl_num][i]->vaddr;
+		bin = filp_priv->bins[bpl_num][i]->vaddr;
 
 		for (k = 6; k < 1024; k++) {
 			if (bin[k]) {
@@ -991,13 +1005,13 @@ static int i915_hwb_idle(drm_device_t *dev, unsigned bpl_num)
 
 				DRM_DEBUG("BPL %d bin %d busaddr=0x%x non-empty:\n",
 					  bpl_num, i,
-					  dev_priv->bins[bpl_num][i]->busaddr);
+					  filp_priv->bins[bpl_num][i]->busaddr);
 
 				if (!firsttime)
 					break;
 
 				for (j = 0; j < 128; j++) {
-					u32 *data = dev_priv->bins[bpl_num][i]->vaddr +
+					u32 *data = filp_priv->bins[bpl_num][i]->vaddr +
 						j * 8 * 4;
 
 					if (data[0] || data[1] || data[2] || data[3] ||
@@ -1018,66 +1032,77 @@ static int i915_hwb_idle(drm_device_t *dev, unsigned bpl_num)
 	return ret;
 }
 
-static void i915_bin_free(drm_device_t *dev)
+static void i915_bin_free(drm_device_t *dev,
+			  struct drm_i915_driver_file_fields *filp_priv)
 {
-	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	int i, j;
 
-	i915_hwb_idle(dev, 0);
+	if (!filp_priv)
+		return;
+
+	i915_hwb_idle(dev, filp_priv, 0);
 
 	for (i = 0; i < 3; i++) {
-		if (!dev_priv->bins[i])
+		if (!filp_priv->bins[i])
 			return;
 
-		for (j = 0; j < dev_priv->num_bins; j++)
-			drm_pci_free(dev, dev_priv->bins[i][j]);
+		for (j = 0; j < filp_priv->num_bins; j++)
+			drm_pci_free(dev, filp_priv->bins[i][j]);
 
-		drm_free(dev_priv->bins[i], dev_priv->num_bins *
+		drm_free(filp_priv->bins[i], filp_priv->num_bins *
 			 sizeof(drm_dma_handle_t*), DRM_MEM_DRIVER);
-		dev_priv->bins[i] = NULL;
+		filp_priv->bins[i] = NULL;
 	}
 }
 
-static int i915_bin_alloc(drm_device_t *dev, int bins)
+static int i915_bin_alloc(drm_device_t *dev,
+			  struct drm_i915_driver_file_fields *filp_priv,
+			  int bins)
 {
-	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	int i, j;
 
-	i915_bin_free(dev);
+	if (!filp_priv) {
+		DRM_ERROR("No driver storage associated with file handle\n");
+		return DRM_ERR(EINVAL);
+	}
 
-	for (i = 0; i < dev_priv->num_bpls; i++) {
-		dev_priv->bins[i] = drm_calloc(1, bins *
-					       sizeof(drm_dma_handle_t*),
-					       DRM_MEM_DRIVER);
+	i915_bin_free(dev, filp_priv);
 
-		if (!dev_priv->bins[i]) {
+	for (i = 0; i < filp_priv->num_bpls; i++) {
+		filp_priv->bins[i] = drm_calloc(1, bins *
+						sizeof(drm_dma_handle_t*),
+						DRM_MEM_DRIVER);
+
+		if (!filp_priv->bins[i]) {
 			DRM_ERROR("Failed to allocate bin pool %d\n", i);
 			return DRM_ERR(ENOMEM);
 		}
 
 		for (j = 0; j < bins; j++) {
-			dev_priv->bins[i][j] = drm_pci_alloc(dev, PAGE_SIZE,
-							     PAGE_SIZE,
-							     0xffffffff);
+			filp_priv->bins[i][j] = drm_pci_alloc(dev, PAGE_SIZE,
+							      PAGE_SIZE,
+							      0xffffffff);
 
-			if (!dev_priv->bins[i][j]) {
+			if (!filp_priv->bins[i][j]) {
 				DRM_ERROR("Failed to allocate page for bin %d "
 					  "of buffer %d\n", j, i);
 				return DRM_ERR(ENOMEM);
 			}
 		}
 
-		dev_priv->preamble_inited[i] = FALSE;
+		filp_priv->preamble_inited[i] = FALSE;
 	}
 
-	dev_priv->num_bins = bins;
+	filp_priv->num_bins = bins;
 
-	DRM_INFO("Allocated %d times %d bins\n", dev_priv->num_bpls, bins);
+	DRM_INFO("Allocated %d times %d bins\n", filp_priv->num_bpls, bins);
 
 	return 0;
 }
 
-static int i915_hwz_alloc(drm_device_t *dev, struct drm_i915_hwz_alloc *alloc)
+static int i915_hwz_alloc(drm_device_t *dev,
+			  struct drm_i915_driver_file_fields *filp_priv,
+			  struct drm_i915_hwz_alloc *alloc)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	int bin_rows = (((alloc->y2 + BIN_HEIGHT - 1) & BIN_HMASK) -
@@ -1096,56 +1121,70 @@ static int i915_hwz_alloc(drm_device_t *dev, struct drm_i915_hwz_alloc *alloc)
 		return DRM_ERR(EINVAL);
 	}
 
-	dev_priv->bin_x1 = alloc->x1;
-	dev_priv->bin_x2 = alloc->x2;
-	dev_priv->bin_y1 = alloc->y1;
-	dev_priv->bin_y2 = alloc->y2;
-
-	if (dev_priv->num_bpls != alloc->num_buffers ||
-	    dev_priv->bin_rows != bin_rows ||
-	    dev_priv->bin_cols != bin_cols) {
-		i915_bin_free(dev);
-		i915_bpl_free(dev);
+	if (!filp_priv) {
+		DRM_ERROR("No driver storage associated with file handle\n");
+		return DRM_ERR(EINVAL);
 	}
 
-	dev_priv->num_bpls = alloc->num_buffers;
+	filp_priv->bin_x1 = alloc->x1;
+	filp_priv->bin_x2 = alloc->x2;
+	filp_priv->bin_y1 = alloc->y1;
+	filp_priv->bin_y2 = alloc->y2;
 
-	ret = i915_bpl_alloc(dev, bin_cols * ((bin_rows + 3) & ~3));
+	if (filp_priv->num_bpls != alloc->num_buffers ||
+	    filp_priv->bin_rows != bin_rows ||
+	    filp_priv->bin_cols != bin_cols) {
+		i915_bin_free(dev, filp_priv);
+		i915_bpl_free(dev, filp_priv);
+	}
+
+	filp_priv->num_bpls = alloc->num_buffers;
+
+	ret = i915_bpl_alloc(dev, filp_priv, bin_cols * ((bin_rows + 3) & ~3));
 
 	if (ret) {
 		DRM_ERROR("Failed to allocate BPLs\n");
 		return ret;
 	}
 
-	ret = i915_bin_alloc(dev, bin_cols * bin_rows);
+	ret = i915_bin_alloc(dev, filp_priv, bin_cols * bin_rows);
 
 	if (ret) {
 		DRM_ERROR("Failed to allocate bins\n");
+		i915_bpl_free(dev, filp_priv);
 		return ret;
 	}
 
-	dev_priv->bin_cols = bin_cols;
-	dev_priv->bin_pitch = alloc->pitch;
-	dev_priv->bin_rows = bin_rows;
+	filp_priv->bin_cols = bin_cols;
+	filp_priv->bin_rows = bin_rows;
 
 	return 0;
 }
 
-static int i915_hwz_free(drm_device_t *dev)
+static int i915_hwz_free(drm_device_t *dev, drm_file_t *filp_priv)
 {
-	i915_bin_free(dev);
-	i915_bpl_free(dev);
+	struct drm_i915_driver_file_fields *filp_i915priv;
+
+	if (!filp_priv || !filp_priv->driver_priv)
+		return 0;
+
+	filp_i915priv = filp_priv->driver_priv;
+
+	i915_bin_free(dev, filp_i915priv);
+	i915_bpl_free(dev, filp_i915priv);
 
 	return 0;
 }
 
-static int i915_bin_init(drm_device_t *dev, int i, u32 DR1, u32 DR4)
+static int i915_bin_init(drm_device_t *dev,
+			 struct drm_i915_driver_file_fields *filp_priv, int i,
+			 u32 DR1, u32 DR4)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	u32 *bpl_vaddr;
 	int bpl_row;
-	drm_dma_handle_t **bins = dev_priv->bins[i];
-	unsigned preamble_inited = dev_priv->preamble_inited[i];
+	drm_dma_handle_t **bins = filp_priv->bins[i];
+	unsigned preamble_inited = filp_priv->preamble_inited[i];
 #if VIRTUAL_BPL
 	int ret;
 #endif
@@ -1155,8 +1194,13 @@ static int i915_bin_init(drm_device_t *dev, int i, u32 DR1, u32 DR4)
 		return DRM_ERR(EINVAL);
 	}
 
+	if (!filp_priv) {
+		DRM_ERROR("No driver storage associated with file handle\n");
+		return DRM_ERR(EINVAL);
+	}
+
 #if VIRTUAL_BPL
-	ret = drm_mem_reg_ioremap(dev, &dev_priv->bpl[i]->mem,
+	ret = drm_mem_reg_ioremap(dev, &filp_priv->bpl[i]->mem,
 				  (void*)&bpl_vaddr);
 
 	if (ret) {
@@ -1164,16 +1208,16 @@ static int i915_bin_init(drm_device_t *dev, int i, u32 DR1, u32 DR4)
 		return ret;
 	}
 #else
-	bpl_vaddr = dev_priv->bpl[i]->vaddr;
+	bpl_vaddr = filp_priv->bpl[i]->vaddr;
 #endif
 
-	for (bpl_row = 0; bpl_row < dev_priv->bin_rows; bpl_row += 4) {
+	for (bpl_row = 0; bpl_row < filp_priv->bin_rows; bpl_row += 4) {
 		int bpl_col;
 
-		for (bpl_col = 0; bpl_col < dev_priv->bin_cols; bpl_col++) {
+		for (bpl_col = 0; bpl_col < filp_priv->bin_cols; bpl_col++) {
 			u32 *bpl = (u32*)bpl_vaddr +
-				2 * (bpl_row * dev_priv->bin_cols + 4 * bpl_col);
-			int j, num_bpls = dev_priv->bin_rows - bpl_row;
+				2 * (bpl_row * filp_priv->bin_cols + 4 * bpl_col);
+			int j, num_bpls = filp_priv->bin_rows - bpl_row;
 
 			if (num_bpls > 4)
 				num_bpls = 4;
@@ -1183,7 +1227,7 @@ static int i915_bin_init(drm_device_t *dev, int i, u32 DR1, u32 DR4)
 
 			for (j = 0; j < num_bpls; j++) {
 				unsigned idx = (bpl_row + j) *
-					dev_priv->bin_cols + bpl_col;
+					filp_priv->bin_cols + bpl_col;
 				drm_dma_handle_t *bin = bins[idx];
 
 				DRM_DEBUG("j=%d => idx=%u bpl=%p busaddr=0x%x\n",
@@ -1194,18 +1238,18 @@ static int i915_bin_init(drm_device_t *dev, int i, u32 DR1, u32 DR4)
 
 				if (!preamble_inited) {
 					u32 *pre = bin->vaddr;
-					u32 ymin = max(dev_priv->bin_y1,
-						       (dev_priv->bin_y1 +
+					u32 ymin = max(filp_priv->bin_y1,
+						       (filp_priv->bin_y1 +
 						       (bpl_row + j) *
 							BIN_HEIGHT) & BIN_HMASK);
-					u32 xmin = max(dev_priv->bin_x1,
-						       (dev_priv->bin_x1 +
+					u32 xmin = max(filp_priv->bin_x1,
+						       (filp_priv->bin_x1 +
 							bpl_col * BIN_WIDTH) &
 						       BIN_WMASK);
-					u32 ymax = min(dev_priv->bin_y2 - 1,
+					u32 ymax = min(filp_priv->bin_y2 - 1,
 						       ((ymin + BIN_HEIGHT) &
 							BIN_HMASK) - 1);
-					u32 xmax = min(dev_priv->bin_x2 - 1,
+					u32 xmax = min(filp_priv->bin_x2 - 1,
 						       ((xmin + BIN_WIDTH) &
 							BIN_WMASK) - 1);
 
@@ -1220,34 +1264,33 @@ static int i915_bin_init(drm_device_t *dev, int i, u32 DR1, u32 DR4)
 		}
 	}
 
-	dev_priv->preamble_inited[i] = TRUE;
+	filp_priv->preamble_inited[i] = TRUE;
 
 #if VIRTUAL_BPL
-	drm_mem_reg_iounmap(dev, &dev_priv->bpl[i]->mem, bpl_vaddr);
+	drm_mem_reg_iounmap(dev, &filp_priv->bpl[i]->mem, bpl_vaddr);
 #else
 	flush_agp_cache();
 #endif
 
 	I915_WRITE(GFX_FLSH_CNTL, 1);
 
-	i915_bpl_print(dev, i);
+	i915_bpl_print(dev, filp_priv, i);
 
-	DRM_DEBUG("BPL %d initialized for %d bins\n", i, dev_priv->bin_rows *
-		  dev_priv->bin_cols);
+	DRM_DEBUG("BPL %d initialized for %d bins\n", i, filp_priv->bin_rows *
+		  filp_priv->bin_cols);
 
 	return 0;
 }
 
-static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render)
+static int i915_hwz_render(drm_device_t *dev,
+			  struct drm_i915_driver_file_fields *filp_priv,
+			   struct drm_i915_hwz_render *render)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	int ret, i;
 	int static_state_off = render->static_state_offset -
 		virt_to_phys((void*)dev_priv->priv1_addr);
 	RING_LOCALS;
-
-	DRM_INFO("i915 hwz render, bpl_num = %d, batch_start = 0x%x\n",
-		 render->bpl_num, render->batch_start);
 
 	if (static_state_off < 0 || render->static_state_size <= 0 ||
 	    static_state_off + 4 * render->static_state_size >
@@ -1256,6 +1299,14 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 		return DRM_ERR(EINVAL);
 	}
 
+	if (!filp_priv) {
+		DRM_ERROR("No driver storage associated with file handle\n");
+		return DRM_ERR(EINVAL);
+	}
+
+	DRM_INFO("i915 hwz render, bpl_num = %d, batch_start = 0x%x\n",
+		 render->bpl_num, render->batch_start);
+
 	if (dev_priv->hwb_ring.tail != (I915_READ(HWB_RING + RING_TAIL)
 					& TAIL_ADDR)) {
 		DRM_INFO("Refreshing contexts of HWZ ring buffers\n");
@@ -1263,11 +1314,12 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 		i915_kernel_lost_context(dev_priv, &dev_priv->hwz_ring);
 	}
 
-	if (i915_hwb_idle(dev, render->bpl_num)) {
+	if (i915_hwb_idle(dev, filp_priv, render->bpl_num)) {
 		return DRM_ERR(EBUSY);
 	}
 
-	ret = i915_bin_init(dev, render->bpl_num, render->DR1, render->DR4);
+	ret = i915_bin_init(dev, filp_priv, render->bpl_num, render->DR1,
+			    render->DR4);
 
 	if (ret) {
 		DRM_ERROR("Failed to initialize  BPL %d\n", render->bpl_num);
@@ -1275,12 +1327,12 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	}
 
 	/* Write the HWB command stream */
-	I915_WRITE(BINSCENE, (dev_priv->bin_rows - 1) << 16 |
-		   (dev_priv->bin_cols - 1) << 10 | BS_MASK);
+	I915_WRITE(BINSCENE, (filp_priv->bin_rows - 1) << 16 |
+		   (filp_priv->bin_cols - 1) << 10 | BS_MASK);
 	I915_WRITE(BINSKPD, (VIRTUAL_BPL<<7) | (1<<(7+16)));
 
 #if VIRTUAL_BPL
-	ret = drm_buffer_object_validate(dev_priv->bpl[render->bpl_num], 0, 0);
+	ret = drm_buffer_object_validate(filp_priv->bpl[render->bpl_num], 0, 0);
 
 	if (ret) {
 		DRM_ERROR("Failed to validate BPL %i\n", render->bpl_num);
@@ -1288,30 +1340,30 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	}
 
 	DRM_INFO("BPL %d validated to offset 0x%lx\n", render->bpl_num,
-		 dev_priv->bpl[render->bpl_num]->offset);
+		 filp_priv->bpl[render->bpl_num]->offset);
 
-	I915_WRITE(BINCTL, dev_priv->bpl[render->bpl_num]->offset | BC_MASK);
+	I915_WRITE(BINCTL, filp_priv->bpl[render->bpl_num]->offset | BC_MASK);
 #else
-	I915_WRITE(BINCTL, dev_priv->bpl[render->bpl_num]->busaddr | BC_MASK);
+	I915_WRITE(BINCTL, filp_priv->bpl[render->bpl_num]->busaddr | BC_MASK);
 #endif
 
 	BEGIN_RING(&dev_priv->hwb_ring, 16);
 
 	OUT_RING(CMD_OP_BIN_CONTROL);
 	OUT_RING(0x5 << 4 | 0x6);
-	OUT_RING((dev_priv->bin_y1 & BIN_HMASK) << 16 |
-		 (dev_priv->bin_x1 & BIN_WMASK));
-	OUT_RING((((dev_priv->bin_y2 + BIN_HEIGHT - 1) & BIN_HMASK) - 1) << 16 |
-		 (((dev_priv->bin_x2 + BIN_WIDTH - 1) & BIN_WMASK) - 1));
-	OUT_RING(dev_priv->bin_y1 << 16 | dev_priv->bin_x1);
-	OUT_RING((dev_priv->bin_y2 - 1) << 16 | (dev_priv->bin_x2 - 1));
+	OUT_RING((filp_priv->bin_y1 & BIN_HMASK) << 16 |
+		 (filp_priv->bin_x1 & BIN_WMASK));
+	OUT_RING((((filp_priv->bin_y2 + BIN_HEIGHT - 1) & BIN_HMASK) - 1) << 16 |
+		 (((filp_priv->bin_x2 + BIN_WIDTH - 1) & BIN_WMASK) - 1));
+	OUT_RING(filp_priv->bin_y1 << 16 | filp_priv->bin_x1);
+	OUT_RING((filp_priv->bin_y2 - 1) << 16 | (filp_priv->bin_x2 - 1));
 
 	OUT_RING(GFX_OP_DRAWRECT_INFO);
 	OUT_RING(render->DR1);
-	OUT_RING((dev_priv->bin_y1 & BIN_HMASK) << 16 |
-		 (dev_priv->bin_x1 & BIN_WMASK));
-	OUT_RING((((dev_priv->bin_y2 + BIN_HEIGHT - 1) & BIN_HMASK) - 1) << 16 |
-		 (((dev_priv->bin_x2 + BIN_WIDTH - 1) & BIN_WMASK) - 1));
+	OUT_RING((filp_priv->bin_y1 & BIN_HMASK) << 16 |
+		 (filp_priv->bin_x1 & BIN_WMASK));
+	OUT_RING((((filp_priv->bin_y2 + BIN_HEIGHT - 1) & BIN_HMASK) - 1) << 16 |
+		 (((filp_priv->bin_x2 + BIN_WIDTH - 1) & BIN_WMASK) - 1));
 	OUT_RING(render->DR4);
 
 	OUT_RING(GFX_OP_DESTBUFFER_VARS);
@@ -1325,7 +1377,7 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	ADVANCE_RING();
 
 #if DEBUG_HWZ
-	i915_hwb_idle(dev, render->bpl_num);
+	i915_hwb_idle(dev, filp_priv, render->bpl_num);
 #endif
 
 	BEGIN_RING(&dev_priv->hwb_ring, 2);
@@ -1338,7 +1390,7 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	DRM_DEBUG("Emitting %d DWORDs of static indirect state\n",
 		  render->static_state_size);
 
-	BEGIN_RING(&dev_priv->ring, 2 * dev_priv->num_bins + 12);
+	BEGIN_RING(&dev_priv->ring, 2 * filp_priv->num_bins + 12);
 
 	OUT_RING(GFX_OP_LOAD_INDIRECT | (1<<8) | (0<<14) | 1);
 	OUT_RING(render->static_state_offset | (1<<1) | (1<<0));
@@ -1349,9 +1401,9 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	OUT_RING(Cache_Mode_0);
 	OUT_RING(0x221 << 16 | 0x201);
 
-	for (i = 0; i < dev_priv->num_bins; i++) {
+	for (i = 0; i < filp_priv->num_bins; i++) {
 		OUT_RING(MI_BATCH_BUFFER_START);
-		OUT_RING(dev_priv->bins[render->bpl_num][i]->busaddr);
+		OUT_RING(filp_priv->bins[render->bpl_num][i]->busaddr);
 	}
 
 	OUT_RING(CMD_MI_FLUSH | MI_END_SCENE | MI_SCENE_COUNT);
@@ -1359,7 +1411,7 @@ static int i915_hwz_render(drm_device_t *dev, struct drm_i915_hwz_render *render
 	OUT_RING(Cache_Mode_0);
 	OUT_RING(0x221 << 16 | 0x20);
 
-	i915_hwb_idle(dev, render->bpl_num);
+	i915_hwb_idle(dev, filp_priv, render->bpl_num);
 
 	ADVANCE_RING();
 
@@ -1425,6 +1477,8 @@ static int i915_hwz_init(drm_device_t *dev, struct drm_i915_hwz_init *init)
 static int i915_hwz(DRM_IOCTL_ARGS)
 {
 	DRM_DEVICE;
+	drm_file_t *filp_priv;
+	struct drm_i915_driver_file_fields *filp_i915priv;
 	drm_i915_hwz_t hwz;
 
 	if (!dev->dev_private) {
@@ -1435,20 +1489,28 @@ static int i915_hwz(DRM_IOCTL_ARGS)
 	DRM_COPY_FROM_USER_IOCTL(hwz, (drm_i915_hwz_t __user *) data,
 				 sizeof(hwz));
 
-	switch (hwz.op) {
-	case DRM_I915_HWZ_INIT:
+	if (hwz.op == DRM_I915_HWZ_INIT) {
 		if (!priv->master) {
 			DRM_ERROR("Only master may initialize HWZ\n");
 			return DRM_ERR(EINVAL);
 		}
+
 		return i915_hwz_init(dev, &hwz.init);
+	}
+
+	DRM_GET_PRIV_WITH_RETURN(filp_priv, filp);
+
+	if (hwz.op == DRM_I915_HWZ_FREE)
+		return i915_hwz_free(dev, filp_priv);
+
+	filp_i915priv = filp_priv->driver_priv;
+
+	switch (hwz.op) {
 	case DRM_I915_HWZ_RENDER:
 		LOCK_TEST_WITH_RETURN(dev, filp);
-		return i915_hwz_render(dev, &hwz.render);
+		return i915_hwz_render(dev, filp_i915priv, &hwz.render);
 	case DRM_I915_HWZ_ALLOC:
-		return i915_hwz_alloc(dev, &hwz.alloc);
-	case DRM_I915_HWZ_FREE:
-		return i915_hwz_free(dev);
+		return i915_hwz_alloc(dev, filp_i915priv, &hwz.alloc);
 	default:
 		DRM_ERROR("Invalid op 0x%x\n", hwz.op);
 		return DRM_ERR(EINVAL);
@@ -1659,7 +1721,7 @@ void i915_driver_preclose(drm_device_t * dev, DRMFILE filp)
 	if (dev->dev_private) {
 		drm_i915_private_t *dev_priv = dev->dev_private;
 		i915_mem_release(dev, filp, dev_priv->agp_heap);
-		i915_hwz_free(dev);
+		i915_hwz_free(dev, filp->private_data);
 	}
 }
 
@@ -1708,4 +1770,33 @@ int i915_driver_firstopen(struct drm_device *dev)
 	drm_bo_driver_init(dev);
 #endif
 	return 0;
+}
+
+int i915_driver_open(drm_device_t *dev, drm_file_t *filp_priv)
+{
+	drm_i915_private_t *dev_priv = dev->dev_private;
+
+	DRM_DEBUG("\n");
+
+	filp_priv->driver_priv = NULL;
+
+	if (!dev_priv || !dev_priv->bmp)
+		return 0;
+
+	filp_priv->driver_priv =
+		drm_calloc(1, sizeof(struct drm_i915_driver_file_fields),
+			   DRM_MEM_FILES);
+
+	if (!filp_priv->driver_priv)
+		return DRM_ERR(ENOMEM);
+
+	return 0;
+}
+
+void i915_driver_postclose(drm_device_t * dev, drm_file_t * filp_priv)
+{
+	DRM_DEBUG("\n");
+
+	drm_free(filp_priv->driver_priv,
+		 sizeof(struct drm_i915_driver_file_fields), DRM_MEM_FILES);
 }

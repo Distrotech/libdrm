@@ -135,21 +135,26 @@ typedef struct drm_i915_private {
 	drm_i915_vbl_swap_t vbl_swaps;
 	unsigned int swaps_pending;
 
+	drm_dma_handle_t *bmp, **bmp_pool;
+
+	unsigned long priv1_addr;
+	unsigned priv1_order;
+} drm_i915_private_t;
+
 #define VIRTUAL_BPL 0
 
+struct drm_i915_driver_file_fields {
 #if VIRTUAL_BPL
 	drm_buffer_object_t *bpl[3];
 #else
 	drm_dma_handle_t *bpl[3];
 #endif
 
-	unsigned int num_bpls, num_bins, preamble_inited[3];
 	drm_dma_handle_t *bmp, **bmp_pool, **bins[3];
-	unsigned bin_x1, bin_x2, bin_cols, bin_pitch, bin_y1, bin_y2, bin_rows;
 
-	unsigned long priv1_addr;
-	unsigned priv1_order;
-} drm_i915_private_t;
+	unsigned int num_bpls, num_bins, preamble_inited[3];
+	unsigned int bin_x1, bin_x2, bin_cols, bin_y1, bin_y2, bin_rows;
+};
 
 enum intel_chip_family {
 	CHIP_I8XX = 0x01,
@@ -174,6 +179,8 @@ extern void i915_emit_breadcrumb(drm_device_t *dev);
 extern void i915_dispatch_flip(drm_device_t * dev, int pipes, int sync);
 extern int i915_emit_mi_flush(drm_device_t *dev, uint32_t flush);
 extern int i915_driver_firstopen(struct drm_device *dev);
+extern int i915_driver_open(drm_device_t * dev, drm_file_t * filp_priv);
+extern void i915_driver_postclose(drm_device_t * dev, drm_file_t * filp_priv);
 
 /* i915_irq.c */
 extern int i915_irq_emit(DRM_IOCTL_ARGS);
