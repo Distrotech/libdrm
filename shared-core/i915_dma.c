@@ -987,9 +987,6 @@ static int i915_hwb_idle(drm_device_t *dev,
 
 	i915_bpl_print(dev, filp_priv, bpl_num);
 
-       	if (!filp_priv->preamble_inited[bpl_num])
-		return ret;
-
 	for (i = 0; i < filp_priv->num_bins; i++) {
 		u32 *bin;
 		int k;
@@ -999,7 +996,7 @@ static int i915_hwb_idle(drm_device_t *dev,
 
 		bin = filp_priv->bins[bpl_num][i]->vaddr;
 
-		for (k = 6; k < 1024; k++) {
+		for (k = 0; k < 1024; k++) {
 			if (bin[k]) {
 				int j;
 
@@ -1042,6 +1039,27 @@ static void i915_bin_free(drm_device_t *dev,
 
 	i915_hwb_idle(dev, filp_priv, 0);
 
+	for (i = 0; i < filp_priv->num_bins; i++) {
+		if (!filp_priv->bin_rects || !filp_priv->bin_rects)
+			goto free_arrays;
+
+		for (j = 0; j < filp_priv->bin_nrects[i]; j++) {
+			drm_free(filp_priv->bin_rects[i],
+				 filp_priv->bin_nrects[i] *
+				 sizeof(drm_clip_rect_t),
+				 DRM_MEM_DRIVER);
+		}
+
+free_arrays:
+		drm_free(filp_priv->bin_rects, filp_priv->num_bins *
+			 sizeof(drm_clip_rect_t*), DRM_MEM_DRIVER);
+		filp_priv->bin_rects = NULL;
+
+		drm_free(filp_priv->bin_nrects, filp_priv->num_bins *
+			 sizeof(unsigned int), DRM_MEM_DRIVER);
+		filp_priv->bin_nrects = NULL;
+	}
+
 	for (i = 0; i < 3; i++) {
 		if (!filp_priv->bins[i])
 			return;
@@ -1057,19 +1075,86 @@ static void i915_bin_free(drm_device_t *dev,
 
 static int i915_bin_alloc(drm_device_t *dev,
 			  struct drm_i915_driver_file_fields *filp_priv,
-			  int bins)
+			  drm_clip_rect_t *cliprects,
+			  unsigned int num_cliprects)
 {
 	int i, j;
+	unsigned int total_cliprects = 0;
 
 	if (!filp_priv) {
 		DRM_ERROR("No driver storage associated with file handle\n");
 		return DRM_ERR(EINVAL);
 	}
 
-	i915_bin_free(dev, filp_priv);
+	filp_priv->bin_rects = drm_calloc(1, filp_priv->num_bins *
+					  sizeof(drm_clip_rect_t*),
+					  DRM_MEM_DRIVER);
+
+	if (!filp_priv->bin_rects) {
+		DRM_ERROR("Failed to allocate bin rects pool\n");
+		return DRM_ERR(ENOMEM);
+	}
+
+	filp_priv->bin_nrects = drm_calloc(1, filp_priv->num_bins *
+					   sizeof(unsigned int),
+					   DRM_MEM_DRIVER);
+
+	if (!filp_priv->bin_nrects) {
+		DRM_ERROR("Failed to allocate bin nrects array\n");
+		return DRM_ERR(ENOMEM);
+	}
+
+	for (i = 0; i < filp_priv->num_bins; i++) {
+		unsigned short bin_row = i / filp_priv->bin_cols;
+		unsigned short bin_col = i % filp_priv->bin_cols;
+		unsigned short bin_y1 = max(filp_priv->bin_y1, (unsigned short)
+					    ((filp_priv->bin_y1 + bin_row *
+					      BIN_HEIGHT) & BIN_HMASK));
+		unsigned short bin_x1 = max(filp_priv->bin_x1, (unsigned short)
+					    ((filp_priv->bin_x1 + bin_col *
+					      BIN_WIDTH) & BIN_WMASK));
+		unsigned short bin_y2 = min(filp_priv->bin_y2 - 1,
+					    ((bin_y1 + BIN_HEIGHT) & BIN_HMASK)
+					    - 1);
+		unsigned short bin_x2 = min(filp_priv->bin_x2 - 1,
+					    ((bin_x1 + BIN_WIDTH) & BIN_WMASK)
+					    - 1);
+
+		for (j = 0; j < num_cliprects; j++) {
+			unsigned short x1 = max(bin_x1, cliprects[j].x1);
+			unsigned short x2 = min(bin_x2, cliprects[j].x2);
+			unsigned short y1 = max(bin_y1, cliprects[j].y1);
+			unsigned short y2 = min(bin_y2, cliprects[j].y2);
+			drm_clip_rect_t *rect;
+
+			if (x1 >= x2 || y1 >= y2)
+				continue;
+
+			filp_priv->bin_rects[i] =
+				drm_realloc(filp_priv->bin_rects[i],
+					    filp_priv->bin_nrects[i] *
+					    sizeof(drm_clip_rect_t),
+					    (filp_priv->bin_nrects[i] + 1) *
+					    sizeof(drm_clip_rect_t),
+					    DRM_MEM_DRIVER);
+
+			rect = &filp_priv->bin_rects[i]
+					[filp_priv->bin_nrects[i]++];
+
+			rect->x1 = x1;
+			rect->x2 = x2;
+			rect->y1 = y1;
+			rect->y2 = y2;
+
+			DRM_DEBUG("Bin %d cliprect %d: (%d, %d) - (%d, %d)\n",
+				  i, filp_priv->bin_nrects[i], x1, y1, x2, y2);
+
+			total_cliprects++;
+		}
+	}
 
 	for (i = 0; i < filp_priv->num_bpls; i++) {
-		filp_priv->bins[i] = drm_calloc(1, bins *
+		filp_priv->bins[i] = drm_calloc(1, filp_priv->num_bins *
 						sizeof(drm_dma_handle_t*),
 						DRM_MEM_DRIVER);
 
@@ -1078,7 +1163,7 @@ static int i915_bin_alloc(drm_device_t *dev,
 			return DRM_ERR(ENOMEM);
 		}
 
-		for (j = 0; j < bins; j++) {
+		for (j = 0; j < filp_priv->num_bins; j++) {
 			filp_priv->bins[i][j] = drm_pci_alloc(dev, PAGE_SIZE,
 							      PAGE_SIZE,
 							      0xffffffff);
@@ -1089,13 +1174,10 @@ static int i915_bin_alloc(drm_device_t *dev,
 				return DRM_ERR(ENOMEM);
 			}
 		}
-
-		filp_priv->preamble_inited[i] = FALSE;
 	}
 
-	filp_priv->num_bins = bins;
-
-	DRM_INFO("Allocated %d times %d bins\n", filp_priv->num_bpls, bins);
+	DRM_INFO("Allocated %d times %d bins and %d cliprects\n",
+		 filp_priv->num_bpls, filp_priv->num_bins, total_cliprects);
 
 	return 0;
 }
@@ -1105,11 +1187,11 @@ static int i915_hwz_alloc(drm_device_t *dev,
 			  struct drm_i915_hwz_alloc *alloc)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
-	int bin_rows = (((alloc->y2 + BIN_HEIGHT - 1) & BIN_HMASK) -
-			 (alloc->y1 & BIN_HMASK)) / BIN_HEIGHT;
-	int bin_cols = (((alloc->x2 + BIN_WIDTH - 1) & BIN_WMASK) -
-			(alloc->x1 & BIN_WMASK)) / BIN_WIDTH;
-	int ret;
+	unsigned short x1 = dev_priv->sarea_priv->width - 1, x2 = 0;
+	unsigned short y1 = dev_priv->sarea_priv->height - 1, y2 = 0;
+	int bin_rows, bin_cols;
+	drm_clip_rect_t __user *cliprects;
+	int i, ret;
 
 	if (!dev_priv->bmp) {
 		DRM_DEBUG("HWZ not initialized\n");
@@ -1126,28 +1208,67 @@ static int i915_hwz_alloc(drm_device_t *dev,
 		return DRM_ERR(EINVAL);
 	}
 
-	filp_priv->bin_x1 = alloc->x1;
-	filp_priv->bin_x2 = alloc->x2;
-	filp_priv->bin_y1 = alloc->y1;
-	filp_priv->bin_y2 = alloc->y2;
+	cliprects = drm_alloc(alloc->num_cliprects * sizeof(drm_clip_rect_t),
+			      DRM_MEM_DRIVER);
+
+	if (!cliprects) {
+		DRM_ERROR("Failed to allocate memory to hold %u cliprects\n",
+			  alloc->num_cliprects);
+		return DRM_ERR(ENOMEM);
+	}
+
+	if (DRM_COPY_FROM_USER(cliprects,
+			       (void*)(unsigned long)alloc->cliprects,
+			       alloc->num_cliprects * sizeof(drm_clip_rect_t))) {
+		DRM_ERROR("DRM_COPY_TO_USER failed for %u cliprects\n",
+			  alloc->num_cliprects);
+		return DRM_ERR(EFAULT);
+	}
+
+	for (i = 0; i < alloc->num_cliprects; i++) {
+		x1 = min(x1, cliprects[i].x1);
+		x2 = max(x2, cliprects[i].x2);
+		y1 = min(y1, cliprects[i].y1);
+		y2 = max(y2, cliprects[i].y2);
+	}
+
+	x2 = min(x2, (unsigned short)(dev_priv->sarea_priv->width - 1));
+	if (y2 >= dev_priv->sarea_priv->height)
+		y2 = dev_priv->sarea_priv->height - 1;
+
+	bin_rows = (((y2 + BIN_HEIGHT - 1) & BIN_HMASK) -
+		    (y1 & BIN_HMASK)) / BIN_HEIGHT;
+	bin_cols = (((x2 + BIN_WIDTH - 1) & BIN_WMASK) -
+		    (x1 & BIN_WMASK)) / BIN_WIDTH;
+
+	if (bin_cols <= 0 || bin_rows <= 0) {
+		DRM_DEBUG("bin_cols=%d bin_rows=%d => nothing to allocate\n",
+			  bin_cols, bin_rows);
+		return DRM_ERR(EINVAL);
+	}
 
 	if (filp_priv->num_bpls != alloc->num_buffers ||
 	    filp_priv->bin_rows != bin_rows ||
 	    filp_priv->bin_cols != bin_cols) {
-		i915_bin_free(dev, filp_priv);
 		i915_bpl_free(dev, filp_priv);
 	}
 
+	filp_priv->bin_x1 = x1;
+	filp_priv->bin_x2 = x2;
+	filp_priv->bin_cols = bin_cols;
+	filp_priv->bin_y1 = y1;
+	filp_priv->bin_y2 = y2;
+	filp_priv->bin_rows = bin_rows;
 	filp_priv->num_bpls = alloc->num_buffers;
 
-	ret = i915_bpl_alloc(dev, filp_priv, bin_cols * ((bin_rows + 3) & ~3));
+	i915_bin_free(dev, filp_priv);
 
-	if (ret) {
-		DRM_ERROR("Failed to allocate BPLs\n");
-		return ret;
-	}
+	filp_priv->num_bins = bin_cols * bin_rows;
 
-	ret = i915_bin_alloc(dev, filp_priv, bin_cols * bin_rows);
+	ret = i915_bin_alloc(dev, filp_priv, cliprects, alloc->num_cliprects);
+
+	drm_free(cliprects, alloc->num_cliprects * sizeof(drm_clip_rect_t),
+		 DRM_MEM_DRIVER);
 
 	if (ret) {
 		DRM_ERROR("Failed to allocate bins\n");
@@ -1155,8 +1276,12 @@ static int i915_hwz_alloc(drm_device_t *dev,
 		return ret;
 	}
 
-	filp_priv->bin_cols = bin_cols;
-	filp_priv->bin_rows = bin_rows;
+	ret = i915_bpl_alloc(dev, filp_priv, bin_cols * ((bin_rows + 3) & ~3));
+
+	if (ret) {
+		DRM_ERROR("Failed to allocate BPLs\n");
+		return ret;
+	}
 
 	return 0;
 }
@@ -1177,14 +1302,12 @@ static int i915_hwz_free(drm_device_t *dev, drm_file_t *filp_priv)
 }
 
 static int i915_bin_init(drm_device_t *dev,
-			 struct drm_i915_driver_file_fields *filp_priv, int i,
-			 u32 DR1, u32 DR4)
+			 struct drm_i915_driver_file_fields *filp_priv, int i)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	u32 *bpl_vaddr;
 	int bpl_row;
 	drm_dma_handle_t **bins = filp_priv->bins[i];
-	unsigned preamble_inited = filp_priv->preamble_inited[i];
 #if VIRTUAL_BPL
 	int ret;
 #endif
@@ -1233,38 +1356,11 @@ static int i915_bin_init(drm_device_t *dev,
 				DRM_DEBUG("j=%d => idx=%u bpl=%p busaddr=0x%x\n",
 					  j, idx, bpl, bin->busaddr);
 
-				*bpl++ = bin->busaddr + 20;
+				*bpl++ = bin->busaddr;
 				*bpl++ = 1 << 2 | 1 << 0;
-
-				if (!preamble_inited) {
-					u32 *pre = bin->vaddr;
-					u32 ymin = max(filp_priv->bin_y1,
-						       (filp_priv->bin_y1 +
-						       (bpl_row + j) *
-							BIN_HEIGHT) & BIN_HMASK);
-					u32 xmin = max(filp_priv->bin_x1,
-						       (filp_priv->bin_x1 +
-							bpl_col * BIN_WIDTH) &
-						       BIN_WMASK);
-					u32 ymax = min(filp_priv->bin_y2 - 1,
-						       ((ymin + BIN_HEIGHT) &
-							BIN_HMASK) - 1);
-					u32 xmax = min(filp_priv->bin_x2 - 1,
-						       ((xmin + BIN_WIDTH) &
-							BIN_WMASK) - 1);
-
-					*pre++ = GFX_OP_DRAWRECT_INFO;
-					*pre++ = DR1;
-					*pre++ = ymin << 16 | xmin;
-					*pre++ = ymax << 16 | xmax;
-					*pre++ = DR4;
-					*pre++ = MI_BATCH_BUFFER_END;
-				}
 			}
 		}
 	}
-
-	filp_priv->preamble_inited[i] = TRUE;
 
 #if VIRTUAL_BPL
 	drm_mem_reg_iounmap(dev, &filp_priv->bpl[i]->mem, bpl_vaddr);
@@ -1318,8 +1414,7 @@ static int i915_hwz_render(drm_device_t *dev,
 		return DRM_ERR(EBUSY);
 	}
 
-	ret = i915_bin_init(dev, filp_priv, render->bpl_num, render->DR1,
-			    render->DR4);
+	ret = i915_bin_init(dev, filp_priv, render->bpl_num);
 
 	if (ret) {
 		DRM_ERROR("Failed to initialize  BPL %d\n", render->bpl_num);
@@ -1390,26 +1485,39 @@ static int i915_hwz_render(drm_device_t *dev,
 	DRM_DEBUG("Emitting %d DWORDs of static indirect state\n",
 		  render->static_state_size);
 
-	BEGIN_RING(&dev_priv->ring, 2 * filp_priv->num_bins + 12);
+	BEGIN_RING(&dev_priv->ring, 7 * filp_priv->num_rects + 11);
 
 	OUT_RING(GFX_OP_LOAD_INDIRECT | (1<<8) | (0<<14) | 1);
 	OUT_RING(render->static_state_offset | (1<<1) | (1<<0));
 	OUT_RING(render->static_state_size - 1);
-	OUT_RING(0);
 	OUT_RING(CMD_MI_FLUSH /*| MI_NO_WRITE_FLUSH*/);
 	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
 	OUT_RING(Cache_Mode_0);
 	OUT_RING(0x221 << 16 | 0x201);
 
 	for (i = 0; i < filp_priv->num_bins; i++) {
-		OUT_RING(MI_BATCH_BUFFER_START);
-		OUT_RING(filp_priv->bins[render->bpl_num][i]->busaddr);
+		int j;
+
+		for (j = 0; j < filp_priv->bin_nrects[i]; j++) {
+			drm_clip_rect_t *rect = &filp_priv->bin_rects[i][j];
+
+			OUT_RING(GFX_OP_DRAWRECT_INFO);
+			OUT_RING(render->DR1);
+			OUT_RING(rect->y1 << 16 | rect->x1);
+			OUT_RING(rect->y2 << 16 | rect->x2);
+			OUT_RING(render->DR4);
+			OUT_RING(MI_BATCH_BUFFER_START);
+			OUT_RING(filp_priv->bins[render->bpl_num][i]->busaddr);
+		}
 	}
 
 	OUT_RING(CMD_MI_FLUSH | MI_END_SCENE | MI_SCENE_COUNT);
 	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
 	OUT_RING(Cache_Mode_0);
 	OUT_RING(0x221 << 16 | 0x20);
+
+	if (!(filp_priv->num_rects & 0x1))
+		OUT_RING(0);
 
 	i915_hwb_idle(dev, filp_priv, render->bpl_num);
 

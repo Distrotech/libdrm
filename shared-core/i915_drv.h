@@ -151,9 +151,11 @@ struct drm_i915_driver_file_fields {
 #endif
 
 	drm_dma_handle_t *bmp, **bmp_pool, **bins[3];
+	drm_clip_rect_t **bin_rects;
 
-	unsigned int num_bpls, num_bins, preamble_inited[3];
-	unsigned int bin_x1, bin_x2, bin_cols, bin_y1, bin_y2, bin_rows;
+	unsigned int num_bpls, num_bins, num_rects;
+	unsigned int bin_cols, bin_rows, *bin_nrects;
+	unsigned short bin_x1, bin_x2, bin_y1, bin_y2;
 };
 
 enum intel_chip_family {
