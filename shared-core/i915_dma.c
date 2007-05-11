@@ -1079,7 +1079,6 @@ static int i915_bin_alloc(drm_device_t *dev,
 			  unsigned int num_cliprects)
 {
 	int i, j;
-	unsigned int total_cliprects = 0;
 
 	if (!filp_priv) {
 		DRM_ERROR("No driver storage associated with file handle\n");
@@ -1103,6 +1102,8 @@ static int i915_bin_alloc(drm_device_t *dev,
 		DRM_ERROR("Failed to allocate bin nrects array\n");
 		return DRM_ERR(ENOMEM);
 	}
+
+	filp_priv->num_rects = 0;
 
 	for (i = 0; i < filp_priv->num_bins; i++) {
 		unsigned short bin_row = i / filp_priv->bin_cols;
@@ -1149,7 +1150,7 @@ static int i915_bin_alloc(drm_device_t *dev,
 			DRM_DEBUG("Bin %d cliprect %d: (%d, %d) - (%d, %d)\n",
 				  i, filp_priv->bin_nrects[i], x1, y1, x2, y2);
 
-			total_cliprects++;
+			filp_priv->num_rects++;
 		}
 	}
 
@@ -1177,7 +1178,7 @@ static int i915_bin_alloc(drm_device_t *dev,
 	}
 
 	DRM_INFO("Allocated %d times %d bins and %d cliprects\n",
-		 filp_priv->num_bpls, filp_priv->num_bins, total_cliprects);
+		 filp_priv->num_bpls, filp_priv->num_bins, filp_priv->num_rects);
 
 	return 0;
 }
@@ -1485,7 +1486,7 @@ static int i915_hwz_render(drm_device_t *dev,
 	DRM_DEBUG("Emitting %d DWORDs of static indirect state\n",
 		  render->static_state_size);
 
-	BEGIN_RING(&dev_priv->ring, 7 * filp_priv->num_rects + 11);
+	BEGIN_RING(&dev_priv->ring, (7 * filp_priv->num_rects + 11 + 1) & ~1);
 
 	OUT_RING(GFX_OP_LOAD_INDIRECT | (1<<8) | (0<<14) | 1);
 	OUT_RING(render->static_state_offset | (1<<1) | (1<<0));
