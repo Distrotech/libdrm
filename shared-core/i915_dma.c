@@ -1635,7 +1635,7 @@ static int i915_hwz(DRM_IOCTL_ARGS)
 			return DRM_ERR(EINVAL);
 		}
 
-		return i915_hwz_init(dev, &hwz.init);
+		return i915_hwz_init(dev, &hwz.arg.init);
 	}
 
 	DRM_GET_PRIV_WITH_RETURN(filp_priv, filp);
@@ -1648,9 +1648,9 @@ static int i915_hwz(DRM_IOCTL_ARGS)
 	switch (hwz.op) {
 	case DRM_I915_HWZ_RENDER:
 		LOCK_TEST_WITH_RETURN(dev, filp);
-		return i915_hwz_render(dev, filp_i915priv, &hwz.render);
+		return i915_hwz_render(dev, filp_i915priv, &hwz.arg.render);
 	case DRM_I915_HWZ_ALLOC:
-		return i915_hwz_alloc(dev, filp_i915priv, &hwz.alloc);
+		return i915_hwz_alloc(dev, filp_i915priv, &hwz.arg.alloc);
 	default:
 		DRM_ERROR("Invalid op 0x%x\n", hwz.op);
 		return DRM_ERR(EINVAL);
