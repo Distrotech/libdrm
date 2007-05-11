@@ -109,6 +109,11 @@ static void i915_bmp_free(drm_device_t *dev)
 		dev_priv->bmp = NULL;
 	}
 
+	I915_WRITE(BMP_BUFFER, 0);
+
+	dev_priv->irq_enable_reg &= ~HWB_OOM_FLAG;
+	I915_WRITE(I915REG_INT_ENABLE_R, dev_priv->irq_enable_reg);
+
 	DRM_INFO("BMP freed\n");
 }
 
@@ -799,6 +804,9 @@ static int i915_bmp_alloc(drm_device_t *dev)
 
 	I915_WRITE(BMP_PUT, (i / 8) << BMP_OFFSET_SHIFT);
 	I915_WRITE(BMP_GET, 0 << BMP_OFFSET_SHIFT);
+
+	dev_priv->irq_enable_reg |= HWB_OOM_FLAG;
+	I915_WRITE(I915REG_INT_ENABLE_R, dev_priv->irq_enable_reg);
 
 	I915_WRITE(BMP_BUFFER, dev_priv->bmp->busaddr | BMP_PAGE_SIZE_4K |
 		   ((BMP_SIZE / PAGE_SIZE - 1) << BMP_BUFFER_SIZE_SHIFT) |
@@ -1586,13 +1594,19 @@ static int i915_hwz_init(drm_device_t *dev, struct drm_i915_hwz_init *init)
 static int i915_hwz(DRM_IOCTL_ARGS)
 {
 	DRM_DEVICE;
+	drm_i915_private_t *dev_priv = dev->dev_private;
 	drm_file_t *filp_priv;
 	struct drm_i915_driver_file_fields *filp_i915priv;
 	drm_i915_hwz_t hwz;
 
-	if (!dev->dev_private) {
+	if (!dev_priv) {
 		DRM_ERROR("called with no initialization\n");
 		return DRM_ERR(EINVAL);
+	}
+
+	if (dev_priv->hwb_oom) {
+		DRM_ERROR("HWB out of memory\n");
+		return DRM_ERR(ENOMEM);
 	}
 
 	DRM_COPY_FROM_USER_IOCTL(hwz, (drm_i915_hwz_t __user *) data,

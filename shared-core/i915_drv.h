@@ -135,6 +135,8 @@ typedef struct drm_i915_private {
 	drm_i915_vbl_swap_t vbl_swaps;
 	unsigned int swaps_pending;
 
+	int hwb_oom;
+
 	drm_dma_handle_t *bmp, **bmp_pool;
 
 	unsigned long priv1_addr;
@@ -297,6 +299,11 @@ extern int i915_wait_ring(drm_i915_private_t *dev_priv, drm_i915_ring_buffer_t
 #define BB1_PROTECTED         (1<<0)
 #define BB1_UNPROTECTED       (0<<0)
 #define BB2_END_ADDR_MASK     (~0x7)
+
+#define USER_INT_FLAG    (1<<1)
+#define VSYNC_PIPEB_FLAG (1<<5)
+#define VSYNC_PIPEA_FLAG (1<<7)
+#define HWB_OOM_FLAG     (1<<13)
 
 #define I915REG_HWSTAM		0x02098
 #define I915REG_INT_IDENTITY_R	0x020a4

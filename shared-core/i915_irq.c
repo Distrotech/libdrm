@@ -31,10 +31,6 @@
 #include "i915_drm.h"
 #include "i915_drv.h"
 
-#define USER_INT_FLAG (1<<1)
-#define VSYNC_PIPEB_FLAG (1<<5)
-#define VSYNC_PIPEA_FLAG (1<<7)
-
 #define MAX_NOPID ((u32)~0)
 
 /**
@@ -285,7 +281,7 @@ irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 	pipeb_stats = I915_READ(I915REG_PIPEBSTAT);
 		
 	temp = I915_READ(I915REG_INT_IDENTITY_R);
-	temp &= (dev_priv->irq_enable_reg | USER_INT_FLAG);
+	temp &= (dev_priv->irq_enable_reg | USER_INT_FLAG | HWB_OOM_FLAG);
 
 #if 0
 	DRM_DEBUG("%s flag=%08x\n", __FUNCTION__, temp);
@@ -333,6 +329,11 @@ irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 		I915_WRITE(I915REG_PIPEBSTAT,
 			pipeb_stats|I915_VBLANK_INTERRUPT_ENABLE|
 			I915_VBLANK_CLEAR);
+	}
+
+	if ((temp & HWB_OOM_FLAG) && !dev_priv->hwb_oom) {
+		DRM_ERROR("HWB out of memory\n");
+		dev_priv->hwb_oom = TRUE;
 	}
 
 	return IRQ_HANDLED;
