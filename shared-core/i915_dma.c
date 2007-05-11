@@ -1494,7 +1494,8 @@ static int i915_hwz_render(drm_device_t *dev,
 	DRM_DEBUG("Emitting %d DWORDs of static indirect state\n",
 		  render->static_state_size);
 
-	BEGIN_RING(&dev_priv->ring, (7 * filp_priv->num_rects + 11 + 1) & ~1);
+	BEGIN_RING(&dev_priv->ring, (7 * filp_priv->num_rects + 11 +
+				     (render->wait_flips ? 2 : 0) + 1) & ~1);
 
 	OUT_RING(GFX_OP_LOAD_INDIRECT | (1<<8) | (0<<14) | 1);
 	OUT_RING(render->static_state_offset | (1<<1) | (1<<0));
@@ -1503,6 +1504,13 @@ static int i915_hwz_render(drm_device_t *dev,
 	OUT_RING(CMD_MI_LOAD_REGISTER_IMM);
 	OUT_RING(Cache_Mode_0);
 	OUT_RING(0x221 << 16 | 0x201);
+
+	if (render->wait_flips) {
+		OUT_RING(render->wait_flips & 0x1 ?
+			 (MI_WAIT_FOR_EVENT | MI_WAIT_FOR_PLANE_A_FLIP) : 0);
+		OUT_RING(render->wait_flips & 0x2 ?
+			 (MI_WAIT_FOR_EVENT | MI_WAIT_FOR_PLANE_B_FLIP) : 0);
+	}
 
 	for (i = 0; i < filp_priv->num_bins; i++) {
 		int j;
