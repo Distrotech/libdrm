@@ -348,7 +348,7 @@ typedef struct drm_i915_hwz {
 			unsigned int static_state_size;
 			unsigned int wait_flips;
 		} render;
-	};
+	} arg;
 } drm_i915_hwz_t;
 
 #endif				/* _I915_DRM_H_ */
