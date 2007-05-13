@@ -185,6 +185,8 @@ extern int i915_emit_mi_flush(drm_device_t *dev, uint32_t flush);
 extern int i915_driver_firstopen(struct drm_device *dev);
 extern int i915_driver_open(drm_device_t * dev, drm_file_t * filp_priv);
 extern void i915_driver_postclose(drm_device_t * dev, drm_file_t * filp_priv);
+extern int i915_init_ring(drm_device_t * dev, drm_i915_ring_buffer_t * ring,
+		   unsigned start, unsigned end, unsigned size, u32 reg);
 
 /* i915_irq.c */
 extern int i915_irq_emit(DRM_IOCTL_ARGS);
@@ -202,6 +204,12 @@ extern int i915_emit_irq(drm_device_t * dev);
 extern void i915_user_irq_on(drm_i915_private_t *dev_priv);
 extern void i915_user_irq_off(drm_i915_private_t *dev_priv);
 extern int i915_vblank_swap(DRM_IOCTL_ARGS);
+
+/* i915_hwz.c */
+extern int i915_hwz(DRM_IOCTL_ARGS);
+extern int i915_hwz_free(drm_device_t *dev, drm_file_t *filp_priv);
+extern void i915_bmp_free(drm_device_t *dev);
+
 
 /* i915_mem.c */
 extern int i915_mem_alloc(DRM_IOCTL_ARGS);
