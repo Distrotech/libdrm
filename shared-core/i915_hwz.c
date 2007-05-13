@@ -123,7 +123,7 @@ static int i915_bmp_alloc(drm_device_t *dev)
 		   ((BMP_SIZE / PAGE_SIZE - 1) << BMP_BUFFER_SIZE_SHIFT) |
 		   BMP_ENABLE);
 
-	DRM_INFO("BMP allocated and initialized\n");
+	DRM_DEBUG("BMP allocated and initialized\n");
 
 	return 0;
 }
@@ -186,8 +186,8 @@ static int i915_bpl_alloc(drm_device_t *dev,
 #endif
 	}
 
-	DRM_INFO("Allocated %d BPLs of %d bytes\n", filp_priv->num_bpls,
-		 bpl_size);
+	DRM_DEBUG("Allocated %d BPLs of %d bytes\n", filp_priv->num_bpls,
+		  bpl_size);
 
 	return 0;
 }
@@ -720,8 +720,8 @@ static int i915_hwz_render(drm_device_t *dev,
 		return DRM_ERR(EINVAL);
 	}
 
-	DRM_INFO("i915 hwz render, bpl_num = %d, batch_start = 0x%x\n",
-		 render->bpl_num, render->batch_start);
+	DRM_DEBUG("bpl_num = %d, batch_start = 0x%x\n", render->bpl_num,
+		  render->batch_start);
 
 	if (dev_priv->hwb_ring.tail != (I915_READ(HWB_RING + RING_TAIL)
 					& TAIL_ADDR)) {
@@ -903,7 +903,7 @@ static int i915_hwz_init(drm_device_t *dev, struct drm_i915_hwz_init *init)
 		return DRM_ERR(ENOMEM);
 	}
 
-	DRM_INFO("Refreshing contexts of HWZ ring buffers\n");
+	DRM_DEBUG("Refreshing contexts of HWZ ring buffers\n");
 	i915_kernel_lost_context(dev_priv, &dev_priv->hwb_ring);
 	i915_kernel_lost_context(dev_priv, &dev_priv->hwz_ring);
 
