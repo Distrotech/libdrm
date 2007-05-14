@@ -1,7 +1,10 @@
 /*
+ Copyright (C) Aristocrat Technologies.  2007.  All Rights Reserved.
  Copyright (C) Intel Corp.  2007.  All Rights Reserved.
- Intel funded Tungsten Graphics (http://www.tungstengraphics.com) to
- develop this 3D driver.
+
+ Aristocrat and Intel funded Tungsten Graphics
+ (http://www.tungstengraphics.com) to support zone rendering in this
+ 3D driver.
  
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the
