@@ -707,7 +707,7 @@ static int i915_hwz_render(drm_device_t *dev,
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	int ret, i;
-	int static_state_off = render->static_state_offset -
+	int static_state_off = render->static_state_start -
 		virt_to_phys((void*)dev_priv->priv1_addr);
 	RING_LOCALS;
 
@@ -723,24 +723,25 @@ static int i915_hwz_render(drm_device_t *dev,
 		return DRM_ERR(EINVAL);
 	}
 
-	DRM_DEBUG("bpl_num = %d, batch_start = 0x%x\n", render->bpl_num,
+	filp_priv->bpl_num = (filp_priv->bpl_num + 1) % filp_priv->num_bpls;
+
+	DRM_DEBUG("bpl_num = %d, batch_start = 0x%x\n", filp_priv->bpl_num,
 		  render->batch_start);
 
 	if (dev_priv->hwb_ring.tail != (I915_READ(HWB_RING + RING_TAIL)
 					& TAIL_ADDR)) {
-		DRM_INFO("Refreshing contexts of HWZ ring buffers\n");
+		DRM_INFO("Refreshing context of HWB ring buffer\n");
 		i915_kernel_lost_context(dev_priv, &dev_priv->hwb_ring);
-		i915_kernel_lost_context(dev_priv, &dev_priv->hwz_ring);
 	}
 
-	if (i915_hwb_idle(dev, filp_priv, render->bpl_num)) {
+	if (i915_hwb_idle(dev, filp_priv, filp_priv->bpl_num)) {
 		return DRM_ERR(EBUSY);
 	}
 
-	ret = i915_bin_init(dev, filp_priv, render->bpl_num);
+	ret = i915_bin_init(dev, filp_priv, filp_priv->bpl_num);
 
 	if (ret) {
-		DRM_ERROR("Failed to initialize  BPL %d\n", render->bpl_num);
+		DRM_ERROR("Failed to initialize  BPL %d\n", filp_priv->bpl_num);
 		return ret;
 	}
 
@@ -750,19 +751,19 @@ static int i915_hwz_render(drm_device_t *dev,
 	I915_WRITE(BINSKPD, (VIRTUAL_BPL<<7) | (1<<(7+16)));
 
 #if VIRTUAL_BPL
-	ret = drm_buffer_object_validate(filp_priv->bpl[render->bpl_num], 0, 0);
+	ret = drm_buffer_object_validate(filp_priv->bpl[filp_priv->bpl_num], 0, 0);
 
 	if (ret) {
-		DRM_ERROR("Failed to validate BPL %i\n", render->bpl_num);
+		DRM_ERROR("Failed to validate BPL %i\n", filp_priv->bpl_num);
 		return ret;
 	}
 
-	DRM_INFO("BPL %d validated to offset 0x%lx\n", render->bpl_num,
-		 filp_priv->bpl[render->bpl_num]->offset);
+	DRM_INFO("BPL %d validated to offset 0x%lx\n", filp_priv->bpl_num,
+		 filp_priv->bpl[filp_priv->bpl_num]->offset);
 
-	I915_WRITE(BINCTL, filp_priv->bpl[render->bpl_num]->offset | BC_MASK);
+	I915_WRITE(BINCTL, filp_priv->bpl[filp_priv->bpl_num]->offset | BC_MASK);
 #else
-	I915_WRITE(BINCTL, filp_priv->bpl[render->bpl_num]->busaddr | BC_MASK);
+	I915_WRITE(BINCTL, filp_priv->bpl[filp_priv->bpl_num]->busaddr | BC_MASK);
 #endif
 
 	BEGIN_RING(&dev_priv->hwb_ring, 16);
@@ -795,7 +796,7 @@ static int i915_hwz_render(drm_device_t *dev,
 	ADVANCE_RING();
 
 #if DEBUG_HWZ
-	i915_hwb_idle(dev, filp_priv, render->bpl_num);
+	i915_hwb_idle(dev, filp_priv, filp_priv->bpl_num);
 #endif
 
 	BEGIN_RING(&dev_priv->hwb_ring, 2);
@@ -812,7 +813,7 @@ static int i915_hwz_render(drm_device_t *dev,
 				     (render->wait_flips ? 2 : 0) + 1) & ~1);
 
 	OUT_RING(GFX_OP_LOAD_INDIRECT | (0x3f<<8) | (0<<14) | 10);
-	OUT_RING(render->static_state_offset | (1<<1) | (1<<0));
+	OUT_RING(render->static_state_start | (1<<1) | (1<<0));
 	OUT_RING(render->static_state_size - 1);
 	OUT_RING(0);
 	OUT_RING(0);
@@ -847,7 +848,7 @@ static int i915_hwz_render(drm_device_t *dev,
 			OUT_RING(rect->y2 << 16 | rect->x2);
 			OUT_RING(render->DR4);
 			OUT_RING(MI_BATCH_BUFFER_START);
-			OUT_RING(filp_priv->bins[render->bpl_num][i]->busaddr);
+			OUT_RING(filp_priv->bins[filp_priv->bpl_num][i]->busaddr);
 		}
 	}
 
@@ -859,7 +860,7 @@ static int i915_hwz_render(drm_device_t *dev,
 	if (filp_priv->num_rects & 0x1)
 		OUT_RING(0);
 
-	i915_hwb_idle(dev, filp_priv, render->bpl_num);
+	i915_hwb_idle(dev, filp_priv, filp_priv->bpl_num);
 
 	ADVANCE_RING();
 
@@ -900,15 +901,8 @@ static int i915_hwz_init(drm_device_t *dev, struct drm_i915_hwz_init *init)
 		return DRM_ERR(ENOMEM);
 	}
 
-	if (i915_init_ring(dev, &dev_priv->hwz_ring, init->hwz_start,
-			   init->hwz_end, init->hwz_size, HP_RING)) {
-		DRM_ERROR("Failed to initialize HWZ ring buffer\n");
-		return DRM_ERR(ENOMEM);
-	}
-
-	DRM_DEBUG("Refreshing contexts of HWZ ring buffers\n");
+	DRM_DEBUG("Refreshing context of HWB ring buffer\n");
 	i915_kernel_lost_context(dev_priv, &dev_priv->hwb_ring);
-	i915_kernel_lost_context(dev_priv, &dev_priv->hwz_ring);
 
 	I915_WRITE(BINSCENE, BS_MASK | BS_OP_LOAD);
 

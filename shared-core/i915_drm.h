@@ -330,9 +330,6 @@ typedef struct drm_i915_hwz {
 			unsigned int hwb_start;
 			unsigned int hwb_end;
 			unsigned int hwb_size;
-			unsigned int hwz_start;
-			unsigned int hwz_end;
-			unsigned int hwz_size;
 		} init;
 		struct drm_i915_hwz_alloc {
 			unsigned int num_buffers;
@@ -340,11 +337,10 @@ typedef struct drm_i915_hwz {
 			uint64_t cliprects;
 		} alloc;
 		struct drm_i915_hwz_render {
-			unsigned int bpl_num;
 			unsigned int batch_start;
 			int DR1;
 			int DR4;
-			unsigned int static_state_offset;
+			unsigned int static_state_start;
 			unsigned int static_state_size;
 			unsigned int wait_flips;
 		} render;

@@ -102,9 +102,6 @@ static int i915_dma_cleanup(drm_device_t * dev)
 		if (dev_priv->hwb_ring.virtual_start) {
 			drm_core_ioremapfree(&dev_priv->hwb_ring.map, dev);
 		}
-		if (dev_priv->hwz_ring.virtual_start) {
-			drm_core_ioremapfree(&dev_priv->hwz_ring.map, dev);
-		}
 
 		if (dev_priv->status_page_dmah) {
 			drm_pci_free(dev, dev_priv->status_page_dmah);

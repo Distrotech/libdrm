@@ -97,7 +97,6 @@ typedef struct drm_i915_private {
 	drm_i915_sarea_t *sarea_priv;
 	drm_i915_ring_buffer_t ring;
 	drm_i915_ring_buffer_t hwb_ring;
-	drm_i915_ring_buffer_t hwz_ring;
 
 	drm_dma_handle_t *status_page_dmah;
 	void *hw_status_page;
@@ -155,7 +154,7 @@ struct drm_i915_driver_file_fields {
 	drm_dma_handle_t *bmp, **bmp_pool, **bins[3];
 	drm_clip_rect_t **bin_rects;
 
-	unsigned int num_bpls, num_bins, num_rects;
+	unsigned int bpl_num, num_bpls, num_bins, num_rects;
 	unsigned int bin_cols, bin_rows, *bin_nrects;
 	unsigned short bin_x1, bin_x2, bin_y1, bin_y2;
 };
