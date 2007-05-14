@@ -652,7 +652,7 @@ int i915_vblank_swap(DRM_IOCTL_ARGS)
 
 			spin_unlock_irqrestore(&dev->drw_lock, irqflags);
 
-			return 0;
+			goto out;
 		}
 	}
 
@@ -692,15 +692,16 @@ int i915_vblank_swap(DRM_IOCTL_ARGS)
 	vbl_swap->sequence = swap.sequence;
 	vbl_swap->flip = (swap.seqtype & _DRM_VBLANK_FLIP);
 
-	if (vbl_swap->flip)
-		swap.sequence++;
-
 	spin_lock_irqsave(&dev_priv->swaps_lock, irqflags);
 
 	list_add_tail((struct list_head *)vbl_swap, &dev_priv->vbl_swaps.head);
 	dev_priv->swaps_pending++;
 
 	spin_unlock_irqrestore(&dev_priv->swaps_lock, irqflags);
+
+out:
+	if (swap.seqtype & _DRM_VBLANK_FLIP)
+		swap.sequence++;
 
 	DRM_COPY_TO_USER_IOCTL((drm_i915_vblank_swap_t __user *) data, swap,
 			       sizeof(swap));
