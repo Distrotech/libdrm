@@ -89,11 +89,7 @@ SAVAGEHEADERS=  savage_drv.h savage_drm.h $(DRMHEADERS)
 VIAHEADERS =	via_drm.h via_drv.h via_3d_reg.h via_verifier.h $(DRMHEADERS)
 MACH64HEADERS = mach64_drv.h mach64_drm.h $(DRMHEADERS)
 NVHEADERS =     nv_drv.h $(DRMHEADERS)
-<<<<<<< HEAD:linux-core/Makefile
-NVSHARED  =     nv_drv.h
-XGIHEADERS =    xgi_drv.h xgi_drm.h
-=======
->>>>>>> 40f6a696cb22ffa064f78198a7a241015d365967:linux-core/Makefile
+XGIHEADERS =    xgi_drv.h xgi_drm.h $(DRMHEADERS)
 FFBHEADERS = 	ffb_drv.h $(DRMHEADERS)
 NOUVEAUHEADERS = nouveau_drv.h nouveau_drm.h nouveau_reg.h $(DRMHEADERS)
 
@@ -288,11 +284,8 @@ CONFIG_DRM_SAVAGE := n
 CONFIG_DRM_VIA := n
 CONFIG_DRM_MACH64 := n
 CONFIG_DRM_NV := n
-<<<<<<< HEAD:linux-core/Makefile
-CONFIG_DRM_XGI := n
-=======
 CONFIG_DRM_NOUVEAU := n
->>>>>>> 40f6a696cb22ffa064f78198a7a241015d365967:linux-core/Makefile
+CONFIG_DRM_XGI := n
 
 # Enable module builds for the modules requested/supported.
 
@@ -326,13 +319,11 @@ endif
 ifneq (,$(findstring nv,$(DRM_MODULES)))
 CONFIG_DRM_NV := m
 endif
-<<<<<<< HEAD:linux-core/Makefile
-ifneq (,$(findstring xgi,$(DRM_MODULES)))
-CONFIG_DRM_XGI := m
-=======
 ifneq (,$(findstring nouveau,$(DRM_MODULES)))
 CONFIG_DRM_NOUVEAU := m
->>>>>>> 40f6a696cb22ffa064f78198a7a241015d365967:linux-core/Makefile
+endif
+ifneq (,$(findstring xgi,$(DRM_MODULES)))
+CONFIG_DRM_XGI := m
 endif
 
 # These require AGP support
@@ -360,11 +351,8 @@ $(savage-objs): $(SAVAGEHEADERS)
 $(via-objs):	$(VIAHEADERS)
 $(mach64-objs): $(MACH64HEADERS)
 $(nv-objs):     $(NVHEADERS)
-<<<<<<< HEAD:linux-core/Makefile
-$(xgi-objs):    $(XGIHEADERS)
-=======
 $(nouveau-objs): $(NOUVEAUHEADERS)
->>>>>>> 40f6a696cb22ffa064f78198a7a241015d365967:linux-core/Makefile
+$(xgi-objs):    $(XGIHEADERS)
 
 endif
 
