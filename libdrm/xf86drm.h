@@ -31,8 +31,6 @@
  *
  */
 
-/* $XFree86: xc/programs/Xserver/hw/xfree86/os-support/xf86drm.h,v 1.26 2003/08/16 19:26:37 dawes Exp $ */
-
 #ifndef _XF86DRM_H_
 #define _XF86DRM_H_
 
@@ -270,6 +268,7 @@ typedef struct _drmTextureRegion {
 typedef enum {
     DRM_VBLANK_ABSOLUTE = 0x0,	/**< Wait for specific vblank sequence number */
     DRM_VBLANK_RELATIVE = 0x1,	/**< Wait for given number of vblanks */
+    DRM_VBLANK_FLIP = 0x8000000,	/**< Scheduled buffer swap should flip */
     DRM_VBLANK_NEXTONMISS = 0x10000000,	/**< If missed, wait for next vblank */
     DRM_VBLANK_SECONDARY = 0x20000000,	/**< Secondary display controller */
     DRM_VBLANK_SIGNAL   = 0x40000000	/* Send signal instead of blocking */

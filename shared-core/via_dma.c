@@ -40,20 +40,6 @@
 #include "via_drv.h"
 #include "via_3d_reg.h"
 
-#define CMDBUF_ALIGNMENT_SIZE   (0x100)
-#define CMDBUF_ALIGNMENT_MASK   (0x0ff)
-
-/* defines for VIA 3D registers */
-#define VIA_REG_STATUS	  0x400
-#define VIA_REG_TRANSET	 0x43C
-#define VIA_REG_TRANSPACE       0x440
-
-/* VIA_REG_STATUS(0x400): Engine Status */
-#define VIA_CMD_RGTR_BUSY       0x00000080	/* Command Regulator is busy */
-#define VIA_2D_ENG_BUSY	 0x00000001	/* 2D Engine is busy */
-#define VIA_3D_ENG_BUSY	 0x00000002	/* 3D Engine is busy */
-#define VIA_VR_QUEUE_BUSY       0x00020000	/* Virtual Queue is busy */
-
 #define SetReg2DAGP(nReg, nData) {				\
 	*((uint32_t *)(vb)) = ((nReg) >> 2) | HALCYON_HEADER1;	\
 	*((uint32_t *)(vb) + 1) = (nData);			\
@@ -98,9 +84,9 @@ static uint32_t via_cmdbuf_lag(drm_via_private_t *dev_priv)
 {
 	uint32_t agp_base = dev_priv->dma_offset + (uint32_t) dev_priv->agpAddr;
 	uint32_t hw_addr = *(dev_priv->hw_addr_ptr) - agp_base;
-	
-	return ((hw_addr <= dev_priv->dma_low) ? 
-		(dev_priv->dma_low - hw_addr) : 
+
+	return ((hw_addr <= dev_priv->dma_low) ?
+		(dev_priv->dma_low - hw_addr) :
 		(dev_priv->dma_wrap + dev_priv->dma_low - hw_addr));
 }
 
@@ -117,7 +103,7 @@ via_cmdbuf_wait(drm_via_private_t * dev_priv, unsigned int size)
 	uint32_t count;
 	hw_addr_ptr = dev_priv->hw_addr_ptr;
 	cur_addr = dev_priv->dma_low;
-	next_addr = cur_addr + size + 512*1024;
+	next_addr = cur_addr + size + 512 * 1024;
 	count = 1000000;
 	do {
 		hw_addr = *hw_addr_ptr - agp_base;
@@ -192,6 +178,11 @@ static int via_initialize(drm_device_t * dev,
 		return DRM_ERR(EFAULT);
 	}
 
+	if (dev_priv->chipset == VIA_DX9_0) {
+		DRM_ERROR("AGP DMA is not supported on this chip\n");
+		return DRM_ERR(EINVAL);
+	}
+
 	dev_priv->ring.map.offset = dev->agp->base + init->offset;
 	dev_priv->ring.map.size = init->size;
 	dev_priv->ring.map.type = 0;
@@ -216,8 +207,8 @@ static int via_initialize(drm_device_t * dev,
 	dev_priv->dma_offset = init->offset;
 	dev_priv->last_pause_ptr = NULL;
 	dev_priv->hw_addr_ptr =
-	    (volatile uint32_t *)((char *)dev_priv->mmio->handle +
-	    init->reg_pause_addr);
+		(volatile uint32_t *)((char *)dev_priv->mmio->handle +
+		init->reg_pause_addr);
 
 	via_cmdbuf_start(dev_priv);
 
@@ -248,8 +239,8 @@ static int via_dma_init(DRM_IOCTL_ARGS)
 			retcode = via_dma_cleanup(dev);
 		break;
 	case VIA_DMA_INITIALIZED:
-		retcode = (dev_priv->ring.virtual_start != NULL) ? 
-			0: DRM_ERR( EFAULT );
+		retcode = (dev_priv->ring.virtual_start != NULL) ?
+			0 : DRM_ERR(EFAULT);
 		break;
 	default:
 		retcode = DRM_ERR(EINVAL);
@@ -277,8 +268,7 @@ static int via_dispatch_cmdbuffer(drm_device_t * dev, drm_via_cmdbuffer_t * cmd)
 
 	if (cmd->size > VIA_PCI_BUF_SIZE) {
 		return DRM_ERR(ENOMEM);
-	} 
-
+	}
 
 	if (DRM_COPY_FROM_USER(dev_priv->pci_buf, cmd->buf, cmd->size))
 		return DRM_ERR(EFAULT);
@@ -294,14 +284,14 @@ static int via_dispatch_cmdbuffer(drm_device_t * dev, drm_via_cmdbuffer_t * cmd)
 				       cmd->size, dev, 1))) {
 		return ret;
 	}
-       	
+
 	vb = via_check_dma(dev_priv, (cmd->size < 0x100) ? 0x102 : cmd->size);
 	if (vb == NULL) {
 		return DRM_ERR(EAGAIN);
 	}
 
 	memcpy(vb, dev_priv->pci_buf, cmd->size);
-	
+
 	dev_priv->dma_low += cmd->size;
 
 	/*
@@ -310,7 +300,7 @@ static int via_dispatch_cmdbuffer(drm_device_t * dev, drm_via_cmdbuffer_t * cmd)
 	 */
 
 	if (cmd->size < 0x100)
-	  via_pad_cache(dev_priv,(0x100 - cmd->size) >> 3);
+		via_pad_cache(dev_priv, (0x100 - cmd->size) >> 3);
 	via_cmdbuf_pause(dev_priv);
 
 	return 0;
@@ -330,7 +320,7 @@ static int via_flush_ioctl(DRM_IOCTL_ARGS)
 {
 	DRM_DEVICE;
 
-	LOCK_TEST_WITH_RETURN( dev, filp );
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	return via_driver_dma_quiescent(dev);
 }
@@ -341,7 +331,7 @@ static int via_cmdbuffer(DRM_IOCTL_ARGS)
 	drm_via_cmdbuffer_t cmdbuf;
 	int ret;
 
-	LOCK_TEST_WITH_RETURN( dev, filp );
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	DRM_COPY_FROM_USER_IOCTL(cmdbuf, (drm_via_cmdbuffer_t __user *) data,
 				 sizeof(cmdbuf));
@@ -364,16 +354,16 @@ static int via_dispatch_pci_cmdbuffer(drm_device_t * dev,
 
 	if (cmd->size > VIA_PCI_BUF_SIZE) {
 		return DRM_ERR(ENOMEM);
-	} 
+	}
 	if (DRM_COPY_FROM_USER(dev_priv->pci_buf, cmd->buf, cmd->size))
 		return DRM_ERR(EFAULT);
-	
-	if ((ret = 
-	     via_verify_command_stream((uint32_t *)dev_priv->pci_buf,
+
+	if ((ret =
+	     via_verify_command_stream((uint32_t *) dev_priv->pci_buf,
 				       cmd->size, dev, 0))) {
 		return ret;
 	}
-	
+
 	ret =
 	    via_parse_command_stream(dev, (const uint32_t *)dev_priv->pci_buf,
 				     cmd->size);
@@ -386,7 +376,7 @@ static int via_pci_cmdbuffer(DRM_IOCTL_ARGS)
 	drm_via_cmdbuffer_t cmdbuf;
 	int ret;
 
-	LOCK_TEST_WITH_RETURN( dev, filp );
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	DRM_COPY_FROM_USER_IOCTL(cmdbuf, (drm_via_cmdbuffer_t __user *) data,
 				 sizeof(cmdbuf));
@@ -402,7 +392,6 @@ static int via_pci_cmdbuffer(DRM_IOCTL_ARGS)
 	return 0;
 }
 
-
 static inline uint32_t *via_align_buffer(drm_via_private_t * dev_priv,
 					 uint32_t * vb, int qw_count)
 {
@@ -411,7 +400,6 @@ static inline uint32_t *via_align_buffer(drm_via_private_t * dev_priv,
 	}
 	return vb;
 }
-
 
 /*
  * This function is used internally by ring buffer mangement code.
@@ -428,69 +416,47 @@ static inline uint32_t *via_get_dma(drm_via_private_t * dev_priv)
  * modifying the pause address stored in the buffer itself. If
  * the regulator has already paused, restart it.
  */
-static int via_hook_segment(drm_via_private_t *dev_priv,
+static int via_hook_segment(drm_via_private_t * dev_priv,
 			    uint32_t pause_addr_hi, uint32_t pause_addr_lo,
 			    int no_pci_fire)
 {
 	int paused, count;
 	volatile uint32_t *paused_at = dev_priv->last_pause_ptr;
-
-	via_flush_write_combine();
-	while(! *(via_get_dma(dev_priv)-1));
-	*dev_priv->last_pause_ptr = pause_addr_lo;
-	via_flush_write_combine();
-
-	/*
-	 * The below statement is inserted to really force the flush.
-	 * Not sure it is needed.
-	 */
-
-	while(! *dev_priv->last_pause_ptr);
-	dev_priv->last_pause_ptr = via_get_dma(dev_priv) - 1;
-	while(! *dev_priv->last_pause_ptr);
-
+	uint32_t reader,ptr;
 
 	paused = 0;
-	count = 20; 
+	via_flush_write_combine();
+	(void) *(volatile uint32_t *)(via_get_dma(dev_priv) -1);
+	*paused_at = pause_addr_lo;
+	via_flush_write_combine();
+	(void) *paused_at;
+	reader = *(dev_priv->hw_addr_ptr);
+	ptr = ((volatile char *)paused_at - dev_priv->dma_ptr) +
+		dev_priv->dma_offset + (uint32_t) dev_priv->agpAddr + 4;
+	dev_priv->last_pause_ptr = via_get_dma(dev_priv) - 1;
 
-	while (!(paused = (VIA_READ(0x41c) & 0x80000000)) && count--);
-	if ((count <= 8) && (count >= 0)) {
-		uint32_t rgtr, ptr;
-		rgtr = *(dev_priv->hw_addr_ptr);
-		ptr = ((volatile char *)dev_priv->last_pause_ptr -
-		      dev_priv->dma_ptr) + dev_priv->dma_offset +
-		      (uint32_t) dev_priv->agpAddr + 4 - CMDBUF_ALIGNMENT_SIZE;
-		if (rgtr <= ptr) {
-			DRM_ERROR
-			   ("Command regulator\npaused at count %d, address %x, "
-			    "while current pause address is %x.\n"
-			    "Please mail this message to "
-			    "<unichrome-devel@lists.sourceforge.net>\n", count,
-			    rgtr, ptr);
-		}
+	if ((ptr - reader) <= dev_priv->dma_diff ) {
+		count = 10000000;
+		while (!(paused = (VIA_READ(0x41c) & 0x80000000)) && count--);
 	}
-		
+
 	if (paused && !no_pci_fire) {
-		uint32_t rgtr,ptr;
-		uint32_t ptr_low;
+		reader = *(dev_priv->hw_addr_ptr);
+		if ((ptr - reader) == dev_priv->dma_diff) {
 
-		count = 1000000;
-		while ((VIA_READ(VIA_REG_STATUS) & VIA_CMD_RGTR_BUSY)
-		       && count--);
-		
-		rgtr = *(dev_priv->hw_addr_ptr);
-		ptr = ((volatile char *)paused_at - dev_priv->dma_ptr) + 
-			dev_priv->dma_offset + (uint32_t) dev_priv->agpAddr + 4;
-		
+			/*
+			 * There is a concern that these writes may stall the PCI bus
+			 * if the GPU is not idle. However, idling the GPU first
+			 * doesn't make a difference.
+			 */
 
-		ptr_low = (ptr > 3*CMDBUF_ALIGNMENT_SIZE) ? 
-			ptr - 3*CMDBUF_ALIGNMENT_SIZE : 0;
-		if (rgtr <= ptr && rgtr >= ptr_low) {
 			VIA_WRITE(VIA_REG_TRANSET, (HC_ParaType_PreCR << 16));
 			VIA_WRITE(VIA_REG_TRANSPACE, pause_addr_hi);
 			VIA_WRITE(VIA_REG_TRANSPACE, pause_addr_lo);
-		} 
+			VIA_READ(VIA_REG_TRANSPACE);
+		}
 	}
+
 	return paused;
 }
 
@@ -499,6 +465,9 @@ static int via_hook_segment(drm_via_private_t *dev_priv,
 static int via_wait_idle(drm_via_private_t * dev_priv)
 {
 	int count = 10000000;
+
+	while (!(VIA_READ(VIA_REG_STATUS) & VIA_VR_QUEUE_BUSY) && count--);
+
 	while (count-- && (VIA_READ(VIA_REG_STATUS) &
 			   (VIA_CMD_RGTR_BUSY | VIA_2D_ENG_BUSY |
 			    VIA_3D_ENG_BUSY))) ;
@@ -506,7 +475,7 @@ static int via_wait_idle(drm_via_private_t * dev_priv)
 }
 
 static uint32_t *via_align_cmd(drm_via_private_t * dev_priv, uint32_t cmd_type,
-			       uint32_t addr, uint32_t *cmd_addr_hi, 
+			       uint32_t addr, uint32_t *cmd_addr_hi,
 			       uint32_t *cmd_addr_lo, int skip_wait)
 {
 	uint32_t agp_base;
@@ -535,9 +504,6 @@ static uint32_t *via_align_cmd(drm_via_private_t * dev_priv, uint32_t cmd_type,
 	return vb;
 }
 
-
-
-
 static void via_cmdbuf_start(drm_via_private_t * dev_priv)
 {
 	uint32_t pause_addr_lo, pause_addr_hi;
@@ -545,7 +511,9 @@ static void via_cmdbuf_start(drm_via_private_t * dev_priv)
 	uint32_t end_addr, end_addr_lo;
 	uint32_t command;
 	uint32_t agp_base;
-
+	uint32_t ptr;
+	uint32_t reader;
+	int count;
 
 	dev_priv->dma_low = 0;
 
@@ -563,7 +531,7 @@ static void via_cmdbuf_start(drm_via_private_t * dev_priv)
 			      &pause_addr_hi, & pause_addr_lo, 1) - 1;
 
 	via_flush_write_combine();
-	while(! *dev_priv->last_pause_ptr);
+	(void) *(volatile uint32_t *)dev_priv->last_pause_ptr;
 
 	VIA_WRITE(VIA_REG_TRANSET, (HC_ParaType_PreCR << 16));
 	VIA_WRITE(VIA_REG_TRANSPACE, command);
@@ -572,8 +540,27 @@ static void via_cmdbuf_start(drm_via_private_t * dev_priv)
 
 	VIA_WRITE(VIA_REG_TRANSPACE, pause_addr_hi);
 	VIA_WRITE(VIA_REG_TRANSPACE, pause_addr_lo);
-
+	DRM_WRITEMEMORYBARRIER();
 	VIA_WRITE(VIA_REG_TRANSPACE, command | HC_HAGPCMNT_MASK);
+	VIA_READ(VIA_REG_TRANSPACE);
+
+	dev_priv->dma_diff = 0;
+
+	count = 10000000;
+	while (!(VIA_READ(0x41c) & 0x80000000) && count--);
+
+	reader = *(dev_priv->hw_addr_ptr);
+	ptr = ((volatile char *)dev_priv->last_pause_ptr - dev_priv->dma_ptr) +
+	    dev_priv->dma_offset + (uint32_t) dev_priv->agpAddr + 4;
+
+	/*
+	 * This is the difference between where we tell the
+	 * command reader to pause and where it actually pauses.
+	 * This differs between hw implementation so we need to
+	 * detect it.
+	 */
+
+	dev_priv->dma_diff = ptr - reader;
 }
 
 static void via_pad_cache(drm_via_private_t *dev_priv, int qwords)
@@ -591,9 +578,8 @@ static inline void via_dummy_bitblt(drm_via_private_t * dev_priv)
 	uint32_t *vb = via_get_dma(dev_priv);
 	SetReg2DAGP(0x0C, (0 | (0 << 16)));
 	SetReg2DAGP(0x10, 0 | (0 << 16));
-	SetReg2DAGP(0x0, 0x1 | 0x2000 | 0xAA000000); 
+	SetReg2DAGP(0x0, 0x1 | 0x2000 | 0xAA000000);
 }
-
 
 static void via_cmdbuf_jump(drm_via_private_t * dev_priv)
 {
@@ -601,10 +587,9 @@ static void via_cmdbuf_jump(drm_via_private_t * dev_priv)
 	uint32_t pause_addr_lo, pause_addr_hi;
 	uint32_t jump_addr_lo, jump_addr_hi;
 	volatile uint32_t *last_pause_ptr;
-	uint32_t dma_low_save1, dma_low_save2;
 
 	agp_base = dev_priv->dma_offset + (uint32_t) dev_priv->agpAddr;
-	via_align_cmd(dev_priv,  HC_HAGPBpID_JUMP, 0, &jump_addr_hi, 
+	via_align_cmd(dev_priv,  HC_HAGPBpID_JUMP, 0, &jump_addr_hi,
 		      &jump_addr_lo, 0);
 	
 	dev_priv->dma_wrap = dev_priv->dma_low;
@@ -620,38 +605,14 @@ static void via_cmdbuf_jump(drm_via_private_t * dev_priv)
 	}
 
 	via_dummy_bitblt(dev_priv);
-	via_dummy_bitblt(dev_priv); 
-
-	last_pause_ptr =
-	    via_align_cmd(dev_priv,  HC_HAGPBpID_PAUSE, 0, &pause_addr_hi, 
+	via_dummy_bitblt(dev_priv);
+	last_pause_ptr = via_align_cmd(dev_priv,  HC_HAGPBpID_PAUSE, 0, &pause_addr_hi,
 				       &pause_addr_lo, 0) -1;
-	via_align_cmd(dev_priv,  HC_HAGPBpID_PAUSE, 0, &pause_addr_hi, 
-		      &pause_addr_lo, 0);
-
-	*last_pause_ptr = pause_addr_lo;
-	dma_low_save1 = dev_priv->dma_low;
-
-	/*
-	 * Now, set a trap that will pause the regulator if it tries to rerun the old
-	 * command buffer. (Which may happen if via_hook_segment detecs a command regulator pause
-	 * and reissues the jump command over PCI, while the regulator has already taken the jump
-	 * and actually paused at the current buffer end).
-	 * There appears to be no other way to detect this condition, since the hw_addr_pointer
-	 * does not seem to get updated immediately when a jump occurs.
-	 */
-
-	last_pause_ptr =
-	    via_align_cmd(dev_priv,  HC_HAGPBpID_PAUSE, 0, &pause_addr_hi, 
-				       &pause_addr_lo, 0) -1;
-	via_align_cmd(dev_priv,  HC_HAGPBpID_PAUSE, 0, &pause_addr_hi, 
+	via_align_cmd(dev_priv,  HC_HAGPBpID_PAUSE, 0, &pause_addr_hi,
 		      &pause_addr_lo, 0);
 	*last_pause_ptr = pause_addr_lo;
 
-	dma_low_save2 = dev_priv->dma_low;
-	dev_priv->dma_low = dma_low_save1;	
 	via_hook_segment( dev_priv, jump_addr_hi, jump_addr_lo, 0);
-	dev_priv->dma_low = dma_low_save2;
-	via_hook_segment( dev_priv, pause_addr_hi, pause_addr_lo, 0);
 }
 
 

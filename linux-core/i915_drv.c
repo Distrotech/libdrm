@@ -40,22 +40,32 @@ static struct pci_device_id pciidlist[] = {
 
 #ifdef I915_HAVE_FENCE
 static drm_fence_driver_t i915_fence_driver = {
-	.no_types = 2,
-	.wrap_diff = (1 << 30),
-	.flush_diff = (1 << 29),
-	.sequence_mask = 0xffffffffU,
+	.num_classes = 1,
+	.wrap_diff = (1U << (BREADCRUMB_BITS - 1)),
+	.flush_diff = (1U << (BREADCRUMB_BITS - 2)),
+	.sequence_mask = BREADCRUMB_MASK,
 	.lazy_capable = 1,
 	.emit = i915_fence_emit_sequence,
 	.poke_flush = i915_poke_flush,
+	.has_irq = i915_fence_has_irq,
 };
 #endif
 #ifdef I915_HAVE_BUFFER
+
+static uint32_t i915_mem_prios[] = {DRM_BO_MEM_PRIV0, DRM_BO_MEM_TT, DRM_BO_MEM_LOCAL};
+static uint32_t i915_busy_prios[] = {DRM_BO_MEM_TT, DRM_BO_MEM_PRIV0, DRM_BO_MEM_LOCAL};
+
 static drm_bo_driver_t i915_bo_driver = {
-        .iomap = {NULL, NULL},
-	.cached = {1, 1},
+	.mem_type_prio = i915_mem_prios,
+	.mem_busy_prio = i915_busy_prios,
+	.num_mem_type_prio = sizeof(i915_mem_prios)/sizeof(uint32_t),
+	.num_mem_busy_prio = sizeof(i915_busy_prios)/sizeof(uint32_t),
 	.create_ttm_backend_entry = i915_create_ttm_backend_entry,
 	.fence_type = i915_fence_types,
-	.invalidate_caches = i915_invalidate_caches
+	.invalidate_caches = i915_invalidate_caches,
+	.init_mem_type = i915_init_mem_type,
+	.evict_mask = i915_evict_mask,
+	.move = i915_move,
 };
 #endif
 
@@ -69,6 +79,7 @@ static struct drm_driver driver = {
 	    DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_IRQ_VBL |
 	    DRIVER_IRQ_VBL2,
 	.load = i915_driver_load,
+	.firstopen = i915_driver_firstopen,
 	.lastclose = i915_driver_lastclose,
 	.preclose = i915_driver_preclose,
 	.device_is_agp = i915_driver_device_is_agp,

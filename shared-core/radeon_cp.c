@@ -824,10 +824,19 @@ static int RADEON_READ_PLL(drm_device_t * dev, int addr)
 	return RADEON_READ(RADEON_CLOCK_CNTL_DATA);
 }
 
-static int RADEON_READ_PCIE(drm_radeon_private_t *dev_priv, int addr)
+static u32 RADEON_READ_PCIE(drm_radeon_private_t *dev_priv, int addr)
 {
 	RADEON_WRITE8(RADEON_PCIE_INDEX, addr & 0xff);
 	return RADEON_READ(RADEON_PCIE_DATA);
+}
+
+static u32 RADEON_READ_IGPGART(drm_radeon_private_t *dev_priv, int addr)
+{
+	u32 ret;
+	RADEON_WRITE(RADEON_IGPGART_INDEX, addr & 0x7f);
+	ret = RADEON_READ(RADEON_IGPGART_DATA);
+	RADEON_WRITE(RADEON_IGPGART_INDEX, 0x7f);
+	return ret;
 }
 
 #if RADEON_FIFO_DEBUG
@@ -1181,9 +1190,15 @@ static void radeon_cp_init_ring_buffer(drm_device_t * dev,
 	/* Set ring buffer size */
 #ifdef __BIG_ENDIAN
 	RADEON_WRITE(RADEON_CP_RB_CNTL,
-		     dev_priv->ring.size_l2qw | RADEON_BUF_SWAP_32BIT);
+		     RADEON_BUF_SWAP_32BIT |
+		     (dev_priv->ring.fetch_size_l2ow << 18) |
+		     (dev_priv->ring.rptr_update_l2qw << 8) |
+		     dev_priv->ring.size_l2qw);
 #else
-	RADEON_WRITE(RADEON_CP_RB_CNTL, dev_priv->ring.size_l2qw);
+	RADEON_WRITE(RADEON_CP_RB_CNTL,
+		     (dev_priv->ring.fetch_size_l2ow << 18) |
+		     (dev_priv->ring.rptr_update_l2qw << 8) |
+		     dev_priv->ring.size_l2qw);
 #endif
 
 	/* Start with assuming that writeback doesn't work */
@@ -1266,7 +1281,45 @@ static void radeon_test_writeback(drm_radeon_private_t * dev_priv)
 	}
 }
 
-/* Enable or disable PCI-E GART on the chip */
+/* Enable or disable IGP GART on the chip */
+static void radeon_set_igpgart(drm_radeon_private_t * dev_priv, int on)
+{
+	u32 temp, tmp;
+
+	tmp = RADEON_READ(RADEON_AIC_CNTL);
+	DRM_DEBUG("setting igpgart AIC CNTL is %08X\n", tmp);
+	if (on) {
+		DRM_DEBUG("programming igpgart %08X %08lX %08X\n",
+			 dev_priv->gart_vm_start,
+			 (long)dev_priv->gart_info.bus_addr,
+			 dev_priv->gart_size);
+
+		RADEON_WRITE_IGPGART(RADEON_IGPGART_UNK_18, 0x1000);
+		RADEON_WRITE_IGPGART(RADEON_IGPGART_ENABLE, 0x1);
+		RADEON_WRITE_IGPGART(RADEON_IGPGART_CTRL, 0x42040800);
+		RADEON_WRITE_IGPGART(RADEON_IGPGART_BASE_ADDR,
+				     dev_priv->gart_info.bus_addr);
+
+		temp = RADEON_READ_IGPGART(dev_priv, RADEON_IGPGART_UNK_39);
+		RADEON_WRITE_IGPGART(RADEON_IGPGART_UNK_39, temp);
+
+		RADEON_WRITE(RADEON_AGP_BASE, (unsigned int)dev_priv->gart_vm_start);
+		dev_priv->gart_size = 32*1024*1024;
+		RADEON_WRITE(RADEON_MC_AGP_LOCATION,
+			     (((dev_priv->gart_vm_start - 1 +
+			       dev_priv->gart_size) & 0xffff0000) |
+			     (dev_priv->gart_vm_start >> 16)));
+
+		temp = RADEON_READ_IGPGART(dev_priv, RADEON_IGPGART_ENABLE);
+		RADEON_WRITE_IGPGART(RADEON_IGPGART_ENABLE, temp);
+
+		RADEON_READ_IGPGART(dev_priv, RADEON_IGPGART_FLUSH);
+		RADEON_WRITE_IGPGART(RADEON_IGPGART_FLUSH, 0x1);
+		RADEON_READ_IGPGART(dev_priv, RADEON_IGPGART_FLUSH);
+		RADEON_WRITE_IGPGART(RADEON_IGPGART_FLUSH, 0x0);
+       }
+}
+
 static void radeon_set_pciegart(drm_radeon_private_t * dev_priv, int on)
 {
 	u32 tmp = RADEON_READ_PCIE(dev_priv, RADEON_PCIE_TX_GART_CNTL);
@@ -1300,6 +1353,11 @@ static void radeon_set_pciegart(drm_radeon_private_t * dev_priv, int on)
 static void radeon_set_pcigart(drm_radeon_private_t * dev_priv, int on)
 {
 	u32 tmp;
+
+	if (dev_priv->flags & RADEON_IS_IGPGART) {
+		radeon_set_igpgart(dev_priv, on);
+		return;
+	}
 
 	if (dev_priv->flags & RADEON_IS_PCIE) {
 		radeon_set_pciegart(dev_priv, on);
@@ -1339,8 +1397,7 @@ static int radeon_do_init_cp(drm_device_t * dev, drm_radeon_init_t * init)
 	DRM_DEBUG("\n");
 
 	/* if we require new memory map but we don't have it fail */
-	if ((dev_priv->flags & RADEON_NEW_MEMMAP) && !dev_priv->new_memmap)
-	{
+	if ((dev_priv->flags & RADEON_NEW_MEMMAP) && !dev_priv->new_memmap) {
 		DRM_ERROR("Cannot initialise DRM on this card\nThis card requires a new X.org DDX for 3D\n");
 		radeon_do_cleanup_cp(dev);
 		return DRM_ERR(EINVAL);
@@ -1371,6 +1428,10 @@ static int radeon_do_init_cp(drm_device_t * dev, drm_radeon_init_t * init)
 		radeon_do_cleanup_cp(dev);
 		return DRM_ERR(EINVAL);
 	}
+
+	/* Enable vblank on CRTC1 for older X servers
+	 */
+	dev_priv->vblank_crtc = DRM_RADEON_VBLANK_CRTC1;
 
 	switch(init->func) {
 	case RADEON_INIT_R200_CP:
@@ -1453,13 +1514,13 @@ static int radeon_do_init_cp(drm_device_t * dev, drm_radeon_init_t * init)
 					 RADEON_ROUND_MODE_TRUNC |
 					 RADEON_ROUND_PREC_8TH_PIX);
 
-	DRM_GETSAREA();
 
 	dev_priv->ring_offset = init->ring_offset;
 	dev_priv->ring_rptr_offset = init->ring_rptr_offset;
 	dev_priv->buffers_offset = init->buffers_offset;
 	dev_priv->gart_textures_offset = init->gart_textures_offset;
 
+	dev_priv->sarea = drm_getsarea(dev);
 	if (!dev_priv->sarea) {
 		DRM_ERROR("could not find sarea!\n");
 		radeon_do_cleanup_cp(dev);
@@ -1563,8 +1624,8 @@ static int radeon_do_init_cp(drm_device_t * dev, drm_radeon_init_t * init)
 		if (dev_priv->flags & RADEON_IS_AGP) {
 			base = dev->agp->base;
 			/* Check if valid */
-			if ((base + dev_priv->gart_size) > dev_priv->fb_location &&
-			    base < (dev_priv->fb_location + dev_priv->fb_size)) {
+			if ((base + dev_priv->gart_size - 1) >= dev_priv->fb_location &&
+			    base < (dev_priv->fb_location + dev_priv->fb_size - 1)) {
 				DRM_INFO("Can't use AGP base @0x%08lx, won't fit\n",
 					 dev->agp->base);
 				base = 0;
@@ -1574,8 +1635,8 @@ static int radeon_do_init_cp(drm_device_t * dev, drm_radeon_init_t * init)
 		/* If not or if AGP is at 0 (Macs), try to put it elsewhere */
 		if (base == 0) {
 			base = dev_priv->fb_location + dev_priv->fb_size;
-			if (((base + dev_priv->gart_size) & 0xfffffffful)
-			    < base)
+			if (base < dev_priv->fb_location ||
+			    ((base + dev_priv->gart_size) & 0xfffffffful) < base)
 				base = dev_priv->fb_location
 					- dev_priv->gart_size;
 		}		
@@ -1611,6 +1672,12 @@ static int radeon_do_init_cp(drm_device_t * dev, drm_radeon_init_t * init)
 	dev_priv->ring.size = init->ring_size;
 	dev_priv->ring.size_l2qw = drm_order(init->ring_size / 8);
 
+	dev_priv->ring.rptr_update = /* init->rptr_update */ 4096;
+	dev_priv->ring.rptr_update_l2qw = drm_order( /* init->rptr_update */ 4096 / 8);
+
+	dev_priv->ring.fetch_size = /* init->fetch_size */ 32;
+	dev_priv->ring.fetch_size_l2ow = drm_order( /* init->fetch_size */ 32 / 16);
+
 	dev_priv->ring.tail_mask = (dev_priv->ring.size / sizeof(u32)) - 1;
 
 	dev_priv->ring.high_mark = RADEON_RING_HIGH_MARK;
@@ -1623,20 +1690,22 @@ static int radeon_do_init_cp(drm_device_t * dev, drm_radeon_init_t * init)
 #endif
 	{
 		/* if we have an offset set from userspace */
-		if (dev_priv->pcigart_offset) {
+		if (dev_priv->pcigart_offset_set) {
 			dev_priv->gart_info.bus_addr =
 			    dev_priv->pcigart_offset + dev_priv->fb_location;
 			dev_priv->gart_info.mapping.offset =
 			    dev_priv->gart_info.bus_addr;
 			dev_priv->gart_info.mapping.size =
-			    RADEON_PCIGART_TABLE_SIZE;
+			    dev_priv->gart_info.table_size;
 
 			drm_core_ioremap(&dev_priv->gart_info.mapping, dev);
 			dev_priv->gart_info.addr =
 			    dev_priv->gart_info.mapping.handle;
 
-			dev_priv->gart_info.is_pcie =
-			    !!(dev_priv->flags & RADEON_IS_PCIE);
+			if (dev_priv->flags & RADEON_IS_PCIE)
+				dev_priv->gart_info.gart_reg_if = DRM_ATI_GART_PCIE;
+			else
+				dev_priv->gart_info.gart_reg_if = DRM_ATI_GART_PCI;
 			dev_priv->gart_info.gart_table_location =
 			    DRM_ATI_GART_FB;
 
@@ -1644,6 +1713,10 @@ static int radeon_do_init_cp(drm_device_t * dev, drm_radeon_init_t * init)
 				  dev_priv->gart_info.addr,
 				  dev_priv->pcigart_offset);
 		} else {
+			if (dev_priv->flags & RADEON_IS_IGPGART)
+				dev_priv->gart_info.gart_reg_if = DRM_ATI_GART_IGP;
+			else
+				dev_priv->gart_info.gart_reg_if = DRM_ATI_GART_PCI;
 			dev_priv->gart_info.gart_table_location =
 			    DRM_ATI_GART_MAIN;
 			dev_priv->gart_info.addr = NULL;
@@ -2229,6 +2302,8 @@ int radeon_driver_firstopen(struct drm_device *dev)
 	int ret;
 	drm_local_map_t *map;
 	drm_radeon_private_t *dev_priv = dev->dev_private;
+
+	dev_priv->gart_info.table_size = RADEON_PCIGART_TABLE_SIZE;
 
 	ret = drm_addmap(dev, drm_get_resource_start(dev, 2),
 			 drm_get_resource_len(dev, 2), _DRM_REGISTERS,

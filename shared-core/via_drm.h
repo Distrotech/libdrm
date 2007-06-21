@@ -42,11 +42,11 @@
  * backwards incompatibilities, (which should be avoided whenever possible).
  */
 
-#define VIA_DRM_DRIVER_DATE		"20060616"
+#define VIA_DRM_DRIVER_DATE		"20070202"
 
 #define VIA_DRM_DRIVER_MAJOR		2
-#define VIA_DRM_DRIVER_MINOR		10
-#define VIA_DRM_DRIVER_PATCHLEVEL	2
+#define VIA_DRM_DRIVER_MINOR		11
+#define VIA_DRM_DRIVER_PATCHLEVEL	1
 #define VIA_DRM_DRIVER_VERSION	  (((VIA_DRM_DRIVER_MAJOR) << 16) | (VIA_DRM_DRIVER_MINOR))
 
 #define VIA_NR_SAREA_CLIPRECTS 		8
@@ -58,21 +58,11 @@
 				      (VIA_MAX_CACHELINE_SIZE - 1)) &	\
 				     ~(VIA_MAX_CACHELINE_SIZE - 1)) +	\
 				    VIA_MAX_CACHELINE_SIZE*(lockNo)))
-
-/* Each region is a minimum of 64k, and there are at most 64 of them.
- */
 #define VIA_NR_TEX_REGIONS 64
-#define VIA_LOG_MIN_TEX_REGION_SIZE 16
+
 #endif
 
-#define VIA_UPLOAD_TEX0IMAGE  0x1	/* handled clientside */
-#define VIA_UPLOAD_TEX1IMAGE  0x2	/* handled clientside */
-#define VIA_UPLOAD_CTX	0x4
-#define VIA_UPLOAD_BUFFERS    0x8
-#define VIA_UPLOAD_TEX0       0x10
-#define VIA_UPLOAD_TEX1       0x20
-#define VIA_UPLOAD_CLIPRECTS  0x40
-#define VIA_UPLOAD_ALL	0xff
+#define DRM_VIA_FENCE_TYPE_ACCEL 0x00000002
 
 /* VIA specific ioctls */
 #define DRM_VIA_ALLOCMEM	0x00

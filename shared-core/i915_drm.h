@@ -113,6 +113,12 @@ typedef struct _drm_i915_sarea {
 	int pipeB_y;
 	int pipeB_w;
 	int pipeB_h;
+
+	/* Triple buffering */
+	drm_handle_t third_handle;
+	int third_offset;
+	int third_size;
+	unsigned int third_tiled;
 } drm_i915_sarea_t;
 
 /* Driver specific fence types and classes.
@@ -152,10 +158,12 @@ typedef struct _drm_i915_sarea {
 #define DRM_I915_SET_VBLANK_PIPE	0x0d
 #define DRM_I915_GET_VBLANK_PIPE	0x0e
 #define DRM_I915_VBLANK_SWAP	0x0f
+#define DRM_I915_MMIO		0x10
+#define DRM_I915_HWS_ADDR	0x11
 
 #define DRM_IOCTL_I915_INIT		DRM_IOW( DRM_COMMAND_BASE + DRM_I915_INIT, drm_i915_init_t)
 #define DRM_IOCTL_I915_FLUSH		DRM_IO ( DRM_COMMAND_BASE + DRM_I915_FLUSH)
-#define DRM_IOCTL_I915_FLIP		DRM_IO ( DRM_COMMAND_BASE + DRM_I915_FLIP)
+#define DRM_IOCTL_I915_FLIP		DRM_IOW( DRM_COMMAND_BASE + DRM_I915_FLIP, drm_i915_flip_t)
 #define DRM_IOCTL_I915_BATCHBUFFER	DRM_IOW( DRM_COMMAND_BASE + DRM_I915_BATCHBUFFER, drm_i915_batchbuffer_t)
 #define DRM_IOCTL_I915_IRQ_EMIT         DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_IRQ_EMIT, drm_i915_irq_emit_t)
 #define DRM_IOCTL_I915_IRQ_WAIT         DRM_IOW( DRM_COMMAND_BASE + DRM_I915_IRQ_WAIT, drm_i915_irq_wait_t)
@@ -170,6 +178,12 @@ typedef struct _drm_i915_sarea {
 #define DRM_IOCTL_I915_GET_VBLANK_PIPE	DRM_IOR( DRM_COMMAND_BASE + DRM_I915_GET_VBLANK_PIPE, drm_i915_vblank_pipe_t)
 #define DRM_IOCTL_I915_VBLANK_SWAP	DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_VBLANK_SWAP, drm_i915_vblank_swap_t)
 
+
+/* Asynchronous page flipping:
+ */
+typedef struct drm_i915_flip {
+	int pipes;
+} drm_i915_flip_t;
 
 /* Allow drivers to submit batchbuffers directly to hardware, relying
  * on the security mechanisms provided by hardware.
@@ -272,5 +286,37 @@ typedef struct drm_i915_vblank_swap {
 	drm_vblank_seq_type_t seqtype;
 	unsigned int sequence;
 } drm_i915_vblank_swap_t;
+
+#define I915_MMIO_READ 	0
+#define I915_MMIO_WRITE 1
+
+#define I915_MMIO_MAY_READ  	0x1
+#define I915_MMIO_MAY_WRITE  	0x2
+
+#define MMIO_REGS_IA_PRIMATIVES_COUNT		0
+#define MMIO_REGS_IA_VERTICES_COUNT		1
+#define MMIO_REGS_VS_INVOCATION_COUNT		2
+#define MMIO_REGS_GS_PRIMITIVES_COUNT		3
+#define MMIO_REGS_GS_INVOCATION_COUNT		4
+#define MMIO_REGS_CL_PRIMITIVES_COUNT		5
+#define MMIO_REGS_CL_INVOCATION_COUNT		6
+#define MMIO_REGS_PS_INVOCATION_COUNT		7
+#define MMIO_REGS_PS_DEPTH_COUNT		8
+
+typedef struct drm_i915_mmio_entry {
+	unsigned int flag;
+	unsigned int offset;
+	unsigned int size;
+}drm_i915_mmio_entry_t;
+
+typedef struct drm_i915_mmio {
+	unsigned int read_write:1;
+	unsigned int reg:31;
+	void __user *data;	
+} drm_i915_mmio_t;
+
+typedef struct drm_i915_hws_addr {
+	uint64_t addr;
+} drm_i915_hws_addr_t;
 
 #endif				/* _I915_DRM_H_ */

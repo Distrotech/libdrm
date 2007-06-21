@@ -118,10 +118,9 @@ static int drm_irq_install(drm_device_t * dev)
 		init_waitqueue_head(&dev->vbl_queue);
 
 		spin_lock_init(&dev->vbl_lock);
-		spin_lock_init(&dev->tasklet_lock);
 
-		INIT_LIST_HEAD(&dev->vbl_sigs.head);
-		INIT_LIST_HEAD(&dev->vbl_sigs2.head);
+		INIT_LIST_HEAD(&dev->vbl_sigs);
+		INIT_LIST_HEAD(&dev->vbl_sigs2);
 
 		dev->vbl_pending = 0;
 	}
@@ -131,7 +130,7 @@ static int drm_irq_install(drm_device_t * dev)
 
 	/* Install handler */
 	if (drm_core_check_feature(dev, DRIVER_IRQ_SHARED))
-		sh_flags = SA_SHIRQ;
+		sh_flags = IRQF_SHARED;
 
 	ret = request_irq(dev->irq, dev->driver->irq_handler,
 			  sh_flags, dev->devname, dev);
@@ -291,7 +290,7 @@ int drm_wait_vblank(DRM_IOCTL_ARGS)
 
 	if (flags & _DRM_VBLANK_SIGNAL) {
 		unsigned long irqflags;
-		drm_vbl_sig_t *vbl_sigs = (flags & _DRM_VBLANK_SECONDARY)
+		struct list_head *vbl_sigs = (flags & _DRM_VBLANK_SECONDARY)
 				      ? &dev->vbl_sigs2 : &dev->vbl_sigs;
 		drm_vbl_sig_t *vbl_sig;
 
@@ -301,7 +300,7 @@ int drm_wait_vblank(DRM_IOCTL_ARGS)
 		 * for the same vblank sequence number; nothing to be done in
 		 * that case
 		 */
-		list_for_each_entry(vbl_sig, &vbl_sigs->head, head) {
+		list_for_each_entry(vbl_sig, vbl_sigs, head) {
 			if (vbl_sig->sequence == vblwait.request.sequence
 			    && vbl_sig->info.si_signo == vblwait.request.signal
 			    && vbl_sig->task == current) {
@@ -335,7 +334,7 @@ int drm_wait_vblank(DRM_IOCTL_ARGS)
 
 		spin_lock_irqsave(&dev->vbl_lock, irqflags);
 
-		list_add_tail((struct list_head *)vbl_sig, &vbl_sigs->head);
+		list_add_tail(&vbl_sig->head, vbl_sigs);
 
 		spin_unlock_irqrestore(&dev->vbl_lock, irqflags);
 
@@ -378,20 +377,18 @@ void drm_vbl_send_signals(drm_device_t * dev)
 	spin_lock_irqsave(&dev->vbl_lock, flags);
 
 	for (i = 0; i < 2; i++) {
-		struct list_head *list, *tmp;
-		drm_vbl_sig_t *vbl_sig;
-		drm_vbl_sig_t *vbl_sigs = i ? &dev->vbl_sigs2 : &dev->vbl_sigs;
+		drm_vbl_sig_t *vbl_sig, *tmp;
+		struct list_head *vbl_sigs = i ? &dev->vbl_sigs2 : &dev->vbl_sigs;
 		unsigned int vbl_seq = atomic_read(i ? &dev->vbl_received2 :
 						   &dev->vbl_received);
 
-		list_for_each_safe(list, tmp, &vbl_sigs->head) {
-			vbl_sig = list_entry(list, drm_vbl_sig_t, head);
+		list_for_each_entry_safe(vbl_sig, tmp, vbl_sigs, head) {
 			if ((vbl_seq - vbl_sig->sequence) <= (1 << 23)) {
 				vbl_sig->info.si_code = vbl_seq;
 				send_sig_info(vbl_sig->info.si_signo,
 					      &vbl_sig->info, vbl_sig->task);
 
-				list_del(list);
+				list_del(&vbl_sig->head);
 
 				drm_free(vbl_sig, sizeof(*vbl_sig),
 					 DRM_MEM_DRIVER);
@@ -422,7 +419,7 @@ static void drm_locked_tasklet_func(unsigned long data)
 	spin_lock_irqsave(&dev->tasklet_lock, irqflags);
 
 	if (!dev->locked_tasklet_func ||
-	    !drm_lock_take(&dev->lock.hw_lock->lock,
+	    !drm_lock_take(&dev->lock,
 			   DRM_KERNEL_CONTEXT)) {
 		spin_unlock_irqrestore(&dev->tasklet_lock, irqflags);
 		return;
@@ -433,7 +430,7 @@ static void drm_locked_tasklet_func(unsigned long data)
 
 	dev->locked_tasklet_func(dev);
 
-	drm_lock_free(dev, &dev->lock.hw_lock->lock,
+	drm_lock_free(&dev->lock,
 		      DRM_KERNEL_CONTEXT);
 
 	dev->locked_tasklet_func = NULL;

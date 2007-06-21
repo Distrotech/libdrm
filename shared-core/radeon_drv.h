@@ -95,10 +95,13 @@
  * 1.24- Add general-purpose packet for manipulating scratch registers (r300)
  * 1.25- Add support for r200 vertex programs (R200_EMIT_VAP_PVS_CNTL,
  *       new packet type)
+ * 1.26- Add support for variable size PCI(E) gart aperture
+ * 1.27- Add support for IGP GART
+ * 1.28- Add support for VBL on CRTC2
  */
 
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		25
+#define DRIVER_MINOR		28
 #define DRIVER_PATCHLEVEL	0
 
 /*
@@ -144,6 +147,7 @@ enum radeon_chip_flags {
 	RADEON_IS_PCIE = 0x00200000UL,
 	RADEON_NEW_MEMMAP = 0x00400000UL,
 	RADEON_IS_PCI = 0x00800000UL,
+	RADEON_IS_IGPGART = 0x01000000UL,
 };
 
 #define GET_RING_HEAD(dev_priv)	(dev_priv->writeback_works ? \
@@ -160,8 +164,14 @@ typedef struct drm_radeon_freelist {
 typedef struct drm_radeon_ring_buffer {
 	u32 *start;
 	u32 *end;
-	int size;
-	int size_l2qw;
+	int size; /* Double Words */
+	int size_l2qw; /* log2 Quad Words */
+
+	int rptr_update; /* Double Words */
+	int rptr_update_l2qw; /* log2 Quad Words */
+
+	int fetch_size; /* Double Words */
+	int fetch_size_l2ow; /* log2 Oct Words */
 
 	u32 tail;
 	u32 tail_mask;
@@ -242,7 +252,6 @@ typedef struct drm_radeon_private {
 
 	int do_boxes;
 	int page_flipping;
-	int current_page;
 
 	u32 color_fmt;
 	unsigned int front_offset;
@@ -277,11 +286,15 @@ typedef struct drm_radeon_private {
 	/* SW interrupt */
 	wait_queue_head_t swi_queue;
 	atomic_t swi_emitted;
+	int vblank_crtc;
+	uint32_t irq_enable_reg;
+	int irq_enabled;
 
 	struct radeon_surface surfaces[RADEON_MAX_SURFACES];
 	struct radeon_virt_surface virt_surfaces[2*RADEON_MAX_SURFACES];
 
 	unsigned long pcigart_offset;
+	unsigned int pcigart_offset_set;
 	drm_ati_pcigart_info gart_info;
 
 	u32 scratch_ages[5];
@@ -305,6 +318,21 @@ typedef struct drm_radeon_kcmd_buffer {
 extern int radeon_no_wb;
 extern drm_ioctl_desc_t radeon_ioctls[];
 extern int radeon_max_ioctl;
+
+/* Check whether the given hardware address is inside the framebuffer or the
+ * GART area.
+ */
+static __inline__ int radeon_check_offset(drm_radeon_private_t *dev_priv,
+					  u64 off)
+{
+	u32 fb_start = dev_priv->fb_location;
+	u32 fb_end = fb_start + dev_priv->fb_size - 1;
+	u32 gart_start = dev_priv->gart_vm_start;
+	u32 gart_end = gart_start + dev_priv->gart_size - 1;
+
+	return ((off >= fb_start && off <= fb_end) ||
+		(off >= gart_start && off <= gart_end));
+}
 
 				/* radeon_cp.c */
 extern int radeon_cp_init(DRM_IOCTL_ARGS);
@@ -337,10 +365,14 @@ extern int radeon_irq_wait(DRM_IOCTL_ARGS);
 extern void radeon_do_release(drm_device_t * dev);
 extern int radeon_driver_vblank_wait(drm_device_t * dev,
 				     unsigned int *sequence);
+extern int radeon_driver_vblank_wait2(drm_device_t * dev,
+				      unsigned int *sequence);
 extern irqreturn_t radeon_driver_irq_handler(DRM_IRQ_ARGS);
 extern void radeon_driver_irq_preinstall(drm_device_t * dev);
 extern void radeon_driver_irq_postinstall(drm_device_t * dev);
 extern void radeon_driver_irq_uninstall(drm_device_t * dev);
+extern int radeon_vblank_crtc_get(drm_device_t *dev);
+extern int radeon_vblank_crtc_set(drm_device_t *dev, int64_t value);
 
 extern int radeon_driver_load(struct drm_device *dev, unsigned long flags);
 extern int radeon_driver_unload(struct drm_device *dev);
@@ -415,6 +447,16 @@ extern int r300_do_cp_cmdbuf(drm_device_t *dev, DRMFILE filp,
 #define RADEON_PCIE_TX_GART_END_LO	0x16
 #define RADEON_PCIE_TX_GART_END_HI	0x17
 
+#define RADEON_IGPGART_INDEX            0x168
+#define RADEON_IGPGART_DATA             0x16c
+#define RADEON_IGPGART_UNK_18           0x18
+#define RADEON_IGPGART_CTRL             0x2b
+#define RADEON_IGPGART_BASE_ADDR        0x2c
+#define RADEON_IGPGART_FLUSH            0x2e
+#define RADEON_IGPGART_ENABLE           0x38
+#define RADEON_IGPGART_UNK_39           0x39
+
+
 #define RADEON_MPP_TB_CONFIG		0x01c0
 #define RADEON_MEM_CNTL			0x0140
 #define RADEON_MEM_SDRAM_MODE_REG	0x0158
@@ -467,12 +509,15 @@ extern int r300_do_cp_cmdbuf(drm_device_t *dev, DRMFILE filp,
 
 #define RADEON_GEN_INT_CNTL		0x0040
 #	define RADEON_CRTC_VBLANK_MASK		(1 << 0)
+#	define RADEON_CRTC2_VBLANK_MASK		(1 << 9)
 #	define RADEON_GUI_IDLE_INT_ENABLE	(1 << 19)
 #	define RADEON_SW_INT_ENABLE		(1 << 25)
 
 #define RADEON_GEN_INT_STATUS		0x0044
 #	define RADEON_CRTC_VBLANK_STAT		(1 << 0)
 #	define RADEON_CRTC_VBLANK_STAT_ACK   	(1 << 0)
+#	define RADEON_CRTC2_VBLANK_STAT		(1 << 9)
+#	define RADEON_CRTC2_VBLANK_STAT_ACK   	(1 << 9)
 #	define RADEON_GUI_IDLE_INT_TEST_ACK     (1 << 19)
 #	define RADEON_SW_INT_TEST		(1 << 25)
 #	define RADEON_SW_INT_TEST_ACK   	(1 << 25)
@@ -573,9 +618,51 @@ extern int r300_do_cp_cmdbuf(drm_device_t *dev, DRMFILE filp,
 #	define RADEON_SOFT_RESET_E2		(1 <<  5)
 #	define RADEON_SOFT_RESET_RB		(1 <<  6)
 #	define RADEON_SOFT_RESET_HDP		(1 <<  7)
+/*
+ *   6:0  Available slots in the FIFO
+ *   8    Host Interface active
+ *   9    CP request active
+ *   10   FIFO request active
+ *   11   Host Interface retry active
+ *   12   CP retry active
+ *   13   FIFO retry active
+ *   14   FIFO pipeline busy
+ *   15   Event engine busy
+ *   16   CP command stream busy
+ *   17   2D engine busy
+ *   18   2D portion of render backend busy
+ *   20   3D setup engine busy
+ *   26   GA engine busy
+ *   27   CBA 2D engine busy
+ *   31   2D engine busy or 3D engine busy or FIFO not empty or CP busy or
+ *           command stream queue not empty or Ring Buffer not empty
+ */
 #define RADEON_RBBM_STATUS		0x0e40
+/* Same as the previous RADEON_RBBM_STATUS; this is a mirror of that register.  */
+/* #define RADEON_RBBM_STATUS 		0x1740 */
+/* bits 6:0 are dword slots available in the cmd fifo */
 #	define RADEON_RBBM_FIFOCNT_MASK		0x007f
-#	define RADEON_RBBM_ACTIVE		(1 << 31)
+#	define RADEON_HIRQ_ON_RBB 	(1 <<  8)
+#	define RADEON_CPRQ_ON_RBB 	(1 <<  9)
+#	define RADEON_CFRQ_ON_RBB 	(1 << 10)
+#	define RADEON_HIRQ_IN_RTBUF 	(1 << 11)
+#	define RADEON_CPRQ_IN_RTBUF 	(1 << 12)
+#	define RADEON_CFRQ_IN_RTBUF 	(1 << 13)
+#	define RADEON_PIPE_BUSY 	(1 << 14)
+#	define RADEON_ENG_EV_BUSY 	(1 << 15)
+#	define RADEON_CP_CMDSTRM_BUSY 	(1 << 16)
+#	define RADEON_E2_BUSY 		(1 << 17)
+#	define RADEON_RB2D_BUSY 	(1 << 18)
+#	define RADEON_RB3D_BUSY 	(1 << 19) /* not used on r300 */
+#	define RADEON_VAP_BUSY 		(1 << 20)
+#	define RADEON_RE_BUSY 		(1 << 21) /* not used on r300 */
+#	define RADEON_TAM_BUSY 		(1 << 22) /* not used on r300 */
+#	define RADEON_TDM_BUSY 		(1 << 23) /* not used on r300 */
+#	define RADEON_PB_BUSY 		(1 << 24) /* not used on r300 */
+#	define RADEON_TIM_BUSY 		(1 << 25) /* not used on r300 */
+#	define RADEON_GA_BUSY 		(1 << 26)
+#	define RADEON_CBA2D_BUSY 	(1 << 27)
+#	define RADEON_RBBM_ACTIVE 	(1 << 31)
 #define RADEON_RE_LINE_PATTERN		0x1cd0
 #define RADEON_RE_MISC			0x26c4
 #define RADEON_RE_TOP_LEFT		0x26c0
@@ -975,6 +1062,14 @@ do {									\
 	RADEON_WRITE8( RADEON_CLOCK_CNTL_INDEX,				\
 		       ((addr) & 0x1f) | RADEON_PLL_WR_EN );		\
 	RADEON_WRITE( RADEON_CLOCK_CNTL_DATA, (val) );			\
+} while (0)
+
+#define RADEON_WRITE_IGPGART( addr, val )				\
+do {									\
+	RADEON_WRITE( RADEON_IGPGART_INDEX,				\
+			((addr) & 0x7f) | (1 << 8));			\
+	RADEON_WRITE( RADEON_IGPGART_DATA, (val) );			\
+	RADEON_WRITE( RADEON_IGPGART_INDEX, 0x7f );			\
 } while (0)
 
 #define RADEON_WRITE_PCIE( addr, val )					\

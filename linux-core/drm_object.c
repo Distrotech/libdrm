@@ -1,8 +1,8 @@
 /**************************************************************************
- * 
- * Copyright 2006 Tungsten Graphics, Inc., Bismarck, ND., USA
+ *
+ * Copyright (c) 2006-2007 Tungsten Graphics, Inc., Cedar Park, TX., USA
  * All Rights Reserved.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -10,21 +10,23 @@
  * distribute, sub license, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL
- * THE COPYRIGHT HOLDERS, AUTHORS AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM,
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE 
- * USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  * The above copyright notice and this permission notice (including the
  * next paragraph) shall be included in all copies or substantial portions
  * of the Software.
- * 
- * 
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL
+ * THE COPYRIGHT HOLDERS, AUTHORS AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+ * USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
  **************************************************************************/
+/*
+ * Authors: Thomas Hellström <thomas-at-tungstengraphics-dot-com>
+ */
 
 #include "drmP.h"
 
@@ -33,6 +35,8 @@ int drm_add_user_object(drm_file_t * priv, drm_user_object_t * item,
 {
 	drm_device_t *dev = priv->head->dev;
 	int ret;
+
+	DRM_ASSERT_LOCKED(&dev->struct_mutex);
 
 	atomic_set(&item->refcount, 1);
 	item->shareable = shareable;
@@ -53,6 +57,8 @@ drm_user_object_t *drm_lookup_user_object(drm_file_t * priv, uint32_t key)
 	drm_hash_item_t *hash;
 	int ret;
 	drm_user_object_t *item;
+
+	DRM_ASSERT_LOCKED(&dev->struct_mutex);
 
 	ret = drm_ht_find_item(&dev->object_hash, key, &hash);
 	if (ret) {
@@ -86,6 +92,8 @@ static void drm_deref_user_object(drm_file_t * priv, drm_user_object_t * item)
 
 int drm_remove_user_object(drm_file_t * priv, drm_user_object_t * item)
 {
+	DRM_ASSERT_LOCKED(&priv->head->dev->struct_mutex);
+
 	if (item->owner != priv) {
 		DRM_ERROR("Cannot destroy object not owned by you.\n");
 		return -EINVAL;
@@ -123,6 +131,7 @@ int drm_add_ref_object(drm_file_t * priv, drm_user_object_t * referenced_object,
 	drm_ref_object_t *item;
 	drm_open_hash_t *ht = &priv->refd_object_hash[ref_action];
 
+	DRM_ASSERT_LOCKED(&priv->head->dev->struct_mutex);
 	if (!referenced_object->shareable && priv != referenced_object->owner) {
 		DRM_ERROR("Not allowed to reference this object\n");
 		return -EINVAL;
@@ -179,6 +188,7 @@ drm_ref_object_t *drm_lookup_ref_object(drm_file_t * priv,
 	drm_hash_item_t *hash;
 	int ret;
 
+	DRM_ASSERT_LOCKED(&priv->head->dev->struct_mutex);
 	ret = drm_ht_find_item(&priv->refd_object_hash[ref_action],
 			       (unsigned long)referenced_object, &hash);
 	if (ret)
@@ -211,6 +221,7 @@ void drm_remove_ref_object(drm_file_t * priv, drm_ref_object_t * item)
 	drm_open_hash_t *ht = &priv->refd_object_hash[item->unref_action];
 	drm_ref_t unref_action;
 
+	DRM_ASSERT_LOCKED(&priv->head->dev->struct_mutex);
 	unref_action = item->unref_action;
 	if (atomic_dec_and_test(&item->refcount)) {
 		ret = drm_ht_remove_item(ht, &item->hash);
@@ -238,11 +249,17 @@ int drm_user_object_ref(drm_file_t * priv, uint32_t user_token,
 {
 	drm_device_t *dev = priv->head->dev;
 	drm_user_object_t *uo;
+	drm_hash_item_t *hash;
 	int ret;
 
 	mutex_lock(&dev->struct_mutex);
-	uo = drm_lookup_user_object(priv, user_token);
-	if (!uo || (uo->type != type)) {
+	ret = drm_ht_find_item(&dev->object_hash, user_token, &hash);
+	if (ret) {
+		DRM_ERROR("Could not find user object to reference.\n");
+		goto out_err;
+	}
+	uo = drm_hash_entry(hash, drm_user_object_t, hash);
+	if (uo->type != type) {
 		ret = -EINVAL;
 		goto out_err;
 	}
@@ -251,7 +268,6 @@ int drm_user_object_ref(drm_file_t * priv, uint32_t user_token,
 		goto out_err;
 	mutex_unlock(&dev->struct_mutex);
 	*object = uo;
-	DRM_ERROR("Referenced an object\n");
 	return 0;
       out_err:
 	mutex_unlock(&dev->struct_mutex);
@@ -279,7 +295,6 @@ int drm_user_object_unref(drm_file_t * priv, uint32_t user_token,
 	}
 	drm_remove_ref_object(priv, ro);
 	mutex_unlock(&dev->struct_mutex);
-	DRM_ERROR("Unreferenced an object\n");
 	return 0;
       out_err:
 	mutex_unlock(&dev->struct_mutex);

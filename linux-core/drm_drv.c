@@ -15,8 +15,6 @@
  * #define DRIVER_DESC		"Matrox G200/G400"
  * #define DRIVER_DATE		"20001127"
  *
- * #define DRIVER_IOCTL_COUNT	DRM_ARRAY_SIZE( mga_ioctls )
- *
  * #define drm_x		mga_##x
  * \endcode
  */
@@ -127,7 +125,7 @@ static drm_ioctl_desc_t drm_ioctls[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_UPDATE_DRAW)] = {drm_update_drawable_info, DRM_AUTH|DRM_MASTER|DRM_ROOT_ONLY},
 };
 
-#define DRIVER_IOCTL_COUNT	ARRAY_SIZE( drm_ioctls )
+#define DRM_CORE_IOCTL_COUNT	ARRAY_SIZE( drm_ioctls )
 
 
 /**
@@ -142,16 +140,17 @@ static drm_ioctl_desc_t drm_ioctls[] = {
 int drm_lastclose(drm_device_t * dev)
 {
 	drm_magic_entry_t *pt, *next;
-	drm_map_list_t *r_list;
-	drm_vma_entry_t *vma, *vma_next;
+	drm_map_list_t *r_list, *list_t;
+	drm_vma_entry_t *vma, *vma_temp;
 	int i;
 
 	DRM_DEBUG("\n");
 
-	if (drm_bo_driver_finish(dev)) {
-		DRM_ERROR("DRM memory manager still busy. "
-			  "System is unstable. Please reboot.\n");
-	}
+	/*
+	 * We can't do much about this function failing.
+	 */
+
+	drm_bo_driver_finish(dev);
 
 	if (dev->driver->lastclose)
 		dev->driver->lastclose(dev);
@@ -167,18 +166,9 @@ int drm_lastclose(drm_device_t * dev)
 		drm_irq_uninstall(dev);
 
 	/* Free drawable information memory */
-	for (i = 0; i < dev->drw_bitfield_length / sizeof(*dev->drw_bitfield);
-	     i++) {
-		drm_drawable_info_t *info = drm_get_drawable_info(dev, i);
-
-		if (info) {
-			drm_free(info->rects, info->num_rects *
-				 sizeof(drm_clip_rect_t), DRM_MEM_BUFS);
-			drm_free(info, sizeof(*info), DRM_MEM_BUFS);
-		}
-	}
-
 	mutex_lock(&dev->struct_mutex);
+
+	drm_drawable_free_all(dev);
 	del_timer(&dev->timer);
 
 	if (dev->unique) {
@@ -199,19 +189,17 @@ int drm_lastclose(drm_device_t * dev)
 
 	/* Clear AGP information */
 	if (drm_core_has_AGP(dev) && dev->agp) {
-		drm_agp_mem_t *entry;
-		drm_agp_mem_t *nexte;
+		drm_agp_mem_t *entry, *tempe;
 
 		/* Remove AGP resources, but leave dev->agp
 		   intact until drv_cleanup is called. */
-		for (entry = dev->agp->memory; entry; entry = nexte) {
-			nexte = entry->next;
+		list_for_each_entry_safe(entry, tempe, &dev->agp->memory, head) {
 			if (entry->bound)
 				drm_unbind_agp(entry->memory);
 			drm_free_agp(entry->memory, entry->pages);
 			drm_free(entry, sizeof(*entry), DRM_MEM_AGPLISTS);
 		}
-		dev->agp->memory = NULL;
+		INIT_LIST_HEAD(&dev->agp->memory);
 
 		if (dev->agp->acquired)
 			drm_agp_release(dev);
@@ -225,20 +213,14 @@ int drm_lastclose(drm_device_t * dev)
 	}
 
 	/* Clear vma list (only built for debugging) */
-	if (dev->vmalist) {
-		for (vma = dev->vmalist; vma; vma = vma_next) {
-			vma_next = vma->next;
-			drm_ctl_free(vma, sizeof(*vma), DRM_MEM_VMAS);
-		}
-		dev->vmalist = NULL;
+	list_for_each_entry_safe(vma, vma_temp, &dev->vmalist, head) {
+		list_del(&vma->head);
+		drm_ctl_free(vma, sizeof(*vma), DRM_MEM_VMAS);
 	}
-
-	if (dev->maplist) {
-		while (!list_empty(&dev->maplist->head)) {
-			struct list_head *list = dev->maplist->head.next;
-			r_list = list_entry(list, drm_map_list_t, head);
-			drm_rmmap_locked(dev, r_list->map);
-		}
+	
+	list_for_each_entry_safe(r_list, list_t, &dev->maplist, head) {
+		drm_rmmap_locked(dev, r_list->map);
+		r_list = NULL;
 	}
 
 	if (drm_core_check_feature(dev, DRIVER_DMA_QUEUE) && dev->queuelist) {
@@ -373,13 +355,9 @@ static void drm_cleanup(drm_device_t * dev)
 	drm_lastclose(dev);
 	drm_fence_manager_takedown(dev);
 
-	if (dev->maplist) {
-		drm_free(dev->maplist, sizeof(*dev->maplist), DRM_MEM_MAPS);
-		dev->maplist = NULL;
-		drm_ht_remove(&dev->map_hash);
-		drm_mm_takedown(&dev->offset_manager);
-		drm_ht_remove(&dev->object_hash);
-	}
+	drm_ht_remove(&dev->map_hash);
+	drm_mm_takedown(&dev->offset_manager);
+	drm_ht_remove(&dev->object_hash);
 
 	if (!drm_fb_loaded)
 		pci_disable_device(dev->pdev);
@@ -441,67 +419,37 @@ void drm_exit(struct drm_driver *driver)
 EXPORT_SYMBOL(drm_exit);
 
 /** File operations structure */
-static struct file_operations drm_stub_fops = {
+static const struct file_operations drm_stub_fops = {
 	.owner = THIS_MODULE,
 	.open = drm_stub_open
 };
-
-static int drm_create_memory_caches(void)
-{
-	drm_cache.mm = kmem_cache_create("drm_mm_node_t", 
-					 sizeof(drm_mm_node_t),
-					 0,
-					 SLAB_HWCACHE_ALIGN,
-					 NULL,NULL);
-	if (!drm_cache.mm)
-		return -ENOMEM;
-
-	drm_cache.fence_object= kmem_cache_create("drm_fence_object_t", 
-						  sizeof(drm_fence_object_t),
-						  0,
-						  SLAB_HWCACHE_ALIGN,
-						  NULL,NULL);
-	if (!drm_cache.fence_object)
-		return -ENOMEM;
-
-	return 0;
-}
-
-static void drm_free_mem_cache(kmem_cache_t *cache, 
-			       const char *name)
-{
-	if (!cache)
-		return;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
-	if (kmem_cache_destroy(cache)) {
-		DRM_ERROR("Warning! DRM is leaking %s memory.\n",
-			  name);
-	}
-#else
-	kmem_cache_destroy(cache);
-#endif
-}
-
-static void drm_free_memory_caches(void )
-{
-	
-	drm_free_mem_cache(drm_cache.fence_object, "fence object");
-	drm_cache.fence_object = NULL;
-	drm_free_mem_cache(drm_cache.mm, "memory manager block");
-	drm_cache.mm = NULL;
-}
-
 
 static int __init drm_core_init(void)
 {
 	int ret;
 	struct sysinfo si;
-	
+	unsigned long avail_memctl_mem;
+	unsigned long max_memctl_mem;
+
 	si_meminfo(&si);
-	drm_init_memctl(si.totalram/2, si.totalram*3/4);
-	ret = drm_create_memory_caches();
-	if (ret)
-		goto err_p1;
+	
+	/*
+	 * AGP only allows low / DMA32 memory ATM.
+	 */
+
+	avail_memctl_mem = si.totalram - si.totalhigh;
+
+	/* 
+	 * Avoid overflows 
+	 */
+
+	max_memctl_mem = 1UL << (32 - PAGE_SHIFT);
+	max_memctl_mem = (max_memctl_mem / si.mem_unit) * PAGE_SIZE; 
+
+	if (avail_memctl_mem >= max_memctl_mem)
+		avail_memctl_mem = max_memctl_mem;
+
+	drm_init_memctl(avail_memctl_mem/2, avail_memctl_mem*3/4, si.mem_unit);
 
 	ret = -ENOMEM;
 	drm_cards_limit =
@@ -539,13 +487,11 @@ err_p2:
 	unregister_chrdev(DRM_MAJOR, "drm");
 	drm_free(drm_heads, sizeof(*drm_heads) * drm_cards_limit, DRM_MEM_STUB);
 err_p1:
-	drm_free_memory_caches();
 	return ret;
 }
 
 static void __exit drm_core_exit(void)
 {
-	drm_free_memory_caches();
 	remove_proc_entry("dri", NULL);
 	drm_sysfs_destroy(drm_class);
 
@@ -622,21 +568,20 @@ int drm_ioctl(struct inode *inode, struct file *filp,
 		  current->pid, cmd, nr, (long)old_encode_dev(priv->head->device),
 		  priv->authenticated);
 
-	if (nr >= DRIVER_IOCTL_COUNT && 
-	    (nr < DRM_COMMAND_BASE || nr >= DRM_COMMAND_END))
+	if ((nr >= DRM_CORE_IOCTL_COUNT) &&
+	    ((nr < DRM_COMMAND_BASE) || (nr >= DRM_COMMAND_END)))
 		goto err_i1;
 	if ((nr >= DRM_COMMAND_BASE) && (nr < DRM_COMMAND_END)
 		&& (nr < DRM_COMMAND_BASE + dev->driver->num_ioctls))
-			ioctl = &dev->driver->ioctls[nr - DRM_COMMAND_BASE];
-	else if (nr >= DRM_COMMAND_END || nr < DRM_COMMAND_BASE)	
+		ioctl = &dev->driver->ioctls[nr - DRM_COMMAND_BASE];
+	else if ((nr >= DRM_COMMAND_END) || (nr < DRM_COMMAND_BASE))
 		ioctl = &drm_ioctls[nr];
-	else 
+	else
 		goto err_i1;
 
-
-
 	func = ioctl->func;
-	if ((nr == DRM_IOCTL_NR(DRM_IOCTL_DMA)) && dev->driver->dma_ioctl)	/* Local override? */
+	/* is there a local override? */
+	if ((nr == DRM_IOCTL_NR(DRM_IOCTL_DMA)) && dev->driver->dma_ioctl)
 		func = dev->driver->dma_ioctl;
 
 	if (!func) {
@@ -656,3 +601,17 @@ err_i1:
 	return retcode;
 }
 EXPORT_SYMBOL(drm_ioctl);
+
+drm_local_map_t *drm_getsarea(struct drm_device *dev)
+{
+	drm_map_list_t *entry;
+
+	list_for_each_entry(entry, &dev->maplist, head) {
+		if (entry->map && entry->map->type == _DRM_SHM &&
+		    (entry->map->flags & _DRM_CONTAINS_LOCK)) {
+			return entry->map;
+		}
+	}
+	return NULL;
+}
+EXPORT_SYMBOL(drm_getsarea);

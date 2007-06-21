@@ -31,7 +31,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <asm/agp.h>
 #ifndef _DRM_COMPAT_H_
 #define _DRM_COMPAT_H_
 
@@ -57,6 +56,12 @@
 #define module_param(name, type, perm)
 #endif
 
+/* older kernels had different irq args */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
+#undef DRM_IRQ_ARGS
+#define DRM_IRQ_ARGS		int irq, void *arg, struct pt_regs *regs
+#endif
+
 #ifndef list_for_each_safe
 #define list_for_each_safe(pos, n, head)				\
 	for (pos = (head)->next, n = pos->next; pos != (head);		\
@@ -80,92 +85,6 @@
              pos = n, n = list_entry(n->member.next, typeof(*n), member))
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,19)
-static inline struct page *vmalloc_to_page(void *vmalloc_addr)
-{
-	unsigned long addr = (unsigned long)vmalloc_addr;
-	struct page *page = NULL;
-	pgd_t *pgd = pgd_offset_k(addr);
-	pmd_t *pmd;
-	pte_t *ptep, pte;
-
-	if (!pgd_none(*pgd)) {
-		pmd = pmd_offset(pgd, addr);
-		if (!pmd_none(*pmd)) {
-			preempt_disable();
-			ptep = pte_offset_map(pmd, addr);
-			pte = *ptep;
-			if (pte_present(pte))
-				page = pte_page(pte);
-			pte_unmap(ptep);
-			preempt_enable();
-		}
-	}
-	return page;
-}
-#endif
-
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,4,2)
-#define down_write down
-#define up_write up
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-#define DRM_PCI_DEV(pdev) &pdev->dev
-#else
-#define DRM_PCI_DEV(pdev) NULL
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-static inline unsigned iminor(struct inode *inode)
-{
-	return MINOR(inode->i_rdev);
-}
-
-#define old_encode_dev(x) (x)
-
-struct drm_sysfs_class;
-struct class_simple;
-struct device;
-
-#define pci_dev_put(x) do {} while (0)
-#define pci_get_subsys pci_find_subsys
-
-static inline struct class_device *DRM(sysfs_device_add) (struct drm_sysfs_class
-							  * cs, dev_t dev,
-							  struct device *
-							  device,
-							  const char *fmt,
-							  ...) {
-	return NULL;
-}
-
-static inline void DRM(sysfs_device_remove) (dev_t dev) {
-}
-
-static inline void DRM(sysfs_destroy) (struct drm_sysfs_class * cs) {
-}
-
-static inline struct drm_sysfs_class *DRM(sysfs_create) (struct module * owner,
-							 char *name) {
-	return NULL;
-}
-
-#ifndef pci_pretty_name
-#define pci_pretty_name(x) x->name
-#endif
-
-struct drm_device;
-static inline int radeon_create_i2c_busses(struct drm_device *dev)
-{
-	return 0;
-};
-static inline void radeon_delete_i2c_busses(struct drm_device *dev)
-{
-};
-
-#endif
-
 #ifndef __user
 #define __user
 #endif
@@ -178,21 +97,28 @@ static inline void radeon_delete_i2c_busses(struct drm_device *dev)
 #define __GFP_COMP 0
 #endif
 
-#ifndef REMAP_PAGE_RANGE_5_ARGS
-#define DRM_RPR_ARG(vma)
-#else
-#define DRM_RPR_ARG(vma) vma,
+#if !defined(IRQF_SHARED)
+#define IRQF_SHARED SA_SHIRQ
 #endif
-
-#define VM_OFFSET(vma) ((vma)->vm_pgoff << PAGE_SHIFT)
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10)
 static inline int remap_pfn_range(struct vm_area_struct *vma, unsigned long from, unsigned long pfn, unsigned long size, pgprot_t pgprot)
 {
-  return remap_page_range(DRM_RPR_ARG(vma) from, 
+  return remap_page_range(vma, from, 
 			  pfn << PAGE_SHIFT,
 			  size,
 			  pgprot);
+}
+
+static __inline__ void *kcalloc(size_t nmemb, size_t size, int flags)
+{
+	void *addr;
+
+	addr = kmalloc(size * nmemb, flags);
+	if (addr != NULL)
+		memset((void *)addr, 0, size * nmemb);
+
+	return addr;
 }
 #endif
 
@@ -215,10 +141,6 @@ static inline int remap_pfn_range(struct vm_area_struct *vma, unsigned long from
 #define __x86_64__
 #endif
 
-#ifndef pci_pretty_name
-#define pci_pretty_name(dev) ""
-#endif
-
 /* sysfs __ATTR macro */
 #ifndef __ATTR
 #define __ATTR(_name,_mode,_show,_store) { \
@@ -228,14 +150,31 @@ static inline int remap_pfn_range(struct vm_area_struct *vma, unsigned long from
 }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
+#define vmalloc_user(_size) ({void * tmp = vmalloc(_size);   \
+      if (tmp) memset(tmp, 0, size);			     \
+      (tmp);})
+#endif
+
+#ifndef list_for_each_entry_safe_reverse
+#define list_for_each_entry_safe_reverse(pos, n, head, member)          \
+        for (pos = list_entry((head)->prev, typeof(*pos), member),      \
+                n = list_entry(pos->member.prev, typeof(*pos), member); \
+             &pos->member != (head);                                    \
+             pos = n, n = list_entry(n->member.prev, typeof(*n), member))
+#endif
+
 #include <linux/mm.h>
 #include <asm/page.h>
 
-#if ((LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)) && \
-     (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,15))) 
+#if ((LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)) && \
+     (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,15)))
 #define DRM_ODD_MM_COMPAT
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21))
+#define DRM_FULL_MM_COMPAT
+#endif
 
 
 /*
@@ -253,16 +192,9 @@ extern void drm_clear_vma(struct vm_area_struct *vma,
 
 extern pgprot_t vm_get_page_prot(unsigned long vm_flags);
 
-/*
- * These are similar to the current kernel gatt pages allocator, only that we
- * want a struct page pointer instead of a virtual address. This allows for pages
- * that are not in the kernel linear map.
- */
-
-#define drm_alloc_gatt_pages(order) ({					\
-			void *_virt = alloc_gatt_pages(order);		\
-			((_virt) ? virt_to_page(_virt) : NULL);})
-#define drm_free_gatt_pages(pages, order) free_gatt_pages(page_address(pages), order) 
+#ifndef GFP_DMA32
+#define GFP_DMA32 0
+#endif
 
 #if defined(CONFIG_X86) && (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,15))
 
@@ -280,18 +212,14 @@ extern int drm_map_page_into_agp(struct page *page);
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,15))
 extern struct page *get_nopage_retry(void);
 extern void free_nopage_retry(void);
-struct fault_data;
-extern struct page *drm_vm_ttm_fault(struct vm_area_struct *vma, 
-				     struct fault_data *data);
 
 #define NOPAGE_REFAULT get_nopage_retry()
 #endif
 
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20))
+#ifndef DRM_FULL_MM_COMPAT
 
 /*
- * Hopefully, real NOPAGE_RETRY functionality will be in 2.6.19. 
  * For now, just return a dummy page that we've allocated out of 
  * static space. The page will be put by do_nopage() since we've already
  * filled out the pte.
@@ -306,19 +234,20 @@ struct fault_data {
 	int type;
 };
 
-
-extern int vm_insert_pfn(struct vm_area_struct *vma, unsigned long addr, 
-			 unsigned long pfn, pgprot_t pgprot);
-
-extern struct page *drm_vm_ttm_nopage(struct vm_area_struct *vma,
-				      unsigned long address, 
-				      int *type);
-
-#endif
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
+extern struct page *drm_bo_vm_nopage(struct vm_area_struct *vma,
+				     unsigned long address, 
+				     int *type);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)) && \
+  !defined(DRM_FULL_MM_COMPAT)
+extern unsigned long drm_bo_vm_nopfn(struct vm_area_struct *vma,
+				     unsigned long address);
+#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)) */
+#endif /* ndef DRM_FULL_MM_COMPAT */
 
 #ifdef DRM_ODD_MM_COMPAT
 
-struct drm_ttm;
+struct drm_buffer_object;
 
 
 /*
@@ -326,14 +255,14 @@ struct drm_ttm;
  * process mm pointer to the ttm mm list. Needs the ttm mutex.
  */
 
-extern int drm_ttm_add_vma(struct drm_ttm * ttm, 
+extern int drm_bo_add_vma(struct drm_buffer_object * bo, 
 			   struct vm_area_struct *vma);
 /*
  * Delete a vma and the corresponding mm pointer from the
  * ttm lists. Needs the ttm mutex.
  */
-extern void drm_ttm_delete_vma(struct drm_ttm * ttm, 
-			       struct vm_area_struct *vma);
+extern void drm_bo_delete_vma(struct drm_buffer_object * bo, 
+			      struct vm_area_struct *vma);
 
 /*
  * Attempts to lock all relevant mmap_sems for a ttm, while
@@ -342,12 +271,12 @@ extern void drm_ttm_delete_vma(struct drm_ttm * ttm,
  * schedule() and try again.
  */
 
-extern int drm_ttm_lock_mm(struct drm_ttm * ttm);
+extern int drm_bo_lock_kmm(struct drm_buffer_object * bo);
 
 /*
  * Unlock all relevant mmap_sems for a ttm.
  */
-extern void drm_ttm_unlock_mm(struct drm_ttm * ttm);
+extern void drm_bo_unlock_kmm(struct drm_buffer_object * bo);
 
 /*
  * If the ttm was bound to the aperture, this function shall be called
@@ -357,7 +286,7 @@ extern void drm_ttm_unlock_mm(struct drm_ttm * ttm);
  * releases the mmap_sems for this ttm.
  */
 
-extern void drm_ttm_finish_unmap(struct drm_ttm *ttm);
+extern void drm_bo_finish_unmap(struct drm_buffer_object *bo);
 
 /*
  * Remap all vmas of this ttm using io_remap_pfn_range. We cannot 
@@ -366,14 +295,23 @@ extern void drm_ttm_finish_unmap(struct drm_ttm *ttm);
  * releases the mmap_sems for this ttm.
  */
 
-extern int drm_ttm_remap_bound(struct drm_ttm *ttm);
+extern int drm_bo_remap_bound(struct drm_buffer_object *bo);
 
 
 /*
  * Remap a vma for a bound ttm. Call with the ttm mutex held and
  * the relevant mmap_sem locked.
  */
-extern int drm_ttm_map_bound(struct vm_area_struct *vma);
+extern int drm_bo_map_bound(struct vm_area_struct *vma);
 
 #endif
+
+/* fixme when functions are upstreamed */
+#define DRM_IDR_COMPAT_FN
+#ifdef DRM_IDR_COMPAT_FN
+int idr_for_each(struct idr *idp,
+		 int (*fn)(int id, void *p, void *data), void *data);
+void idr_remove_all(struct idr *idp);
+#endif
+
 #endif
