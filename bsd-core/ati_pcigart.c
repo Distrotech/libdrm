@@ -1,6 +1,3 @@
-/* ati_pcigart.h -- ATI PCI GART support -*- linux-c -*-
- * Created: Wed Dec 13 21:52:19 2000 by gareth@valinux.com
- */
 /*-
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All Rights Reserved.
@@ -29,11 +26,14 @@
  *
  */
 
+/** @file ati_pcigart.c
+ * Implementation of ATI's PCIGART, which provides an aperture in card virtual
+ * address space with addresses remapped to system memory.
+ */
+
 #include "drmP.h"
 
 #define ATI_PCIGART_PAGE_SIZE		4096	/* PCI GART page size */
-#define ATI_MAX_PCIGART_PAGES		8192	/* 32 MB aperture, 4K pages */
-#define ATI_PCIGART_TABLE_SIZE		32768
 
 int drm_ati_pcigart_init(drm_device_t *dev, drm_ati_pcigart_info *gart_info)
 {
@@ -48,7 +48,7 @@ int drm_ati_pcigart_init(drm_device_t *dev, drm_ati_pcigart_info *gart_info)
 
 	if (gart_info->gart_table_location == DRM_ATI_GART_MAIN) {
 		/* GART table in system memory */
-		dev->sg->dmah = drm_pci_alloc(dev, ATI_PCIGART_TABLE_SIZE, 0,
+		dev->sg->dmah = drm_pci_alloc(dev, gart_info->table_size, 0,
 		    0xfffffffful);
 		if (dev->sg->dmah == NULL) {
 			DRM_ERROR("cannot allocate PCI GART table!\n");
@@ -63,9 +63,9 @@ int drm_ati_pcigart_init(drm_device_t *dev, drm_ati_pcigart_info *gart_info)
 		pci_gart = gart_info->addr;
 	}
 	
-	pages = DRM_MIN(dev->sg->pages, ATI_MAX_PCIGART_PAGES);
+	pages = DRM_MIN(dev->sg->pages, gart_info->table_size / sizeof(u32));
 
-	bzero(pci_gart, ATI_PCIGART_TABLE_SIZE);
+	bzero(pci_gart, gart_info->table_size);
 
 	KASSERT(PAGE_SIZE >= ATI_PCIGART_PAGE_SIZE, ("page size too small"));
 
@@ -73,10 +73,17 @@ int drm_ati_pcigart_init(drm_device_t *dev, drm_ati_pcigart_info *gart_info)
 		page_base = (u32) dev->sg->busaddr[i];
 
 		for (j = 0; j < (PAGE_SIZE / ATI_PCIGART_PAGE_SIZE); j++) {
-			if (gart_info->is_pcie)
-				*pci_gart = (cpu_to_le32(page_base) >> 8) | 0xc;
-			else
+			switch(gart_info->gart_reg_if) {
+			case DRM_ATI_GART_IGP:
+				*pci_gart = cpu_to_le32(page_base | 0xc);
+				break;
+			case DRM_ATI_GART_PCIE:
+				*pci_gart = cpu_to_le32((page_base >> 8) | 0xc);
+				break;
+			default:
 				*pci_gart = cpu_to_le32(page_base);
+				break;
+			}
 			pci_gart++;
 			page_base += ATI_PCIGART_PAGE_SIZE;
 		}

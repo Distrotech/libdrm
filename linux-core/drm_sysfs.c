@@ -93,11 +93,15 @@ struct drm_sysfs_class *drm_sysfs_create(struct module *owner, char *name)
 	retval = class_register(&cs->class);
 	if (retval)
 		goto error;
-	class_create_file(&cs->class, &class_attr_version);
+	retval = class_create_file(&cs->class, &class_attr_version);
+	if (retval)
+		goto error_with_class;
 
 	return cs;
 
-      error:
+ error_with_class:
+	class_unregister(&cs->class);
+ error:
 	kfree(cs);
 	return ERR_PTR(retval);
 }
@@ -119,7 +123,7 @@ void drm_sysfs_destroy(struct drm_sysfs_class *cs)
 
 static ssize_t show_dri(struct class_device *class_device, char *buf)
 {
-	drm_device_t * dev = ((drm_head_t *)class_get_devdata(class_device))->dev;
+	struct drm_device * dev = ((struct drm_head *)class_get_devdata(class_device))->dev;
 	if (dev->driver->dri_library_name)
 		return dev->driver->dri_library_name(dev, buf);
 	return snprintf(buf, PAGE_SIZE, "%s\n", dev->driver->pci_driver.name);
@@ -144,7 +148,7 @@ static struct class_device_attribute class_device_attrs[] = {
  * created with a call to drm_sysfs_create().
  */
 struct class_device *drm_sysfs_device_add(struct drm_sysfs_class *cs,
-					  drm_head_t * head)
+					  struct drm_head * head)
 {
 	struct simple_dev *s_dev = NULL;
 	int i, retval;
@@ -170,16 +174,31 @@ struct class_device *drm_sysfs_device_add(struct drm_sysfs_class *cs,
 	if (retval)
 		goto error;
 
-	class_device_create_file(&s_dev->class_dev, &cs->attr);
+	retval = class_device_create_file(&s_dev->class_dev, &cs->attr);
+	if (retval)
+		goto error_with_device;
+
 	class_set_devdata(&s_dev->class_dev, head);
 
-	for (i = 0; i < ARRAY_SIZE(class_device_attrs); i++)
-		class_device_create_file(&s_dev->class_dev, &class_device_attrs[i]);
+	for (i = 0; i < ARRAY_SIZE(class_device_attrs); i++) {
+		retval = class_device_create_file(&s_dev->class_dev,
+						  &class_device_attrs[i]);
+		if (retval)
+			goto error_with_files;
+	}
 
 	return &s_dev->class_dev;
 
-error:
+ error_with_files:
+	while (i > 0)
+		class_device_remove_file(&s_dev->class_dev,
+					 &class_device_attrs[--i]);
+	class_device_remove_file(&s_dev->class_dev, &cs->attr);
+ error_with_device:
+	class_device_unregister(&s_dev->class_dev);
+ error:
 	kfree(s_dev);
+
 	return ERR_PTR(retval);
 }
 

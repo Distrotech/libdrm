@@ -252,11 +252,10 @@ eat_words(const uint32_t ** buf, const uint32_t * buf_end, unsigned num_words)
 static __inline__ drm_local_map_t *via_drm_lookup_agp_map(drm_via_state_t * seq,
 							  unsigned long offset,
 							  unsigned long size,
-							  drm_device_t * dev)
+							  struct drm_device * dev)
 {
 #ifdef __linux__
-	struct list_head *list;
-	drm_map_list_t *r_list;
+	struct drm_map_list *r_list;
 #endif
 	drm_local_map_t *map = seq->map_cache;
 
@@ -265,8 +264,7 @@ static __inline__ drm_local_map_t *via_drm_lookup_agp_map(drm_via_state_t * seq,
 		return map;
 	}
 #ifdef __linux__
-	list_for_each(list, &dev->maplist->head) {
-		r_list = (drm_map_list_t *) list;
+	list_for_each_entry(r_list, &dev->maplist, head) {
 		map = r_list->map;
 		if (!map)
 			continue;
@@ -969,7 +967,7 @@ via_parse_vheader6(drm_via_private_t * dev_priv, uint32_t const **buffer,
 
 int
 via_verify_command_stream(const uint32_t * buf, unsigned int size,
-			  drm_device_t * dev, int agp)
+			  struct drm_device * dev, int agp)
 {
 
 	drm_via_private_t *dev_priv = (drm_via_private_t *) dev->dev_private;
@@ -1033,18 +1031,18 @@ via_verify_command_stream(const uint32_t * buf, unsigned int size,
 		case state_error:
 		default:
 			*hc_state = saved_state;
-			return DRM_ERR(EINVAL);
+			return -EINVAL;
 		}
 	}
 	if (state == state_error) {
 		*hc_state = saved_state;
-		return DRM_ERR(EINVAL);
+		return -EINVAL;
 	}
 	return 0;
 }
 
 int
-via_parse_command_stream(drm_device_t * dev, const uint32_t * buf,
+via_parse_command_stream(struct drm_device * dev, const uint32_t * buf,
 			 unsigned int size)
 {
 
@@ -1089,11 +1087,11 @@ via_parse_command_stream(drm_device_t * dev, const uint32_t * buf,
 			break;
 		case state_error:
 		default:
-			return DRM_ERR(EINVAL);
+			return -EINVAL;
 		}
 	}
 	if (state == state_error) {
-		return DRM_ERR(EINVAL);
+		return -EINVAL;
 	}
 	return 0;
 }

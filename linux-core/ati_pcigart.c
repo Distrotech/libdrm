@@ -81,9 +81,9 @@ static void drm_ati_free_pcigart_table(void *address, int order)
 	free_pages((unsigned long)address, order);
 }
 
-int drm_ati_pcigart_cleanup(drm_device_t *dev, drm_ati_pcigart_info *gart_info)
+int drm_ati_pcigart_cleanup(struct drm_device *dev, struct ati_pcigart_info *gart_info)
 {
-	drm_sg_mem_t *entry = dev->sg;
+	struct drm_sg_mem *entry = dev->sg;
 	unsigned long pages;
 	int i;
 	int order;
@@ -132,9 +132,9 @@ int drm_ati_pcigart_cleanup(drm_device_t *dev, drm_ati_pcigart_info *gart_info)
 }
 EXPORT_SYMBOL(drm_ati_pcigart_cleanup);
 
-int drm_ati_pcigart_init(drm_device_t *dev, drm_ati_pcigart_info *gart_info)
+int drm_ati_pcigart_init(struct drm_device *dev, struct ati_pcigart_info *gart_info)
 {
-	drm_sg_mem_t *entry = dev->sg;
+	struct drm_sg_mem *entry = dev->sg;
 	void *address = NULL;
 	unsigned long pages;
 	u32 *pci_gart, page_base, bus_address = 0;
@@ -151,7 +151,8 @@ int drm_ati_pcigart_init(drm_device_t *dev, drm_ati_pcigart_info *gart_info)
 	if (gart_info->gart_table_location == DRM_ATI_GART_MAIN) {
 		DRM_DEBUG("PCI: no table in VRAM: using normal RAM\n");
 
-		order = drm_order((gart_info->table_size + (PAGE_SIZE-1)) / PAGE_SIZE);
+		order = drm_order((gart_info->table_size +
+				   (PAGE_SIZE-1)) / PAGE_SIZE);
 		num_pages = 1 << order;
 		address = drm_ati_alloc_pcigart_table(order);
 		if (!address) {
@@ -169,7 +170,8 @@ int drm_ati_pcigart_init(drm_device_t *dev, drm_ati_pcigart_info *gart_info)
 					     PCI_DMA_TODEVICE);
 		if (bus_address == 0) {
 			DRM_ERROR("unable to map PCIGART pages!\n");
-			order = drm_order((gart_info->table_size + (PAGE_SIZE-1)) / PAGE_SIZE);
+			order = drm_order((gart_info->table_size +
+					   (PAGE_SIZE-1)) / PAGE_SIZE);
 			drm_ati_free_pcigart_table(address, order);
 			address = NULL;
 			goto done;

@@ -46,7 +46,7 @@
 #define BMP_SIZE PAGE_SIZE
 #define BMP_POOL_SIZE ((BMP_SIZE - 32) / 4)
 
-void i915_bmp_free(drm_device_t *dev)
+void i915_bmp_free(struct drm_device *dev)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 
@@ -79,7 +79,7 @@ void i915_bmp_free(drm_device_t *dev)
 }
 
 
-static int i915_bmp_alloc(drm_device_t *dev)
+static int i915_bmp_alloc(struct drm_device *dev)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	int i;
@@ -89,7 +89,7 @@ static int i915_bmp_alloc(drm_device_t *dev)
 
 	if (!dev_priv->bmp) {
 		DRM_ERROR("Failed to allocate BMP ring buffer\n");
-		return DRM_ERR(ENOMEM);
+		return -ENOMEM;
 	}
 
 	dev_priv->bmp_pool = drm_calloc(1, BMP_POOL_SIZE *
@@ -100,7 +100,7 @@ static int i915_bmp_alloc(drm_device_t *dev)
 		DRM_ERROR("Failed to allocate BMP pool\n");
 		drm_pci_free(dev, dev_priv->bmp);
 		dev_priv->bmp = NULL;
-		return DRM_ERR(ENOMEM);
+		return -ENOMEM;
 	}
 
 	for (i = 0, ring = dev_priv->bmp->vaddr; i < BMP_POOL_SIZE; i++) {
@@ -133,7 +133,7 @@ static int i915_bmp_alloc(drm_device_t *dev)
 
 #define BPL_ALIGN (16 * 1024)
 
-static int i915_bpl_alloc(drm_device_t *dev,
+static int i915_bpl_alloc(struct drm_device *dev,
 			  struct drm_i915_driver_file_fields *filp_priv,
 			  int num_bins)
 {
@@ -141,12 +141,12 @@ static int i915_bpl_alloc(drm_device_t *dev,
 
 	if (num_bins <= 0) {
 		DRM_ERROR("Invalid num_bins=%d\n", num_bins);
-		return DRM_ERR(EINVAL);
+		return -EINVAL;
 	}
 
 	if (!filp_priv) {
 		DRM_ERROR("No driver storage associated with file handle\n");
-		return DRM_ERR(EINVAL);
+		return -EINVAL;
 	}
 
 #if !VIRTUAL_BPL
@@ -172,7 +172,7 @@ static int i915_bpl_alloc(drm_device_t *dev,
 #endif
 		if (!filp_priv->bpl[i]) {
 			DRM_ERROR("Failed to allocate BPL %d\n", i);
-			return DRM_ERR(ENOMEM);
+			return -ENOMEM;
 		}
 #if VIRTUAL_BPL
 		if (filp_priv->bpl[i]->offset & (0x7 << 29)) {
@@ -182,7 +182,7 @@ static int i915_bpl_alloc(drm_device_t *dev,
 			drm_bo_usage_deref_locked(filp_priv->bpl[i]);
 			mutex_unlock(&dev->struct_mutex);
 			filp_priv->bpl[i] = NULL;
-			return DRM_ERR(ENOMEM);
+			return -ENOMEM;
 		}
 
 		DRM_INFO("BPL %d offset=0x%lx\n", i, filp_priv->bpl[i]->offset);
@@ -195,7 +195,7 @@ static int i915_bpl_alloc(drm_device_t *dev,
 	return 0;
 }
 
-static void i915_bpl_free(drm_device_t *dev,
+static void i915_bpl_free(struct drm_device *dev,
 			  struct drm_i915_driver_file_fields *filp_priv)
 {
 	int i;
@@ -221,7 +221,7 @@ static void i915_bpl_free(drm_device_t *dev,
 
 #define DEBUG_HWZ 0
 
-static void i915_bpl_print(drm_device_t *dev,
+static void i915_bpl_print(struct drm_device *dev,
 			   struct drm_i915_driver_file_fields *filp_priv, int i)
 {
 #if DEBUG_HWZ
@@ -268,7 +268,7 @@ static void i915_bpl_print(drm_device_t *dev,
 #endif /* DEBUG_HWZ */
 }
 
-static int i915_hwb_idle(drm_device_t *dev,
+static int i915_hwb_idle(struct drm_device *dev,
 			 struct drm_i915_driver_file_fields *filp_priv,
 			 unsigned bpl_num)
 {
@@ -297,7 +297,7 @@ static int i915_hwb_idle(drm_device_t *dev,
 			  I915_READ(BMCD), I915_READ(BDCD), I915_READ(BPCD),
 			  I915_READ(BINSCENE), I915_READ(BINSKPD), I915_READ(HWBSKPD));
 
-		ret = DRM_ERR(EBUSY);
+		ret = -EBUSY;
 	}
 
 #if DEBUG_HWZ
@@ -351,7 +351,7 @@ static int i915_hwb_idle(drm_device_t *dev,
 	return ret;
 }
 
-static void i915_bin_free(drm_device_t *dev,
+static void i915_bin_free(struct drm_device *dev,
 			  struct drm_i915_driver_file_fields *filp_priv)
 {
 	int i, j;
@@ -368,13 +368,13 @@ static void i915_bin_free(drm_device_t *dev,
 		for (j = 0; j < filp_priv->bin_nrects[i]; j++) {
 			drm_free(filp_priv->bin_rects[i],
 				 filp_priv->bin_nrects[i] *
-				 sizeof(drm_clip_rect_t),
+				 sizeof(struct drm_clip_rect),
 				 DRM_MEM_DRIVER);
 		}
 
 free_arrays:
 		drm_free(filp_priv->bin_rects, filp_priv->num_bins *
-			 sizeof(drm_clip_rect_t*), DRM_MEM_DRIVER);
+			 sizeof(struct drm_clip_rect*), DRM_MEM_DRIVER);
 		filp_priv->bin_rects = NULL;
 
 		drm_free(filp_priv->bin_nrects, filp_priv->num_bins *
@@ -395,25 +395,25 @@ free_arrays:
 	}
 }
 
-static int i915_bin_alloc(drm_device_t *dev,
+static int i915_bin_alloc(struct drm_device *dev,
 			  struct drm_i915_driver_file_fields *filp_priv,
-			  drm_clip_rect_t *cliprects,
+			  struct drm_clip_rect *cliprects,
 			  unsigned int num_cliprects)
 {
 	int i, j;
 
 	if (!filp_priv) {
 		DRM_ERROR("No driver storage associated with file handle\n");
-		return DRM_ERR(EINVAL);
+		return -EINVAL;
 	}
 
 	filp_priv->bin_rects = drm_calloc(1, filp_priv->num_bins *
-					  sizeof(drm_clip_rect_t*),
+					  sizeof(struct drm_clip_rect*),
 					  DRM_MEM_DRIVER);
 
 	if (!filp_priv->bin_rects) {
 		DRM_ERROR("Failed to allocate bin rects pool\n");
-		return DRM_ERR(ENOMEM);
+		return -ENOMEM;
 	}
 
 	filp_priv->bin_nrects = drm_calloc(1, filp_priv->num_bins *
@@ -422,7 +422,7 @@ static int i915_bin_alloc(drm_device_t *dev,
 
 	if (!filp_priv->bin_nrects) {
 		DRM_ERROR("Failed to allocate bin nrects array\n");
-		return DRM_ERR(ENOMEM);
+		return -ENOMEM;
 	}
 
 	filp_priv->num_rects = 0;
@@ -448,7 +448,7 @@ static int i915_bin_alloc(drm_device_t *dev,
 			unsigned short x2 = min(bin_x2, cliprects[j].x2);
 			unsigned short y1 = max(bin_y1, cliprects[j].y1);
 			unsigned short y2 = min(bin_y2, cliprects[j].y2);
-			drm_clip_rect_t *rect;
+			struct drm_clip_rect *rect;
 
 			if (x1 >= x2 || y1 >= y2)
 				continue;
@@ -456,9 +456,9 @@ static int i915_bin_alloc(drm_device_t *dev,
 			filp_priv->bin_rects[i] =
 				drm_realloc(filp_priv->bin_rects[i],
 					    filp_priv->bin_nrects[i] *
-					    sizeof(drm_clip_rect_t),
+					    sizeof(struct drm_clip_rect),
 					    (filp_priv->bin_nrects[i] + 1) *
-					    sizeof(drm_clip_rect_t),
+					    sizeof(struct drm_clip_rect),
 					    DRM_MEM_DRIVER);
 
 			rect = &filp_priv->bin_rects[i]
@@ -483,7 +483,7 @@ static int i915_bin_alloc(drm_device_t *dev,
 
 		if (!filp_priv->bins[i]) {
 			DRM_ERROR("Failed to allocate bin pool %d\n", i);
-			return DRM_ERR(ENOMEM);
+			return -ENOMEM;
 		}
 
 		for (j = 0; j < filp_priv->num_bins; j++) {
@@ -494,7 +494,7 @@ static int i915_bin_alloc(drm_device_t *dev,
 			if (!filp_priv->bins[i][j]) {
 				DRM_ERROR("Failed to allocate page for bin %d "
 					  "of buffer %d\n", j, i);
-				return DRM_ERR(ENOMEM);
+				return -ENOMEM;
 			}
 		}
 	}
@@ -505,7 +505,7 @@ static int i915_bin_alloc(drm_device_t *dev,
 	return 0;
 }
 
-static int i915_hwz_alloc(drm_device_t *dev,
+static int i915_hwz_alloc(struct drm_device *dev,
 			  struct drm_i915_driver_file_fields *filp_priv,
 			  struct drm_i915_hwz_alloc *alloc)
 {
@@ -513,39 +513,39 @@ static int i915_hwz_alloc(drm_device_t *dev,
 	unsigned short x1 = dev_priv->sarea_priv->width - 1, x2 = 0;
 	unsigned short y1 = dev_priv->sarea_priv->height - 1, y2 = 0;
 	int bin_rows, bin_cols;
-	drm_clip_rect_t __user *cliprects;
+	struct drm_clip_rect __user *cliprects;
 	int i, ret;
 
 	if (!dev_priv->bmp) {
 		DRM_DEBUG("HWZ not initialized\n");
-		return DRM_ERR(EINVAL);
+		return -EINVAL;
 	}
 
 	if (alloc->num_buffers > 3) {
 		DRM_ERROR("Only up to 3 buffers allowed\n");
-		return DRM_ERR(EINVAL);
+		return -EINVAL;
 	}
 
 	if (!filp_priv) {
 		DRM_ERROR("No driver storage associated with file handle\n");
-		return DRM_ERR(EINVAL);
+		return -EINVAL;
 	}
 
-	cliprects = drm_alloc(alloc->num_cliprects * sizeof(drm_clip_rect_t),
+	cliprects = drm_alloc(alloc->num_cliprects * sizeof(struct drm_clip_rect),
 			      DRM_MEM_DRIVER);
 
 	if (!cliprects) {
 		DRM_ERROR("Failed to allocate memory to hold %u cliprects\n",
 			  alloc->num_cliprects);
-		return DRM_ERR(ENOMEM);
+		return -ENOMEM;
 	}
 
 	if (DRM_COPY_FROM_USER(cliprects,
 			       (void*)(unsigned long)alloc->cliprects,
-			       alloc->num_cliprects * sizeof(drm_clip_rect_t))) {
+			       alloc->num_cliprects * sizeof(struct drm_clip_rect))) {
 		DRM_ERROR("DRM_COPY_TO_USER failed for %u cliprects\n",
 			  alloc->num_cliprects);
-		return DRM_ERR(EFAULT);
+		return -EFAULT;
 	}
 
 	for (i = 0; i < alloc->num_cliprects; i++) {
@@ -567,7 +567,7 @@ static int i915_hwz_alloc(drm_device_t *dev,
 	if (bin_cols <= 0 || bin_rows <= 0) {
 		DRM_DEBUG("bin_cols=%d bin_rows=%d => nothing to allocate\n",
 			  bin_cols, bin_rows);
-		return DRM_ERR(EINVAL);
+		return -EINVAL;
 	}
 
 	if (filp_priv->num_bpls != alloc->num_buffers ||
@@ -590,7 +590,7 @@ static int i915_hwz_alloc(drm_device_t *dev,
 
 	ret = i915_bin_alloc(dev, filp_priv, cliprects, alloc->num_cliprects);
 
-	drm_free(cliprects, alloc->num_cliprects * sizeof(drm_clip_rect_t),
+	drm_free(cliprects, alloc->num_cliprects * sizeof(struct drm_clip_rect),
 		 DRM_MEM_DRIVER);
 
 	if (ret) {
@@ -609,7 +609,7 @@ static int i915_hwz_alloc(drm_device_t *dev,
 	return 0;
 }
 
-int i915_hwz_free(drm_device_t *dev, drm_file_t *filp_priv)
+int i915_hwz_free(struct drm_device *dev, struct drm_file *filp_priv)
 {
 	struct drm_i915_driver_file_fields *filp_i915priv;
 
@@ -624,7 +624,7 @@ int i915_hwz_free(drm_device_t *dev, drm_file_t *filp_priv)
 	return 0;
 }
 
-static int i915_bin_init(drm_device_t *dev,
+static int i915_bin_init(struct drm_device *dev,
 			 struct drm_i915_driver_file_fields *filp_priv, int i)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
@@ -637,12 +637,12 @@ static int i915_bin_init(drm_device_t *dev,
 
 	if (!bins) {
 		DRM_ERROR("Bins not allocated\n");
-		return DRM_ERR(EINVAL);
+		return -EINVAL;
 	}
 
 	if (!filp_priv) {
 		DRM_ERROR("No driver storage associated with file handle\n");
-		return DRM_ERR(EINVAL);
+		return -EINVAL;
 	}
 
 #if VIRTUAL_BPL
@@ -701,7 +701,7 @@ static int i915_bin_init(drm_device_t *dev,
 	return 0;
 }
 
-static int i915_hwz_render(drm_device_t *dev,
+static int i915_hwz_render(struct drm_device *dev,
 			  struct drm_i915_driver_file_fields *filp_priv,
 			   struct drm_i915_hwz_render *render)
 {
@@ -715,12 +715,12 @@ static int i915_hwz_render(drm_device_t *dev,
 	    static_state_off + 4 * render->static_state_size >
 	    ((1 << dev_priv->priv1_order) * PAGE_SIZE)) {
 	  	DRM_ERROR("Invalid static indirect state\n");
-		return DRM_ERR(EINVAL);
+		return -EINVAL;
 	}
 
 	if (!filp_priv) {
 		DRM_ERROR("No driver storage associated with file handle\n");
-		return DRM_ERR(EINVAL);
+		return -EINVAL;
 	}
 
 	filp_priv->bpl_num = (filp_priv->bpl_num + 1) % filp_priv->num_bpls;
@@ -735,7 +735,7 @@ static int i915_hwz_render(drm_device_t *dev,
 	}
 
 	if (i915_hwb_idle(dev, filp_priv, filp_priv->bpl_num)) {
-		return DRM_ERR(EBUSY);
+		return -EBUSY;
 	}
 
 	ret = i915_bin_init(dev, filp_priv, filp_priv->bpl_num);
@@ -840,7 +840,7 @@ static int i915_hwz_render(drm_device_t *dev,
 		int j;
 
 		for (j = 0; j < filp_priv->bin_nrects[i]; j++) {
-			drm_clip_rect_t *rect = &filp_priv->bin_rects[i][j];
+			struct drm_clip_rect *rect = &filp_priv->bin_rects[i][j];
 
 			OUT_RING(GFX_OP_DRAWRECT_INFO);
 			OUT_RING(render->DR1);
@@ -867,7 +867,7 @@ static int i915_hwz_render(drm_device_t *dev,
 	return ret;
 }
 
-static int i915_hwz_init(drm_device_t *dev, struct drm_i915_hwz_init *init)
+static int i915_hwz_init(struct drm_device *dev, struct drm_i915_hwz_init *init)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	int ret;
@@ -875,12 +875,12 @@ static int i915_hwz_init(drm_device_t *dev, struct drm_i915_hwz_init *init)
 
 	if (!dev_priv) {
 		DRM_ERROR("called without initialization\n");
-		return DRM_ERR(EINVAL);
+		return -EINVAL;
 	}
 
 	if (dev_priv->bmp) {
 		DRM_DEBUG("Already initialized\n");
-		return DRM_ERR(EBUSY);
+		return -EBUSY;
 	}
 
 	ret = i915_init_priv1(dev);
@@ -892,13 +892,13 @@ static int i915_hwz_init(drm_device_t *dev, struct drm_i915_hwz_init *init)
 
 	if (i915_bmp_alloc(dev)) {
 		DRM_ERROR("Failed to allocate BMP\n");
-		return DRM_ERR(ENOMEM);
+		return -ENOMEM;
 	}
 
 	if (i915_init_ring(dev, &dev_priv->hwb_ring, init->hwb_start,
 			   init->hwb_end, init->hwb_size, HWB_RING)) {
 		DRM_ERROR("Failed to initialize HWB ring buffer\n");
-		return DRM_ERR(ENOMEM);
+		return -ENOMEM;
 	}
 
 	DRM_DEBUG("Refreshing context of HWB ring buffer\n");
@@ -916,51 +916,44 @@ static int i915_hwz_init(drm_device_t *dev, struct drm_i915_hwz_init *init)
 	return 0;
 }
 
-int i915_hwz(DRM_IOCTL_ARGS)
+int i915_hwz(struct drm_device *dev, void *data, struct drm_file *file_priv)
 {
-	DRM_DEVICE;
 	drm_i915_private_t *dev_priv = dev->dev_private;
-	drm_file_t *filp_priv;
-	struct drm_i915_driver_file_fields *filp_i915priv;
-	drm_i915_hwz_t hwz;
+	struct drm_i915_driver_file_fields *file_i915priv;
+	drm_i915_hwz_t *hwz = data;
 
 	if (!dev_priv) {
 		DRM_ERROR("called with no initialization\n");
-		return DRM_ERR(EINVAL);
+		return -EINVAL;
 	}
 
 	if (dev_priv->hwb_oom) {
 		DRM_ERROR("HWB out of memory\n");
-		return DRM_ERR(ENOMEM);
+		return -ENOMEM;
 	}
 
-	DRM_COPY_FROM_USER_IOCTL(hwz, (drm_i915_hwz_t __user *) data,
-				 sizeof(hwz));
-
-	if (hwz.op == DRM_I915_HWZ_INIT) {
-		if (!priv->master) {
+	if (hwz->op == DRM_I915_HWZ_INIT) {
+		if (!file_priv->master) {
 			DRM_ERROR("Only master may initialize HWZ\n");
-			return DRM_ERR(EINVAL);
+			return -EINVAL;
 		}
 
-		return i915_hwz_init(dev, &hwz.arg.init);
+		return i915_hwz_init(dev, &hwz->arg.init);
 	}
 
-	DRM_GET_PRIV_WITH_RETURN(filp_priv, filp);
+	if (hwz->op == DRM_I915_HWZ_FREE)
+		return i915_hwz_free(dev, file_priv);
 
-	if (hwz.op == DRM_I915_HWZ_FREE)
-		return i915_hwz_free(dev, filp_priv);
+	file_i915priv = file_priv->driver_priv;
 
-	filp_i915priv = filp_priv->driver_priv;
-
-	switch (hwz.op) {
+	switch (hwz->op) {
 	case DRM_I915_HWZ_RENDER:
-		LOCK_TEST_WITH_RETURN(dev, filp);
-		return i915_hwz_render(dev, filp_i915priv, &hwz.arg.render);
+		LOCK_TEST_WITH_RETURN(dev, file_priv);
+		return i915_hwz_render(dev, file_i915priv, &hwz->arg.render);
 	case DRM_I915_HWZ_ALLOC:
-		return i915_hwz_alloc(dev, filp_i915priv, &hwz.arg.alloc);
+		return i915_hwz_alloc(dev, file_i915priv, &hwz->arg.alloc);
 	default:
-		DRM_ERROR("Invalid op 0x%x\n", hwz.op);
-		return DRM_ERR(EINVAL);
+		DRM_ERROR("Invalid op 0x%x\n", hwz->op);
+		return -EINVAL;
 	}
 }

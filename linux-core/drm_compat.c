@@ -196,15 +196,16 @@ static int vm_insert_pfn(struct vm_area_struct *vma, unsigned long addr,
 	return ret;
 }
 
-static struct page *drm_bo_vm_fault(struct vm_area_struct *vma, 
+
+static struct page *drm_bo_vm_fault(struct vm_area_struct *vma,
 				    struct fault_data *data)
 {
 	unsigned long address = data->address;
-	drm_buffer_object_t *bo = (drm_buffer_object_t *) vma->vm_private_data;
+	struct drm_buffer_object *bo = (struct drm_buffer_object *) vma->vm_private_data;
 	unsigned long page_offset;
 	struct page *page = NULL;
-	drm_ttm_t *ttm; 
-	drm_device_t *dev;
+	struct drm_ttm *ttm; 
+	struct drm_device *dev;
 	unsigned long pfn;
 	int err;
 	unsigned long bus_base;
@@ -261,7 +262,7 @@ static struct page *drm_bo_vm_fault(struct vm_area_struct *vma,
 	page_offset = (address - vma->vm_start) >> PAGE_SHIFT;
 
 	if (bus_size) {
-		drm_mem_type_manager_t *man = &dev->bm.man[bo->mem.mem_type];
+		struct drm_mem_type_manager *man = &dev->bm.man[bo->mem.mem_type];
 
 		pfn = ((bus_base + bus_offset) >> PAGE_SHIFT) + page_offset;
 		vma->vm_page_prot = drm_io_prot(man->drm_bus_maptype, vma);
@@ -350,11 +351,11 @@ struct page *drm_bo_vm_nopage(struct vm_area_struct *vma,
 			       unsigned long address, 
 			       int *type)
 {
-	drm_buffer_object_t *bo = (drm_buffer_object_t *) vma->vm_private_data;
+	struct drm_buffer_object *bo = (struct drm_buffer_object *) vma->vm_private_data;
 	unsigned long page_offset;
 	struct page *page;
-	drm_ttm_t *ttm; 
-	drm_device_t *dev;
+	struct drm_ttm *ttm; 
+	struct drm_device *dev;
 
 	mutex_lock(&bo->mutex);
 
@@ -394,7 +395,7 @@ out_unlock:
 
 int drm_bo_map_bound(struct vm_area_struct *vma)
 {
-	drm_buffer_object_t *bo = (drm_buffer_object_t *)vma->vm_private_data;
+	struct drm_buffer_object *bo = (struct drm_buffer_object *)vma->vm_private_data;
 	int ret = 0;
 	unsigned long bus_base;
 	unsigned long bus_offset;
@@ -405,7 +406,7 @@ int drm_bo_map_bound(struct vm_area_struct *vma)
 	BUG_ON(ret);
 
 	if (bus_size) {
-		drm_mem_type_manager_t *man = &bo->dev->bm.man[bo->mem.mem_type];
+		struct drm_mem_type_manager *man = &bo->dev->bm.man[bo->mem.mem_type];
 		unsigned long pfn = (bus_base + bus_offset) >> PAGE_SHIFT;
 		pgprot_t pgprot = drm_io_prot(man->drm_bus_maptype, vma);
 		ret = io_remap_pfn_range(vma, vma->vm_start, pfn,
@@ -417,7 +418,7 @@ int drm_bo_map_bound(struct vm_area_struct *vma)
 }
 	
 
-int drm_bo_add_vma(drm_buffer_object_t * bo, struct vm_area_struct *vma)
+int drm_bo_add_vma(struct drm_buffer_object * bo, struct vm_area_struct *vma)
 {
 	p_mm_entry_t *entry, *n_entry;
 	vma_entry_t *v_entry;
@@ -453,7 +454,7 @@ int drm_bo_add_vma(drm_buffer_object_t * bo, struct vm_area_struct *vma)
 	return 0;
 }
 
-void drm_bo_delete_vma(drm_buffer_object_t * bo, struct vm_area_struct *vma)
+void drm_bo_delete_vma(struct drm_buffer_object * bo, struct vm_area_struct *vma)
 {
 	p_mm_entry_t *entry, *n;
 	vma_entry_t *v_entry, *v_n;
@@ -485,7 +486,7 @@ void drm_bo_delete_vma(drm_buffer_object_t * bo, struct vm_area_struct *vma)
 
 
 
-int drm_bo_lock_kmm(drm_buffer_object_t * bo)
+int drm_bo_lock_kmm(struct drm_buffer_object * bo)
 {
 	p_mm_entry_t *entry;
 	int lock_ok = 1;
@@ -517,7 +518,7 @@ int drm_bo_lock_kmm(drm_buffer_object_t * bo)
 	return -EAGAIN;
 }
 
-void drm_bo_unlock_kmm(drm_buffer_object_t * bo)
+void drm_bo_unlock_kmm(struct drm_buffer_object * bo)
 {
 	p_mm_entry_t *entry;
 	
@@ -528,7 +529,7 @@ void drm_bo_unlock_kmm(drm_buffer_object_t * bo)
 	}
 }
 
-int drm_bo_remap_bound(drm_buffer_object_t *bo) 
+int drm_bo_remap_bound(struct drm_buffer_object *bo) 
 {
 	vma_entry_t *v_entry;
 	int ret = 0;
@@ -544,7 +545,7 @@ int drm_bo_remap_bound(drm_buffer_object_t *bo)
 	return ret;
 }
 
-void drm_bo_finish_unmap(drm_buffer_object_t *bo)
+void drm_bo_finish_unmap(struct drm_buffer_object *bo)
 {
 	vma_entry_t *v_entry;
 
@@ -555,3 +556,126 @@ void drm_bo_finish_unmap(drm_buffer_object_t *bo)
 
 #endif
 
+#ifdef DRM_IDR_COMPAT_FN
+/* only called when idp->lock is held */
+static void __free_layer(struct idr *idp, struct idr_layer *p)
+{
+	p->ary[0] = idp->id_free;
+	idp->id_free = p;
+	idp->id_free_cnt++;
+}
+
+static void free_layer(struct idr *idp, struct idr_layer *p)
+{
+	unsigned long flags;
+
+	/*
+	 * Depends on the return element being zeroed.
+	 */
+	spin_lock_irqsave(&idp->lock, flags);
+	__free_layer(idp, p);
+	spin_unlock_irqrestore(&idp->lock, flags);
+}
+
+/**
+ * idr_for_each - iterate through all stored pointers
+ * @idp: idr handle
+ * @fn: function to be called for each pointer
+ * @data: data passed back to callback function
+ *
+ * Iterate over the pointers registered with the given idr.  The
+ * callback function will be called for each pointer currently
+ * registered, passing the id, the pointer and the data pointer passed
+ * to this function.  It is not safe to modify the idr tree while in
+ * the callback, so functions such as idr_get_new and idr_remove are
+ * not allowed.
+ *
+ * We check the return of @fn each time. If it returns anything other
+ * than 0, we break out and return that value.
+ *
+* The caller must serialize idr_find() vs idr_get_new() and idr_remove().
+ */
+int idr_for_each(struct idr *idp,
+		 int (*fn)(int id, void *p, void *data), void *data)
+{
+	int n, id, max, error = 0;
+	struct idr_layer *p;
+	struct idr_layer *pa[MAX_LEVEL];
+	struct idr_layer **paa = &pa[0];
+
+	n = idp->layers * IDR_BITS;
+	p = idp->top;
+	max = 1 << n;
+
+	id = 0;
+	while (id < max) {
+		while (n > 0 && p) {
+			n -= IDR_BITS;
+			*paa++ = p;
+			p = p->ary[(id >> n) & IDR_MASK];
+		}
+
+		if (p) {
+			error = fn(id, (void *)p, data);
+			if (error)
+				break;
+		}
+
+		id += 1 << n;
+		while (n < fls(id)) {
+			n += IDR_BITS;
+			p = *--paa;
+		}
+	}
+
+	return error;
+}
+EXPORT_SYMBOL(idr_for_each);
+
+/**
+ * idr_remove_all - remove all ids from the given idr tree
+ * @idp: idr handle
+ *
+ * idr_destroy() only frees up unused, cached idp_layers, but this
+ * function will remove all id mappings and leave all idp_layers
+ * unused.
+ *
+ * A typical clean-up sequence for objects stored in an idr tree, will
+ * use idr_for_each() to free all objects, if necessay, then
+ * idr_remove_all() to remove all ids, and idr_destroy() to free
+ * up the cached idr_layers.
+ */
+void idr_remove_all(struct idr *idp)
+{
+       int n, id, max, error = 0;
+       struct idr_layer *p;
+       struct idr_layer *pa[MAX_LEVEL];
+       struct idr_layer **paa = &pa[0];
+
+       n = idp->layers * IDR_BITS;
+       p = idp->top;
+       max = 1 << n;
+
+       id = 0;
+       while (id < max && !error) {
+               while (n > IDR_BITS && p) {
+                       n -= IDR_BITS;
+                       *paa++ = p;
+                       p = p->ary[(id >> n) & IDR_MASK];
+               }
+
+               id += 1 << n;
+               while (n < fls(id)) {
+                       if (p) {
+                               memset(p, 0, sizeof *p);
+                               free_layer(idp, p);
+                       }
+                       n += IDR_BITS;
+                       p = *--paa;
+               }
+       }
+       idp->top = NULL;
+       idp->layers = 0;
+}
+EXPORT_SYMBOL(idr_remove_all);
+#endif
