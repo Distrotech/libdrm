@@ -303,12 +303,12 @@ static void i915_vblank_tasklet(struct drm_device *dev)
 	}
 }
 
-static drm_device_t *hotplug_dev;
+static struct drm_device *hotplug_dev;
 
 static void i915_hotplug_work_func(struct work_struct *work)
 {
-	drm_device_t *dev = hotplug_dev;
-	drm_i915_private_t *dev_priv = dev->dev_private;
+	struct drm_device *dev = hotplug_dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct drm_output *output;
 	struct intel_output *iout;
 	int has_config = 0;
@@ -367,10 +367,10 @@ unlock_struct:
 	DRM_DEBUG("monkey hunt done\n");
 }
 
-static int i915_run_hotplug_tasklet(drm_device_t *dev)
+static int i915_run_hotplug_tasklet(struct drm_device *dev)
 {
 	static DECLARE_WORK(hotplug, i915_hotplug_work_func);
-	drm_i915_private_t *dev_priv = dev->dev_private;
+	struct drm_i915_private *dev_priv = dev->dev_private;
 
 //	DRM_DEBUG("%p\n", dev);
 //	atomic_long_set(&hotplug.data,(unsigned long) dev);
