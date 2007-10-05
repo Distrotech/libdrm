@@ -349,6 +349,7 @@ void drm_crtc_probe_output_modes(struct drm_device *dev, int maxX, int maxY)
 		}
 	}
 }
+EXPORT_SYMBOL(drm_crtc_probe_output_modes);
 
 /**
  * drm_crtc_set_mode - set a mode
@@ -506,7 +507,8 @@ void drm_disable_unused_functions(struct drm_device *dev)
 			crtc->funcs->dpms(crtc, DPMSModeOff);
 	}
 }
-	
+EXPORT_SYMBOL(drm_disable_unused_functions);
+
 /**
  * drm_mode_probed_add - add a mode to the specified output's probed mode list
  * @output: output the new mode
@@ -863,7 +865,7 @@ clone:
     		}
 	}
 }
-
+EXPORT_SYMBOL(drm_pick_crtcs);
 
 /**
  * drm_initial_config - setup a sane initial output configuration
@@ -1168,7 +1170,7 @@ int drm_mode_getresources(struct drm_device *dev,
 
 	if (card_res->count_modes == 0) {
 		DRM_DEBUG("probing modes %dx%d\n", dev->mode_config.max_width, dev->mode_config.max_height);
-		drm_crtc_probe_output_modes(dev, dev->mode_config.max_width, dev->mode_config.max_height);
+		/* drm_crtc_probe_output_modes(dev, dev->mode_config.max_width, dev->mode_config.max_height); */
 		mode_count = 0;
 		list_for_each_entry(output, &dev->mode_config.output_list, head) {
 			list_for_each(lh, &output->modes)

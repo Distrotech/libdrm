@@ -530,7 +530,6 @@ void drm_bo_usage_deref_unlocked(struct drm_buffer_object ** bo)
 	}
 }
 EXPORT_SYMBOL(drm_bo_usage_deref_unlocked);
-
 /*
  * Note. The caller has to register (if applicable)
  * and deregister fence object usage.

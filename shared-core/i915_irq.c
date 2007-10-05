@@ -31,6 +31,8 @@
 #include "i915_drm.h"
 #include "i915_drv.h"
 
+#include "intel_drv.h"
+
 #define USER_INT_FLAG (1<<1)
 #define VSYNC_PIPEB_FLAG (1<<5)
 #define VSYNC_PIPEA_FLAG (1<<7)
@@ -301,27 +303,128 @@ static void i915_vblank_tasklet(struct drm_device *dev)
 	}
 }
 
+static drm_device_t *hotplug_dev;
+
+static void i915_hotplug_work_func(struct work_struct *work)
+{
+	drm_device_t *dev = hotplug_dev;
+	drm_i915_private_t *dev_priv = dev->dev_private;
+	struct drm_output *output;
+	struct intel_output *iout;
+	int has_config = 0;
+
+	DRM_DEBUG("starting monkey hunt\n");
+	mutex_lock(&dev->struct_mutex);
+
+	/* find the crt output */
+	list_for_each_entry(output, &dev->mode_config.output_list, head) {
+		iout = output->driver_private;
+		if (iout->type == INTEL_OUTPUT_ANALOG)
+			break;
+	}
+
+	if (iout == 0) {
+		DRM_DEBUG("could not find monkey\n");
+		goto unlock_struct;
+	}
+
+	mutex_lock(&dev->mode_config.mutex);
+
+	if (output->crtc && output->crtc->desired_mode) {
+		DRM_DEBUG("monkey has banana\n");
+		has_config = 1;
+	}
+
+	DRM_DEBUG("monkey looking for bananas\n");
+	drm_crtc_probe_output_modes(dev, 2048, 2048);
+
+	drm_pick_crtcs(dev);
+
+	if (!output->crtc || !output->crtc->desired_mode) {
+		DRM_DEBUG("monkey had no parent or banana\n");
+		goto unlock_mode;
+	}
+
+
+	mutex_unlock(&dev->struct_mutex);
+
+	DRM_DEBUG("monkey eating banana\n");
+	/* We should realy check if there is a fb using this crtc */
+	if (!has_config)
+		dev->driver->fb_probe(dev, output->crtc);
+	else
+		if (!drm_crtc_set_mode(output->crtc, output->crtc->desired_mode, 0, 0))
+
+	DRM_DEBUG("throwing away unused bananas\n");
+	drm_disable_unused_functions(dev);
+	mutex_lock(&dev->struct_mutex);
+
+unlock_mode:
+	mutex_unlock(&dev->mode_config.mutex);
+
+unlock_struct:
+	mutex_unlock(&dev->struct_mutex);
+	DRM_DEBUG("monkey hunt done\n");
+}
+
+static int i915_run_hotplug_tasklet(drm_device_t *dev)
+{
+	static DECLARE_WORK(hotplug, i915_hotplug_work_func);
+	drm_i915_private_t *dev_priv = dev->dev_private;
+
+//	DRM_DEBUG("%p\n", dev);
+//	atomic_long_set(&hotplug.data,(unsigned long) dev);
+	hotplug_dev = dev;
+
+	queue_work(dev_priv->wq, &hotplug);
+
+	return 0;
+}
+
 irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 {
 	struct drm_device *dev = (struct drm_device *) arg;
 	struct drm_i915_private *dev_priv = (struct drm_i915_private *) dev->dev_private;
-	u16 temp;
+	u32 temp;
+	u32 temp2;
 	u32 pipea_stats, pipeb_stats;
 
 	pipea_stats = I915_READ(I915REG_PIPEASTAT);
 	pipeb_stats = I915_READ(I915REG_PIPEBSTAT);
 		
-	temp = I915_READ16(I915REG_INT_IDENTITY_R);
+	/* On i8xx hw the IIR and IER are 16bit on i9xx its 32bit */
+	/* if (IS_I9XX(dev)) */ {
+		temp = I915_READ(I915REG_INT_IDENTITY_R);
+	} /* else {
+		temp = I915_READ16(I915REG_INT_IDENTITY_R);
+	} */
+
+	temp2 = temp;
 	temp &= (dev_priv->irq_enable_reg | USER_INT_FLAG);
 
-#if 0
+#if 1
+	/* ugly despamification of pipeb event irq */
+	if (temp & (0xFFFFFFF ^ ((1 << 5) | (1 << 7)))) {
+		DRM_DEBUG("IIR %08x\n", temp2);
+		DRM_DEBUG("MSK %08x\n", dev_priv->irq_enable_reg | USER_INT_FLAG);
+		DRM_DEBUG("M&I %08x\n", temp);
+		DRM_DEBUG("HOT %08x\n", I915_READ(PORT_HOTPLUG_STAT));
+	}
+#else
 	DRM_DEBUG("%s flag=%08x\n", __FUNCTION__, temp);
 #endif
+
 	if (temp == 0)
 		return IRQ_NONE;
 
-	I915_WRITE16(I915REG_INT_IDENTITY_R, temp);
-	(void) I915_READ16(I915REG_INT_IDENTITY_R);
+	/* if (IS_I9XX(dev)) */ {
+		I915_WRITE(I915REG_INT_IDENTITY_R, temp);
+		(void) I915_READ(I915REG_INT_IDENTITY_R);
+	} /* else {
+		I915_WRITE16(I915REG_INT_IDENTITY_R, temp);
+		(void) I915_READ16(I915REG_INT_IDENTITY_R);
+	} */
+
 	DRM_READMEMORYBARRIER();
 
 	dev_priv->sarea_priv->last_dispatch = READ_BREADCRUMB(dev_priv);
@@ -360,6 +463,23 @@ irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 		I915_WRITE(I915REG_PIPEBSTAT,
 			pipeb_stats|I915_VBLANK_INTERRUPT_ENABLE|
 			I915_VBLANK_CLEAR);
+	}
+
+	/* for now lest just ack it */
+	if (temp & (1 << 17)) {
+		DRM_DEBUG("Hotplug event recived\n");
+
+		temp2 = I915_READ(PORT_HOTPLUG_STAT);
+
+		if (temp2 & (1 << 11) && temp2 & (1 << 9) && temp2 & (1 << 8)) {
+			DRM_DEBUG("CRT connected\n");
+			i915_run_hotplug_tasklet(dev);
+		}
+
+		if (temp2 & (1 << 11) && !(temp2 & ((1 << 9) | (1 << 8))))
+			DRM_DEBUG("CRT disconnected\n");
+
+		I915_WRITE(PORT_HOTPLUG_STAT,temp2);
 	}
 
 	return IRQ_HANDLED;
@@ -533,8 +653,26 @@ void i915_enable_interrupt (struct drm_device *dev)
 	if (dev_priv->vblank_pipe & DRM_I915_VBLANK_PIPE_B)
 		dev_priv->irq_enable_reg |= VSYNC_PIPEB_FLAG;
 
-	I915_WRITE16(I915REG_INT_ENABLE_R, dev_priv->irq_enable_reg);
+	/* if (dev_priv->mode_setting) */ {
+		dev_priv->irq_enable_reg |= (1 << 17);
+
+		/* Activate the CRT hotplug detection */
+		I915_WRITE(PORT_HOTPLUG_EN, (1 << 9));
+	}
+
+	/* if (IS_I9XX(dev_priv)) */ {
+		I915_WRITE(I915REG_INT_ENABLE_R, dev_priv->irq_enable_reg);
+	} /* else {
+		I915_WRITE16(I915REG_INT_ENABLE_R, dev_priv->irq_enable_reg);
+	} */
+
+	DRM_DEBUG("HEN %08x\n",I915_READ(PORT_HOTPLUG_EN));
+	DRM_DEBUG("HST %08x\n",I915_READ(PORT_HOTPLUG_STAT));
+	DRM_DEBUG("IER %08x\n",I915_READ(I915REG_INT_ENABLE_R));
+
 	dev_priv->irq_enabled = 1;
+
+	DRM_DEBUG("enabled\n");
 }
 
 /* Set the vblank monitor pipe
@@ -766,15 +904,27 @@ void i915_driver_irq_postinstall(struct drm_device * dev)
 void i915_driver_irq_uninstall(struct drm_device * dev)
 {
 	struct drm_i915_private *dev_priv = (struct drm_i915_private *) dev->dev_private;
-	u16 temp;
+	u32 temp;
+
 	if (!dev_priv)
 		return;
 
 	dev_priv->irq_enabled = 0;
-	I915_WRITE16(I915REG_HWSTAM, 0xffff);
-	I915_WRITE16(I915REG_INT_MASK_R, 0xffff);
-	I915_WRITE16(I915REG_INT_ENABLE_R, 0x0);
 
-	temp = I915_READ16(I915REG_INT_IDENTITY_R);
-	I915_WRITE16(I915REG_INT_IDENTITY_R, temp);
+
+	/* if(IS_I9XX(dev_priv) */ {
+		I915_WRITE(I915REG_HWSTAM, 0xffffffff);
+		I915_WRITE(I915REG_INT_MASK_R, 0xffffffff);
+		I915_WRITE(I915REG_INT_ENABLE_R, 0x0);
+
+		temp = I915_READ(I915REG_INT_IDENTITY_R);
+		I915_WRITE(I915REG_INT_IDENTITY_R, temp);
+	} /* else {
+		I915_WRITE16(I915REG_HWSTAM, 0xffff);
+		I915_WRITE16(I915REG_INT_MASK_R, 0xffff);
+		I915_WRITE16(I915REG_INT_ENABLE_R, 0x0);
+
+		temp = I915_READ16(I915REG_INT_IDENTITY_R);
+		I915_WRITE16(I915REG_INT_IDENTITY_R, temp);
+	} */
 }

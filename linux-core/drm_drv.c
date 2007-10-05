@@ -184,6 +184,7 @@ int drm_lastclose(struct drm_device * dev)
 
 	DRM_DEBUG("\n");
 
+/*	return 0; */
 	/*
 	 * We can't do much about this function failing.
 	 */
@@ -198,8 +199,8 @@ int drm_lastclose(struct drm_device * dev)
 		dev->unique_len=0;
 	}
 
-	if (dev->irq_enabled)
-		drm_irq_uninstall(dev);
+/*	if (dev->irq_enabled)
+		drm_irq_uninstall(dev); */
 
 	/* Free drawable information memory */
 	mutex_lock(&dev->struct_mutex);
@@ -253,11 +254,11 @@ int drm_lastclose(struct drm_device * dev)
 		list_del(&vma->head);
 		drm_ctl_free(vma, sizeof(*vma), DRM_MEM_VMAS);
 	}
-	
+	/*
 	list_for_each_entry_safe(r_list, list_t, &dev->maplist, head) {
 		drm_rmmap_locked(dev, r_list->map);
 		r_list = NULL;
-	}
+	}*/
 
 	if (drm_core_check_feature(dev, DRIVER_DMA_QUEUE) && dev->queuelist) {
 		for (i = 0; i < dev->queue_count; i++) {

@@ -489,8 +489,8 @@ int intelfb_probe(struct drm_device *dev, struct drm_crtc *crtc)
 	}
 	crtc->fb = fb;
 
-	fb->width = crtc->desired_mode->hdisplay;
-	fb->height = crtc->desired_mode->vdisplay;
+	fb->width = 2048;//crtc->desired_mode->hdisplay;
+	fb->height = 2048;//crtc->desired_mode->vdisplay;
 
 	fb->bits_per_pixel = 32;
 	fb->pitch = fb->width * ((fb->bits_per_pixel + 1) / 8);
@@ -499,8 +499,8 @@ int intelfb_probe(struct drm_device *dev, struct drm_crtc *crtc)
 				       drm_bo_type_kernel,
 				       DRM_BO_FLAG_READ |
 				       DRM_BO_FLAG_WRITE |
-				       DRM_BO_FLAG_MEM_TT |
-				       DRM_BO_FLAG_MEM_VRAM,
+				       DRM_BO_FLAG_MEM_VRAM | DRM_BO_FLAG_MEM_TT |
+				       DRM_BO_FLAG_NO_MOVE,
 				       0, 0, 0,
 				       &fbo);
 	if (ret || !fbo) {
