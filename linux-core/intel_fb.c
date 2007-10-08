@@ -499,6 +499,8 @@ int intelfb_resize(struct drm_device *dev, struct drm_crtc *crtc)
 	info->var.pixclock = 10000000 / mode->htotal * 1000 / mode->vtotal * 100;
     /* avoid overflow */
 	info->var.pixclock = info->var.pixclock * 1000 / mode->vrefresh;
+
+	return 0;
 }
 EXPORT_SYMBOL(intelfb_resize);
 
