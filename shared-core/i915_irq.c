@@ -352,8 +352,11 @@ static void i915_hotplug_work_func(struct work_struct *work)
 	/* We should realy check if there is a fb using this crtc */
 	if (!has_config)
 		dev->driver->fb_probe(dev, output->crtc);
-	else
+	else {
+		intelfb_resize(dev, output->crtc);
 		if (!drm_crtc_set_mode(output->crtc, output->crtc->desired_mode, 0, 0))
+			DRM_ERROR("setting mode failed\n");
+	}
 
 	DRM_DEBUG("throwing away unused bananas\n");
 	drm_disable_unused_functions(dev);
