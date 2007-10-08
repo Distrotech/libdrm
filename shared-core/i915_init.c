@@ -262,6 +262,10 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 
 	intel_modeset_init(dev);
 	drm_initial_config(dev, false);
+
+	drm_mm_print(&dev->bm.man[DRM_BO_MEM_VRAM].manager, "VRAM");
+	drm_mm_print(&dev->bm.man[DRM_BO_MEM_TT].manager, "TT");
+
 	drm_irq_install(dev);
 
 	return 0;
