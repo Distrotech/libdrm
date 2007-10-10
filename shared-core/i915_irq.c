@@ -304,7 +304,7 @@ static void i915_vblank_tasklet(struct drm_device *dev)
 }
 
 static struct drm_device *hotplug_dev;
-static int hotplug_command = 0;
+static int hotplug_cmd = 0;
 static spinlock_t hotplug_lock = SPIN_LOCK_UNLOCKED;
 
 static void i915_hotplug_crt(struct drm_device *dev)
@@ -374,12 +374,12 @@ static void i915_hotplug_work_func(struct work_struct *work)
 	int sdvoB;
 	int sdvoC;
 
-	spin_lock(hotplug_lock);
+	spin_lock(&hotplug_lock);
 	crt = hotplug_cmd & 1;
 	sdvoB = hotplug_cmd & 4;
 	sdvoC = hotplug_cmd & 8;
 	hotplug_cmd = 0;
-	spin_unlock(hotplug_lock);
+	spin_unlock(&hotplug_lock);
 
 	if (crt)
 		i915_hotplug_crt(dev);
@@ -396,9 +396,9 @@ static int i915_run_hotplug_tasklet(struct drm_device *dev, uint32_t stat)
 		DRM_DEBUG("CRT event\n");
 
 		if (stat & (1 << 9) && stat & (1 << 8)) {
-			spin_lock(hotplug_lock);
+			spin_lock(&hotplug_lock);
 			hotplug_cmd |= 1;
-			spin_unlock(hotplug_lock);
+			spin_unlock(&hotplug_lock);
 		} else {
 			/* handle crt disconnects */
 		}
@@ -407,17 +407,17 @@ static int i915_run_hotplug_tasklet(struct drm_device *dev, uint32_t stat)
 	if (stat & (1 << 6)) {
 		DRM_DEBUG("sDVOB event\n");
 
-		spin_lock(hotplug_lock);
+		spin_lock(&hotplug_lock);
 		hotplug_cmd |= 4;
-		spin_unlock(hotplug_lock);
+		spin_unlock(&hotplug_lock);
 	}
 
 	if (stat & (1 << 7)) {
 		DRM_DEBUG("sDVOC event\n");
 
-		spin_lock(hotplug_lock);
+		spin_lock(&hotplug_lock);
 		hotplug_cmd |= 8;
-		spin_unlock(hotplug_lock);
+		spin_unlock(&hotplug_lock);
 	}
 
 	queue_work(dev_priv->wq, &hotplug);
@@ -513,7 +513,6 @@ irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 	if (temp & (1 << 17)) {
 		DRM_DEBUG("Hotplug event recived\n");
 
-		i915_run_hotplug_tasklet(dev);
 		temp2 = I915_READ(PORT_HOTPLUG_STAT);
 
 		i915_run_hotplug_tasklet(dev, temp2);
