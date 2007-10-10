@@ -304,17 +304,19 @@ static void i915_vblank_tasklet(struct drm_device *dev)
 }
 
 static struct drm_device *hotplug_dev;
+static int hotplug_command = 0;
+static spinlock_t hotplug_lock = SPIN_LOCK_UNLOCKED;
 
-static void i915_hotplug_work_func(struct work_struct *work)
+static void i915_hotplug_crt(struct drm_device *dev)
 {
-	struct drm_device *dev = hotplug_dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct drm_output *output;
+	struct drm_crtc *crtc;
 	struct intel_output *iout;
 	int has_config = 0;
 
-	DRM_DEBUG("starting monkey hunt\n");
+
 	mutex_lock(&dev->struct_mutex);
+	mutex_lock(&dev->mode_config.mutex);
 
 	/* find the crt output */
 	list_for_each_entry(output, &dev->mode_config.output_list, head) {
@@ -323,28 +325,23 @@ static void i915_hotplug_work_func(struct work_struct *work)
 			break;
 	}
 
-	if (iout == 0) {
-		DRM_DEBUG("could not find monkey\n");
-		goto unlock_struct;
-	}
-
-	mutex_lock(&dev->mode_config.mutex);
+	if (iout == 0)
+		goto unlock;
 
 	if (output->crtc && output->crtc->desired_mode) {
 		DRM_DEBUG("monkey has banana\n");
 		has_config = 1;
 	}
 
-	DRM_DEBUG("monkey looking for bananas\n");
 	drm_crtc_probe_output_modes(dev, 2048, 2048);
 
-	drm_pick_crtcs(dev);
+	if (!has_config)
+		drm_pick_crtcs(dev);
 
 	if (!output->crtc || !output->crtc->desired_mode) {
-		DRM_DEBUG("monkey had no parent or banana\n");
-		goto unlock_mode;
+		DRM_DEBUG("no desired mode or no crtc found\n");
+		goto unlock;
 	}
-
 
 	mutex_unlock(&dev->struct_mutex);
 
@@ -358,26 +355,70 @@ static void i915_hotplug_work_func(struct work_struct *work)
 			DRM_ERROR("setting mode failed\n");
 	}
 
-	DRM_DEBUG("throwing away unused bananas\n");
 	drm_disable_unused_functions(dev);
-	mutex_lock(&dev->struct_mutex);
 
-unlock_mode:
 	mutex_unlock(&dev->mode_config.mutex);
+	return;
 
-unlock_struct:
+unlock:
+	mutex_unlock(&dev->mode_config.mutex);
 	mutex_unlock(&dev->struct_mutex);
+
 	DRM_DEBUG("monkey hunt done\n");
 }
 
-static int i915_run_hotplug_tasklet(struct drm_device *dev)
+static void i915_hotplug_work_func(struct work_struct *work)
+{
+	struct drm_device *dev = hotplug_dev;
+	int crt;
+	int sdvoB;
+	int sdvoC;
+
+	spin_lock(hotplug_lock);
+	crt = hotplug_cmd & 1;
+	sdvoB = hotplug_cmd & 4;
+	sdvoC = hotplug_cmd & 8;
+	hotplug_cmd = 0;
+	spin_unlock(hotplug_lock);
+
+	if (crt)
+		i915_hotplug_crt(dev);
+}
+
+static int i915_run_hotplug_tasklet(struct drm_device *dev, uint32_t stat)
 {
 	static DECLARE_WORK(hotplug, i915_hotplug_work_func);
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-//	DRM_DEBUG("%p\n", dev);
-//	atomic_long_set(&hotplug.data,(unsigned long) dev);
 	hotplug_dev = dev;
+
+	if (stat & (1 << 11)) {
+		DRM_DEBUG("CRT event\n");
+
+		if (stat & (1 << 9) && stat & (1 << 8)) {
+			spin_lock(hotplug_lock);
+			hotplug_cmd |= 1;
+			spin_unlock(hotplug_lock);
+		} else {
+			/* handle crt disconnects */
+		}
+	}
+
+	if (stat & (1 << 6)) {
+		DRM_DEBUG("sDVOB event\n");
+
+		spin_lock(hotplug_lock);
+		hotplug_cmd |= 4;
+		spin_unlock(hotplug_lock);
+	}
+
+	if (stat & (1 << 7)) {
+		DRM_DEBUG("sDVOC event\n");
+
+		spin_lock(hotplug_lock);
+		hotplug_cmd |= 8;
+		spin_unlock(hotplug_lock);
+	}
 
 	queue_work(dev_priv->wq, &hotplug);
 
@@ -472,15 +513,10 @@ irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 	if (temp & (1 << 17)) {
 		DRM_DEBUG("Hotplug event recived\n");
 
+		i915_run_hotplug_tasklet(dev);
 		temp2 = I915_READ(PORT_HOTPLUG_STAT);
 
-		if (temp2 & (1 << 11) && temp2 & (1 << 9) && temp2 & (1 << 8)) {
-			DRM_DEBUG("CRT connected\n");
-			i915_run_hotplug_tasklet(dev);
-		}
-
-		if (temp2 & (1 << 11) && !(temp2 & ((1 << 9) | (1 << 8))))
-			DRM_DEBUG("CRT disconnected\n");
+		i915_run_hotplug_tasklet(dev, temp2);
 
 		I915_WRITE(PORT_HOTPLUG_STAT,temp2);
 	}
