@@ -930,6 +930,11 @@ void intel_sdvo_set_hotplug(struct drm_output *output, int on)
 	u8 response[2];
 	u8 status;
 
+	DRM_DEBUG("read\n");
+	intel_sdvo_write_cmd(output, SDVO_CMD_GET_ACTIVE_HOT_PLUG, NULL, 0);
+	intel_sdvo_read_response(output, &response, 2);
+
+	DRM_DEBUG("write\n");
 	if (on) {
 		intel_sdvo_write_cmd(output, SDVO_CMD_GET_HOT_PLUG_SUPPORT, NULL, 0);
 		status = intel_sdvo_read_response(output, &response, 2);

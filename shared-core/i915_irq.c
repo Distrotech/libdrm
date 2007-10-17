@@ -409,6 +409,7 @@ static void i915_hotplug_sdvo(struct drm_device *dev, int sdvoB)
 
 	if (status != output_status_connected) {
 		DRM_DEBUG("disconnect or unkown we don't do anything then\n");
+		intel_sdvo_set_hotplug(output, 1);
 		goto unlock;
 	}
 
@@ -416,6 +417,8 @@ static void i915_hotplug_sdvo(struct drm_device *dev, int sdvoB)
 	mutex_unlock(&dev->struct_mutex);
 
 	i915_hotplug_stage2(dev, output);
+
+	intel_sdvo_set_hotplug(output, 1);
 
     mutex_unlock(&dev->mode_config.mutex);
     return;
