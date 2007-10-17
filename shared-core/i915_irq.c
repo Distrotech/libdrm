@@ -307,26 +307,19 @@ static struct drm_device *hotplug_dev;
 static int hotplug_cmd = 0;
 static spinlock_t hotplug_lock = SPIN_LOCK_UNLOCKED;
 
-static void i915_hotplug_crt(struct drm_device *dev)
+/* TODO
+ * The locking in these functions are realy messed up.
+ * Currently the stage 1 functions takes both the locks.
+ * But have to release it since intel_fb_probe grabs the
+ * struct_mTODO utex. So to do this as cleanly as possible
+ * you need to release the locks between stage 1 and 2.
+ */
+
+static void i915_hotplug_stage2(struct drm_device *dev, struct drm_output *output)
 {
-	struct drm_output *output;
-	struct drm_crtc *crtc;
-	struct intel_output *iout;
 	int has_config = 0;
 
-
 	mutex_lock(&dev->struct_mutex);
-	mutex_lock(&dev->mode_config.mutex);
-
-	/* find the crt output */
-	list_for_each_entry(output, &dev->mode_config.output_list, head) {
-		iout = output->driver_private;
-		if (iout->type == INTEL_OUTPUT_ANALOG)
-			break;
-	}
-
-	if (iout == 0)
-		goto unlock;
 
 	if (output->crtc && output->crtc->desired_mode) {
 		DRM_DEBUG("monkey has banana\n");
@@ -357,6 +350,36 @@ static void i915_hotplug_crt(struct drm_device *dev)
 
 	drm_disable_unused_functions(dev);
 
+unlock:
+	mutex_unlock(&dev->struct_mutex);
+
+}
+
+static void i915_hotplug_crt(struct drm_device *dev)
+{
+	struct drm_output *output;
+	struct intel_output *iout;
+
+	mutex_lock(&dev->struct_mutex);
+	mutex_lock(&dev->mode_config.mutex);
+
+	/* find the crt output */
+	list_for_each_entry(output, &dev->mode_config.output_list, head) {
+		iout = output->driver_private;
+		if (iout->type == INTEL_OUTPUT_ANALOG)
+			break;
+		else
+			iout = 0;
+	}
+
+	if (iout == 0)
+		goto unlock;
+
+	/* TODO ugly locking */
+	mutex_unlock(&dev->struct_mutex);
+
+	i915_hotplug_stage2(dev, output);
+
 	mutex_unlock(&dev->mode_config.mutex);
 	return;
 
@@ -365,6 +388,41 @@ unlock:
 	mutex_unlock(&dev->struct_mutex);
 
 	DRM_DEBUG("monkey hunt done\n");
+}
+
+static void i915_hotplug_sdvo(struct drm_device *dev, int sdvoB)
+{
+	struct drm_output *output = 0;
+	enum drm_output_status status;
+
+	mutex_lock(&dev->struct_mutex);
+	mutex_lock(&dev->mode_config.mutex);
+
+	output = intel_sdvo_find(dev, sdvoB);
+
+	if (!output) {
+		DRM_ERROR("could not find sdvo%s output\n", sdvoB ? "B" : "C");
+		goto unlock;
+	}
+
+	status = output->funcs->detect(output);
+
+	if (status != output_status_connected) {
+		DRM_DEBUG("disconnect or unkown we don't do anything then\n");
+		goto unlock;
+	}
+
+	/* TODO ugly locking */
+	mutex_unlock(&dev->struct_mutex);
+
+	i915_hotplug_stage2(dev, output);
+
+    mutex_unlock(&dev->mode_config.mutex);
+    return;
+
+unlock:
+	mutex_unlock(&dev->mode_config.mutex);
+	mutex_unlock(&dev->struct_mutex);
 }
 
 static void i915_hotplug_work_func(struct work_struct *work)
@@ -383,6 +441,13 @@ static void i915_hotplug_work_func(struct work_struct *work)
 
 	if (crt)
 		i915_hotplug_crt(dev);
+
+	if (sdvoB)
+		i915_hotplug_sdvo(dev, 1);
+
+	if (sdvoC)
+		i915_hotplug_sdvo(dev, 0);
+
 }
 
 static int i915_run_hotplug_tasklet(struct drm_device *dev, uint32_t stat)
@@ -453,6 +518,8 @@ irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 		DRM_DEBUG("MSK %08x\n", dev_priv->irq_enable_reg | USER_INT_FLAG);
 		DRM_DEBUG("M&I %08x\n", temp);
 		DRM_DEBUG("HOT %08x\n", I915_READ(PORT_HOTPLUG_STAT));
+	} else {
+		/* DRM_DEBUG("v\n"); */
 	}
 #else
 	DRM_DEBUG("%s flag=%08x\n", __FUNCTION__, temp);
@@ -684,6 +751,7 @@ int i915_irq_wait(struct drm_device *dev, void *data,
 void i915_enable_interrupt (struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = (struct drm_i915_private *) dev->dev_private;
+	struct drm_output *o;
 	
 	dev_priv->irq_enable_reg = USER_INT_FLAG; 
 	if (dev_priv->vblank_pipe & DRM_I915_VBLANK_PIPE_A)
@@ -694,8 +762,17 @@ void i915_enable_interrupt (struct drm_device *dev)
 	/* if (dev_priv->mode_setting) */ {
 		dev_priv->irq_enable_reg |= (1 << 17);
 
-		/* Activate the CRT hotplug detection */
-		I915_WRITE(PORT_HOTPLUG_EN, (1 << 9));
+		/* Activate the CRT and SDVOB hotplug detection */
+		I915_WRITE(PORT_HOTPLUG_EN, (1 << 9) | (1 << 26));
+
+		o = intel_sdvo_find(dev, 1);
+		if (o) {
+			intel_sdvo_supports_hotplug(o);
+
+			intel_sdvo_set_hotplug(o, 1);
+			I915_WRITE(SDVOB, I915_READ(SDVOB) | (1 << 26));
+			I915_WRITE(SDVOB, I915_READ(SDVOB) | (1 << 26));
+		}
 	}
 
 	/* if (IS_I9XX(dev_priv)) */ {
@@ -707,6 +784,9 @@ void i915_enable_interrupt (struct drm_device *dev)
 	DRM_DEBUG("HEN %08x\n",I915_READ(PORT_HOTPLUG_EN));
 	DRM_DEBUG("HST %08x\n",I915_READ(PORT_HOTPLUG_STAT));
 	DRM_DEBUG("IER %08x\n",I915_READ(I915REG_INT_ENABLE_R));
+	DRM_DEBUG("SDB %08x\n",I915_READ(SDVOB));
+
+	I915_WRITE(PORT_HOTPLUG_STAT, I915_READ(PORT_HOTPLUG_STAT));
 
 	dev_priv->irq_enabled = 1;
 
@@ -914,8 +994,8 @@ void i915_driver_irq_preinstall(struct drm_device * dev)
 	struct drm_i915_private *dev_priv = (struct drm_i915_private *) dev->dev_private;
 
 	I915_WRITE16(I915REG_HWSTAM, 0xeffe);
-	I915_WRITE16(I915REG_INT_MASK_R, 0x0);
-	I915_WRITE16(I915REG_INT_ENABLE_R, 0x0);
+	I915_WRITE(I915REG_INT_MASK_R, 0x0);
+	I915_WRITE(I915REG_INT_ENABLE_R, 0x0);
 }
 
 void i915_driver_irq_postinstall(struct drm_device * dev)
