@@ -1053,6 +1053,54 @@ int drm_crtc_set_config(struct drm_crtc *crtc, struct drm_mode_crtc *crtc_info, 
 }
 
 /**
+ * drm_hotplug_stage_two
+ * @dev DRM device
+ * @output hotpluged output
+ *
+ * LOCKING.
+ * Caller must hold mode config lock, function might grap struct lock.
+ *
+ * Stage two of a hotplug.
+ *
+ * RETURNS:
+ * Zero on success, errno on failure.
+ */
+int drm_hotplug_stage_two(struct drm_device *dev, struct drm_output *output)
+{
+	int has_config = 0;
+
+	if (output->crtc && output->crtc->desired_mode) {
+		DRM_DEBUG("drm thinks that output already has a config\n");
+		has_config = 1;
+	}
+
+	drm_crtc_probe_output_modes(dev, 2048, 2048);
+
+	if (!has_config)
+		drm_pick_crtcs(dev);
+
+	if (!output->crtc || !output->crtc->desired_mode) {
+		DRM_DEBUG("could not find a desired mode or crtc for output\n");
+		return 1;
+	}
+
+	/* We should realy check if there is a fb using this crtc */
+	if (!has_config)
+		dev->driver->fb_probe(dev, output->crtc);
+	else {
+		dev->driver->fb_resize(dev, output->crtc);
+
+		if (!drm_crtc_set_mode(output->crtc, output->crtc->desired_mode, 0, 0))
+			DRM_ERROR("failed to set mode after hotplug\n");
+	}
+
+	drm_disable_unused_functions(dev);
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_hotplug_stage_two);
+
+/**
  * drm_crtc_convert_to_umode - convert a drm_display_mode into a modeinfo
  * @out: drm_mode_modeinfo struct to return to the user
  * @in: drm_display_mode to use

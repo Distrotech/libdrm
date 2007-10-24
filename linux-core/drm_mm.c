@@ -295,10 +295,9 @@ void drm_mm_takedown(struct drm_mm * mm)
 
 EXPORT_SYMBOL(drm_mm_takedown);
 
-int drm_mm_print(struct drm_mm *mm, const char *name)
+void drm_mm_print(struct drm_mm *mm, const char *name)
 { 
 	struct list_head *list;
-	const struct list_head *free_stack = &mm->fl_entry;
 	const struct list_head *mm_stack = &mm->ml_entry;
 	struct drm_mm_node *entry;
 
@@ -308,7 +307,5 @@ int drm_mm_print(struct drm_mm *mm, const char *name)
 		DRM_DEBUG("\t0x%08lx %li %s pages\n", entry->start, entry->size,
 			entry->free ? "free" : "used");
 	}
-
-	return 0;
 }
 EXPORT_SYMBOL(drm_mm_print);

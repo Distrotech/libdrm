@@ -891,23 +891,20 @@ struct drm_output* intel_sdvo_find(struct drm_device *dev, int sdvoB)
 	list_for_each_entry(output, &dev->mode_config.output_list, head) {
 		iout = output->driver_private;
 
-		if (iout->type != INTEL_OUTPUT_SDVO) {
-			iout = 0;
+		if (iout->type != INTEL_OUTPUT_SDVO)
 			continue;
-		}
 
 		sdvo = iout->dev_priv;
 
 		if (sdvo->output_device == SDVOB && sdvoB)
-			break;
+			return output;
 
 		if (sdvo->output_device == SDVOC && !sdvoB)
-			break;
+			return output;
 
-		sdvo = 0;
     }
 
-	return output;
+	return 0;
 }
 
 int intel_sdvo_supports_hotplug(struct drm_output *output)
@@ -915,6 +912,9 @@ int intel_sdvo_supports_hotplug(struct drm_output *output)
 	u8 response[2];
 	u8 status;
 	DRM_DEBUG("\n");
+
+	if (!output)
+		return 0;
 
 	intel_sdvo_write_cmd(output, SDVO_CMD_GET_HOT_PLUG_SUPPORT, NULL, 0);
 	status = intel_sdvo_read_response(output, &response, 2);
@@ -930,11 +930,9 @@ void intel_sdvo_set_hotplug(struct drm_output *output, int on)
 	u8 response[2];
 	u8 status;
 
-	DRM_DEBUG("read\n");
 	intel_sdvo_write_cmd(output, SDVO_CMD_GET_ACTIVE_HOT_PLUG, NULL, 0);
 	intel_sdvo_read_response(output, &response, 2);
 
-	DRM_DEBUG("write\n");
 	if (on) {
 		intel_sdvo_write_cmd(output, SDVO_CMD_GET_HOT_PLUG_SUPPORT, NULL, 0);
 		status = intel_sdvo_read_response(output, &response, 2);
@@ -946,7 +944,6 @@ void intel_sdvo_set_hotplug(struct drm_output *output, int on)
 		intel_sdvo_write_cmd(output, SDVO_CMD_SET_ACTIVE_HOT_PLUG, &response, 2);
 	}
 
-	DRM_DEBUG("readback\n");
 	intel_sdvo_write_cmd(output, SDVO_CMD_GET_ACTIVE_HOT_PLUG, NULL, 0);
 	intel_sdvo_read_response(output, &response, 2);
 }

@@ -321,6 +321,7 @@ static struct drm_driver driver = {
 	.get_reg_ofs = drm_core_get_reg_ofs,
 	.fb_probe = intelfb_probe,
 	.fb_remove = intelfb_remove,
+	.fb_resize = intelfb_resize,
 	.ioctls = i915_ioctls,
 	.fops = {
 		.owner = THIS_MODULE,

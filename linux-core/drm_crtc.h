@@ -526,6 +526,7 @@ extern int drmfb_probe(struct drm_device *dev, struct drm_crtc *crtc);
 extern int drmfb_remove(struct drm_device *dev, struct drm_framebuffer *fb);
 extern bool drm_crtc_set_mode(struct drm_crtc *crtc, struct drm_display_mode *mode,
 		       int x, int y);
+extern int drm_hotplug_stage_two(struct drm_device *dev, struct drm_output *output);
 
 /* IOCTLs */
 extern int drm_mode_getresources(struct drm_device *dev,
