@@ -173,6 +173,7 @@ benchmarkBuffer(TinyDRIContext * ctx, unsigned long size,
     int ret;
     drmBO buf;
     void *virtual;
+    int i;
 
     /*
      * Test system memory objects.
@@ -229,6 +230,11 @@ benchmarkBuffer(TinyDRIContext * ctx, unsigned long size,
     curTime = fastrdtsc();
     *ticks++ = time_diff(oldTime, curTime);
 
+    for (i=0; i<buf.size; ++i) {
+      if (((uint8_t *)virtual)[i] != 0x0F) 
+	printf("Coherency error at position %d\n", i);
+    }
+
     oldTime = fastrdtsc();
     memset(virtual, 0xF0, buf.size);
     curTime = fastrdtsc();
@@ -244,8 +250,22 @@ benchmarkBuffer(TinyDRIContext * ctx, unsigned long size,
     curTime = fastrdtsc();
     *ticks++ = time_diff(oldTime, curTime);
 
+    oldTime = fastrdtsc();
     BM_CKFATAL(drmBOUnmap(ctx->drmFD, &buf));
+    BM_CKFATAL(drmBOSetStatus(ctx->drmFD, &buf,
+			     DRM_BO_FLAG_MEM_LOCAL | DRM_BO_FLAG_CACHED, DRM_BO_MASK_MEM | DRM_BO_FLAG_CACHED, 0, 0,0));    
+    BM_CKFATAL(drmBOMap(ctx->drmFD, &buf,
+	    DRM_BO_FLAG_READ | DRM_BO_FLAG_WRITE, 0, &virtual));
+    readBuf(virtual, buf.size);
+    BM_CKFATAL(drmBOUnmap(ctx->drmFD, &buf));
+    BM_CKFATAL(drmBOSetStatus(ctx->drmFD, &buf,
+			     DRM_BO_FLAG_MEM_TT, DRM_BO_MASK_MEM | DRM_BO_FLAG_CACHED, 0, 0,0));    
+    BM_CKFATAL(drmBOMap(ctx->drmFD, &buf,
+	    DRM_BO_FLAG_READ | DRM_BO_FLAG_WRITE, 0, &virtual));
+    curTime = fastrdtsc();
+    *ticks++ = time_diff(oldTime, curTime);
 
+    BM_CKFATAL(drmBOUnmap(ctx->drmFD, &buf));
     oldTime = fastrdtsc();
     BM_CKFATAL(drmBOSetStatus(ctx->drmFD, &buf,
 			     DRM_BO_FLAG_MEM_LOCAL, DRM_BO_MASK_MEM, 0, 0,0));
@@ -330,6 +350,7 @@ testAGP(TinyDRIContext * ctx)
     printf("Writing to TT took       %12lu ticks\n", *pTicks++);
     printf("Writing again to TT took %12lu ticks\n", *pTicks++);
     printf("Reading from TT took     %12lu ticks\n", *pTicks++);
+    printf("Moveout Reading took     %12lu ticks\n", *pTicks++);
     printf("Moving to system took    %12lu ticks\n", *pTicks++);
 
     if (ret == 1)

@@ -503,8 +503,8 @@ void i915_user_irq_off(drm_i915_private_t *dev_priv)
 {
 	DRM_SPINLOCK(&dev_priv->user_irq_lock);
 	if (dev_priv->irq_enabled && (--dev_priv->user_irq_refcount == 0)) {
-		//		dev_priv->irq_enable_reg &= ~USER_INT_FLAG;
-		//		I915_WRITE16(I915REG_INT_ENABLE_R, dev_priv->irq_enable_reg);
+		dev_priv->irq_enable_reg &= ~USER_INT_FLAG;
+		I915_WRITE16(I915REG_INT_ENABLE_R, dev_priv->irq_enable_reg);
 	}
 	DRM_SPINUNLOCK(&dev_priv->user_irq_lock);
 }
