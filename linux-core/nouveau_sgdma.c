@@ -49,7 +49,8 @@ nouveau_sgdma_populate(struct drm_ttm_backend *be, unsigned long num_pages,
 							 NV_CTXDMA_PAGE_SIZE,
 							 PCI_DMA_BIDIRECTIONAL);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27))
-			if (pci_dma_mapping_error(be->dev->pdev, nvbe->pagelist[d])) {
+			if (pci_dma_mapping_error(nvbe->dev->pdev, 
+nvbe->pagelist[d])) {
 #else
 			if (pci_dma_mapping_error(nvbe->pagelist[d])) {
 #endif
