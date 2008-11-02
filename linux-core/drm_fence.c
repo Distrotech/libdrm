@@ -369,7 +369,7 @@ int drm_fence_object_wait(struct drm_fence_object *fence,
 	struct drm_fence_manager *fm = &dev->fm;
 	struct drm_fence_class_manager *fc = &fm->fence_class[fence->fence_class];
 	int ret = 0;
-	unsigned long _end = 3 * DRM_HZ;
+	unsigned long _end = jiffies + (3 * DRM_HZ);
 
 	if (mask & ~fence->type) {
 		DRM_ERROR("Wait trying to extend fence type"
