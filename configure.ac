@@ -117,8 +117,8 @@ AC_OUTPUT([
 	Makefile
 	libdrm/Makefile
 	libdrm/intel/Makefile
-	libdrm/radeon/Makefile
 	shared-core/Makefile
 	tests/Makefile
-	linux-core/ttm/Makefile
+	tests/modeprint/Makefile
+	tests/modetest/Makefile
 	libdrm.pc])
