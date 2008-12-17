@@ -42,6 +42,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <signal.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #define stat_t struct stat
@@ -177,7 +178,7 @@ static char *drmStrdup(const char *s)
 /**
  * Call ioctl, restarting if it is interupted
  */
-static int
+int
 drmIoctl(int fd, unsigned long request, void *arg)
 {
     int	ret;
@@ -395,7 +396,7 @@ static int drmOpenMinor(int minor, int create, int type)
     char buf[64];
     
     if (create)
-      return drmOpenDevice(makedev(DRM_MAJOR, minor), minor, type);
+	return drmOpenDevice(makedev(DRM_MAJOR, minor), minor, type);
     
     sprintf(buf, type ? DRM_DEV_NAME : DRM_CONTROL_DEV_NAME, DRM_DIR_NAME, minor);
     if ((fd = open(buf, O_RDWR, 0)) >= 0)
@@ -1896,13 +1897,33 @@ int drmScatterGatherFree(int fd, drm_handle_t handle)
  */
 int drmWaitVBlank(int fd, drmVBlankPtr vbl)
 {
+    struct timespec timeout, cur;
     int ret;
 
+    ret = clock_gettime(CLOCK_MONOTONIC, &timeout);
+    if (ret < 0) {
+	fprintf(stderr, "clock_gettime failed: %s\n", strerror(ret));
+	goto out;
+    }
+    timeout.tv_sec++;
+
     do {
-       ret = drmIoctl(fd, DRM_IOCTL_WAIT_VBLANK, vbl);
+       ret = ioctl(fd, DRM_IOCTL_WAIT_VBLANK, vbl);
        vbl->request.type &= ~DRM_VBLANK_RELATIVE;
+       if (ret && errno == EINTR) {
+	       clock_gettime(CLOCK_MONOTONIC, &cur);
+	       /* Timeout after 1s */
+	       if (cur.tv_sec > timeout.tv_sec + 1 ||
+		   (cur.tv_sec == timeout.tv_sec && cur.tv_nsec >=
+		    timeout.tv_nsec)) {
+		       errno = EBUSY;
+		       ret = -1;
+		       break;
+	       }
+       }
     } while (ret && errno == EINTR);
 
+out:
     return ret;
 }
 

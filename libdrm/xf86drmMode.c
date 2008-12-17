@@ -9,7 +9,9 @@
  */
 
 /*
- * Copyright (c) <year> <copyright holders>
+ * Copyright (c) 2007-2008 Tungsten Graphics, Inc., Cedar Park, Texas.
+ * Copyright (c) 2007-2008 Dave Airlie <airlied@linux.ie>
+ * Copyright (c) 2007-2008 Jakob Bornecrantz <wallbraker@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -135,7 +137,7 @@ drmModeResPtr drmModeGetResources(int fd)
 
 	memset(&res, 0, sizeof(struct drm_mode_card_res));
 
-	if (ioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res))
+	if (drmIoctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res))
 		return 0;
 
 	if (res.count_fbs)
@@ -147,7 +149,7 @@ drmModeResPtr drmModeGetResources(int fd)
 	if (res.count_encoders)
 		res.encoder_id_ptr = VOID2U64(drmMalloc(res.count_encoders*sizeof(uint32_t)));
 
-	if (ioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res)) {
+	if (drmIoctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res)) {
 		r = NULL;
 		goto err_allocs;
 	}
@@ -197,7 +199,7 @@ int drmModeAddFB(int fd, uint32_t width, uint32_t height, uint8_t depth,
 	f.depth  = depth;
 	f.handle = bo_handle;
 
-	if ((ret = ioctl(fd, DRM_IOCTL_MODE_ADDFB, &f)))
+	if ((ret = drmIoctl(fd, DRM_IOCTL_MODE_ADDFB, &f)))
 		return ret;
 
 	*buf_id = f.fb_id;
@@ -206,7 +208,7 @@ int drmModeAddFB(int fd, uint32_t width, uint32_t height, uint8_t depth,
 
 int drmModeRmFB(int fd, uint32_t bufferId)
 {
-	return ioctl(fd, DRM_IOCTL_MODE_RMFB, &bufferId);
+	return drmIoctl(fd, DRM_IOCTL_MODE_RMFB, &bufferId);
 
 
 }
@@ -218,7 +220,7 @@ drmModeFBPtr drmModeGetFB(int fd, uint32_t buf)
 
 	info.fb_id = buf;
 
-	if (ioctl(fd, DRM_IOCTL_MODE_GETFB, &info))
+	if (drmIoctl(fd, DRM_IOCTL_MODE_GETFB, &info))
 		return NULL;
 
 	if (!(r = drmMalloc(sizeof(*r))))
@@ -247,7 +249,7 @@ drmModeCrtcPtr drmModeGetCrtc(int fd, uint32_t crtcId)
 
 	crtc.crtc_id = crtcId;
 
-	if (ioctl(fd, DRM_IOCTL_MODE_GETCRTC, &crtc))
+	if (drmIoctl(fd, DRM_IOCTL_MODE_GETCRTC, &crtc))
 		return 0;
 
 	/*
@@ -256,7 +258,7 @@ drmModeCrtcPtr drmModeGetCrtc(int fd, uint32_t crtcId)
 
 	if (!(r = drmMalloc(sizeof(*r))))
 		return 0;
-	
+
 	r->crtc_id         = crtc.crtc_id;
 	r->x               = crtc.x;
 	r->y               = crtc.y;
@@ -287,7 +289,7 @@ int drmModeSetCrtc(int fd, uint32_t crtcId, uint32_t bufferId,
 	} else
 	  crtc.mode_valid = 0;
 
-	return ioctl(fd, DRM_IOCTL_MODE_SETCRTC, &crtc);
+	return drmIoctl(fd, DRM_IOCTL_MODE_SETCRTC, &crtc);
 }
 
 /*
@@ -304,7 +306,7 @@ int drmModeSetCursor(int fd, uint32_t crtcId, uint32_t bo_handle, uint32_t width
 	arg.height = height;
 	arg.handle = bo_handle;
 
-	return ioctl(fd, DRM_IOCTL_MODE_CURSOR, &arg);
+	return drmIoctl(fd, DRM_IOCTL_MODE_CURSOR, &arg);
 }
 
 int drmModeMoveCursor(int fd, uint32_t crtcId, int x, int y)
@@ -316,11 +318,11 @@ int drmModeMoveCursor(int fd, uint32_t crtcId, int x, int y)
 	arg.x = x;
 	arg.y = y;
 
-	return ioctl(fd, DRM_IOCTL_MODE_CURSOR, &arg);
+	return drmIoctl(fd, DRM_IOCTL_MODE_CURSOR, &arg);
 }
 
 /*
- * Encoder get 
+ * Encoder get
  */
 drmModeEncoderPtr drmModeGetEncoder(int fd, uint32_t encoder_id)
 {
@@ -332,7 +334,7 @@ drmModeEncoderPtr drmModeGetEncoder(int fd, uint32_t encoder_id)
 	enc.possible_crtcs = 0;
 	enc.possible_clones = 0;
 
-	if (ioctl(fd, DRM_IOCTL_MODE_GETENCODER, &enc))
+	if (drmIoctl(fd, DRM_IOCTL_MODE_GETENCODER, &enc))
 		return 0;
 
 	if (!(r = drmMalloc(sizeof(*r))))
@@ -367,7 +369,7 @@ drmModeConnectorPtr drmModeGetConnector(int fd, uint32_t connector_id)
 	conn.count_encoders  = 0;
 	conn.encoders_ptr = 0;
 
-	if (ioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn))
+	if (drmIoctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn))
 		return 0;
 
 	if (conn.count_props) {
@@ -381,7 +383,7 @@ drmModeConnectorPtr drmModeGetConnector(int fd, uint32_t connector_id)
 	if (conn.count_encoders)
 		conn.encoders_ptr = VOID2U64(drmMalloc(conn.count_encoders*sizeof(uint32_t)));
 
-	if (ioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn))
+	if (drmIoctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn))
 		goto err_allocs;
 
 	if(!(r = drmMalloc(sizeof(*r)))) {
@@ -424,7 +426,7 @@ int drmModeAttachMode(int fd, uint32_t connector_id, struct drm_mode_modeinfo *m
 	memcpy(&res.mode, mode_info, sizeof(struct drm_mode_modeinfo));
 	res.connector_id = connector_id;
 
-	return ioctl(fd, DRM_IOCTL_MODE_ATTACHMODE, &res);
+	return drmIoctl(fd, DRM_IOCTL_MODE_ATTACHMODE, &res);
 }
 
 int drmModeDetachMode(int fd, uint32_t connector_id, struct drm_mode_modeinfo *mode_info)
@@ -434,7 +436,7 @@ int drmModeDetachMode(int fd, uint32_t connector_id, struct drm_mode_modeinfo *m
 	memcpy(&res.mode, mode_info, sizeof(struct drm_mode_modeinfo));
 	res.connector_id = connector_id;
 
-	return ioctl(fd, DRM_IOCTL_MODE_DETACHMODE, &res);
+	return drmIoctl(fd, DRM_IOCTL_MODE_DETACHMODE, &res);
 }
 
 
@@ -450,7 +452,7 @@ drmModePropertyPtr drmModeGetProperty(int fd, uint32_t property_id)
 	prop.enum_blob_ptr = 0;
 	prop.values_ptr = 0;
 
-	if (ioctl(fd, DRM_IOCTL_MODE_GETPROPERTY, &prop))
+	if (drmIoctl(fd, DRM_IOCTL_MODE_GETPROPERTY, &prop))
 		return 0;
 
 	if (prop.count_values)
@@ -464,17 +466,17 @@ drmModePropertyPtr drmModeGetProperty(int fd, uint32_t property_id)
 		prop.enum_blob_ptr = VOID2U64(drmMalloc(prop.count_enum_blobs * sizeof(uint32_t)));
 	}
 
-	if (ioctl(fd, DRM_IOCTL_MODE_GETPROPERTY, &prop)) {
+	if (drmIoctl(fd, DRM_IOCTL_MODE_GETPROPERTY, &prop)) {
 		r = NULL;
 		goto err_allocs;
 	}
 
 	if (!(r = drmMalloc(sizeof(*r))))
 		return NULL;
-	
+
 	r->prop_id = prop.prop_id;
 	r->count_values = prop.count_values;
-	
+
 	r->flags = prop.flags;
 	if (prop.count_values)
 		r->values = drmAllocCpy(U642VOID(prop.values_ptr), prop.count_values, sizeof(uint64_t));
@@ -515,13 +517,13 @@ drmModePropertyBlobPtr drmModeGetPropertyBlob(int fd, uint32_t blob_id)
 	blob.data = 0;
 	blob.blob_id = blob_id;
 
-	if (ioctl(fd, DRM_IOCTL_MODE_GETPROPBLOB, &blob))
+	if (drmIoctl(fd, DRM_IOCTL_MODE_GETPROPBLOB, &blob))
 		return NULL;
 
 	if (blob.length)
 		blob.data = VOID2U64(drmMalloc(blob.length));
 
-	if (ioctl(fd, DRM_IOCTL_MODE_GETPROPBLOB, &blob)) {
+	if (drmIoctl(fd, DRM_IOCTL_MODE_GETPROPBLOB, &blob)) {
 		r = NULL;
 		goto err_allocs;
 	}
@@ -557,7 +559,7 @@ int drmModeConnectorSetProperty(int fd, uint32_t connector_id, uint32_t property
 	osp.prop_id = property_id;
 	osp.value = value;
 
-	if ((ret = ioctl(fd, DRM_IOCTL_MODE_SETPROPERTY, &osp)))
+	if ((ret = drmIoctl(fd, DRM_IOCTL_MODE_SETPROPERTY, &osp)))
 		return ret;
 
 	return 0;
@@ -593,7 +595,7 @@ int drmCheckModesettingSupported(const char *busid)
 				found = 1;
 				break;
 			}
-		
+
 			dent = readdir(sysdir);
 		}
 		closedir(sysdir);
@@ -614,37 +616,16 @@ int drmCheckModesettingSupported(const char *busid)
 			found = 1;
 			break;
 		}
-		
+
 		dent = readdir(sysdir);
 	}
-			
+
 	closedir(sysdir);
 	if (found)
 		return 0;
 #endif
 	return -ENOSYS;
 
-}
-
-int drmModeReplaceFB(int fd, uint32_t buffer_id,
-		     uint32_t width, uint32_t height, uint8_t depth,
-		     uint8_t bpp, uint32_t pitch, uint32_t bo_handle)
-{
-	struct drm_mode_fb_cmd f;
-	int ret;
-
-	f.width = width;
-	f.height = height;
-	f.pitch = pitch;
-	f.bpp = bpp;
-	f.depth = depth;
-	f.handle = bo_handle;
-	f.fb_id = buffer_id;
-
-	if ((ret = ioctl(fd, DRM_IOCTL_MODE_REPLACEFB, &f)))
-		return ret;
-
-	return 0;
 }
 
 int drmModeCrtcGetGamma(int fd, uint32_t crtc_id, uint32_t size,
@@ -658,8 +639,8 @@ int drmModeCrtcGetGamma(int fd, uint32_t crtc_id, uint32_t size,
 	l.red = VOID2U64(red);
 	l.green = VOID2U64(green);
 	l.blue = VOID2U64(blue);
-	
-	if ((ret = ioctl(fd, DRM_IOCTL_MODE_GETGAMMA, &l)))
+
+	if ((ret = drmIoctl(fd, DRM_IOCTL_MODE_GETGAMMA, &l)))
 		return ret;
 
 	return 0;
@@ -676,8 +657,8 @@ int drmModeCrtcSetGamma(int fd, uint32_t crtc_id, uint32_t size,
 	l.red = VOID2U64(red);
 	l.green = VOID2U64(green);
 	l.blue = VOID2U64(blue);
-	
-	if ((ret = ioctl(fd, DRM_IOCTL_MODE_SETGAMMA, &l)))
+
+	if ((ret = drmIoctl(fd, DRM_IOCTL_MODE_SETGAMMA, &l)))
 		return ret;
 
 	return 0;

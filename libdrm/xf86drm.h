@@ -75,6 +75,7 @@ typedef struct drmHashEntry {
     void     *tagTable;
 } drmHashEntry;
 
+extern int drmIoctl(int fd, unsigned long request, void *arg);
 extern void *drmGetHashTable(void);
 extern drmHashEntry *drmGetEntry(int fd);
 

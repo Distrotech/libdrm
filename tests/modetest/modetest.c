@@ -4,6 +4,38 @@
  *   Jakob Bornecrantz <jakob@tungstengraphics.com>
  * Copyright 2008 Intel Corporation
  *   Jesse Barnes <jesse.barnes@intel.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
+/*
+ * This fairly simple test program dumps output in a similar format to the
+ * "xrandr" tool everyone knows & loves.  It's necessarily slightly different
+ * since the kernel separates outputs into encoder and connector structures,
+ * each with their own unique ID.  The program also allows test testing of the
+ * memory management and mode setting APIs by allowing the user to specify a
+ * connector and mode to use for mode setting.  If all works as expected, a
+ * blue background should be painted on the monitor attached to the specified
+ * connector after the selected mode is set.
+ *
+ * TODO: use cairo to write the mode info on the selected output once
+ *       the mode has been programmed, along with possible test patterns.
  */
 #include <assert.h>
 #include <stdio.h>
@@ -96,6 +128,22 @@ void dump_encoders(void)
 		       encoder->possible_clones);
 		drmModeFreeEncoder(encoder);
 	}
+	printf("\n");
+}
+
+void dump_mode(struct drm_mode_modeinfo *mode)
+{
+	printf("  %s %.02f %d %d %d %d %d %d %d %d\n",
+	       mode->name,
+	       (float)mode->vrefresh / 1000,
+	       mode->hdisplay,
+	       mode->hsync_start,
+	       mode->hsync_end,
+	       mode->htotal,
+	       mode->vdisplay,
+	       mode->vsync_start,
+	       mode->vsync_end,
+	       mode->vtotal);
 }
 
 void dump_connectors(void)
@@ -128,24 +176,12 @@ void dump_connectors(void)
 		printf("  modes:\n");
 		printf("  name refresh (Hz) hdisp hss hse htot vdisp "
 		       "vss vse vtot)\n");
-		for (j = 0; j < connector->count_modes; j++) {
-			struct drm_mode_modeinfo *mode;
+		for (j = 0; j < connector->count_modes; j++)
+			dump_mode(&connector->modes[j]);
 
-			mode = &connector->modes[j];
-			printf("  %s %.02f %d %d %d %d %d %d %d %d\n",
-			       mode->name,
-			       (float)mode->vrefresh / 1000,
-			       mode->hdisplay,
-			       mode->hsync_start,
-			       mode->hsync_end,
-			       mode->htotal,
-			       mode->vdisplay,
-			       mode->vsync_start,
-			       mode->vsync_end,
-			       mode->vtotal);
-		}
 		drmModeFreeConnector(connector);
 	}
+	printf("\n");
 }
 
 void dump_crtcs(void)
@@ -153,6 +189,8 @@ void dump_crtcs(void)
 	drmModeCrtc *crtc;
 	int i;
 
+	printf("CRTCs:\n");
+	printf("id\tfb\tpos\tsize\n");
 	for (i = 0; i < resources->count_crtcs; i++) {
 		crtc = drmModeGetCrtc(fd, resources->crtcs[i]);
 
@@ -161,8 +199,16 @@ void dump_crtcs(void)
 				resources->crtcs[i], strerror(errno));
 			continue;
 		}
+		printf("%d\t%d\t(%d,%d)\t(%dx%d)\n",
+		       crtc->crtc_id,
+		       crtc->buffer_id,
+		       crtc->x, crtc->y,
+		       crtc->width, crtc->height);
+		dump_mode(&crtc->mode);
+
 		drmModeFreeCrtc(crtc);
 	}
+	printf("\n");
 }
 
 void dump_framebuffers(void)
@@ -170,6 +216,8 @@ void dump_framebuffers(void)
 	drmModeFB *fb;
 	int i;
 
+	printf("Frame buffers:\n");
+	printf("id\tsize\tpitch\n");
 	for (i = 0; i < resources->count_fbs; i++) {
 		fb = drmModeGetFB(fd, resources->fbs[i]);
 
@@ -178,10 +226,22 @@ void dump_framebuffers(void)
 				resources->fbs[i], strerror(errno));
 			continue;
 		}
+		printf("%d\t(%dx%d)\t%d\n",
+		       fb->fb_id,
+		       fb->width, fb->height);
+
 		drmModeFreeFB(fb);
 	}
+	printf("\n");
 }
 
+/*
+ * Mode setting with the kernel interfaces is a bit of a chore.
+ * First you have to find the connector in question and make sure the
+ * requested mode is available.
+ * Then you need to find the encoder attached to that connector so you
+ * can bind it with a free crtc.
+ */
 void set_mode(int connector_id, char *mode_str)
 {
 	drmModeConnector *connector;
