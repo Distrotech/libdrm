@@ -51,7 +51,7 @@ struct cs_reloc_gem {
 
 struct cs_gem {
     struct radeon_cs            base;
-    struct drm_radeon_cs2       cs;
+    struct drm_radeon_cs        cs;
     struct drm_radeon_cs_chunk  chunks[2];
     unsigned                    nrelocs;
     uint32_t                    *relocs;
