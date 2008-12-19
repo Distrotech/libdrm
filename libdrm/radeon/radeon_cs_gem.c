@@ -242,8 +242,8 @@ static int cs_gem_emit(struct radeon_cs *cs)
     csg->cs.num_chunks = 2;
     csg->cs.chunks = (uint64_t)(intptr_t)chunk_array;
 
-    r = drmCommandWriteRead(cs->csm->fd, DRM_RADEON_CS2,
-                            &csg->cs, sizeof(struct drm_radeon_cs2));
+    r = drmCommandWriteRead(cs->csm->fd, DRM_RADEON_CS,
+                            &csg->cs, sizeof(struct drm_radeon_cs));
     for (i = 0; i < csg->base.crelocs; i++) {
         radeon_bo_unref(csg->relocs_bo[i]);
         csg->relocs_bo[i] = NULL;
