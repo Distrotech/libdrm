@@ -29,11 +29,11 @@
 #include "radeon_drv.h"
 #include "r300_reg.h"
 
-int radeon_cs2_ioctl(struct drm_device *dev, void *data, struct drm_file *fpriv)
+int radeon_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *fpriv)
 {
 	struct drm_radeon_cs_parser parser;
 	struct drm_radeon_private *dev_priv = dev->dev_private;
-	struct drm_radeon_cs2 *cs = data;
+	struct drm_radeon_cs *cs = data;
 	uint32_t cs_id;
 	struct drm_radeon_cs_chunk __user **chunk_ptr = NULL;
 	uint64_t *chunk_array;
@@ -98,11 +98,6 @@ int radeon_cs2_ioctl(struct drm_device *dev, void *data, struct drm_file *fpriv)
 		if (parser.chunks[i].chunk_id == RADEON_CHUNK_ID_IB)
 			parser.ib_index = i;
 
-		if (parser.chunks[i].chunk_id == RADEON_CHUNK_ID_OLD) {
-			parser.ib_index = i;
-			parser.reloc_index = -1;
-		}
-
 		parser.chunks[i].length_dw = user_chunk.length_dw;
 		parser.chunks[i].chunk_data = (uint32_t *)(unsigned long)user_chunk.chunk_data;
 
@@ -111,7 +106,6 @@ int radeon_cs2_ioctl(struct drm_device *dev, void *data, struct drm_file *fpriv)
 
 		switch(parser.chunks[i].chunk_id) {
 		case RADEON_CHUNK_ID_IB:
-		case RADEON_CHUNK_ID_OLD:
 			if (size == 0) {
 				r = -EINVAL;
 				goto out;
@@ -175,80 +169,6 @@ out:
 	drm_free(parser.chunks, sizeof(struct drm_radeon_kernel_chunk)*parser.num_chunks, DRM_MEM_DRIVER);
 	drm_free(chunk_array, sizeof(uint64_t)*parser.num_chunks, DRM_MEM_DRIVER);
 
-	return r;
-}
-
-int radeon_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *fpriv)
-{
-	struct drm_radeon_cs_parser parser;
-	struct drm_radeon_private *dev_priv = dev->dev_private;
-	struct drm_radeon_cs *cs = data;
-	uint32_t *packets = NULL;
-	uint32_t cs_id;
-	long size;
-	int r;
-	struct drm_radeon_kernel_chunk chunk_fake[1];
-
-	/* set command stream id to 0 which is fake id */
-	cs_id = 0;
-	cs->cs_id = cs_id;
-
-	if (dev_priv == NULL) {
-		DRM_ERROR("called with no initialization\n");
-		return -EINVAL;
-	}
-	if (!cs->dwords) {
-		return 0;
-	}
-	/* limit cs to 64K ib */
-	if (cs->dwords > (16 * 1024)) {
-		return -EINVAL;
-	}
-	/* copy cs from userspace maybe we should copy into ib to save
-	 * one copy but ib will be mapped wc so not good for cmd checking
-	 * somethings worth testing i guess (Jerome)
-	 */
-	size = cs->dwords * sizeof(uint32_t);
-	packets = drm_alloc(size, DRM_MEM_DRIVER);
-	if (packets == NULL) {
-		return -ENOMEM;
-	}
-	if (DRM_COPY_FROM_USER(packets, (void __user *)(unsigned long)cs->packets, size)) {
-		r = -EFAULT;
-		goto out;
-	}
-
-	chunk_fake[0].chunk_id = RADEON_CHUNK_ID_OLD;
-	chunk_fake[0].length_dw = cs->dwords;
-	chunk_fake[0].kdata = packets;
-
-	parser.dev = dev;
-	parser.file_priv = fpriv;
-	parser.num_chunks = 1;
-	parser.chunks = chunk_fake;
-	parser.ib_index = 0;
-	parser.reloc_index = -1;
-
-	/* get ib */
-	r = dev_priv->cs.ib_get(&parser);
-	if (r) {
-		goto out;
-	}
-
-	/* now parse command stream */
-	r = dev_priv->cs.parse(&parser);
-	if (r) {
-		goto out;
-	}
-
-	/* emit cs id sequence */
-	dev_priv->cs.id_emit(&parser, &cs_id);
-	COMMIT_RING();
-
-	cs->cs_id = cs_id;
-out:
-	dev_priv->cs.ib_free(&parser);
-	drm_free(packets, size, DRM_MEM_DRIVER);
 	return r;
 }
 

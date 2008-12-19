@@ -37,8 +37,6 @@
 
 struct radeon_cs_reloc {
     struct radeon_bo    *bo;
-    uint32_t            start_offset;
-    uint32_t            end_offset;
     uint32_t            read_domain;
     uint32_t            write_domain;
     uint32_t            flags;
@@ -69,8 +67,6 @@ struct radeon_cs_funcs {
     int (*cs_write_dword)(struct radeon_cs *cs, uint32_t dword);
     int (*cs_write_reloc)(struct radeon_cs *cs,
                           struct radeon_bo *bo,
-                          uint32_t start_offset,
-                          uint32_t end_offset,
                           uint32_t read_domain,
                           uint32_t write_domain,
                           uint32_t flags);
@@ -108,16 +104,12 @@ static inline int radeon_cs_write_dword(struct radeon_cs *cs, uint32_t dword)
 
 static inline int radeon_cs_write_reloc(struct radeon_cs *cs,
                                         struct radeon_bo *bo,
-                                        uint32_t start_offset,
-                                        uint32_t end_offset,
                                         uint32_t read_domain,
                                         uint32_t write_domain,
                                         uint32_t flags)
 {
     return cs->csm->funcs->cs_write_reloc(cs,
                                           bo,
-                                          start_offset,
-                                          end_offset,
                                           read_domain,
                                           write_domain,
                                           flags);

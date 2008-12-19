@@ -513,8 +513,7 @@ typedef struct {
 #define DRM_RADEON_GEM_SET_DOMAIN 0x23
 #define DRM_RADEON_GEM_WAIT_RENDERING 0x24
 
-#define DRM_RADEON_CS           0x25
-#define DRM_RADEON_CS2       0x26
+#define DRM_RADEON_CS       0x26
 
 #define DRM_IOCTL_RADEON_CP_INIT    DRM_IOW( DRM_COMMAND_BASE + DRM_RADEON_CP_INIT, drm_radeon_init_t)
 #define DRM_IOCTL_RADEON_CP_START   DRM_IO(  DRM_COMMAND_BASE + DRM_RADEON_CP_START)
@@ -554,8 +553,6 @@ typedef struct {
 #define DRM_IOCTL_RADEON_GEM_SET_DOMAIN  DRM_IOWR(DRM_COMMAND_BASE + DRM_RADEON_GEM_SET_DOMAIN, struct drm_radeon_gem_set_domain)
 #define DRM_IOCTL_RADEON_GEM_WAIT_RENDERING DRM_IOW(DRM_COMMAND_BASE + DRM_RADEON_GEM_WAIT_RENDERING, struct drm_radeon_gem_wait_rendering) 
 #define DRM_IOCTL_RADEON_CS DRM_IOWR(DRM_COMMAND_BASE + DRM_RADEON_CS, struct drm_radeon_cs)
-#define DRM_IOCTL_RADEON_CS2 DRM_IOWR(DRM_COMMAND_BASE + DRM_RADEON_CS2, struct drm_radeon_cs2)
-
 
 typedef struct drm_radeon_init {
 	enum {
@@ -870,16 +867,8 @@ struct drm_radeon_gem_pwrite {
 /* New interface which obsolete all previous interface.
  */
 
-
-struct drm_radeon_cs {
-	uint32_t            dwords;
-	uint32_t            cs_id;
-	uint64_t            packets;
-};
-
 #define RADEON_CHUNK_ID_RELOCS 0x01
 #define RADEON_CHUNK_ID_IB     0x02
-#define RADEON_CHUNK_ID_OLD 0xff
 
 struct drm_radeon_cs_chunk {
 	uint32_t chunk_id;
@@ -887,7 +876,7 @@ struct drm_radeon_cs_chunk {
 	uint64_t chunk_data;
 };
 
-struct drm_radeon_cs2 {
+struct drm_radeon_cs {
 	uint32_t	num_chunks;
 	uint32_t        cs_id;
 	uint64_t	chunks; /* this points to uint64_t * which point to

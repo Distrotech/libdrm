@@ -1739,7 +1739,6 @@ extern int radeon_master_create(struct drm_device *dev, struct drm_master *maste
 extern void radeon_master_destroy(struct drm_device *dev, struct drm_master *master);
 extern void radeon_cp_dispatch_flip(struct drm_device * dev, struct drm_master *master);
 extern int radeon_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *fpriv);
-extern int radeon_cs2_ioctl(struct drm_device *dev, void *data, struct drm_file *fpriv);
 extern int radeon_cs_init(struct drm_device *dev);
 void radeon_gem_update_offsets(struct drm_device *dev, struct drm_master *master);
 void radeon_init_memory_map(struct drm_device *dev);

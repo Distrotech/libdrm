@@ -43,8 +43,6 @@
 #pragma pack(1)
 struct cs_reloc_gem {
     uint32_t    handle;
-    uint32_t    start_offset;
-    uint32_t    end_offset;
     uint32_t    read_domain;
     uint32_t    write_domain;
     uint32_t    flags;
@@ -127,8 +125,6 @@ static int cs_gem_write_dword(struct radeon_cs *cs, uint32_t dword)
 
 static int cs_gem_write_reloc(struct radeon_cs *cs,
                               struct radeon_bo *bo,
-                              uint32_t start_offset,
-                              uint32_t end_offset,
                               uint32_t read_domain,
                               uint32_t write_domain,
                               uint32_t flags)
@@ -151,13 +147,6 @@ static int cs_gem_write_reloc(struct radeon_cs *cs,
     if (write_domain == RADEON_GEM_DOMAIN_CPU) {
         return -EINVAL;
     }
-    /* check reloc window */
-    if (end_offset > bo->size) {
-        return -EINVAL;
-    }
-    if (start_offset > end_offset) {
-        return -EINVAL;
-    }
     /* check if bo is already referenced */
     for(i = 0; i < cs->crelocs; i++) {
         idx = i * 6;
@@ -177,13 +166,6 @@ static int cs_gem_write_reloc(struct radeon_cs *cs,
             }
             reloc->read_domain |= read_domain;
             reloc->write_domain |= write_domain;
-            /* update start and end offset */
-            if (start_offset < reloc->start_offset) {
-                reloc->start_offset = start_offset;
-            }
-            if (end_offset > reloc->end_offset) {
-                reloc->end_offset = end_offset;
-            }
             /* update flags */
             reloc->flags |= (flags & reloc->flags);
             /* write relocation packet */
@@ -215,8 +197,6 @@ static int cs_gem_write_reloc(struct radeon_cs *cs,
     idx = (csg->base.crelocs++) * 6;
     reloc = (struct cs_reloc_gem*)&csg->relocs[idx];
     reloc->handle = bo->handle;
-    reloc->start_offset = start_offset;
-    reloc->end_offset = end_offset;
     reloc->read_domain = read_domain;
     reloc->write_domain = write_domain;
     reloc->flags = flags;
