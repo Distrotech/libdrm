@@ -47,7 +47,9 @@ struct cs_reloc_gem {
     uint32_t    write_domain;
     uint32_t    flags;
 };
+
 #pragma pack()
+#define RELOC_SIZE (sizeof(struct cs_reloc_gem) / sizeof(uint32_t))
 
 struct cs_gem {
     struct radeon_cs            base;
@@ -149,7 +151,7 @@ static int cs_gem_write_reloc(struct radeon_cs *cs,
     }
     /* check if bo is already referenced */
     for(i = 0; i < cs->crelocs; i++) {
-        idx = i * 6;
+        idx = i * RELOC_SIZE;
         reloc = (struct cs_reloc_gem*)&csg->relocs[idx];
         if (reloc->handle == bo->handle) {
             /* Check domains must be in read or write. As we check already
@@ -184,7 +186,7 @@ static int cs_gem_write_reloc(struct radeon_cs *cs,
             return -ENOMEM;
         }
         csg->relocs_bo = (struct radeon_bo**)tmp;
-        size = ((csg->nrelocs + 1) * 6 * 4);
+        size = ((csg->nrelocs + 1) * RELOC_SIZE * 4);
         tmp = (uint32_t*)realloc(csg->relocs, size);
         if (tmp == NULL) {
             return -ENOMEM;
@@ -194,13 +196,13 @@ static int cs_gem_write_reloc(struct radeon_cs *cs,
         csg->chunks[1].chunk_data = (uint64_t)(intptr_t)csg->relocs;
     }
     csg->relocs_bo[csg->base.crelocs] = bo;
-    idx = (csg->base.crelocs++) * 6;
+    idx = (csg->base.crelocs++) * RELOC_SIZE;
     reloc = (struct cs_reloc_gem*)&csg->relocs[idx];
     reloc->handle = bo->handle;
     reloc->read_domain = read_domain;
     reloc->write_domain = write_domain;
     reloc->flags = flags;
-    csg->chunks[1].length_dw += 6;
+    csg->chunks[1].length_dw += RELOC_SIZE;
     radeon_bo_ref(bo);
     cs->relocs_total_size += bo->size;
     cs_gem_write_dword(cs, 0xc0001000);
