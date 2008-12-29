@@ -3261,7 +3261,7 @@ struct drm_ioctl_desc radeon_ioctls[] = {
 	DRM_IOCTL_DEF(DRM_RADEON_INDICES, radeon_cp_indices, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_RADEON_TEXTURE, radeon_cp_texture, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_RADEON_STIPPLE, radeon_cp_stipple, DRM_AUTH),
-	DRM_IOCTL_DEF(DRM_RADEON_INDIRECT, radeon_cp_indirect, DRM_AUTH|DRM_MASTER|DRM_ROOT_ONLY),
+	DRM_IOCTL_DEF(DRM_RADEON_INDIRECT, radeon_cp_indirect, DRM_AUTH|DRM_ROOT_ONLY),
 	DRM_IOCTL_DEF(DRM_RADEON_VERTEX2, radeon_cp_vertex2, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_RADEON_CMDBUF, radeon_cp_cmdbuf, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_RADEON_GETPARAM, radeon_cp_getparam, DRM_AUTH),
