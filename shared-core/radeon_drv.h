@@ -135,6 +135,16 @@ enum radeon_family {
 	CHIP_RV560,
 	CHIP_RV570,
 	CHIP_R580,
+	CHIP_R600,
+	CHIP_RV610,
+	CHIP_RV630,
+	CHIP_RV620,
+	CHIP_RV635,
+	CHIP_RV670,
+	CHIP_RS780,
+	CHIP_RV770,
+	CHIP_RV730,
+	CHIP_RV710,
 	CHIP_LAST,
 };
 
@@ -158,6 +168,9 @@ enum radeon_chip_flags {
 #define GET_RING_HEAD(dev_priv)	(dev_priv->writeback_works ? \
         DRM_READ32(  (dev_priv)->ring_rptr, 0 ) : RADEON_READ(RADEON_CP_RB_RPTR))
 #define SET_RING_HEAD(dev_priv,val)	DRM_WRITE32( (dev_priv)->ring_rptr, 0, (val) )
+
+#define R600_GET_RING_HEAD(dev_priv)	(dev_priv->writeback_works ? \
+        DRM_READ32(  (dev_priv)->ring_rptr, 0 ) : RADEON_READ(R600_CP_RB_RPTR))
 
 typedef struct drm_radeon_freelist {
 	unsigned int age;
@@ -316,6 +329,26 @@ typedef struct drm_radeon_private {
 	int num_gb_pipes;
 	int track_flush;
 	uint32_t chip_family; /* extract from flags */
+
+ 	/* r6xx/r7xx pipe/shader config */
+ 	int r600_max_pipes;
+ 	int r600_max_tile_pipes;
+ 	int r600_max_simds;
+ 	int r600_max_backends;
+ 	int r600_max_gprs;
+ 	int r600_max_threads;
+ 	int r600_max_stack_entries;
+ 	int r600_max_hw_contexts;
+ 	int r600_max_gs_threads;
+ 	int r600_sx_max_export_size;
+ 	int r600_sx_max_export_pos_size;
+ 	int r600_sx_max_export_smx_size;
+ 	int r600_sq_num_cf_insts;
+ 	int r700_sx_num_of_sets;
+ 	int r700_sc_prim_fifo_size;
+ 	int r700_sc_hiz_tile_fifo_size;
+ 	int r700_sc_earlyz_tile_fifo_fize;
+
 } drm_radeon_private_t;
 
 typedef struct drm_radeon_buf_priv {
@@ -359,6 +392,7 @@ extern int radeon_engine_reset(struct drm_device *dev, void *data, struct drm_fi
 extern int radeon_fullscreen(struct drm_device *dev, void *data, struct drm_file *file_priv);
 extern int radeon_cp_buffers(struct drm_device *dev, void *data, struct drm_file *file_priv);
 extern u32 radeon_read_fb_location(drm_radeon_private_t *dev_priv);
+extern u32 RADEON_READ_MM(drm_radeon_private_t *dev_priv, int addr);
 
 extern void radeon_freelist_reset(struct drm_device * dev);
 extern struct drm_buf *radeon_freelist_get(struct drm_device * dev);
@@ -403,6 +437,8 @@ extern int radeon_driver_open(struct drm_device * dev,
 extern long radeon_compat_ioctl(struct file *filp, unsigned int cmd,
 					 unsigned long arg);
 
+void radeon_write_agp_location(drm_radeon_private_t *dev_priv, u32 agp_loc);
+void radeon_write_fb_location(drm_radeon_private_t *dev_priv, u32 fb_loc);
 /* r300_cmdbuf.c */
 extern void r300_init_reg_flags(struct drm_device *dev);
 
@@ -410,6 +446,12 @@ extern int r300_do_cp_cmdbuf(struct drm_device *dev,
 			     struct drm_file *file_priv,
 			     drm_radeon_kcmd_buffer_t *cmdbuf);
 
+/* r600 cp */
+int r600_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init);
+int r600_do_resume_cp(struct drm_device * dev);
+void r600_do_cp_start(drm_radeon_private_t * dev_priv);
+int r600_cp_indirect(struct drm_device *dev, struct drm_buf *buf, drm_radeon_indirect_t *indirect);
+void r600_do_cp_stop(drm_radeon_private_t * dev_priv);
 /* Flags for stats.boxes
  */
 #define RADEON_BOX_DMA_IDLE      0x1
@@ -421,6 +463,9 @@ extern int r300_do_cp_cmdbuf(struct drm_device *dev,
 /* Register definitions, register access macros and drmAddMap constants
  * for Radeon kernel driver.
  */
+#define RADEON_MM_INDEX		        0x0000
+#define RADEON_MM_DATA		        0x0004
+
 #define RADEON_AGP_COMMAND		0x0f60
 #define RADEON_AGP_COMMAND_PCI_CONFIG	0x0060	/* offset in PCI config */
 #       define RADEON_AGP_ENABLE            (1<<8)
@@ -623,11 +668,28 @@ extern int r300_do_cp_cmdbuf(struct drm_device *dev,
 #define RADEON_SCRATCH_UMSK		0x0770
 #define RADEON_SCRATCH_ADDR		0x0774
 
+#define R600_SCRATCH_REG0		0x8500
+#define R600_SCRATCH_REG1		0x8504
+#define R600_SCRATCH_REG2		0x8508
+#define R600_SCRATCH_REG3		0x850c
+#define R600_SCRATCH_REG4		0x8510
+#define R600_SCRATCH_REG5		0x8514
+#define R600_SCRATCH_REG6		0x8518
+#define R600_SCRATCH_REG7		0x851c
+#define R600_SCRATCH_UMSK		0x8540
+#define R600_SCRATCH_ADDR		0x8544
+
 #define RADEON_SCRATCHOFF( x )		(RADEON_SCRATCH_REG_OFFSET + 4*(x))
+
+#define R600_SCRATCHOFF( x )		(R600_SCRATCH_REG_OFFSET + 4*(x))
 
 #define GET_SCRATCH( x )	(dev_priv->writeback_works			\
 				? DRM_READ32( dev_priv->ring_rptr, RADEON_SCRATCHOFF(x) ) \
 				: RADEON_READ( RADEON_SCRATCH_REG0 + 4*(x) ) )
+
+#define GET_R600_SCRATCH( x )	(dev_priv->writeback_works			\
+				? DRM_READ32( dev_priv->ring_rptr, R600_SCRATCHOFF(x) ) \
+				: RADEON_READ( R600_SCRATCH_REG0 + 4*(x) ) )
 
 #define RADEON_CRTC_CRNT_FRAME 0x0214
 #define RADEON_CRTC2_CRNT_FRAME 0x0314
@@ -893,6 +955,7 @@ extern int r300_do_cp_cmdbuf(struct drm_device *dev,
 #define RADEON_SW_SEMAPHORE		0x013c
 
 #define RADEON_WAIT_UNTIL		0x1720
+#define R600_WAIT_UNTIL		        0x8040
 #	define RADEON_WAIT_CRTC_PFLIP		(1 << 0)
 #	define RADEON_WAIT_2D_IDLE		(1 << 14)
 #	define RADEON_WAIT_3D_IDLE		(1 << 15)
@@ -915,6 +978,7 @@ extern int r300_do_cp_cmdbuf(struct drm_device *dev,
 #define RADEON_CP_RB_CNTL		0x0704
 #	define RADEON_BUF_SWAP_32BIT		(2 << 16)
 #	define RADEON_RB_NO_UPDATE		(1 << 27)
+#	define RADEON_RB_RPTR_WR_ENA		(1 << 31)
 #define RADEON_CP_RB_RPTR_ADDR		0x070c
 #define RADEON_CP_RB_RPTR		0x0710
 #define RADEON_CP_RB_WPTR		0x0714
@@ -975,6 +1039,10 @@ extern int r300_do_cp_cmdbuf(struct drm_device *dev,
 #	define RADEON_CNTL_PAINT_MULTI		0x00009A00
 #	define RADEON_CNTL_BITBLT_MULTI		0x00009B00
 #	define RADEON_CNTL_SET_SCISSORS		0xC0001E00
+
+#	define R600_IT_INDIRECT_BUFFER		0x00003200
+#	define R600_IT_ME_INITIALIZE		0x00004400
+#              define R600_ME_INITIALIZE_DEVICE_ID(x) ((x) << 16)
 
 #define RADEON_CP_PACKET_MASK		0xC0000000
 #define RADEON_CP_PACKET_COUNT_MASK	0x3fff0000
@@ -1199,6 +1267,47 @@ extern int r300_do_cp_cmdbuf(struct drm_device *dev,
 #define R500_D1_VBLANK_INTERRUPT (1 << 4)
 #define R500_D2_VBLANK_INTERRUPT (1 << 5)
 
+#define R600_BUS_CNTL 0x5420
+#define R600_BUS_MASTER_DIS (1 << 4)
+
+#define R600_MC_VM_FB_LOCATION                                     0x2180
+#define R600_MC_VM_AGP_TOP                                         0x2184
+#define R600_MC_VM_AGP_BOT                                         0x2188
+#define R600_MC_VM_AGP_BASE                                        0x218c
+#define R600_MC_VM_SYSTEM_APERTURE_LOW_ADDR                        0x2190
+#define R600_MC_VM_SYSTEM_APERTURE_HIGH_ADDR                       0x2194
+#define R600_MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR                    0x2198
+
+#define R700_MC_VM_FB_LOCATION                                     0x2024
+#define R700_MC_VM_AGP_TOP                                         0x2028
+#define R700_MC_VM_AGP_BOT                                         0x202c
+#define R700_MC_VM_AGP_BASE                                        0x2030
+#define R700_MC_VM_SYSTEM_APERTURE_LOW_ADDR                        0x2034
+#define R700_MC_VM_SYSTEM_APERTURE_HIGH_ADDR                       0x2038
+#define R700_MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR                    0x203c
+
+#define R600_CP_RB_BASE                                            0xc100
+#define R600_CP_RB_CNTL                                            0xc104
+#       define R600_RB_NO_UPDATE                                   (1 << 27)
+#       define R600_RB_RPTR_WR_ENA                                 (1 << 31)
+#define R600_CP_RB_RPTR_WR                                         0xc108
+#define R600_CP_RB_RPTR_ADDR                                       0xc10c
+#define R600_CP_RB_RPTR_ADDR_HI                                    0xc110
+#define R600_CP_RB_WPTR                                            0xc114
+#define R600_CP_RB_WPTR_ADDR                                       0xc118
+#define R600_CP_RB_WPTR_ADDR_HI                                    0xc11c
+
+#define R600_CP_RB_RPTR                                            0x8700
+#define R600_CP_RB_WPTR_DELAY                                      0x8704
+
+#define R600_CP_PFP_UCODE_ADDR                                     0xc150
+#define R600_CP_PFP_UCODE_DATA                                     0xc154
+#define R600_CP_ME_RAM_RADDR                                       0xc158
+#define R600_CP_ME_RAM_WADDR                                       0xc15c
+#define R600_CP_ME_RAM_DATA                                        0xc160
+
+
+
 /* Constants */
 #define RADEON_MAX_USEC_TIMEOUT		100000	/* 100 ms */
 
@@ -1208,6 +1317,12 @@ extern int r300_do_cp_cmdbuf(struct drm_device *dev,
 #define RADEON_LAST_SWI_REG		RADEON_SCRATCH_REG3
 #define RADEON_LAST_DISPATCH		1
 
+
+#define R600_LAST_FRAME_REG		R600_SCRATCH_REG0
+#define R600_LAST_DISPATCH_REG	        R600_SCRATCH_REG1
+#define R600_LAST_CLEAR_REG		R600_SCRATCH_REG2
+#define R600_LAST_SWI_REG		R600_SCRATCH_REG3
+
 #define RADEON_MAX_VB_AGE		0x7fffffff
 #define RADEON_MAX_VB_VERTS		(0xffff)
 
@@ -1215,8 +1330,16 @@ extern int r300_do_cp_cmdbuf(struct drm_device *dev,
 
 #define RADEON_PCIGART_TABLE_SIZE      (32*1024)
 
-#define RADEON_READ(reg)    DRM_READ32(  dev_priv->mmio, (reg) )
-#define RADEON_WRITE(reg,val)  DRM_WRITE32( dev_priv->mmio, (reg), (val) )
+#define RADEON_READ(reg)        RADEON_READ_MM(dev_priv, reg)
+#define RADEON_WRITE(reg,val)                                           \
+do {									\
+	if (reg < 0x10000) {				                \
+		DRM_WRITE32( dev_priv->mmio, (reg), (val) );            \
+	} else {                                                        \
+		DRM_WRITE32( dev_priv->mmio, RADEON_MM_INDEX, (reg) );  \
+		DRM_WRITE32( dev_priv->mmio, RADEON_MM_DATA, (val) );   \
+	}                                                               \
+} while (0)
 #define RADEON_READ8(reg)	DRM_READ8(  dev_priv->mmio, (reg) )
 #define RADEON_WRITE8(reg,val)	DRM_WRITE8( dev_priv->mmio, (reg), (val) )
 
@@ -1281,26 +1404,38 @@ do {									\
  */
 
 #define RADEON_WAIT_UNTIL_2D_IDLE() do {				\
-	OUT_RING( CP_PACKET0( RADEON_WAIT_UNTIL, 0 ) );			\
+        if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600)        \
+	        OUT_RING( CP_PACKET0( R600_WAIT_UNTIL, 0 ) );		\
+        else                                                            \
+	        OUT_RING( CP_PACKET0( RADEON_WAIT_UNTIL, 0 ) );		\
 	OUT_RING( (RADEON_WAIT_2D_IDLECLEAN |				\
 		   RADEON_WAIT_HOST_IDLECLEAN) );			\
 } while (0)
 
 #define RADEON_WAIT_UNTIL_3D_IDLE() do {				\
-	OUT_RING( CP_PACKET0( RADEON_WAIT_UNTIL, 0 ) );			\
+        if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600)        \
+	        OUT_RING( CP_PACKET0( R600_WAIT_UNTIL, 0 ) );		\
+        else                                                            \
+	        OUT_RING( CP_PACKET0( RADEON_WAIT_UNTIL, 0 ) );		\
 	OUT_RING( (RADEON_WAIT_3D_IDLECLEAN |				\
 		   RADEON_WAIT_HOST_IDLECLEAN) );			\
 } while (0)
 
 #define RADEON_WAIT_UNTIL_IDLE() do {					\
-	OUT_RING( CP_PACKET0( RADEON_WAIT_UNTIL, 0 ) );			\
+        if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600)        \
+	        OUT_RING( CP_PACKET0( R600_WAIT_UNTIL, 0 ) );		\
+        else                                                            \
+	        OUT_RING( CP_PACKET0( RADEON_WAIT_UNTIL, 0 ) );		\
 	OUT_RING( (RADEON_WAIT_2D_IDLECLEAN |				\
 		   RADEON_WAIT_3D_IDLECLEAN |				\
 		   RADEON_WAIT_HOST_IDLECLEAN) );			\
 } while (0)
 
 #define RADEON_WAIT_UNTIL_PAGE_FLIPPED() do {				\
-	OUT_RING( CP_PACKET0( RADEON_WAIT_UNTIL, 0 ) );			\
+        if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600)        \
+	        OUT_RING( CP_PACKET0( R600_WAIT_UNTIL, 0 ) );		\
+        else                                                            \
+	        OUT_RING( CP_PACKET0( RADEON_WAIT_UNTIL, 0 ) );		\
 	OUT_RING( RADEON_WAIT_CRTC_PFLIP );				\
 } while (0)
 
@@ -1375,6 +1510,13 @@ do {									\
 	OUT_RING( age );						\
 } while (0)
 
+
+#define R600_DISPATCH_AGE( age ) do {					\
+	OUT_RING( CP_PACKET0( R600_LAST_DISPATCH_REG, 0 ) );		\
+	OUT_RING( age );						\
+} while (0)
+
+
 #define RADEON_FRAME_AGE( age ) do {					\
 	OUT_RING( CP_PACKET0( RADEON_LAST_FRAME_REG, 0 ) );		\
 	OUT_RING( age );						\
@@ -1421,13 +1563,28 @@ do {									\
 		dev_priv->ring.tail = write;				\
 } while (0)
 
-#define COMMIT_RING() do {						\
+#define R600_COMMIT_RING() do {			\
+		DRM_MEMORYBARRIER();		\
+		R600_GET_RING_HEAD( dev_priv ); \
+		RADEON_WRITE( R600_CP_RB_WPTR, dev_priv->ring.tail ); \
+		RADEON_READ( R600_CP_RB_RPTR); \
+} while (0)
+
+#define RADEON_COMMIT_RING() do {					\
 	/* Flush writes to ring */					\
 	DRM_MEMORYBARRIER();						\
 	GET_RING_HEAD( dev_priv );					\
-	RADEON_WRITE( RADEON_CP_RB_WPTR, dev_priv->ring.tail );		\
-	/* read from PCI bus to ensure correct posting */		\
-	RADEON_READ( RADEON_CP_RB_RPTR );				\
+	RADEON_WRITE( RADEON_CP_RB_WPTR, dev_priv->ring.tail );	        \
+	/* read from PCI bus to ensure correct posting */	        \
+	RADEON_READ( RADEON_CP_RB_RPTR );			        \
+} while (0)
+
+#define COMMIT_RING() do {						\
+        if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600) {      \
+	        R600_COMMIT_RING();                             	\
+        } else {                                                        \
+	        RADEON_COMMIT_RING();			                \
+        }                                                               \
 } while (0)
 
 #define OUT_RING( x ) do {						\

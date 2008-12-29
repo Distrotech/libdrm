@@ -2482,6 +2482,10 @@ static int radeon_cp_indirect(struct drm_device *dev, void *data, struct drm_fil
 		return -EINVAL;
 	}
 
+	if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600) {
+		return r600_cp_indirect(dev, buf, indirect);
+	}
+
 	RING_SPACE_TEST_WITH_RETURN(dev_priv);
 	VB_AGE_TEST_WITH_RETURN(dev_priv);
 
@@ -3038,14 +3042,23 @@ static int radeon_cp_getparam(struct drm_device *dev, void *data, struct drm_fil
 		break;
 	case RADEON_PARAM_LAST_FRAME:
 		dev_priv->stats.last_frame_reads++;
-		value = GET_SCRATCH(0);
+		if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600)
+			value = GET_R600_SCRATCH(0);
+		else
+			value = GET_SCRATCH(0);
 		break;
 	case RADEON_PARAM_LAST_DISPATCH:
-		value = GET_SCRATCH(1);
+		if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600)
+			value = GET_R600_SCRATCH(1);
+		else
+			value = GET_SCRATCH(1);
 		break;
 	case RADEON_PARAM_LAST_CLEAR:
 		dev_priv->stats.last_clear_reads++;
-		value = GET_SCRATCH(2);
+		if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600)
+			value = GET_R600_SCRATCH(2);
+		else
+			value = GET_SCRATCH(2);
 		break;
 	case RADEON_PARAM_IRQ_NR:
 		value = dev->irq;
@@ -3080,7 +3093,10 @@ static int radeon_cp_getparam(struct drm_device *dev, void *data, struct drm_fil
 	case RADEON_PARAM_SCRATCH_OFFSET:
 		if (!dev_priv->writeback_works)
 			return -EINVAL;
-		value = RADEON_SCRATCH_REG_OFFSET;
+		if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600)
+			value = R600_SCRATCH_REG_OFFSET;
+		else
+			value = RADEON_SCRATCH_REG_OFFSET;
 		break;
 
 	case RADEON_PARAM_CARD_TYPE:
