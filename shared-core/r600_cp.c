@@ -2496,7 +2496,7 @@ int r600_cp_indirect(struct drm_device *dev, struct drm_buf *buf, drm_radeon_ind
 		BEGIN_RING(16);
 		OUT_RING(CP_PACKET3(R600_IT_INDIRECT_BUFFER, 2));
 		OUT_RING((offset & 0xfffffffc));
-		OUT_RING(((offset >> 32) & 0xff));
+		OUT_RING((upper_32_bits(offset) & 0xff));
 		OUT_RING(dwords);
 		OUT_RING(RADEON_CP_PACKET2);
 		OUT_RING(RADEON_CP_PACKET2);
