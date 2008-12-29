@@ -581,7 +581,7 @@ static void r600_vm_init(struct drm_device *dev)
 }
 
 /* load r600 microcode */
-void r600_cp_load_microcode(drm_radeon_private_t * dev_priv)
+static void r600_cp_load_microcode(drm_radeon_private_t * dev_priv)
 {
 	int i;
 
@@ -788,7 +788,7 @@ static void r700_vm_init(struct drm_device *dev)
 }
 
 /* load r600 microcode */
-void r700_cp_load_microcode(drm_radeon_private_t * dev_priv)
+static void r700_cp_load_microcode(drm_radeon_private_t * dev_priv)
 {
 	int i;
 
@@ -1937,10 +1937,10 @@ static void r700_gfx_init(struct drm_device * dev,
 
 }
 
-void r600_cp_init_ring_buffer(struct drm_device * dev,
+static void r600_cp_init_ring_buffer(struct drm_device * dev,
 			      drm_radeon_private_t * dev_priv)
 {
-	u32 ring_start, cur_read_ptr;
+	u32 ring_start, __unused cur_read_ptr;
 	u32 tmp;
 
 	if (((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_RV770))
@@ -2370,15 +2370,17 @@ int r600_do_resume_cp(struct drm_device * dev)
 	return 0;
 }
 
+#if 0 /* Currently unused, avoid warnings */
 /* Wait for the CP to go idle.
  */
-int r600_do_cp_idle(drm_radeon_private_t * dev_priv)
+static int r600_do_cp_idle(drm_radeon_private_t * dev_priv)
 {
 	RING_LOCALS;
 	DRM_DEBUG("\n");
 
 	return 0;
 }
+#endif
 
 /* Start the Command Processor.
  */
@@ -2422,9 +2424,9 @@ void r600_do_cp_start(drm_radeon_private_t * dev_priv)
 
 void r600_do_cp_stop(drm_radeon_private_t * dev_priv)
 {
-	RING_LOCALS;
-	DRM_DEBUG("\n");
 	uint32_t cp_me;
+
+	DRM_DEBUG("\n");
 
 	cp_me = 0xff | R600_CP_ME_HALT;
 
