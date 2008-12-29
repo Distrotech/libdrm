@@ -1588,7 +1588,7 @@ static void r700_gfx_init(struct drm_device * dev,
 	u32 smx_dc_ctl0;
 	u32 num_gs_verts_per_thread;
         u32 vgt_gs_per_es;
-	u32 gs_prim_buffer_depth;
+	u32 gs_prim_buffer_depth = 0;
 	u32 sq_ms_fifo_sizes;
 	u32 sq_config;
 	u32 sq_thread_resource_mgmt;
