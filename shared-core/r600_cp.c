@@ -511,7 +511,7 @@ static void r600_vm_flush_gart_range(struct drm_device *dev)
 	do {
 		resp = RADEON_READ(R600_VM_CONTEXT0_REQUEST_RESPONSE);
 		countdown--;
-		udelay(1);
+		DRM_UDELAY(1);
 	} while (((resp & 0xf0) == 0) && countdown );
 }
 
@@ -595,7 +595,7 @@ void r600_cp_load_microcode(drm_radeon_private_t * dev_priv)
 
 	RADEON_WRITE(R600_GRBM_SOFT_RESET, R600_SOFT_RESET_CP);
 	RADEON_READ(R600_GRBM_SOFT_RESET);
-	udelay(15000);
+	DRM_UDELAY(15000);
 	RADEON_WRITE(R600_GRBM_SOFT_RESET, 0);
 
 
@@ -801,7 +801,7 @@ void r700_cp_load_microcode(drm_radeon_private_t * dev_priv)
 
 	RADEON_WRITE(R600_GRBM_SOFT_RESET, R600_SOFT_RESET_CP);
 	RADEON_READ(R600_GRBM_SOFT_RESET);
-	udelay(15000);
+	DRM_UDELAY(15000);
 	RADEON_WRITE(R600_GRBM_SOFT_RESET, 0);
 
 
@@ -922,7 +922,7 @@ static void r600_engine_reset(struct drm_device * dev,
 
     RADEON_WRITE(R600_GRBM_SOFT_RESET, 0x7fff);
     RADEON_READ(R600_GRBM_SOFT_RESET);
-    udelay(50);
+    DRM_UDELAY(50);
     RADEON_WRITE(R600_GRBM_SOFT_RESET, 0);
     RADEON_READ(R600_GRBM_SOFT_RESET);
 
@@ -1950,7 +1950,7 @@ void r600_cp_init_ring_buffer(struct drm_device * dev,
 
 	RADEON_WRITE(R600_GRBM_SOFT_RESET, R600_SOFT_RESET_CP);
 	RADEON_READ(R600_GRBM_SOFT_RESET);
-	udelay(15000);
+	DRM_UDELAY(15000);
 	RADEON_WRITE(R600_GRBM_SOFT_RESET, 0);
 
 
