@@ -1940,7 +1940,8 @@ static void r700_gfx_init(struct drm_device * dev,
 static void r600_cp_init_ring_buffer(struct drm_device * dev,
 			      drm_radeon_private_t * dev_priv)
 {
-	u32 ring_start, __unused cur_read_ptr;
+	u32 ring_start;
+	/*u32 cur_read_ptr;*/
 	u32 tmp;
 
 	if (((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_RV770))
@@ -2386,9 +2387,9 @@ static int r600_do_cp_idle(drm_radeon_private_t * dev_priv)
  */
 void r600_do_cp_start(drm_radeon_private_t * dev_priv)
 {
+	u32 cp_me;
 	RING_LOCALS;
 	DRM_DEBUG("\n");
-	uint32_t cp_me;
 
 	BEGIN_RING(16);
 	OUT_RING(CP_PACKET3(R600_IT_ME_INITIALIZE, 5));
@@ -2466,8 +2467,8 @@ do {									\
 int r600_cp_indirect(struct drm_device *dev, struct drm_buf *buf, drm_radeon_indirect_t *indirect)
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
-	RING_LOCALS;
 	int start = indirect->start, end = indirect->end;
+	RING_LOCALS;
 
 	RING_SPACE_TEST_WITH_RETURN(dev_priv);
 	R600_VB_AGE_TEST_WITH_RETURN(dev_priv);
