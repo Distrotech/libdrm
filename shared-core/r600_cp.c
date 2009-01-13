@@ -2297,11 +2297,14 @@ int r600_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init)
 					 - (unsigned long)dev->sg->virtual
 					 + dev_priv->gart_vm_start);
 
-	DRM_DEBUG("fb 0x%08x size %d\n", dev_priv->fb_location, dev_priv->fb_size);
+	DRM_DEBUG("fb 0x%08x size %d\n",
+	          (unsigned int) dev_priv->fb_location,
+	          (unsigned int) dev_priv->fb_size);
 	DRM_DEBUG("dev_priv->gart_size %d\n", dev_priv->gart_size);
-	DRM_DEBUG("dev_priv->gart_vm_start 0x%x\n", dev_priv->gart_vm_start);
-	DRM_DEBUG("dev_priv->gart_buffers_offset 0x%lx\n",
-		  dev_priv->gart_buffers_offset);
+	DRM_DEBUG("dev_priv->gart_vm_start 0x%08x\n",
+	          (unsigned int) dev_priv->gart_vm_start);
+	DRM_DEBUG("dev_priv->gart_buffers_offset 0x%08lx\n",
+	          dev_priv->gart_buffers_offset);
 
 	dev_priv->ring.start = (u32 *) dev_priv->cp_ring->handle;
 	dev_priv->ring.end = ((u32 *) dev_priv->cp_ring->handle
@@ -2321,8 +2324,13 @@ int r600_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init)
 
 	dev_priv->gart_info.table_mask = DMA_BIT_MASK(32);
 	/* if we have an offset set from userspace */
-	if (!dev_priv->pcigart_offset_set)
+	if (!dev_priv->pcigart_offset_set) {
 		DRM_ERROR("Need gart offset from userspace\n");
+		r600_do_cleanup_cp(dev);
+		return -EINVAL;
+	}
+
+	DRM_DEBUG("Using gart offset 0x%08lx\n", dev_priv->pcigart_offset);
 
 	dev_priv->gart_info.bus_addr =
 		dev_priv->pcigart_offset + dev_priv->fb_location;
@@ -2330,15 +2338,20 @@ int r600_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init)
 		dev_priv->pcigart_offset + dev_priv->fb_aper_offset;
 	dev_priv->gart_info.mapping.size =
 		dev_priv->gart_info.table_size;
-	
-	drm_core_ioremap(&dev_priv->gart_info.mapping, dev);
+
+	drm_core_ioremap_wc(&dev_priv->gart_info.mapping, dev);
+	if (!dev_priv->gart_info.mapping.handle) {
+		DRM_ERROR("ioremap failed.\n");
+		r600_do_cleanup_cp(dev);
+		return -EINVAL;
+	}
 
 	dev_priv->gart_info.addr =
 		dev_priv->gart_info.mapping.handle;
 
 	DRM_DEBUG("Setting phys_pci_gart to %p %08lX\n",
-		  dev_priv->gart_info.addr,
-		  dev_priv->pcigart_offset);
+	          dev_priv->gart_info.addr,
+	          dev_priv->pcigart_offset);
 
 	r600_page_table_init(dev);
 	if (((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_RV770)) {

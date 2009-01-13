@@ -1165,9 +1165,10 @@ static int radeon_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init)
 					+ dev_priv->gart_vm_start);
 
 	DRM_DEBUG("dev_priv->gart_size %d\n", dev_priv->gart_size);
-	DRM_DEBUG("dev_priv->gart_vm_start 0x%x\n", dev_priv->gart_vm_start);
+	DRM_DEBUG("dev_priv->gart_vm_start 0x%x\n",
+	          (unsigned int) dev_priv->gart_vm_start);
 	DRM_DEBUG("dev_priv->gart_buffers_offset 0x%lx\n",
-		  dev_priv->gart_buffers_offset);
+	          dev_priv->gart_buffers_offset);
 
 	dev_priv->ring.start = (u32 *) dev_priv->cp_ring->handle;
 	dev_priv->ring.end = ((u32 *) dev_priv->cp_ring->handle
@@ -1203,6 +1204,12 @@ static int radeon_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init)
 			    dev_priv->gart_info.table_size;
 
 			drm_core_ioremap_wc(&dev_priv->gart_info.mapping, dev);
+			if (!dev_priv->gart_info.mapping.handle) {
+				DRM_ERROR("ioremap failed.\n");
+				radeon_do_cleanup_cp(dev);
+				return -EINVAL;
+			}
+
 			dev_priv->gart_info.addr =
 			    dev_priv->gart_info.mapping.handle;
 
