@@ -35,6 +35,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+#include <errno.h>
 #include "xf86drm.h"
 #include "drm.h"
 #include "radeon_drm.h"
@@ -176,12 +177,26 @@ static int bo_unmap(struct radeon_bo *bo)
     return 0;
 }
 
+static int bo_wait(struct radeon_bo *bo)
+{
+    struct drm_radeon_gem_wait_rendering args;
+    int ret;
+
+    args.handle = bo->handle;
+    do {
+        ret = drmCommandWriteRead(bo->bom->fd, DRM_RADEON_GEM_WAIT_RENDERING,
+                                  &args, sizeof(args));
+    } while (ret == -EAGAIN);
+    return ret;
+}
+
 static struct radeon_bo_funcs bo_gem_funcs = {
     bo_open,
     bo_ref,
     bo_unref,
     bo_map,
-    bo_unmap
+    bo_unmap,
+    bo_wait
 };
 
 struct radeon_bo_manager *radeon_bo_manager_gem_ctor(int fd)
