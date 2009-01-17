@@ -22,7 +22,7 @@
 # here too, but let's just do libdrm for now
 
 AUTOMAKE_OPTIONS = foreign
-SUBDIRS = libdrm shared-core tests
+SUBDIRS = libdrm shared-core tests linux-core/ttm
 
 pkgconfigdir = @pkgconfigdir@
 pkgconfig_DATA = libdrm.pc

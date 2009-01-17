@@ -120,4 +120,5 @@ AC_OUTPUT([
 	libdrm/radeon/Makefile
 	shared-core/Makefile
 	tests/Makefile
+	linux-core/ttm/Makefile
 	libdrm.pc])
