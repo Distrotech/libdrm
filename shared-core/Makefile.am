@@ -39,4 +39,6 @@ klibdrminclude_HEADERS = \
                          via_drm.h \
                          r300_reg.h \
                          via_3d_reg.h \
-			 xgi_drm.h
+			 xgi_drm.h \
+			 ochr_drm.h
+

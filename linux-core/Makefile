@@ -97,6 +97,8 @@ RADEONMSHEADERS = radeon_ms_driver.h $(DRMHEADERS)
 PROGS = dristat drmstat
 
 CLEANFILES = *.o *.ko $(PROGS) .depend .*.flags .*.d .*.cmd *.mod.c drm_pciids.h .tmp_versions
+CLEANMODFILES = *.o *.ko modules.order Module.symvers *.mod.c
+
 
 # VERSION is not defined from the initial invocation.  It is defined when
 # this Makefile is invoked from the kernel's root Makefile.
@@ -218,6 +220,7 @@ endif
 
 clean cleandir:
 	rm -rf $(CLEANFILES)
+	cd openchrome; rm -rf $(CLEANMODFILES)
 
 $(MODULE_LIST)::
 	make DRM_MODULES=$@ modules
@@ -292,6 +295,7 @@ CONFIG_DRM_NV := n
 CONFIG_DRM_NOUVEAU := n
 CONFIG_DRM_XGI := n
 CONFIG_DRM_RADEON_MS := n
+CONFIG_DRM_OPENCHROME := n
 
 # Enable module builds for the modules requested/supported.
 
@@ -333,6 +337,9 @@ CONFIG_DRM_XGI := m
 endif
 ifneq (,$(findstring radeon_ms,$(DRM_MODULES)))
 #CONFIG_DRM_RADEON_MS := m
+endif
+ifneq (,$(findstring openchrome,$(DRM_MODULES)))
+CONFIG_DRM_OPENCHROME := m
 endif
 
 # These require AGP support

@@ -81,3 +81,4 @@ obj-$(CONFIG_DRM_NV)    += nv.o
 #obj-$(CONFIG_DRM_NOUVEAU) += nouveau.o
 obj-$(CONFIG_DRM_XGI)   += xgi.o
 obj-$(CONFIG_DRM_RADEON_MS) += radeon_ms.o
+obj-$(CONFIG_DRM_OPENCHROME) += openchrome/
