@@ -58,7 +58,7 @@ endif
 
 # Modules for all architectures
 MODULE_LIST := drm.o tdfx.o r128.o radeon.o mga.o sis.o savage.o via.o \
-               mach64.o nv.o nouveau.o xgi.o radeon_ms.o
+               mach64.o nv.o nouveau.o xgi.o radeon_ms.o openchrome/
 
 # Modules only for ix86 architectures
 ifneq (,$(findstring 86,$(MACHINE)))
