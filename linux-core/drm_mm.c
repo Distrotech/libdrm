@@ -82,7 +82,7 @@ static int drm_mm_create_tail_node(struct drm_mm *mm,
 	struct drm_mm_node *child;
 
 	child = (struct drm_mm_node *)
-		drm_ctl_alloc(sizeof(*child), DRM_MEM_MM);
+		drm_alloc(sizeof(*child), DRM_MEM_MM);
 	if (!child)
 		return -ENOMEM;
 
@@ -118,7 +118,7 @@ static struct drm_mm_node *drm_mm_split_at_start(struct drm_mm_node *parent,
 	struct drm_mm_node *child;
 
 	child = (struct drm_mm_node *)
-		drm_ctl_alloc(sizeof(*child), DRM_MEM_MM);
+		drm_alloc(sizeof(*child), DRM_MEM_MM);
 	if (!child)
 		return NULL;
 
@@ -199,8 +199,8 @@ void drm_mm_put_block(struct drm_mm_node * cur)
 				prev_node->size += next_node->size;
 				list_del(&next_node->ml_entry);
 				list_del(&next_node->fl_entry);
-				drm_ctl_free(next_node, sizeof(*next_node),
-					     DRM_MEM_MM);
+				drm_free(next_node, sizeof(*next_node),
+					 DRM_MEM_MM);
 			} else {
 				next_node->size += cur->size;
 				next_node->start = cur->start;
@@ -213,7 +213,7 @@ void drm_mm_put_block(struct drm_mm_node * cur)
 		list_add(&cur->fl_entry, &mm->fl_entry);
 	} else {
 		list_del(&cur->ml_entry);
-		drm_ctl_free(cur, sizeof(*cur), DRM_MEM_MM);
+		drm_free(cur, sizeof(*cur), DRM_MEM_MM);
 	}
 }
 EXPORT_SYMBOL(drm_mm_put_block);
@@ -292,6 +292,6 @@ void drm_mm_takedown(struct drm_mm * mm)
 
 	list_del(&entry->fl_entry);
 	list_del(&entry->ml_entry);
-	drm_ctl_free(entry, sizeof(*entry), DRM_MEM_MM);
+	drm_free(entry, sizeof(*entry), DRM_MEM_MM);
 }
 EXPORT_SYMBOL(drm_mm_takedown);

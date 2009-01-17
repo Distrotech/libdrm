@@ -660,7 +660,6 @@ struct drm_gem_object {
 	void *driver_private;
 };
 
-#include "drm_objects.h"
 #include "drm_crtc.h"
 
 /* per-master structure */
@@ -883,7 +882,6 @@ struct drm_device {
 	struct list_head maplist;	/**< Linked list of regions */
 	int map_count;			/**< Number of mappable regions */
 	struct drm_open_hash map_hash;       /**< User token hash table for maps */
-	struct drm_mm offset_manager;        /**< User token manager */
 	struct address_space *dev_mapping;  /**< For unmap_mapping_range() */
 	struct page *ttm_dummy_page;
 
@@ -994,9 +992,6 @@ struct drm_device {
 	struct drm_minor *control;
 	struct drm_minor *primary;		/**< render type primary screen head */
 
-	struct drm_fence_manager fm;
-	struct drm_buffer_manager bm;
-
 	/** \name Drawable information */
 	/*@{ */
 	spinlock_t drw_lock;
@@ -1021,27 +1016,6 @@ struct drm_device {
 	uint32_t flush_domains;		/* domains pending flush */
 	/*@} */
 };
-
-#if __OS_HAS_AGP
-struct drm_agp_ttm_backend {
-	struct drm_ttm_backend backend;
-	DRM_AGP_MEM *mem;
-	struct agp_bridge_data *bridge;
-	int populated;
-};
-#endif
-struct ati_pcigart_ttm_backend {
-	struct drm_ttm_backend backend;
-	int populated;
-	void (*gart_flush_fn)(struct drm_device *dev);
-	struct drm_ati_pcigart_info *gart_info;
-	unsigned long offset;
-	struct page **pages;
-	int num_pages;
-	int bound;
-	struct drm_device *dev;
-};
-extern struct drm_ttm_backend *ati_pcigart_init_ttm(struct drm_device *dev, struct drm_ati_pcigart_info *info, void (*gart_flush_fn)(struct drm_device *dev));
 
 static __inline__ int drm_core_check_feature(struct drm_device *dev,
 					     int feature)
@@ -1536,39 +1510,6 @@ static __inline__ void drm_free(void *pt, size_t size, int area)
 extern void *drm_alloc(size_t size, int area);
 extern void drm_free(void *pt, size_t size, int area);
 #endif
-
-/*
- * Accounting variants of standard calls.
- */
-
-static inline void *drm_ctl_alloc(size_t size, int area)
-{
-	void *ret;
-	if (drm_alloc_memctl(size))
-		return NULL;
-	ret = drm_alloc(size, area);
-	if (!ret)
-		drm_free_memctl(size);
-	return ret;
-}
-
-static inline void *drm_ctl_calloc(size_t nmemb, size_t size, int area)
-{
-	void *ret;
-
-	if (drm_alloc_memctl(nmemb*size))
-		return NULL;
-	ret = drm_calloc(nmemb, size, area);
-	if (!ret)
-		drm_free_memctl(nmemb*size);
-	return ret;
-}
-
-static inline void drm_ctl_free(void *pt, size_t size, int area)
-{
-	drm_free(pt, size, area);
-	drm_free_memctl(size);
-}
 
 /*@}*/
 

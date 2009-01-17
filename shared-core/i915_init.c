@@ -513,13 +513,6 @@ void i915_driver_lastclose(struct drm_device * dev)
 	if (drm_core_check_feature(dev, DRIVER_MODESET))
 		return;
 
-#ifdef I915_HAVE_BUFFER
-	if (dev_priv->val_bufs) {
-		vfree(dev_priv->val_bufs);
-		dev_priv->val_bufs = NULL;
-	}
-#endif
-
 	i915_gem_lastclose(dev);
 
 	if (dev_priv->agp_heap)

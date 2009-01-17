@@ -74,11 +74,6 @@ enum pipe {
     PIPE_B,
 };
 
-#ifdef I915_HAVE_BUFFER
-#define I915_MAX_VALIDATE_BUFFERS 4096
-struct drm_i915_validate_buffer;
-#endif
-
 #define WATCH_COHERENCY	0
 #define WATCH_BUF	0
 #define WATCH_EXEC	0
@@ -177,11 +172,7 @@ struct drm_i915_private {
 	struct drm_mm vram;
 
 #ifdef I915_HAVE_BUFFER
-	void *agp_iomap;
-	unsigned int max_validate_buffers;
-	struct mutex cmdbuf_mutex;
-	u32 stolen_base;
-	struct drm_i915_validate_buffer *val_bufs;
+//	void *agp_iomap;
 #endif
 
 	DRM_SPINTYPE swaps_lock;
@@ -197,7 +188,7 @@ struct drm_i915_private {
 #if defined(I915_HAVE_BUFFER) && defined(DRI2)
 	/* DRI2 sarea */
 	struct drm_gem_object *sarea_object;
-        struct drm_bo_kmap_obj sarea_kmap;
+//        struct drm_bo_kmap_obj sarea_kmap;
 #endif
 
 	/* Feature bits from the VBIOS */

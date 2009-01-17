@@ -179,9 +179,6 @@ int drm_lastclose(struct drm_device * dev)
 		dev->driver->lastclose(dev);
 	DRM_DEBUG("driver lastclose completed\n");
 
-	if (!drm_core_check_feature(dev, DRIVER_MODESET))
-		drm_bo_driver_finish(dev);
-
 	if (dev->irq_enabled && !drm_core_check_feature(dev, DRIVER_MODESET))
 		drm_irq_uninstall(dev);
 
@@ -222,7 +219,7 @@ int drm_lastclose(struct drm_device * dev)
 	/* Clear vma list (only built for debugging) */
 	list_for_each_entry_safe(vma, vma_temp, &dev->vmalist, head) {
 		list_del(&vma->head);
-		drm_ctl_free(vma, sizeof(*vma), DRM_MEM_VMAS);
+		drm_free(vma, sizeof(*vma), DRM_MEM_VMAS);
 	}
 
 	/*
@@ -368,7 +365,6 @@ static void drm_cleanup(struct drm_device * dev)
 	}
 
 	drm_lastclose(dev);
-	drm_fence_manager_takedown(dev);
 
 	if (drm_core_has_MTRR(dev) && drm_core_has_AGP(dev) && dev->agp
 	    && dev->agp->agp_mtrr >= 0) {
@@ -382,7 +378,6 @@ static void drm_cleanup(struct drm_device * dev)
 	if (dev->driver->unload)
 		dev->driver->unload(dev);
         
-	drm_ht_remove(&dev->map_hash);
 	if (drm_core_has_AGP(dev) && dev->agp) {
 		drm_free(dev->agp, sizeof(*dev->agp), DRM_MEM_AGPLISTS);
 		dev->agp = NULL;
@@ -393,7 +388,6 @@ static void drm_cleanup(struct drm_device * dev)
 
 	drm_ctxbitmap_cleanup(dev);
 	drm_ht_remove(&dev->map_hash);
-	drm_mm_takedown(&dev->offset_manager);
 
 	if (drm_core_check_feature(dev, DRIVER_MODESET))
 		drm_put_minor(&dev->control);
@@ -452,31 +446,8 @@ static const struct file_operations drm_stub_fops = {
 static int __init drm_core_init(void)
 {
 	int ret;
-	struct sysinfo si;
-	unsigned long avail_memctl_mem;
-	unsigned long max_memctl_mem;
 
 	idr_init(&drm_minors_idr);
-	si_meminfo(&si);
-
-	/*
-	 * AGP only allows low / DMA32 memory ATM.
-	 */
-
-	avail_memctl_mem = si.totalram - si.totalhigh;
-
-	/*
-	 * Avoid overflows
-	 */
-
-	max_memctl_mem = 1UL << (32 - PAGE_SHIFT);
-	max_memctl_mem = (max_memctl_mem / si.mem_unit) * PAGE_SIZE;
-
-	if (avail_memctl_mem >= max_memctl_mem)
-		avail_memctl_mem = max_memctl_mem;
-
-	drm_init_memctl(avail_memctl_mem/2, avail_memctl_mem*3/4, si.mem_unit);
-
 	ret = -ENOMEM;
 
 	if (register_chrdev(DRM_MAJOR, "drm", &drm_stub_fops))

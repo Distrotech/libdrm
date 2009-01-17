@@ -41,10 +41,6 @@
 
 static void drm_vm_open(struct vm_area_struct *vma);
 static void drm_vm_close(struct vm_area_struct *vma);
-static int drm_bo_mmap_locked(struct vm_area_struct *vma,
-			      struct file *filp,
-			      drm_local_map_t *map);
-
 
 pgprot_t drm_io_prot(uint32_t map_type, struct vm_area_struct *vma)
 {
@@ -232,7 +228,6 @@ static void drm_vm_shm_close(struct vm_area_struct *vma)
 			found_maps++;
 		if (pt->vma == vma) {
 			list_del(&pt->head);
-			drm_ctl_free(pt, sizeof(*pt), DRM_MEM_VMAS);
 		}
 	}
 	/* We were the only map that was found */
@@ -416,7 +411,7 @@ static void drm_vm_open_locked(struct vm_area_struct *vma)
 		  vma->vm_start, vma->vm_end - vma->vm_start);
 	atomic_inc(&dev->vma_count);
 
-	vma_entry = drm_ctl_alloc(sizeof(*vma_entry), DRM_MEM_VMAS);
+	vma_entry = drm_alloc(sizeof(*vma_entry), DRM_MEM_VMAS);
 	if (vma_entry) {
 		vma_entry->vma = vma;
 		vma_entry->pid = current->pid;
@@ -456,7 +451,7 @@ static void drm_vm_close(struct vm_area_struct *vma)
 	list_for_each_entry_safe(pt, temp, &dev->vmalist, head) {
 		if (pt->vma == vma) {
 			list_del(&pt->head);
-			drm_ctl_free(pt, sizeof(*pt), DRM_MEM_VMAS);
+			drm_free(pt, sizeof(*pt), DRM_MEM_VMAS);
 			break;
 		}
 	}
@@ -651,8 +646,6 @@ static int drm_mmap_locked(struct file *filp, struct vm_area_struct *vma)
 		vma->vm_flags |= VM_RESERVED;
 		vma->vm_page_prot = drm_dma_prot(map->type, vma);
 		break;
-	case _DRM_TTM:
-		return drm_bo_mmap_locked(vma, filp, map);
 	default:
 		return -EINVAL;	/* This should never happen. */
 	}
@@ -677,213 +670,3 @@ int drm_mmap(struct file *filp, struct vm_area_struct *vma)
 }
 EXPORT_SYMBOL(drm_mmap);
 
-/**
- * buffer object vm functions.
- */
-
-/**
- * \c Pagefault method for buffer objects.
- *
- * \param vma Virtual memory area.
- * \param vmf vm fault data
- * \return Error or VM_FAULT_NOPAGE:. The pfn is manually inserted.
- *
- * It's important that pfns are inserted while holding the bo->mutex lock.
- * otherwise we might race with unmap_mapping_range() which is always
- * called with the bo->mutex lock held.
- *
- * We're modifying the page attribute bits of the vma->vm_page_prot field,
- * without holding the mmap_sem in write mode. Only in read mode.
- * These bits are not used by the mm subsystem code, and we consider them
- * protected by the bo->mutex lock.
- */
-
-#if defined(DRM_FULL_MM_COMPAT) && !defined(DRM_NO_FAULT)
-static int drm_bo_vm_fault(struct vm_area_struct *vma,
-				     struct vm_fault *vmf)
-{
-	struct drm_buffer_object *bo = (struct drm_buffer_object *) vma->vm_private_data;
-	unsigned long page_offset;
-	struct page *page = NULL;
-	struct drm_ttm *ttm;
-	struct drm_device *dev;
-	unsigned long pfn;
-	int err;
-	unsigned long bus_base;
-	unsigned long bus_offset;
-	unsigned long bus_size;
-	unsigned long ret = VM_FAULT_NOPAGE;
-
-	dev = bo->dev;
-
-	err = mutex_lock_interruptible(&bo->mutex);
-	if (err) {
-		return VM_FAULT_NOPAGE;
-	}
-
-	err = drm_bo_wait(bo, 0, 1, 0, 1);
-	if (err) {
-		ret = (err != -EAGAIN) ? VM_FAULT_SIGBUS : VM_FAULT_NOPAGE;
-		bo->priv_flags &= ~_DRM_BO_FLAG_UNLOCKED;
-		goto out_unlock;
-	}
-
-	bo->priv_flags &= ~_DRM_BO_FLAG_UNLOCKED;
-
-	/*
-	 * If buffer happens to be in a non-mappable location,
-	 * move it to a mappable.
-	 */
-
-	if (!(bo->mem.flags & DRM_BO_FLAG_MAPPABLE)) {
-		uint32_t new_flags = bo->mem.proposed_flags |
-			DRM_BO_FLAG_MAPPABLE |
-			DRM_BO_FLAG_FORCE_MAPPABLE;
-		err = drm_bo_move_buffer(bo, new_flags, 0, 0);
-		if (err) {
-			ret = (err != -EAGAIN) ? VM_FAULT_SIGBUS : VM_FAULT_NOPAGE;
-			goto out_unlock;
-		}
-	}
-
-	err = drm_bo_pci_offset(dev, &bo->mem, &bus_base, &bus_offset,
-				&bus_size);
-
-	if (err) {
-		ret = VM_FAULT_SIGBUS;
-		goto out_unlock;
-	}
-
-	page_offset = ((unsigned long)vmf->virtual_address - vma->vm_start) >> PAGE_SHIFT;
-
-	if (bus_size) {
-		struct drm_mem_type_manager *man = &dev->bm.man[bo->mem.mem_type];
-
-		pfn = ((bus_base + bus_offset) >> PAGE_SHIFT) + page_offset;
-		vma->vm_page_prot = drm_io_prot(man->drm_bus_maptype, vma);
-	} else {
-		ttm = bo->ttm;
-
-		drm_ttm_fixup_caching(ttm);
-		page = drm_ttm_get_page(ttm, page_offset);
-		if (!page) {
-			ret = VM_FAULT_OOM;
-			goto out_unlock;
-		}
-		pfn = page_to_pfn(page);
-		vma->vm_page_prot = (bo->mem.flags & DRM_BO_FLAG_CACHED) ?
-			vm_get_page_prot(vma->vm_flags) :
-			drm_io_prot(_DRM_TTM, vma);
-	}
-
-	err = vm_insert_pfn(vma, (unsigned long)vmf->virtual_address, pfn);
-	if (err) {
-		ret = (err != -EAGAIN) ? VM_FAULT_OOM : VM_FAULT_NOPAGE;
-		goto out_unlock;
-	}
-out_unlock:
-	BUG_ON(bo->priv_flags & _DRM_BO_FLAG_UNLOCKED);
-	mutex_unlock(&bo->mutex);
-	return ret;
-}
-#endif
-
-static void drm_bo_vm_open_locked(struct vm_area_struct *vma)
-{
-	struct drm_buffer_object *bo = (struct drm_buffer_object *) vma->vm_private_data;
-
-	/* clear the clean flags */
-	bo->mem.flags &= ~DRM_BO_FLAG_CLEAN;
-	bo->mem.proposed_flags &= ~DRM_BO_FLAG_CLEAN;
-
-	drm_vm_open_locked(vma);
-	atomic_inc(&bo->usage);
-#ifdef DRM_ODD_MM_COMPAT
-	drm_bo_add_vma(bo, vma);
-#endif
-}
-
-/**
- * \c vma open method for buffer objects.
- *
- * \param vma virtual memory area.
- */
-
-static void drm_bo_vm_open(struct vm_area_struct *vma)
-{
-	struct drm_buffer_object *bo = (struct drm_buffer_object *) vma->vm_private_data;
-	struct drm_device *dev = bo->dev;
-
-	mutex_lock(&dev->struct_mutex);
-	drm_bo_vm_open_locked(vma);
-	mutex_unlock(&dev->struct_mutex);
-}
-
-/**
- * \c vma close method for buffer objects.
- *
- * \param vma virtual memory area.
- */
-
-static void drm_bo_vm_close(struct vm_area_struct *vma)
-{
-	struct drm_buffer_object *bo = (struct drm_buffer_object *) vma->vm_private_data;
-	struct drm_device *dev = bo->dev;
-
-	drm_vm_close(vma);
-	if (bo) {
-		mutex_lock(&dev->struct_mutex);
-#ifdef DRM_ODD_MM_COMPAT
-		drm_bo_delete_vma(bo, vma);
-#endif
-		drm_bo_usage_deref_locked((struct drm_buffer_object **)
-					  &vma->vm_private_data);
-		mutex_unlock(&dev->struct_mutex);
-	}
-	return;
-}
-
-static struct vm_operations_struct drm_bo_vm_ops = {
-#ifdef DRM_FULL_MM_COMPAT
-#ifdef DRM_NO_FAULT
-	.nopfn = drm_bo_vm_nopfn,
-#else
-	.fault = drm_bo_vm_fault,
-#endif
-#else
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19))
-	.nopfn = drm_bo_vm_nopfn,
-#else
-	.nopage = drm_bo_vm_nopage,
-#endif
-#endif
-	.open = drm_bo_vm_open,
-	.close = drm_bo_vm_close,
-};
-
-/**
- * mmap buffer object memory.
- *
- * \param vma virtual memory area.
- * \param file_priv DRM file private.
- * \param map The buffer object drm map.
- * \return zero on success or a negative number on failure.
- */
-
-int drm_bo_mmap_locked(struct vm_area_struct *vma,
-		       struct file *filp,
-		       drm_local_map_t *map)
-{
-	vma->vm_ops = &drm_bo_vm_ops;
-	vma->vm_private_data = map->handle;
-	vma->vm_file = filp;
-	vma->vm_flags |= VM_RESERVED | VM_IO;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19))
-	vma->vm_flags |= VM_PFNMAP;
-#endif
-	drm_bo_vm_open_locked(vma);
-#ifdef DRM_ODD_MM_COMPAT
-	drm_bo_map_bound(vma);
-#endif
-	return 0;
-}
