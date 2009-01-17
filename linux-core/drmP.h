@@ -87,6 +87,7 @@
 #include "drm_os_linux.h"
 #include "drm_hashtab.h"
 #include "drm_internal.h"
+#include "drm_mm.h"
 
 struct drm_device;
 struct drm_file;
@@ -529,26 +530,6 @@ struct drm_sg_mem {
 struct drm_sigdata {
 	int context;
 	struct drm_hw_lock *lock;
-};
-
-
-/*
- * Generic memory manager structs
- */
-
-struct drm_mm_node {
-	struct list_head fl_entry;
-	struct list_head ml_entry;
-	int free;
-	unsigned long start;
-	unsigned long size;
-	struct drm_mm *mm;
-	void *private;
-};
-
-struct drm_mm {
-	struct list_head fl_entry;
-	struct list_head ml_entry;
 };
 
 
@@ -1372,27 +1353,6 @@ extern void drm_sysfs_device_remove(struct drm_minor *minor);
 extern char *drm_get_connector_status_name(enum drm_connector_status status);
 extern int drm_sysfs_connector_add(struct drm_connector *connector);
 extern void drm_sysfs_connector_remove(struct drm_connector *connector);
-
-/*
- * Basic memory manager support (drm_mm.c)
- */
-
-extern struct drm_mm_node * drm_mm_get_block(struct drm_mm_node * parent, unsigned long size,
-					       unsigned alignment);
-extern void drm_mm_put_block(struct drm_mm_node *cur);
-extern struct drm_mm_node *drm_mm_search_free(const struct drm_mm *mm, unsigned long size,
-						unsigned alignment, int best_match);
-extern int drm_mm_init(struct drm_mm *mm, unsigned long start, unsigned long size);
-extern void drm_mm_takedown(struct drm_mm *mm);
-extern int drm_mm_clean(struct drm_mm *mm);
-extern unsigned long drm_mm_tail_space(struct drm_mm *mm);
-extern int drm_mm_remove_space_from_tail(struct drm_mm *mm, unsigned long size);
-extern int drm_mm_add_space_to_tail(struct drm_mm *mm, unsigned long size);
-
-static inline struct drm_mm *drm_get_mm(struct drm_mm_node *block)
-{
-	return block->mm;
-}
 
 /* Graphics Execution Manager library functions (drm_gem.c) */
 int
