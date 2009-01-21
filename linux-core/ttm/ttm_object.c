@@ -266,8 +266,8 @@ int ttm_ref_object_add(struct ttm_object_file *tfile,
 		write_unlock(&tfile->lock);
 		BUG_ON(ret != -EINVAL);
 
-		kfree(ref);
 		ttm_mem_global_free(mem_glob, sizeof(*ref), 0);
+		kfree(ref);
 	}
 
 	return ret;
@@ -291,8 +291,8 @@ static void ttm_ref_object_release(struct kref *kref)
 		base->ref_obj_release(base, ref->ref_type);
 
 	ttm_base_object_unref(&ref->obj);
-	kfree(ref);
 	ttm_mem_global_free(mem_glob, sizeof(*ref), 0);
+	kfree(ref);
 	write_lock(&tfile->lock);
 }
 

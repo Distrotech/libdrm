@@ -97,8 +97,8 @@ static void ttm_bo_user_destroy(struct ttm_buffer_object *bo)
 	struct ttm_bo_user_object *user_bo =
 	    container_of(bo, struct ttm_bo_user_object, bo);
 
-	kfree(user_bo);
 	ttm_mem_global_free(bo->bdev->mem_glob, bo->acc_size, 0);
+	kfree(user_bo);
 }
 
 static void ttm_bo_user_release(struct ttm_base_object **p_base)
@@ -176,8 +176,8 @@ int ttm_pl_create_ioctl(struct ttm_object_file *tfile,
 	bo = &user_bo->bo;
 	ret = ttm_read_lock(lock, true);
 	if (unlikely(ret != 0)) {
-		kfree(user_bo);
 		ttm_mem_global_free(mem_glob, acc_size, 0);
+		kfree(user_bo);
 		return ret;
 	}
 

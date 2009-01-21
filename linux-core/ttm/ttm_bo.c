@@ -70,8 +70,8 @@ static void ttm_bo_release_list(struct kref *list_kref)
 	if (bo->destroy)
 		bo->destroy(bo);
 	else {
-		kfree(bo);
 		ttm_mem_global_free(bdev->mem_glob, bo->acc_size, 0);
+		kfree(bo);
 	}
 }
 
