@@ -601,6 +601,7 @@ static int ttm_bo_mem_force_space(struct ttm_bo_device *bdev,
 	struct ttm_mem_type_manager *man = &bdev->man[mem_type];
 	struct list_head *lru;
 	unsigned long num_pages = mem->num_pages;
+	int put_count = 0;
 	int ret;
 
       retry_pre_get:
@@ -624,10 +625,17 @@ static int ttm_bo_mem_force_space(struct ttm_bo_device *bdev,
 
 		ret =
 		    ttm_bo_reserve_locked(entry, interruptible, no_wait, 0, 0);
+
+		if (likely(ret == 0))
+			put_count = ttm_bo_del_from_lru(entry);
+
 		spin_unlock(&bdev->lru_lock);
 
 		if (unlikely(ret != 0))
 			return ret;
+
+		while (put_count--)
+			kref_put(&entry->list_kref, ttm_bo_ref_bug);
 
 		mutex_lock(&entry->mutex);
 		ret = ttm_bo_evict(entry, mem_type, interruptible, no_wait);
