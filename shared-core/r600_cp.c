@@ -2493,9 +2493,8 @@ int r600_cp_indirect(struct drm_device *dev, struct drm_buf *buf, drm_radeon_ind
 					+ buf->offset + start);
 		int dwords = (end - start + 3) / sizeof(u32);
 
-		DRM_DEBUG("%d\n", dwords);
-		DRM_INFO("dwords:%d\n", dwords);
-		DRM_INFO("offset 0x%lx\n", offset);
+		DRM_DEBUG("dwords:%d\n", dwords);
+		DRM_DEBUG("offset 0x%lx\n", offset);
 
 
 		/* Indirect buffer data must be modulo 4.
