@@ -629,8 +629,6 @@ long drm_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 err_i1:
 	atomic_dec(&dev->ioctl_count);
-	if (retcode)
-		DRM_ERROR("ret = %x %d\n", nr, retcode);
 	return retcode;
 }
 EXPORT_SYMBOL(drm_unlocked_ioctl);
