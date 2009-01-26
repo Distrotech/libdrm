@@ -444,16 +444,20 @@ static int via_detect_vram(struct drm_device *dev)
 	 */
 
 	dev_priv->vram_direct = 0;
-	switch (fn3->device) {
-	case 0x3204:
-		pci_read_config_byte(fn3, 0x47, &size);
-		dev_priv->vram_start = size << 24;
-		dev_priv->vram_start -= dev_priv->vram_size * 1024;
-		dev_priv->vram_direct = 1;
-		break;
-	default:
+	if (fn3 != NULL) {
+		switch (fn3->device) {
+		case 0x3204:
+			pci_read_config_byte(fn3, 0x47, &size);
+			dev_priv->vram_start = size << 24;
+			dev_priv->vram_start -= dev_priv->vram_size * 1024;
+			dev_priv->vram_direct = 1;
+			break;
+		default:
+			dev_priv->vram_start = pci_resource_start(dev->pdev, 0);
+			break;
+		}
+	} else {		
 		dev_priv->vram_start = pci_resource_start(dev->pdev, 0);
-		break;
 	}
 
 	if (dev_priv->vram_direct)
