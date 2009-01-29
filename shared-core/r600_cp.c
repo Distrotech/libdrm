@@ -209,6 +209,10 @@
 #       define R700_ES_AUTO                                     1
 #       define R700_GS_AUTO                                     2
 #       define R700_ES_AND_GS_AUTO                              3
+#define R600_VGT_VERTEX_REUSE_BLOCK_CNTL                        0x28c58
+#       define R600_VTX_REUSE_DEPTH_MASK                        0xff
+#define R600_VGT_OUT_DEALLOC_CNTL                               0x28c5c
+#       define R600_DEALLOC_DIST_MASK                           0x7f
 #define R600_PA_SC_AA_SAMPLE_LOCS_2S                            0x8b40
 #define R600_PA_SC_AA_SAMPLE_LOCS_4S                            0x8b44
 #define R600_PA_SC_AA_SAMPLE_LOCS_8S_WD0                        0x8b48
@@ -377,7 +381,9 @@
 #define R600_CC_GC_SHADER_PIPE_CONFIG                           0x8950
 #define R600_GC_USER_SHADER_PIPE_CONFIG                         0x8954
 #       define R600_INACTIVE_QD_PIPES(x)                        ((x) << 8)
+#       define R600_INACTIVE_QD_PIPES_MASK                      (0xff << 8)
 #       define R600_INACTIVE_SIMDS(x)                           ((x) << 16)
+#       define R600_INACTIVE_SIMDS_MASK                         (0xff << 16)
 
 #define R700_CGTS_SYS_TCC_DISABLE                               0x3f90
 #define R700_CGTS_USER_SYS_TCC_DISABLE                          0x3f94
@@ -1046,10 +1052,20 @@ static u32 r600_get_tile_pipe_to_backend_map(u32 num_tile_pipes,
 	return backend_map;
 }
 
+static int r600_count_pipe_bits (uint32_t val)
+{
+	int i, ret = 0;
+	for (i = 0; i < 32; i++) {
+		ret += val & 1;
+		val >>= 1;
+	}
+	return ret;
+}
+
 static void r600_gfx_init(struct drm_device * dev,
 			  drm_radeon_private_t * dev_priv)
 {
-	int i, j;
+	int i, j, num_qd_pipes;
 	u32 sx_debug_1;
 	u32 tc_cntl;
 	u32 arb_pop;
@@ -1209,6 +1225,10 @@ static void r600_gfx_init(struct drm_device * dev,
 	RADEON_WRITE(R600_CC_GC_SHADER_PIPE_CONFIG,   cc_gc_shader_pipe_config);
 	RADEON_WRITE(R600_GC_USER_SHADER_PIPE_CONFIG, cc_gc_shader_pipe_config);
 
+	num_qd_pipes =
+		R6XX_MAX_BACKENDS - r600_count_pipe_bits(cc_gc_shader_pipe_config & R600_INACTIVE_QD_PIPES_MASK);
+	RADEON_WRITE(R600_VGT_OUT_DEALLOC_CNTL, (num_qd_pipes * 4) & R600_DEALLOC_DIST_MASK);
+	RADEON_WRITE(R600_VGT_VERTEX_REUSE_BLOCK_CNTL, ((num_qd_pipes * 4) - 2) & R600_VTX_REUSE_DEPTH_MASK);
 
 	/* set HW defaults for 3D engine */
 	RADEON_WRITE(R600_CP_QUEUE_THRESHOLDS, (R600_ROQ_IB1_START(0x16) |
@@ -1469,6 +1489,7 @@ static void r600_gfx_init(struct drm_device * dev,
 	RADEON_WRITE(R600_PA_CL_ENHANCE, (R600_CLIP_VTX_REORDER_ENA |
 					  R600_NUM_CLIP_SEQ(3)));
 	RADEON_WRITE(R600_PA_SC_ENHANCE, R600_FORCE_EOV_MAX_CLK_CNT(4095));
+
 }
 
 static u32 r700_get_tile_pipe_to_backend_map(u32 num_tile_pipes,
@@ -1583,7 +1604,7 @@ static u32 r700_get_tile_pipe_to_backend_map(u32 num_tile_pipes,
 static void r700_gfx_init(struct drm_device * dev,
 			  drm_radeon_private_t * dev_priv)
 {
-	int i, j;
+	int i, j, num_qd_pipes;
 	u32 sx_debug_1;
 	u32 smx_dc_ctl0;
 	u32 num_gs_verts_per_thread;
@@ -1745,6 +1766,11 @@ static void r700_gfx_init(struct drm_device * dev,
 	RADEON_WRITE(R700_CGTS_TCC_DISABLE, 0);
 	RADEON_WRITE(R700_CGTS_USER_SYS_TCC_DISABLE, 0);
 	RADEON_WRITE(R700_CGTS_USER_TCC_DISABLE, 0);
+
+	num_qd_pipes =
+		R7XX_MAX_BACKENDS - r600_count_pipe_bits(cc_gc_shader_pipe_config & R600_INACTIVE_QD_PIPES_MASK);
+	RADEON_WRITE(R600_VGT_OUT_DEALLOC_CNTL, (num_qd_pipes * 4) & R600_DEALLOC_DIST_MASK);
+	RADEON_WRITE(R600_VGT_VERTEX_REUSE_BLOCK_CNTL, ((num_qd_pipes * 4) - 2) & R600_VTX_REUSE_DEPTH_MASK);
 
 	/* set HW defaults for 3D engine */
 	RADEON_WRITE(R600_CP_QUEUE_THRESHOLDS, (R600_ROQ_IB1_START(0x16) |
