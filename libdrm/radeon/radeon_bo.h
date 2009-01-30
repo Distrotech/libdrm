@@ -52,6 +52,7 @@ struct radeon_bo {
 #endif
     void                        *ptr;
     struct radeon_bo_manager    *bom;
+    uint32_t                    space_accounted;
 };
 
 /* bo functions */
