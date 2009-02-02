@@ -127,12 +127,13 @@ void radeon_write_fb_location(drm_radeon_private_t *dev_priv, u32 fb_loc)
 
 void radeon_write_agp_location(drm_radeon_private_t *dev_priv, u32 agp_loc)
 {
+	/*R6xx/R7xx: AGP_TOP and BOT are actually 18 bits each */
 	if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_RV770) {
-		RADEON_WRITE(R700_MC_VM_AGP_BOT, agp_loc); /* FIX ME */
-		RADEON_WRITE(R700_MC_VM_AGP_TOP, 0);
+		RADEON_WRITE(R700_MC_VM_AGP_BOT, agp_loc & 0xffff); /* FIX ME */
+		RADEON_WRITE(R700_MC_VM_AGP_TOP, (agp_loc >> 16) & 0xffff);
 	} else if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600) {
-		RADEON_WRITE(R600_MC_VM_AGP_BOT, agp_loc); /* FIX ME */
-		RADEON_WRITE(R600_MC_VM_AGP_TOP, 0);
+		RADEON_WRITE(R600_MC_VM_AGP_BOT, agp_loc & 0xffff); /* FIX ME */
+		RADEON_WRITE(R600_MC_VM_AGP_TOP, (agp_loc >> 16) & 0xffff);
 	} else if ((dev_priv->flags & RADEON_FAMILY_MASK) == CHIP_RV515)
 		R500_WRITE_MCIND(RV515_MC_AGP_LOCATION, agp_loc);
 	else if (((dev_priv->flags & RADEON_FAMILY_MASK) == CHIP_RS690) ||
@@ -144,15 +145,17 @@ void radeon_write_agp_location(drm_radeon_private_t *dev_priv, u32 agp_loc)
 		RADEON_WRITE(RADEON_MC_AGP_LOCATION, agp_loc);
 }
 
-static void radeon_write_agp_base(drm_radeon_private_t *dev_priv, u64 agp_base)
+void radeon_write_agp_base(drm_radeon_private_t *dev_priv, u64 agp_base)
 {
 	u32 agp_base_hi = upper_32_bits(agp_base);
 	u32 agp_base_lo = agp_base & 0xffffffff;
+	u32 r6xx_agp_base = (agp_base >> 22) & 0x3ffff;
 
+	// R6xx/R7xx must be aligned to a 4MB boundry
 	if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_RV770)
-		RADEON_WRITE(R700_MC_VM_AGP_BASE, 0); /* FIX ME */
+		RADEON_WRITE(R700_MC_VM_AGP_BASE, r6xx_agp_base); /* FIX ME */
 	else if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600)
-		RADEON_WRITE(R600_MC_VM_AGP_BASE, 0); /* FIX ME */
+		RADEON_WRITE(R600_MC_VM_AGP_BASE, r6xx_agp_base); /* FIX ME */
 	else if ((dev_priv->flags & RADEON_FAMILY_MASK) == CHIP_RV515) {
 		R500_WRITE_MCIND(RV515_MC_AGP_BASE, agp_base_lo);
 		R500_WRITE_MCIND(RV515_MC_AGP_BASE_2, agp_base_hi);

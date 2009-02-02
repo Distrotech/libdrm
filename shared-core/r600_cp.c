@@ -476,7 +476,7 @@ static int r600_page_table_init(struct drm_device *dev)
 	memset(pci_gart, 0, max_pages * sizeof(u64));
 
 	for (i = 0; i < pages; i++) {
-				entry->busaddr[i] = pci_map_single(dev->pdev,
+		entry->busaddr[i] = pci_map_single(dev->pdev,
 						   page_address(entry->
 								pagelist[i]),
 						   PAGE_SIZE, PCI_DMA_TODEVICE);
@@ -2029,6 +2029,15 @@ static void r600_cp_init_ring_buffer(struct drm_device * dev,
 	SET_RING_HEAD(dev_priv, 0);
 	dev_priv->ring.tail = 0;
 
+#if __OS_HAS_AGP
+	if (dev_priv->flags & RADEON_IS_AGP) {
+		// XXX
+		RADEON_WRITE(R600_CP_RB_RPTR_ADDR,
+			     (dev_priv->ring_rptr->offset
+			     - dev->agp->base + dev_priv->gart_vm_start) >> 8);
+		RADEON_WRITE(R600_CP_RB_RPTR_ADDR_HI, 0);
+	} else
+#endif
 	{
 		struct drm_sg_mem *entry = dev->sg;
 		unsigned long tmp_ofs, page_ofs;
@@ -2055,9 +2064,25 @@ static void r600_cp_init_ring_buffer(struct drm_device * dev,
 		     dev_priv->ring.size_l2qw);
 #endif
 
-	ring_start = (dev_priv->cp_ring->offset
-		      - (unsigned long)dev->sg->virtual
-		      + dev_priv->gart_vm_start);
+#if __OS_HAS_AGP
+	if (dev_priv->flags & RADEON_IS_AGP) {
+		// XXX
+		radeon_write_agp_base(dev_priv, dev->agp->base);
+
+		// XXX
+		radeon_write_agp_location(dev_priv,
+			     (((dev_priv->gart_vm_start - 1 +
+				dev_priv->gart_size) & 0xffff0000) |
+			      (dev_priv->gart_vm_start >> 16)));
+
+		ring_start = (dev_priv->cp_ring->offset
+			      - dev->agp->base
+			      + dev_priv->gart_vm_start);
+	} else
+#endif
+		ring_start = (dev_priv->cp_ring->offset
+			      - (unsigned long)dev->sg->virtual
+			      + dev_priv->gart_vm_start);
 
 	RADEON_WRITE(R600_CP_RB_BASE, ring_start >> 8);
 
@@ -2162,6 +2187,22 @@ int r600_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init)
 		return -EINVAL;
 	}
 
+	if (init->is_pci && (dev_priv->flags & RADEON_IS_AGP))
+	{
+		DRM_DEBUG("Forcing AGP card to PCI mode\n");
+		dev_priv->flags &= ~RADEON_IS_AGP;
+		/* The writeback test succeeds, but when writeback is enabled,
+		 * the ring buffer read ptr update fails after first 128 bytes.
+		 */
+		radeon_no_wb = 1;
+	}
+	else if (!(dev_priv->flags & (RADEON_IS_AGP | RADEON_IS_PCI | RADEON_IS_PCIE))
+		 && !init->is_pci)
+	{
+		DRM_DEBUG("Restoring AGP flag\n");
+		dev_priv->flags |= RADEON_IS_AGP;
+	}
+
 	dev_priv->usec_timeout = init->usec_timeout;
 	if (dev_priv->usec_timeout < 1 ||
 	    dev_priv->usec_timeout > RADEON_MAX_USEC_TIMEOUT) {
@@ -2248,6 +2289,7 @@ int r600_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init)
 				    init->sarea_priv_offset);
 
 #if __OS_HAS_AGP
+	// XXX
 	if (dev_priv->flags & RADEON_IS_AGP) {
 		drm_core_ioremap(dev_priv->cp_ring, dev);
 		drm_core_ioremap(dev_priv->ring_rptr, dev);
@@ -2305,6 +2347,19 @@ int r600_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init)
 		 * location in the card and on the bus, though we have to
 		 * align it down.
 		 */
+#if __OS_HAS_AGP
+		// XXX
+		if (dev_priv->flags & RADEON_IS_AGP) {
+			base = dev->agp->base;
+			/* Check if valid */
+			if ((base + dev_priv->gart_size - 1) >= dev_priv->fb_location &&
+			    base < (dev_priv->fb_location + dev_priv->fb_size - 1)) {
+				DRM_INFO("Can't use AGP base @0x%08lx, won't fit\n",
+					 dev->agp->base);
+				base = 0;
+			}
+		}
+#endif
 		/* If not or if AGP is at 0 (Macs), try to put it elsewhere */
 		if (base == 0) {
 			base = dev_priv->fb_location + dev_priv->fb_size;
@@ -2317,11 +2372,19 @@ int r600_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init)
 		if (dev_priv->gart_vm_start != base)
 			DRM_INFO("GART aligned down from 0x%08x to 0x%08x\n",
 				 base, dev_priv->gart_vm_start);
-	} 
+	}
 
-	dev_priv->gart_buffers_offset = (dev->agp_buffer_map->offset
-					 - (unsigned long)dev->sg->virtual
-					 + dev_priv->gart_vm_start);
+#if __OS_HAS_AGP
+	// XXX
+	if (dev_priv->flags & RADEON_IS_AGP)
+		dev_priv->gart_buffers_offset = (dev->agp_buffer_map->offset
+						 - dev->agp->base
+						 + dev_priv->gart_vm_start);
+	else
+#endif
+		dev_priv->gart_buffers_offset = (dev->agp_buffer_map->offset
+						 - (unsigned long)dev->sg->virtual
+						 + dev_priv->gart_vm_start);
 
 	DRM_DEBUG("fb 0x%08x size %d\n",
 	          (unsigned int) dev_priv->fb_location,
@@ -2348,45 +2411,56 @@ int r600_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init)
 
 	dev_priv->ring.high_mark = RADEON_RING_HIGH_MARK;
 
-	dev_priv->gart_info.table_mask = DMA_BIT_MASK(32);
-	/* if we have an offset set from userspace */
-	if (!dev_priv->pcigart_offset_set) {
-		DRM_ERROR("Need gart offset from userspace\n");
-		r600_do_cleanup_cp(dev);
-		return -EINVAL;
+#if __OS_HAS_AGP
+	if (dev_priv->flags & RADEON_IS_AGP) {
+		// XXX turn off pcie gart
+	} else
+#endif
+	{
+		dev_priv->gart_info.table_mask = DMA_BIT_MASK(32);
+		/* if we have an offset set from userspace */
+		if (!dev_priv->pcigart_offset_set) {
+			DRM_ERROR("Need gart offset from userspace\n");
+			r600_do_cleanup_cp(dev);
+			return -EINVAL;
+		}
+
+		DRM_DEBUG("Using gart offset 0x%08lx\n", dev_priv->pcigart_offset);
+
+		dev_priv->gart_info.bus_addr =
+			dev_priv->pcigart_offset + dev_priv->fb_location;
+		dev_priv->gart_info.mapping.offset =
+			dev_priv->pcigart_offset + dev_priv->fb_aper_offset;
+		dev_priv->gart_info.mapping.size =
+			dev_priv->gart_info.table_size;
+
+		drm_core_ioremap_wc(&dev_priv->gart_info.mapping, dev);
+		if (!dev_priv->gart_info.mapping.handle) {
+			DRM_ERROR("ioremap failed.\n");
+			r600_do_cleanup_cp(dev);
+			return -EINVAL;
+		}
+
+		dev_priv->gart_info.addr =
+			dev_priv->gart_info.mapping.handle;
+
+		DRM_DEBUG("Setting phys_pci_gart to %p %08lX\n",
+			  dev_priv->gart_info.addr,
+			  dev_priv->pcigart_offset);
+
+		r600_page_table_init(dev);
+
+		if (((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_RV770))
+			r700_vm_init(dev);
+		else
+			r600_vm_init(dev);
 	}
 
-	DRM_DEBUG("Using gart offset 0x%08lx\n", dev_priv->pcigart_offset);
-
-	dev_priv->gart_info.bus_addr =
-		dev_priv->pcigart_offset + dev_priv->fb_location;
-	dev_priv->gart_info.mapping.offset =
-		dev_priv->pcigart_offset + dev_priv->fb_aper_offset;
-	dev_priv->gart_info.mapping.size =
-		dev_priv->gart_info.table_size;
-
-	drm_core_ioremap_wc(&dev_priv->gart_info.mapping, dev);
-	if (!dev_priv->gart_info.mapping.handle) {
-		DRM_ERROR("ioremap failed.\n");
-		r600_do_cleanup_cp(dev);
-		return -EINVAL;
-	}
-
-	dev_priv->gart_info.addr =
-		dev_priv->gart_info.mapping.handle;
-
-	DRM_DEBUG("Setting phys_pci_gart to %p %08lX\n",
-	          dev_priv->gart_info.addr,
-	          dev_priv->pcigart_offset);
-
-	r600_page_table_init(dev);
-	if (((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_RV770)) {
-	    r700_vm_init(dev);
+	if (((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_RV770))
 	    r700_cp_load_microcode(dev_priv);
-	} else {
-	    r600_vm_init(dev);
+	else
 	    r600_cp_load_microcode(dev_priv);
-	}
+
 	r600_cp_init_ring_buffer(dev, dev_priv);
 
 	dev_priv->last_buf = 0;

@@ -439,6 +439,8 @@ extern long radeon_compat_ioctl(struct file *filp, unsigned int cmd,
 
 void radeon_write_agp_location(drm_radeon_private_t *dev_priv, u32 agp_loc);
 void radeon_write_fb_location(drm_radeon_private_t *dev_priv, u32 fb_loc);
+void radeon_write_agp_base(drm_radeon_private_t *dev_priv, u64 agp_base);
+
 /* r300_cmdbuf.c */
 extern void r300_init_reg_flags(struct drm_device *dev);
 
