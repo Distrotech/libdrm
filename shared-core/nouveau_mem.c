@@ -34,7 +34,6 @@
 #include "drm.h"
 #include "drm_sarea.h"
 #include "nouveau_drv.h"
-#include "nv50_kms_wrapper.h"
 
 static struct mem_block *
 split_block(struct mem_block *p, uint64_t start, uint64_t size,
@@ -116,17 +115,6 @@ static struct mem_block *find_block(struct mem_block *heap, uint64_t start)
 
 	list_for_each(p, heap)
 		if (p->start == start)
-			return p;
-
-	return NULL;
-}
-
-struct mem_block *find_block_by_handle(struct mem_block *heap, drm_handle_t handle)
-{
-	struct mem_block *p;
-
-	list_for_each(p, heap)
-		if (p->map_handle == handle)
 			return p;
 
 	return NULL;
@@ -237,10 +225,20 @@ void nouveau_mem_close(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
-	nouveau_mem_takedown(&dev_priv->agp_heap);
-	nouveau_mem_takedown(&dev_priv->fb_heap);
-	if (dev_priv->pci_heap)
-		nouveau_mem_takedown(&dev_priv->pci_heap);
+	if (!dev_priv->mm_enabled) {
+		nouveau_mem_takedown(&dev_priv->agp_heap);
+		nouveau_mem_takedown(&dev_priv->fb_heap);
+		if (dev_priv->pci_heap)
+			nouveau_mem_takedown(&dev_priv->pci_heap);
+	} else {
+		drm_bo_driver_finish(dev);
+	}
+
+	if (dev_priv->fb_mtrr) {
+		drm_mtrr_del(dev_priv->fb_mtrr, drm_get_resource_start(dev, 1),
+			     drm_get_resource_len(dev, 1), DRM_MTRR_WC);
+		dev_priv->fb_mtrr = 0;
+	}
 }
 
 /*XXX won't work on BSD because of pci_read_config_dword */
@@ -407,17 +405,36 @@ nouveau_mem_init_agp(struct drm_device *dev, int ttm)
 	return 0;
 }
 
-#define HACK_OLD_MM
+
+static int
+nv50_mem_vm_preinit(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
+	dev_priv->vm_gart_base = 0;
+	dev_priv->vm_gart_size = 512 * 1024 * 1024;
+	dev_priv->vm_vram_base = 512 * 1024 * 1024;
+	dev_priv->vm_vram_size = 512 * 1024 * 1024;
+	dev_priv->vm_end = 1024ULL * 1024 * 1024;
+
+	return 0;
+}
+
 int
 nouveau_mem_init_ttm(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	uint32_t vram_size, bar1_size;
+	uint32_t vram_size, bar1_size, text_size;
 	int ret;
 
-	dev_priv->agp_heap = dev_priv->pci_heap = dev_priv->fb_heap = NULL;
-	dev_priv->fb_phys = drm_get_resource_start(dev,1);
+	dev_priv->fb_phys = drm_get_resource_start(dev, 1);
 	dev_priv->gart_info.type = NOUVEAU_GART_NONE;
+
+	if (dev_priv->card_type >= NV_50) {
+		ret = nv50_mem_vm_preinit(dev);
+		if (ret)
+			return ret;
+	}
 
 	drm_bo_driver_init(dev);
 
@@ -426,9 +443,10 @@ nouveau_mem_init_ttm(struct drm_device *dev)
 	dev_priv->fb_available_size -= dev_priv->ramin_rsvd_vram;
 	vram_size = dev_priv->fb_available_size >> PAGE_SHIFT;
 	bar1_size = drm_get_resource_len(dev, 1) >> PAGE_SHIFT;
+	text_size = (256 * 1024) >> PAGE_SHIFT;
 	if (bar1_size < vram_size) {
-		if ((ret = drm_bo_init_mm(dev, DRM_BO_MEM_PRIV0,
-					  bar1_size, vram_size - bar1_size, 1))) {
+		if ((ret = drm_bo_init_mm(dev, DRM_BO_MEM_PRIV0, bar1_size,
+					  vram_size - bar1_size, 1))) {
 			DRM_ERROR("Failed PRIV0 mm init: %d\n", ret);
 			return ret;
 		}
@@ -436,10 +454,8 @@ nouveau_mem_init_ttm(struct drm_device *dev)
 	}
 
 	/* mappable vram */
-#ifdef HACK_OLD_MM
-	vram_size /= 4;
-#endif
-	if ((ret = drm_bo_init_mm(dev, DRM_BO_MEM_VRAM, 0, vram_size, 1))) {
+	if ((ret = drm_bo_init_mm(dev, DRM_BO_MEM_VRAM, text_size,
+				  vram_size - text_size, 1))) {
 		DRM_ERROR("Failed VRAM mm init: %d\n", ret);
 		return ret;
 	}
@@ -458,18 +474,29 @@ nouveau_mem_init_ttm(struct drm_device *dev)
 	}
 
 	if ((ret = drm_bo_init_mm(dev, DRM_BO_MEM_TT, 0,
-				  dev_priv->gart_info.aper_size >>
-				  PAGE_SHIFT, 1))) {
+				  dev_priv->gart_info.aper_size >> PAGE_SHIFT,
+				  1))) {
 		DRM_ERROR("Failed TT mm init: %d\n", ret);
 		return ret;
 	}
 
-#ifdef HACK_OLD_MM
-	vram_size <<= PAGE_SHIFT;
-	DRM_INFO("Old MM using %dKiB VRAM\n", (vram_size * 3) >> 10);
-	if (nouveau_mem_init_heap(&dev_priv->fb_heap, vram_size, vram_size * 3))
-		return -ENOMEM;
-#endif
+	dev_priv->fb_mtrr = drm_mtrr_add(drm_get_resource_start(dev, 1),
+					 drm_get_resource_len(dev, 1),
+					 DRM_MTRR_WC);
+
+	/* G8x: Allocate shared page table to map real VRAM pages into */
+	if (dev_priv->card_type >= NV_50) {
+		unsigned size = ((512 * 1024 * 1024) / 65536) * 8;
+
+		ret = nouveau_gpuobj_new(dev, NULL, size, 0,
+					 NVOBJ_FLAG_ZERO_ALLOC |
+					 NVOBJ_FLAG_ALLOW_NO_REFS,
+					 &dev_priv->vm_vram_pt);
+		if (ret) {
+			DRM_ERROR("Error creating VRAM page table: %d\n", ret);
+			return ret;
+		}
+	}
 
 	return 0;
 }
@@ -477,7 +504,7 @@ nouveau_mem_init_ttm(struct drm_device *dev)
 int nouveau_mem_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	uint32_t fb_size;
+	uint32_t fb_size, vram_base, gart_base;
 	int ret = 0;
 
 	dev_priv->agp_heap = dev_priv->pci_heap = dev_priv->fb_heap = NULL;
@@ -488,6 +515,14 @@ int nouveau_mem_init(struct drm_device *dev)
 	dev_priv->fb_mtrr = drm_mtrr_add(drm_get_resource_start(dev, 1),
 					 nouveau_mem_fb_amount(dev),
 					 DRM_MTRR_WC);
+
+	if (dev_priv->card_type >= NV_50) {
+		ret = nv50_mem_vm_preinit(dev);
+		if (ret)
+			return ret;
+	}
+	gart_base = dev_priv->vm_gart_base;
+	vram_base = dev_priv->vm_vram_base;
 
 	/* Init FB */
 	dev_priv->fb_phys=drm_get_resource_start(dev,1);
@@ -508,13 +543,14 @@ int nouveau_mem_init(struct drm_device *dev)
 		/* On cards with > 256Mb, you can't map everything.
 		 * So we create a second FB heap for that type of memory */
 		if (nouveau_mem_init_heap(&dev_priv->fb_heap,
-					  0, 256*1024*1024))
+					  vram_base, 256*1024*1024))
 			return -ENOMEM;
 		if (nouveau_mem_init_heap(&dev_priv->fb_nomap_heap,
-					  256*1024*1024, fb_size-256*1024*1024))
+					  vram_base + 256*1024*1024,
+					  fb_size - 256*1024*1024))
 			return -ENOMEM;
 	} else {
-		if (nouveau_mem_init_heap(&dev_priv->fb_heap, 0, fb_size))
+		if (nouveau_mem_init_heap(&dev_priv->fb_heap, vram_base, fb_size))
 			return -ENOMEM;
 		dev_priv->fb_nomap_heap=NULL;
 	}
@@ -542,8 +578,8 @@ int nouveau_mem_init(struct drm_device *dev)
 	}
 
 	if (dev_priv->gart_info.type != NOUVEAU_GART_NONE) {
-		if (nouveau_mem_init_heap(&dev_priv->agp_heap,
-					  0, dev_priv->gart_info.aper_size)) {
+		if (nouveau_mem_init_heap(&dev_priv->agp_heap, gart_base,
+					  dev_priv->gart_info.aper_size)) {
 			if (dev_priv->gart_info.type == NOUVEAU_GART_SGDMA) {
 				nouveau_sgdma_nottm_hack_takedown(dev);
 				nouveau_sgdma_takedown(dev);
@@ -594,6 +630,54 @@ nouveau_mem_alloc(struct drm_device *dev, int alignment, uint64_t size,
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct mem_block *block;
 	int type, tail = !(flags & NOUVEAU_MEM_USER);
+	int ret;
+
+	/* This case will only ever be hit through in-kernel use */
+	if (dev_priv->mm_enabled) {
+		uint64_t memtype = 0;
+
+		size = (size + 65535) & ~65535;
+		if (alignment < (65536 / PAGE_SIZE))
+			alignment = (65536 / PAGE_SIZE);
+
+		block = drm_calloc(1, sizeof(*block), DRM_MEM_DRIVER);
+		if (!block)
+			return NULL;
+
+		if (flags & (NOUVEAU_MEM_FB | NOUVEAU_MEM_FB_ACCEPTABLE))
+			memtype |= DRM_BO_FLAG_MEM_VRAM;
+		if (flags & NOUVEAU_MEM_AGP)
+			memtype |= DRM_BO_FLAG_MEM_TT;
+		if (flags & NOUVEAU_MEM_NOVM)
+			memtype |= DRM_NOUVEAU_BO_FLAG_NOVM;
+
+		ret = drm_buffer_object_create(dev, size, drm_bo_type_kernel,
+					       DRM_BO_FLAG_READ |
+					       DRM_BO_FLAG_WRITE |
+					       DRM_BO_FLAG_NO_EVICT |
+					       memtype, DRM_BO_HINT_DONT_FENCE,
+					       alignment, 0, &block->bo);
+		if (ret) {
+			drm_free(block, sizeof(*block), DRM_MEM_DRIVER);
+			return NULL;
+		}
+
+		block->start = block->bo->offset;
+		block->size = block->bo->mem.size;
+
+		if (block->bo->mem.mem_type == DRM_BO_MEM_VRAM) {
+			block->flags = NOUVEAU_MEM_FB;
+			if (flags & NOUVEAU_MEM_NOVM) {
+				block->flags |= NOUVEAU_MEM_NOVM;
+				block->start -= dev_priv->vm_vram_base;
+			}
+		} else
+		if (block->bo->mem.mem_type == DRM_BO_MEM_TT) {
+			block->flags = NOUVEAU_MEM_AGP;
+		}
+
+		return block;
+	}
 
 	/*
 	 * Make things easier on ourselves: all allocations are page-aligned.
@@ -672,7 +756,7 @@ alloc_ok:
 	if (block->flags & NOUVEAU_MEM_FB && dev_priv->card_type >= NV_50 &&
 	    !(flags & NOUVEAU_MEM_NOVM)) {
 		struct nouveau_gpuobj *pt = dev_priv->vm_vram_pt;
-		unsigned offset = block->start;
+		unsigned offset = block->start - dev_priv->vm_vram_base;
 		unsigned count = block->size / 65536;
 		unsigned tile = 0;
 
@@ -700,30 +784,43 @@ alloc_ok:
 			INSTANCE_WR(pt, (pte * 2) + 1, 0x00000000 | tile);
 			offset += 65536;
 		}
-	} else {
+	} else
+	if (block->flags & NOUVEAU_MEM_FB && dev_priv->card_type >= NV_50) {
+		block->start -= dev_priv->vm_vram_base;
 		block->flags |= NOUVEAU_MEM_NOVM;
 	}	
 
-	if (flags&NOUVEAU_MEM_MAPPED)
+	if (flags & NOUVEAU_MEM_MAPPED)
 	{
 		struct drm_map_list *entry;
+		uint64_t map_offset;
 		int ret = 0;
-		block->flags|=NOUVEAU_MEM_MAPPED;
+
+		block->flags |= NOUVEAU_MEM_MAPPED;
+
+		map_offset = block->start;
+		if (!(block->flags & NOUVEAU_MEM_NOVM)) {
+			if (block->flags & NOUVEAU_MEM_FB)
+				map_offset -= dev_priv->vm_vram_base;
+			else
+			if (block->flags & NOUVEAU_MEM_AGP)
+				map_offset -= dev_priv->vm_gart_base;
+		}
 
 		if (type == NOUVEAU_MEM_AGP) {
 			if (dev_priv->gart_info.type != NOUVEAU_GART_SGDMA)
-			ret = drm_addmap(dev, block->start, block->size,
+			ret = drm_addmap(dev, map_offset, block->size,
 					 _DRM_AGP, 0, &block->map);
 			else
-			ret = drm_addmap(dev, block->start, block->size,
+			ret = drm_addmap(dev, map_offset, block->size,
 					 _DRM_SCATTER_GATHER, 0, &block->map);
 		}
 		else if (type == NOUVEAU_MEM_FB)
-			ret = drm_addmap(dev, block->start + dev_priv->fb_phys,
+			ret = drm_addmap(dev, map_offset + dev_priv->fb_phys,
 					 block->size, _DRM_FRAME_BUFFER,
 					 0, &block->map);
 		else if (type == NOUVEAU_MEM_PCI)
-			ret = drm_addmap(dev, block->start, block->size,
+			ret = drm_addmap(dev, map_offset, block->size,
 					 _DRM_SCATTER_GATHER, 0, &block->map);
 
 		if (ret) {
@@ -749,28 +846,12 @@ void nouveau_mem_free(struct drm_device* dev, struct mem_block* block)
 
 	DRM_DEBUG("freeing 0x%llx type=0x%08x\n", block->start, block->flags);
 
-	/* Check if the deallocations cause problems for our modesetting system. */
-	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
-		if (dev_priv->card_type >= NV_50) {
-			struct nv50_crtc *crtc = NULL;
-			struct nv50_display *display = nv50_get_display(dev);
-
-			list_for_each_entry(crtc, &display->crtcs, item) {
-				if (crtc->fb->block == block) {
-					crtc->fb->block = NULL;
-
-					if (!crtc->blanked)
-						crtc->blank(crtc, true);
-				}
-
-				if (crtc->cursor->block == block) {
-					crtc->cursor->block = NULL;
-
-					if (crtc->cursor->visible)
-						crtc->cursor->hide(crtc);
-				}
-			}
-		}
+	if (dev_priv->mm_enabled) {
+		if (block->kmap.virtual)
+			drm_bo_kunmap(&block->kmap);
+		drm_bo_usage_deref_unlocked(&block->bo);
+		drm_free(block, sizeof(*block), DRM_MEM_DRIVER);
+		return;
 	}
 
 	if (block->flags&NOUVEAU_MEM_MAPPED)
@@ -780,7 +861,7 @@ void nouveau_mem_free(struct drm_device* dev, struct mem_block* block)
 	if (block->flags & NOUVEAU_MEM_FB && dev_priv->card_type >= NV_50 &&
 	    !(block->flags & NOUVEAU_MEM_NOVM)) {
 		struct nouveau_gpuobj *pt = dev_priv->vm_vram_pt;
-		unsigned offset = block->start;
+		unsigned offset = block->start - dev_priv->vm_vram_base;
 		unsigned count = block->size / 65536;
 
 		if (!pt) {
@@ -808,11 +889,11 @@ int
 nouveau_ioctl_mem_alloc(struct drm_device *dev, void *data,
 			struct drm_file *file_priv)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_nouveau_mem_alloc *alloc = data;
 	struct mem_block *block;
 
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
+	NOUVEAU_CHECK_MM_DISABLED_WITH_RETURN;
 
 	if (alloc->flags & NOUVEAU_MEM_INTERNAL)
 		return -EINVAL;
@@ -824,9 +905,6 @@ nouveau_ioctl_mem_alloc(struct drm_device *dev, void *data,
 	alloc->map_handle=block->map_handle;
 	alloc->offset=block->start;
 	alloc->flags=block->flags;
-
-	if (dev_priv->card_type >= NV_50 && alloc->flags & NOUVEAU_MEM_FB)
-		alloc->offset += 512*1024*1024;
 
 	return 0;
 }
@@ -840,9 +918,7 @@ nouveau_ioctl_mem_free(struct drm_device *dev, void *data,
 	struct mem_block *block;
 
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
-
-	if (dev_priv->card_type >= NV_50 && memfree->flags & NOUVEAU_MEM_FB)
-		memfree->offset -= 512*1024*1024;
+	NOUVEAU_CHECK_MM_DISABLED_WITH_RETURN;
 
 	block=NULL;
 	if (memfree->flags & NOUVEAU_MEM_FB)
@@ -869,14 +945,13 @@ nouveau_ioctl_mem_tile(struct drm_device *dev, void *data,
 	struct mem_block *block = NULL;
 
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
+	NOUVEAU_CHECK_MM_DISABLED_WITH_RETURN;
 
 	if (dev_priv->card_type < NV_50)
 		return -EINVAL;
 	
-	if (memtile->flags & NOUVEAU_MEM_FB) {
-		memtile->offset -= 512*1024*1024;
+	if (memtile->flags & NOUVEAU_MEM_FB)
 		block = find_block(dev_priv->fb_heap, memtile->offset);
-	}
 
 	if (!block)
 		return -EINVAL;
@@ -889,6 +964,8 @@ nouveau_ioctl_mem_tile(struct drm_device *dev, void *data,
 		unsigned offset = block->start + memtile->delta;
 		unsigned count = memtile->size / 65536;
 		unsigned tile = 0;
+		
+		offset -= dev_priv->vm_vram_base;
 
 		if (memtile->flags & NOUVEAU_MEM_TILE) {
 			if (memtile->flags & NOUVEAU_MEM_TILE_ZETA)

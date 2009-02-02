@@ -31,44 +31,38 @@
 
 static int nv50_lut_alloc(struct nv50_crtc *crtc)
 {
-	struct mem_block *block;
-	struct drm_file *file_priv = kzalloc(sizeof(struct drm_file), GFP_KERNEL);
-	uint32_t flags = NOUVEAU_MEM_FB | NOUVEAU_MEM_MAPPED;
-	int rval = 0;
+	struct drm_device *dev = crtc->dev;
+	int ret;
 
 	NV50_DEBUG("\n");
 
-	if (!file_priv)
-		return -ENOMEM;
+	ret = drm_buffer_object_create(dev, 4096, drm_bo_type_kernel,
+				       DRM_BO_FLAG_MEM_VRAM |
+				       DRM_BO_FLAG_READ | DRM_BO_FLAG_WRITE |
+				       DRM_BO_FLAG_NO_EVICT,
+				       DRM_BO_HINT_DONT_FENCE, 0, 0,
+				       &crtc->lut->bo);
+	if (ret)
+		return ret;
 
-	/* Any file_priv should do as it's pointer is used as identification. */
-	block = nouveau_mem_alloc(crtc->dev, 0, 4096, flags, file_priv);
-
-	if (!block) {
-		rval = -ENOMEM;
-		goto out;
+	ret = drm_bo_kmap(crtc->lut->bo, 0, crtc->lut->bo->mem.num_pages,
+			  &crtc->lut->kmap);
+	if (ret) {
+		drm_bo_usage_deref_unlocked(&crtc->lut->bo);
+		return ret;
 	}
 
-	crtc->lut->block = block;
-
 	return 0;
-
-out:
-	if (file_priv)
-		kfree(file_priv);
-
-	return rval;
 }
 
 static int nv50_lut_free(struct nv50_crtc *crtc)
 {
-	struct drm_file *file_priv = crtc->lut->block->file_priv;
-
 	NV50_DEBUG("\n");
 
-	nouveau_mem_free(crtc->dev, crtc->lut->block);
-
-	kfree(file_priv);
+	if (crtc->lut->bo) {
+		drm_bo_kunmap(&crtc->lut->kmap);
+		drm_bo_usage_deref_unlocked(&crtc->lut->bo);
+	}
 
 	return 0;
 }
@@ -77,24 +71,17 @@ static int nv50_lut_free(struct nv50_crtc *crtc)
 static int nv50_lut_set(struct nv50_crtc *crtc, uint16_t *red, uint16_t *green, uint16_t *blue)
 {
 	uint32_t index = 0, i;
-	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
-	void __iomem *lut = NULL;
+	void __iomem *lut;
 
 	NV50_DEBUG("\n");
 
-	if (!crtc->lut || !crtc->lut->block) {
+	if (!crtc->lut || !crtc->lut->bo) {
 		DRM_ERROR("Something wrong with the LUT\n");
 		return -EINVAL;
 	}
+	lut = crtc->lut->kmap.virtual;
 
 	/* 16 bits, red, green, blue, unused, total of 64 bits per index */
-	/* maybe switch to ioremap_wc once it becomes available. */
-	lut = ioremap(dev_priv->fb_phys + crtc->lut->block->start, crtc->lut->block->size);
-	if (!lut) {
-		DRM_ERROR("ioremap failed on LUT\n");
-		return -EINVAL;
-	}
-
 	/* 10 bits lut, with 14 bits values. */
 	switch (crtc->fb->depth) {
 		case 15:
@@ -131,9 +118,6 @@ static int nv50_lut_set(struct nv50_crtc *crtc, uint16_t *red, uint16_t *green, 
 	}
 
 	crtc->lut->depth = crtc->fb->depth;
-
-	/* Cleaning time. */
-	iounmap(lut);
 
 	return 0;
 }

@@ -29,18 +29,22 @@
 #include "nouveau_drv.h"
 #include "nouveau_dma.h"
 
-static int
-nouveau_fence_has_irq(struct drm_device *dev, uint32_t class, uint32_t flags)
+static struct nouveau_channel *
+nouveau_fence_channel(struct drm_device *dev, uint32_t class)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
+	if (class == 0)
+		class = dev_priv->channel->id;
+
+	return dev_priv->fifos[class];
+}
+
+static int
+nouveau_fence_has_irq(struct drm_device *dev, uint32_t class, uint32_t flags)
+{
 	DRM_DEBUG("class=%d, flags=0x%08x\n", class, flags);
 
-	/* DRM's channel always uses IRQs to signal fences */
-	if (class == dev_priv->channel.chan->id)
-		return 1;
-
-	/* Other channels don't use IRQs at all yet */
 	return 0;
 }
 
@@ -48,28 +52,23 @@ static int
 nouveau_fence_emit(struct drm_device *dev, uint32_t class, uint32_t flags,
 		   uint32_t *breadcrumb, uint32_t *native_type)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_channel *chan = dev_priv->fifos[class];
-	struct nouveau_drm_channel *dchan = &dev_priv->channel;
+	struct nouveau_channel *chan = nouveau_fence_channel(dev, class);
+	int ret;
 
 	DRM_DEBUG("class=%d, flags=0x%08x\n", class, flags);
 
-	/* We can't emit fences on client channels, update sequence number
-	 * and userspace will emit the fence
-	 */
+	ret = RING_SPACE(chan, 2);
+	if (ret)
+		return ret;
+
 	*breadcrumb  = ++chan->next_sequence;
 	*native_type = DRM_FENCE_TYPE_EXE;
-	if (chan != dchan->chan) {
-		DRM_DEBUG("user fence 0x%08x\n", *breadcrumb);
-		return 0;
-	}
 
 	DRM_DEBUG("emit 0x%08x\n", *breadcrumb);
-	BEGIN_RING(NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_SET_REF, 1);
-	OUT_RING  (*breadcrumb);
-	BEGIN_RING(NvSubM2MF, 0x0150, 1);
-	OUT_RING  (0);
-	FIRE_RING ();
+
+	BEGIN_RING(chan, NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_SET_REF, 1);
+	OUT_RING  (chan, *breadcrumb);
+	FIRE_RING (chan);
 
 	return 0;
 }
@@ -79,12 +78,21 @@ nouveau_fence_poll(struct drm_device *dev, uint32_t class, uint32_t waiting_type
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_fence_class_manager *fc = &dev->fm.fence_class[class];
-	struct nouveau_channel *chan = dev_priv->fifos[class];
+	struct nouveau_channel *chan = nouveau_fence_channel(dev, class);
 
 	DRM_DEBUG("class=%d\n", class);
 	DRM_DEBUG("pending: 0x%08x 0x%08x\n", waiting_types, fc->waiting_types);
 
-	if (waiting_types & DRM_FENCE_TYPE_EXE) {
+	if (!chan) {
+		static int warn_once = 0;
+		if (!warn_once) {
+		DRM_ERROR("AIII channel %d inactive\n", class);
+		warn_once = 1;
+		}
+		return;
+	}
+
+	if (1) {
 		uint32_t sequence = NV_READ(chan->ref_cnt);
 
 		DRM_DEBUG("got 0x%08x\n", sequence);

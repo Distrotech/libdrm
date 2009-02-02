@@ -70,13 +70,14 @@ static int nv50_cursor_show(struct nv50_crtc *crtc)
 
 	/* Better not show the cursor when we have none. */
 	/* TODO: is cursor offset actually set? */
-	if (!crtc->cursor->block) {
+	if (!crtc->cursor->gem) {
 		DRM_ERROR("No cursor available on crtc %d\n", crtc->index);
 		return -EINVAL;
 	}
 
 	OUT_MODE(NV50_CRTC0_CURSOR_CTRL + offset, NV50_CRTC0_CURSOR_CTRL_SHOW);
 
+	crtc->cursor->visible = true;
 	return 0;
 }
 
@@ -89,6 +90,7 @@ static int nv50_cursor_hide(struct nv50_crtc *crtc)
 
 	OUT_MODE(NV50_CRTC0_CURSOR_CTRL + offset, NV50_CRTC0_CURSOR_CTRL_HIDE);
 
+	crtc->cursor->visible = false;
 	return 0;
 }
 
@@ -106,11 +108,13 @@ static int nv50_cursor_set_pos(struct nv50_crtc *crtc, int x, int y)
 static int nv50_cursor_set_offset(struct nv50_crtc *crtc)
 {
 	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct nouveau_gem_object *ngem = nouveau_gem_object(crtc->cursor->gem);
 
 	NV50_DEBUG("\n");
 
-	if (crtc->cursor->block) {
-		OUT_MODE(NV50_CRTC0_CURSOR_OFFSET + crtc->index * 0x400, crtc->cursor->block->start >> 8);
+	if (ngem) {
+		OUT_MODE(NV50_CRTC0_CURSOR_OFFSET + crtc->index * 0x400,
+			 (ngem->bo->offset - dev_priv->vm_vram_base) >> 8);
 	} else {
 		OUT_MODE(NV50_CRTC0_CURSOR_OFFSET + crtc->index * 0x400, 0);
 	}
@@ -118,33 +122,20 @@ static int nv50_cursor_set_offset(struct nv50_crtc *crtc)
 	return 0;
 }
 
-static int nv50_cursor_set_bo(struct nv50_crtc *crtc, drm_handle_t handle)
+static int
+nv50_cursor_set_bo(struct nv50_crtc *crtc, struct drm_gem_object *gem)
 {
-	struct mem_block *block = NULL;
-	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct nv50_cursor *cursor = crtc->cursor;
 
-	NV50_DEBUG("\n");
+	if (cursor->gem) {
+		mutex_lock(&crtc->dev->struct_mutex);
+		drm_gem_object_unreference(cursor->gem);
+		mutex_unlock(&crtc->dev->struct_mutex);
 
-	block = find_block_by_handle(dev_priv->fb_heap, handle);
-
-	if (block) {
-		bool first_time = false;
-		if (!crtc->cursor->block)
-			first_time = true;
-
-		crtc->cursor->block = block;
-
-		/* set the cursor offset cursor */
-		if (first_time) {
-			crtc->cursor->set_offset(crtc);
-			if (crtc->cursor->visible)
-				crtc->cursor->show(crtc);
-		}
-	} else {
-		DRM_ERROR("Unable to find cursor bo with handle 0x%X\n", handle);
-		return -EINVAL;
+		cursor->gem = NULL;
 	}
 
+	cursor->gem = gem;
 	return 0;
 }
 

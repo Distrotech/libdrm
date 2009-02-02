@@ -571,7 +571,7 @@ nouveau_gpuobj_new_fake(struct drm_device *dev, uint32_t p_offset,
 	}
 
 	if (b_offset != ~0) {
-		gpuobj->im_backing = drm_calloc(1, sizeof(struct mem_block),
+		gpuobj->im_backing = drm_calloc(1, sizeof(*gpuobj->im_backing),
 					       DRM_MEM_DRIVER);
 		if (!gpuobj->im_backing) {
 			nouveau_gpuobj_del(dev, &gpuobj);
@@ -984,8 +984,10 @@ nouveau_gpuobj_channel_init(struct nouveau_channel *chan,
 	 */
 	if (0 || dev_priv->card_type == NV_50) {
 		ret = nouveau_gpuobj_channel_init_pramin(chan);
-		if (ret)
+		if (ret) {
+			DRM_ERROR("init pramin\n");
 			return ret;
+		}
 	}
 
 	/* NV50 VM
@@ -1041,7 +1043,7 @@ nouveau_gpuobj_channel_init(struct nouveau_channel *chan,
 	/* VRAM ctxdma */
 	if (dev_priv->card_type >= NV_50) {
 		ret = nouveau_gpuobj_dma_new(chan, NV_CLASS_DMA_IN_MEMORY,
-					     0, 0x100000000ULL,
+					     0, dev_priv->vm_end,
 					     NV_DMA_ACCESS_RW,
 					     NV_DMA_TARGET_AGP, &vram);
 		if (ret) {

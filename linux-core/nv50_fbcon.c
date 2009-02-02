@@ -358,15 +358,12 @@ static struct fb_ops nv50_fb_ops = {
 static int nv50_fbcon_initial_config(struct drm_device *dev)
 {
 	struct drm_connector *drm_connector;
-
 	struct drm_framebuffer *drm_fb = NULL;
 	struct drm_mode_fb_cmd drm_fb_cmd;
 	enum drm_connector_status status;
 	uint32_t max_width = 0, max_height = 0, pitch = 0;
-	struct mem_block *block;
-	struct drm_file *file_priv;
-	uint32_t flags;
-	int rval = 0;
+	struct drm_gem_object *gem = NULL;
+	int ret = 0;
 
 	list_for_each_entry(drm_connector, &dev->mode_config.connector_list, head) {
 		status = drm_connector->funcs->detect(drm_connector);
@@ -385,22 +382,25 @@ static int nv50_fbcon_initial_config(struct drm_device *dev)
 		}
 	}
 
-	/* allocate framebuffer */
-	file_priv = kzalloc(sizeof(struct drm_file), GFP_KERNEL);
-	if (!file_priv) {
-		rval = -ENOMEM;
-		goto out;
+	if (!max_width || !max_height) {
+		DRM_ERROR("Can't determine framebuffer size!\n");
+		return -EINVAL;
 	}
 
+	/* allocate framebuffer */
 	pitch = (max_width + 63) & ~63;
 	pitch *= 4; /* TODO */
 
-	flags = NOUVEAU_MEM_FB | NOUVEAU_MEM_MAPPED;
+	ret = nouveau_gem_new(dev, NULL, pitch * max_height, 0,
+			      NOUVEAU_GEM_DOMAIN_VRAM, &gem);
+	if (ret)
+		goto out;
 
-	/* Any file_priv should do as it's pointer is used as identification. */
-	block = nouveau_mem_alloc(dev, 0, pitch * max_height, flags, file_priv);
-	if (!block) {
-		rval = -ENOMEM;
+	ret = nouveau_gem_pin(gem, NOUVEAU_GEM_DOMAIN_VRAM);
+	if (ret) {
+		mutex_lock(&dev->struct_mutex);
+		drm_gem_object_unreference(gem);
+		mutex_unlock(&dev->struct_mutex);
 		goto out;
 	}
 
@@ -410,12 +410,11 @@ static int nv50_fbcon_initial_config(struct drm_device *dev)
 	drm_fb_cmd.height = max_height;
 	drm_fb_cmd.pitch = pitch;
 	drm_fb_cmd.bpp = 32; /* TODO */
-	drm_fb_cmd.handle = block->map_handle;
 	drm_fb_cmd.depth = 24; /* TODO */
 
-	drm_fb = dev->mode_config.funcs->fb_create(dev, file_priv, &drm_fb_cmd);
+	drm_fb = nv50_framebuffer_create(dev, gem, &drm_fb_cmd);
 	if (!drm_fb) {
-		rval = -EINVAL;
+		ret = -EINVAL;
 		goto out;
 	}
 
@@ -424,12 +423,10 @@ static int nv50_fbcon_initial_config(struct drm_device *dev)
 	return 0;
 
 out:
-	if (file_priv)
-		kfree(file_priv);
 	if (drm_fb)
 		drm_fb->funcs->destroy(drm_fb);
 
-	return rval;
+	return ret;
 }
 
 /*
@@ -442,14 +439,14 @@ int nv50_fbcon_init(struct drm_device *dev)
 	struct nv50_fbcon_par *par;
 	struct device *device = &dev->pdev->dev;
 	struct drm_framebuffer *drm_fb;
-	struct mem_block *block;
-	void __iomem *fb = NULL;
-	int rval;
+	struct nv50_framebuffer *nv50_fb;
+	struct nouveau_gem_object *ngem;
+	int ret;
 
-	rval = nv50_fbcon_initial_config(dev);
-	if (rval != 0) {
+	ret = nv50_fbcon_initial_config(dev);
+	if (ret != 0) {
 		DRM_ERROR("nv50_fbcon_initial_config failed\n");
-		return rval;
+		return ret;
 	}
 
 	list_for_each_entry(drm_fb, &dev->mode_config.fb_kernel_list, filp_head) {
@@ -460,12 +457,14 @@ int nv50_fbcon_init(struct drm_device *dev)
 		DRM_ERROR("no drm_fb found\n");
 		return -EINVAL;
 	}
+	nv50_fb = nv50_framebuffer(drm_fb);
 
-	block = find_block_by_handle(dev_priv->fb_heap, drm_fb->mm_handle);
-	if (!block) {
-		DRM_ERROR("can't find mem_block\n");
+	ngem = nouveau_gem_object(nv50_fb->gem);
+	if (!ngem) {
+		DRM_ERROR("no buffer object for FB!\n");
 		return -EINVAL;
 	}
+
 
 	info = framebuffer_alloc(sizeof(struct nv50_fbcon_par), device);
 	if (!info) {
@@ -490,18 +489,18 @@ int nv50_fbcon_init(struct drm_device *dev)
 	info->fbops = &nv50_fb_ops;
 
 	info->fix.line_length = drm_fb->pitch;
-	info->fix.smem_start = dev_priv->fb_phys + block->start;
+	info->fix.smem_start = dev_priv->fb_phys + ngem->bo->offset;
 	info->fix.smem_len = info->fix.line_length * drm_fb->height;
 
 	info->flags = FBINFO_DEFAULT;
 
-	fb = ioremap(dev_priv->fb_phys + block->start, block->size);
-	if (!fb) {
-		DRM_ERROR("Unable to ioremap framebuffer\n");
-		return -EINVAL;
+	ret = drm_bo_kmap(ngem->bo, 0, ngem->bo->mem.num_pages, &nv50_fb->kmap);
+	if (ret) {
+		DRM_ERROR("Error mapping framebuffer: %d\n", ret);
+		return ret;
 	}
 
- 	info->screen_base = fb;
+ 	info->screen_base = nv50_fb->kmap.virtual;
 	info->screen_size = info->fix.smem_len; /* FIXME */
 
 	info->pseudo_palette = drm_fb->pseudo_palette;
@@ -581,11 +580,9 @@ int nv50_fbcon_init(struct drm_device *dev)
 
 int nv50_fbcon_destroy(struct drm_device *dev)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_framebuffer *drm_fb;
+	struct nv50_framebuffer *nv50_fb;
 	struct fb_info *info;
-	struct mem_block *block;
-	struct drm_file *file_priv;
 
 	list_for_each_entry(drm_fb, &dev->mode_config.fb_kernel_list, filp_head) {
 		break; /* first entry is the only entry */
@@ -595,6 +592,7 @@ int nv50_fbcon_destroy(struct drm_device *dev)
 		DRM_ERROR("No framebuffer to destroy\n");
 		return -EINVAL;
 	}
+	nv50_fb = nv50_framebuffer(drm_fb);
 
 	info = drm_fb->fbdev;
 	if (!info) {
@@ -604,22 +602,10 @@ int nv50_fbcon_destroy(struct drm_device *dev)
 
 	unregister_framebuffer(info);
 
-	block = find_block_by_handle(dev_priv->fb_heap, drm_fb->mm_handle);
-	if (!block) {
-		DRM_ERROR("can't find mem_block\n");
-		return -EINVAL;
-	}
-
-	/* we need to free this after memory is freed */
-	file_priv = block->file_priv;
-
-	/* free memory */
-	nouveau_mem_free(dev, block);
-
-	if (file_priv) {
-		kfree(file_priv);
-		file_priv = NULL;
-	}
+	drm_bo_kunmap(&nv50_fb->kmap);
+	mutex_lock(&dev->struct_mutex);
+	drm_gem_object_unreference(nv50_fb->gem);
+	mutex_unlock(&dev->struct_mutex);
 
 	framebuffer_release(info);
 

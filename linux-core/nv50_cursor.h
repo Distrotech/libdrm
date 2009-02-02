@@ -32,7 +32,7 @@
 struct nv50_crtc;
 
 struct nv50_cursor {
-	struct mem_block *block;
+	struct drm_gem_object *gem;
 	int x, y;
 	bool visible;
 	bool enabled;
@@ -41,7 +41,7 @@ struct nv50_cursor {
 	int (*hide) (struct nv50_crtc *crtc);
 	int (*set_pos) (struct nv50_crtc *crtc, int x, int y);
 	int (*set_offset) (struct nv50_crtc *crtc);
-	int (*set_bo) (struct nv50_crtc *crtc, drm_handle_t handle);
+	int (*set_bo) (struct nv50_crtc *crtc, struct drm_gem_object *gem);
 	int (*enable) (struct nv50_crtc *crtc);
 	int (*disable) (struct nv50_crtc *crtc);
 };

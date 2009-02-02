@@ -253,13 +253,13 @@ nv50_fifo_create_context(struct nouveau_channel *chan)
 		ramfc = chan->ramfc->gpuobj;
 	}
 
+	INSTANCE_WR(ramfc, 0x08/4, chan->pushbuf_base);
+	INSTANCE_WR(ramfc, 0x10/4, chan->pushbuf_base);
 	INSTANCE_WR(ramfc, 0x48/4, chan->pushbuf->instance >> 4);
 	INSTANCE_WR(ramfc, 0x80/4, (0xc << 24) | (chan->ramht->instance >> 4));
 	INSTANCE_WR(ramfc, 0x3c/4, 0x000f0078); /* fetch? */
 	INSTANCE_WR(ramfc, 0x44/4, 0x2101ffff);
 	INSTANCE_WR(ramfc, 0x60/4, 0x7fffffff);
-	INSTANCE_WR(ramfc, 0x10/4, 0x00000000);
-	INSTANCE_WR(ramfc, 0x08/4, 0x00000000);
 	INSTANCE_WR(ramfc, 0x40/4, 0x00000000);
 	INSTANCE_WR(ramfc, 0x50/4, 0x2039b2e0);
 	INSTANCE_WR(ramfc, 0x54/4, 0x000f0000);
@@ -316,8 +316,8 @@ nv50_fifo_load_context(struct nouveau_channel *chan)
 
 	/*XXX: incomplete, only touches the regs that NV does */
 
-	NV_WRITE(0x3244, 0);
-	NV_WRITE(0x3240, 0);
+	NV_WRITE(0x3244, INSTANCE_RD(ramfc, 0x08/4));
+	NV_WRITE(0x3240, INSTANCE_RD(ramfc, 0x10/4));
 
 	NV_WRITE(0x3224, INSTANCE_RD(ramfc, 0x3c/4));
 	NV_WRITE(NV04_PFIFO_CACHE1_DMA_INSTANCE, INSTANCE_RD(ramfc, 0x48/4));

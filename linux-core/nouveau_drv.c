@@ -28,6 +28,9 @@
 
 #include "drm_pciids.h"
 
+int nouveau_mm_enabled = 0;
+module_param_named(mm_enabled, nouveau_mm_enabled, int, 0400);
+
 unsigned int nouveau_modeset = 0; /* kms */
 module_param_named(modeset, nouveau_modeset, int, 0400);
 
@@ -84,6 +87,8 @@ static struct drm_driver driver = {
 		.remove = __devexit_p(drm_cleanup_pci),
 	},
 
+	.gem_init_object = nouveau_gem_object_new,
+	.gem_free_object = nouveau_gem_object_del,
         .bo_driver = &nouveau_bo_driver,
         .fence_driver = &nouveau_fence_driver,
 
@@ -108,8 +113,11 @@ static int __init nouveau_init(void)
 {
 	driver.num_ioctls = nouveau_max_ioctl;
 
+	if (nouveau_mm_enabled == 1)
+		driver.driver_features |= DRIVER_GEM;
+
 	if (nouveau_modeset == 1)
-		driver.driver_features |= DRIVER_MODESET;
+		driver.driver_features |= (DRIVER_MODESET | DRIVER_GEM);
 
 	return drm_init(&driver, pciidlist);
 }

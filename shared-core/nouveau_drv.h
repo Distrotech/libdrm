@@ -43,7 +43,24 @@
 #include "nouveau_reg.h"
 #include "nouveau_bios.h"
 
+#define DRM_NOUVEAU_BO_FLAG_NOVM  0x8000000000000000ULL
+#define DRM_NOUVEAU_BO_FLAG_TILE  0x4000000000000000ULL
+#define DRM_NOUVEAU_BO_FLAG_ZTILE 0x2000000000000000ULL
+
 #define MAX_NUM_DCB_ENTRIES 16
+
+struct nouveau_gem_object {
+	struct list_head entry;
+
+	struct drm_gem_object *gem;
+	struct drm_buffer_object *bo;
+};
+
+static inline struct nouveau_gem_object *
+nouveau_gem_object(struct drm_gem_object *gem)
+{
+	return gem ? gem->driver_private : NULL;
+}
 
 struct mem_block {
 	struct mem_block *next;
@@ -54,6 +71,9 @@ struct mem_block {
 	int flags;
 	drm_local_map_t *map;
 	drm_handle_t map_handle;
+
+	struct drm_buffer_object *bo;
+	struct drm_bo_kmap_obj kmap;
 };
 
 enum nouveau_flags {
@@ -146,22 +166,21 @@ struct nouveau_channel
 	struct mem_block          *ramin_heap; /* Private PRAMIN heap */
 	struct nouveau_gpuobj_ref *ramht; /* Hash table */
 	struct list_head           ramht_refs; /* Objects referenced by RAMHT */
-};
 
-struct nouveau_drm_channel {
-	struct nouveau_channel *chan;
+	/* GPU object info for stuff used in-kernel (mm_enabled) */
+	uint32_t m2mf_ntfy;
+	uint32_t vram_handle;
+	uint32_t gart_handle;
 
-	/* DMA state */
-	int max, put, cur, free;
-	int push_free;
-	volatile uint32_t *pushbuf;
-
-	/* Notifiers */
-	uint32_t notify0_offset;
-
-	/* Buffer moves */
-	uint32_t m2mf_dma_source;
-	uint32_t m2mf_dma_destin;
+	/* Push buffer state (only for drm's channel on !mm_enabled) */
+	struct {
+		int max;
+		int free;
+		int cur;
+		int put;
+		
+		volatile uint32_t *pushbuf;
+	} dma;
 };
 
 struct nouveau_config {
@@ -243,7 +262,7 @@ struct drm_nouveau_private {
 		NOUVEAU_CARD_INIT_FAILED
 	} init_state;
 
-	int ttm;
+	int mm_enabled;
 
 	/* the card type, takes NV_* as values */
 	int card_type;
@@ -259,7 +278,7 @@ struct drm_nouveau_private {
 	struct nouveau_channel *fifos[NOUVEAU_MAX_CHANNEL_NR];
 
 	struct nouveau_engine Engine;
-	struct nouveau_drm_channel channel;
+	struct nouveau_channel *channel;
 
 	/* RAMIN configuration, RAMFC, RAMHT and RAMRO offsets */
 	struct nouveau_gpuobj *ramht;
@@ -294,7 +313,12 @@ struct drm_nouveau_private {
 		unsigned long sg_handle;
 	} gart_info;
 
-	/* G8x global VRAM page table */
+	/* G8x/G9x virtual address space */
+	uint64_t vm_gart_base;
+	uint64_t vm_gart_size;
+	uint64_t vm_vram_base;
+	uint64_t vm_vram_size;
+	uint64_t vm_end;
 	struct nouveau_gpuobj *vm_vram_pt;
 
 	/* the mtrr covering the FB */
@@ -335,6 +359,7 @@ struct drm_nouveau_private {
 		unsigned char i2c_read[MAX_NUM_DCB_ENTRIES];
 		unsigned char i2c_write[MAX_NUM_DCB_ENTRIES];
 	} dcb_table;
+
 	struct nouveau_suspend_resume {
 		uint32_t fifo_mode;
 		uint32_t graph_ctx_control;
@@ -342,12 +367,30 @@ struct drm_nouveau_private {
 		uint32_t *ramin_copy;
 		uint64_t ramin_size;
 	} susres;
+
+	struct mutex submit_mutex;
 };
 
 #define NOUVEAU_CHECK_INITIALISED_WITH_RETURN do {         \
 	struct drm_nouveau_private *nv = dev->dev_private; \
 	if (nv->init_state != NOUVEAU_CARD_INIT_DONE) {    \
 		DRM_ERROR("called without init\n");        \
+		return -EINVAL;                            \
+	}                                                  \
+} while(0)
+
+#define NOUVEAU_CHECK_MM_ENABLED_WITH_RETURN do {          \
+	struct drm_nouveau_private *nv = dev->dev_private; \
+	if (!nv->mm_enabled) {                             \
+		DRM_ERROR("invalid - using legacy mm\n");  \
+		return -EINVAL;                            \
+	}                                                  \
+} while(0)
+
+#define NOUVEAU_CHECK_MM_DISABLED_WITH_RETURN do {         \
+	struct drm_nouveau_private *nv = dev->dev_private; \
+	if (nv->mm_enabled) {                              \
+		DRM_ERROR("invalid - using kernel mm\n");  \
 		return -EINVAL;                            \
 	}                                                  \
 } while(0)
@@ -389,7 +432,6 @@ extern struct mem_block *nouveau_mem_alloc_block(struct mem_block *,
 						 struct drm_file *, int tail);
 extern void nouveau_mem_takedown(struct mem_block **heap);
 extern void nouveau_mem_free_block(struct mem_block *);
-extern struct mem_block* find_block_by_handle(struct mem_block *heap, drm_handle_t handle);
 extern uint64_t nouveau_mem_fb_amount(struct drm_device *);
 extern void nouveau_mem_release(struct drm_file *, struct mem_block *heap);
 extern int  nouveau_ioctl_mem_alloc(struct drm_device *, void *data,
@@ -491,7 +533,8 @@ extern void nouveau_sgdma_nottm_hack_takedown(struct drm_device *);
 /* nouveau_dma.c */
 extern int  nouveau_dma_channel_init(struct drm_device *);
 extern void nouveau_dma_channel_takedown(struct drm_device *);
-extern int  nouveau_dma_wait(struct drm_device *, int size);
+extern int  nouveau_dma_channel_setup(struct nouveau_channel *);
+extern int  nouveau_dma_wait(struct nouveau_channel *, int size);
 
 /* nv04_fb.c */
 extern int  nv04_fb_init(struct drm_device *);
@@ -622,6 +665,32 @@ extern struct drm_bo_driver nouveau_bo_driver;
 /* nouveau_fence.c */
 extern struct drm_fence_driver nouveau_fence_driver;
 extern void nouveau_fence_handler(struct drm_device *dev, int channel);
+
+/* nouveau_gem.c */
+extern int nouveau_gem_object_new(struct drm_gem_object *);
+extern void nouveau_gem_object_del(struct drm_gem_object *);
+extern int nouveau_gem_new(struct drm_device *, struct nouveau_channel *,
+			   int size, int align, uint32_t domain,
+			   struct drm_gem_object **);
+extern int nouveau_gem_pin(struct drm_gem_object *, uint32_t domain);
+extern int nouveau_gem_ioctl_new(struct drm_device *, void *,
+				 struct drm_file *);
+extern int nouveau_gem_ioctl_pushbuf(struct drm_device *, void *,
+				     struct drm_file *);
+extern int nouveau_gem_ioctl_pushbuf_call(struct drm_device *, void *,
+					  struct drm_file *);
+extern int nouveau_gem_ioctl_pin(struct drm_device *, void *,
+				 struct drm_file *);
+extern int nouveau_gem_ioctl_unpin(struct drm_device *, void *,
+				   struct drm_file *);
+extern int nouveau_gem_ioctl_tile(struct drm_device *, void *,
+				  struct drm_file *);
+extern int nouveau_gem_ioctl_mmap(struct drm_device *, void *,
+				  struct drm_file *);
+extern int nouveau_gem_ioctl_cpu_prep(struct drm_device *, void *,
+				      struct drm_file *);
+extern int nouveau_gem_ioctl_cpu_fini(struct drm_device *, void *,
+				      struct drm_file *);
 
 #if defined(__powerpc__)
 #define NV_READ(reg)        in_be32((void __iomem *)(dev_priv->mmio)->handle + (reg) )

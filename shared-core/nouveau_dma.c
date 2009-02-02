@@ -33,13 +33,14 @@ int
 nouveau_dma_channel_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_drm_channel *dchan = &dev_priv->channel;
-	struct nouveau_gpuobj *gpuobj = NULL;
-	struct mem_block *pushbuf;
-	int grclass, ret, i;
+	struct mem_block *pushbuf = NULL;
+	int ret;
 
 	DRM_DEBUG("\n");
 
+	/* On !mm_enabled, we can't map a GART push buffer into kernel
+	 * space easily - so we'll just use VRAM.
+	 */
 	pushbuf = nouveau_mem_alloc(dev, 0, 0x8000,
 				    NOUVEAU_MEM_FB | NOUVEAU_MEM_MAPPED,
 				    (struct drm_file *)-2);
@@ -48,67 +49,23 @@ nouveau_dma_channel_init(struct drm_device *dev)
 		return -ENOMEM;
 	}
 
-	/* Allocate channel */
-	ret = nouveau_fifo_alloc(dev, &dchan->chan, (struct drm_file *)-2,
+	ret = nouveau_fifo_alloc(dev, &dev_priv->channel, (struct drm_file *)-2,
 				 pushbuf, NvDmaFB, NvDmaTT);
 	if (ret) {
 		DRM_ERROR("Error allocating GPU channel: %d\n", ret);
 		return ret;
 	}
-	DRM_DEBUG("Using FIFO channel %d\n", dchan->chan->id);
 
-	/* Map push buffer */
-	drm_core_ioremap(dchan->chan->pushbuf_mem->map, dev);
-	if (!dchan->chan->pushbuf_mem->map->handle) {
-		DRM_ERROR("Failed to ioremap push buffer\n");
-		return -EINVAL;
+	if (!dev_priv->mm_enabled) {
+		ret = nouveau_dma_channel_setup(dev_priv->channel);
+		if (ret) {
+			nouveau_fifo_free(dev_priv->channel);
+			dev_priv->channel = NULL;
+			return ret;
+		}
 	}
-	dchan->pushbuf = (void*)dchan->chan->pushbuf_mem->map->handle;
-
-	/* Initialise DMA vars */
-	dchan->max  = (dchan->chan->pushbuf_mem->size >> 2) - 2;
-	dchan->put  = dchan->chan->pushbuf_base >> 2;
-	dchan->cur  = dchan->put;
-	dchan->free = dchan->max - dchan->cur;
-
-	/* Insert NOPS for NOUVEAU_DMA_SKIPS */
-	dchan->free -= NOUVEAU_DMA_SKIPS;
-	dchan->push_free = NOUVEAU_DMA_SKIPS;
-	for (i=0; i < NOUVEAU_DMA_SKIPS; i++)
-		OUT_RING(0);
-
-	/* NV_MEMORY_TO_MEMORY_FORMAT requires a notifier */
-	if ((ret = nouveau_notifier_alloc(dchan->chan, NvNotify0, 1,
-					  &dchan->notify0_offset))) {
-		DRM_ERROR("Error allocating NvNotify0: %d\n", ret);
-		return ret;
-	}
-
-	/* We use NV_MEMORY_TO_MEMORY_FORMAT for buffer moves */
-	if (dev_priv->card_type < NV_50) grclass = NV_MEMORY_TO_MEMORY_FORMAT;
-	else                             grclass = NV50_MEMORY_TO_MEMORY_FORMAT;
-	if ((ret = nouveau_gpuobj_gr_new(dchan->chan, grclass, &gpuobj))) {
-		DRM_ERROR("Error creating NvM2MF: %d\n", ret);
-		return ret;
-	}
-
-	if ((ret = nouveau_gpuobj_ref_add(dev, dchan->chan, NvM2MF,
-					  gpuobj, NULL))) {
-		DRM_ERROR("Error referencing NvM2MF: %d\n", ret);
-		return ret;
-	}
-	dchan->m2mf_dma_source = NvDmaFB;
-	dchan->m2mf_dma_destin = NvDmaFB;
-
-	BEGIN_RING(NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_NAME, 1);
-	OUT_RING  (NvM2MF);
-	BEGIN_RING(NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_SET_DMA_NOTIFY, 1);
-	OUT_RING  (NvNotify0);
-	BEGIN_RING(NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_SET_DMA_SOURCE, 2);
-	OUT_RING  (dchan->m2mf_dma_source);
-	OUT_RING  (dchan->m2mf_dma_destin);
-	FIRE_RING();
-
+	
+	DRM_DEBUG("Using FIFO channel %d\n", dev_priv->channel->id);
 	return 0;
 }
 
@@ -116,57 +73,130 @@ void
 nouveau_dma_channel_takedown(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_drm_channel *dchan = &dev_priv->channel;
 
 	DRM_DEBUG("\n");
 
-	if (dchan->chan) {
-		nouveau_fifo_free(dchan->chan);
-		dchan->chan = NULL;
+	if (dev_priv->channel) {
+		nouveau_fifo_free(dev_priv->channel);
+		dev_priv->channel = NULL;
 	}
 }
 
-#define READ_GET() ((NV_READ(dchan->chan->get) -                               \
-		    dchan->chan->pushbuf_base) >> 2)
-#define WRITE_PUT(val) do {                                                    \
-	NV_WRITE(dchan->chan->put,                                             \
-		 ((val) << 2) + dchan->chan->pushbuf_base);                    \
-} while(0)
+int
+nouveau_dma_channel_setup(struct nouveau_channel *chan)
+{
+	struct drm_device *dev = chan->dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_gpuobj *m2mf = NULL;
+	int ret, i;
+
+	/* Create NV_MEMORY_TO_MEMORY_FORMAT for buffer moves */
+	ret = nouveau_gpuobj_gr_new(chan, dev_priv->card_type < NV_50 ?
+				    0x0039 : 0x5039, &m2mf);
+	if (ret)
+		return ret;
+
+	ret = nouveau_gpuobj_ref_add(dev, chan, NvM2MF, m2mf, NULL);
+	if (ret)
+		return ret;
+
+	/* NV_MEMORY_TO_MEMORY_FORMAT requires a notifier object */
+	ret = nouveau_notifier_alloc(chan, NvNotify0, 1, &chan->m2mf_ntfy);
+	if (ret)
+		return ret;
+
+	/* Map push buffer */
+	if (dev_priv->mm_enabled) {
+		ret = drm_bo_kmap(chan->pushbuf_mem->bo, 0,
+				  chan->pushbuf_mem->bo->mem.num_pages,
+				  &chan->pushbuf_mem->kmap);
+		if (ret)
+			return ret;
+		chan->dma.pushbuf = chan->pushbuf_mem->kmap.virtual;
+	} else {
+		drm_core_ioremap(chan->pushbuf_mem->map, dev);
+		if (!chan->pushbuf_mem->map->handle) {
+			DRM_ERROR("Failed to ioremap push buffer\n");
+			return -EINVAL;
+		}
+		chan->dma.pushbuf = (void *)chan->pushbuf_mem->map->handle;
+	}
+
+	/* Initialise DMA vars */
+	chan->dma.max  = (chan->pushbuf_mem->size >> 2) - 2;
+	chan->dma.put  = 0;
+	chan->dma.cur  = chan->dma.put;
+	chan->dma.free = chan->dma.max - chan->dma.cur;
+
+	/* Insert NOPS for NOUVEAU_DMA_SKIPS */
+	RING_SPACE(chan, NOUVEAU_DMA_SKIPS);
+	for (i = 0; i < NOUVEAU_DMA_SKIPS; i++)
+		OUT_RING (chan, 0);
+
+	/* Initialise NV_MEMORY_TO_MEMORY_FORMAT */
+	RING_SPACE(chan, 4);
+	BEGIN_RING(chan, NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_NAME, 1);
+	OUT_RING  (chan, NvM2MF);
+	BEGIN_RING(chan, NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_DMA_NOTIFY, 1);
+	OUT_RING  (chan, NvNotify0);
+
+	/* Sit back and pray the channel works.. */
+	FIRE_RING (chan);
+
+	return 0;
+}
+
+#define READ_GET() ((NV_READ(chan->get) - chan->pushbuf_base) >> 2)
+#define WRITE_PUT(val) NV_WRITE(chan->put, ((val) << 2) + chan->pushbuf_base)
 
 int
-nouveau_dma_wait(struct drm_device *dev, int size)
+nouveau_dma_wait(struct nouveau_channel *chan, int size)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_drm_channel *dchan = &dev_priv->channel;
-	uint32_t get;
+	struct drm_nouveau_private *dev_priv = chan->dev->dev_private;
+	const int us_timeout = 100000;
+	int ret = -EBUSY, i;
 
-	while (dchan->free < size) {
-		get = READ_GET();
+	for (i = 0; i < us_timeout; i++) {
+		uint32_t get = READ_GET();
 
-		if (dchan->put >= get) {
-			dchan->free = dchan->max - dchan->cur;
+		if (chan->dma.put >= get) {
+			chan->dma.free = chan->dma.max - chan->dma.cur;
 
-			if (dchan->free < size) {
-				dchan->push_free = 1;
-				OUT_RING(0x20000000|dchan->chan->pushbuf_base);
+			if (chan->dma.free < size) {
+				OUT_RING(chan, 0x20000000|chan->pushbuf_base);
 				if (get <= NOUVEAU_DMA_SKIPS) {
 					/*corner case - will be idle*/
-					if (dchan->put <= NOUVEAU_DMA_SKIPS)
+					if (chan->dma.put <= NOUVEAU_DMA_SKIPS)
 						WRITE_PUT(NOUVEAU_DMA_SKIPS + 1);
 
-					do {
+					for (; i < us_timeout; i++) {
 						get = READ_GET();
-					} while (get <= NOUVEAU_DMA_SKIPS);
+						if (get > NOUVEAU_DMA_SKIPS)
+							break;
+
+						DRM_UDELAY(1);
+					}
+
+					if (i >= us_timeout)
+						break;
 				}
 
 				WRITE_PUT(NOUVEAU_DMA_SKIPS);
-				dchan->cur  = dchan->put = NOUVEAU_DMA_SKIPS;
-				dchan->free = get - (NOUVEAU_DMA_SKIPS + 1);
+				chan->dma.cur  =
+				chan->dma.put  = NOUVEAU_DMA_SKIPS;
+				chan->dma.free = get - (NOUVEAU_DMA_SKIPS + 1);
 			}
 		} else {
-			dchan->free = get - dchan->cur - 1;
+			chan->dma.free = get - chan->dma.cur - 1;
 		}
+
+		if (chan->dma.free >= size) {
+			ret = 0;
+			break;
+		}
+
+		DRM_UDELAY(1);
 	}
 
-	return 0;
+	return ret;
 }

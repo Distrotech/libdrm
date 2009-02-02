@@ -32,7 +32,7 @@
 struct nv50_crtc;
 
 struct nv50_fb_info {
-	struct mem_block *block;
+	struct drm_gem_object *gem;
 	int width, height;
 	int bpp, depth;
 	int pitch;
@@ -40,7 +40,7 @@ struct nv50_fb_info {
 };
 
 struct nv50_fb {
-	struct mem_block *block;
+	struct drm_gem_object *gem;
 	int width, height;
 	int bpp, depth;
 	int pitch;
@@ -50,6 +50,18 @@ struct nv50_fb {
 	/* function points */
 	int (*bind) (struct nv50_crtc *crtc, struct nv50_fb_info *info);
 };
+
+struct nv50_framebuffer {
+	struct drm_framebuffer base;
+	struct drm_gem_object *gem;
+	struct drm_bo_kmap_obj kmap;
+};
+
+static inline struct nv50_framebuffer *
+nv50_framebuffer(struct drm_framebuffer *fb)
+{
+	return (struct nv50_framebuffer *)fb;
+}
 
 int nv50_fb_create(struct nv50_crtc *crtc);
 int nv50_fb_destroy(struct nv50_crtc *crtc);

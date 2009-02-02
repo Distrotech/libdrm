@@ -40,13 +40,15 @@ static int nv50_fb_bind(struct nv50_crtc *crtc, struct nv50_fb_info *info)
 		return -EINVAL;
 	}
 
-	if (!info->block || !info->width || !info->height || !info->depth || !info->bpp || !info->pitch) {
-		DRM_ERROR("block %p width %d height %d depth %d bpp %d pitch %d\n", info->block, info->width, 
-			info->height, info->depth, info->bpp, info->pitch);
+	if (!info->gem || !info->width || !info->height || !info->depth ||
+	    !info->bpp || !info->pitch) {
+		DRM_ERROR("gem %p width %d height %d depth %d bpp %d pitch %d\n",
+			  info->gem, info->width, info->height, info->depth,
+			  info->bpp, info->pitch);
 		return -EINVAL;
 	}
 
-	crtc->fb->block = info->block;
+	crtc->fb->gem = info->gem;
 	crtc->fb->width = info->width;
 	crtc->fb->height = info->height;
 

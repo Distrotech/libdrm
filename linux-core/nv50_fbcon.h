@@ -39,3 +39,4 @@ int nv50_fbcon_init(struct drm_device *dev);
 int nv50_fbcon_destroy(struct drm_device *dev);
 
 #endif /* __NV50_FBCON_H__ */
+

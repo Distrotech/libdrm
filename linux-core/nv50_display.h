@@ -29,8 +29,8 @@
 
 #include "drmP.h"
 #include "drm.h"
-#include "nouveau_dma.h"
 #include "nouveau_drv.h"
+#include "nouveau_dma.h"
 #include "nouveau_reg.h"
 #include "nv50_display_commands.h"
 

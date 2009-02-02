@@ -295,7 +295,11 @@ nouveau_card_init(struct drm_device *dev)
 
 	if (dev_priv->init_state == NOUVEAU_CARD_INIT_DONE)
 		return 0;
-	dev_priv->ttm = 0;
+
+	if (drm_core_check_feature(dev, DRIVER_GEM))
+		dev_priv->mm_enabled = 1;
+	else
+		dev_priv->mm_enabled = 0;
 
 	/* Determine exact chipset we're running on */
 	if (dev_priv->card_type < NV_10)
@@ -321,7 +325,7 @@ nouveau_card_init(struct drm_device *dev)
 	if (ret) return ret;
 
 	/* Setup the memory manager */
-	if (dev_priv->ttm) {
+	if (dev_priv->mm_enabled) {
 		ret = nouveau_mem_init_ttm(dev);
 		if (ret) return ret;
 	} else {
@@ -365,6 +369,8 @@ nouveau_card_init(struct drm_device *dev)
 	ret = nouveau_dma_channel_init(dev);
 	if (ret) return ret;
 
+	mutex_init(&dev_priv->submit_mutex);
+
 	dev_priv->init_state = NOUVEAU_CARD_INIT_DONE;
 
 	if (drm_core_check_feature(dev, DRIVER_MODESET))
@@ -393,7 +399,13 @@ static void nouveau_card_takedown(struct drm_device *dev)
 		engine->timer.takedown(dev);
 		engine->mc.takedown(dev);
 
-		nouveau_sgdma_nottm_hack_takedown(dev);
+		if (dev_priv->mm_enabled) {
+			mutex_lock(&dev->struct_mutex);
+			drm_bo_clean_mm(dev, DRM_BO_MEM_TT, 1);
+			mutex_unlock(&dev->struct_mutex);
+		} else {
+			nouveau_sgdma_nottm_hack_takedown(dev);
+		}
 		nouveau_sgdma_takedown(dev);
 
 		nouveau_gpuobj_takedown(dev);
@@ -417,9 +429,12 @@ void nouveau_preclose(struct drm_device *dev, struct drm_file *file_priv)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
 	nouveau_fifo_cleanup(dev, file_priv);
-	nouveau_mem_release(file_priv,dev_priv->fb_heap);
-	nouveau_mem_release(file_priv,dev_priv->agp_heap);
-	nouveau_mem_release(file_priv,dev_priv->pci_heap);
+
+	if (!dev_priv->mm_enabled) {
+		nouveau_mem_release(file_priv, dev_priv->fb_heap);
+		nouveau_mem_release(file_priv, dev_priv->agp_heap);
+		nouveau_mem_release(file_priv, dev_priv->pci_heap);
+	}
 }
 
 int nouveau_setup_mappings(struct drm_device *dev)
@@ -595,15 +610,8 @@ void nouveau_close(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
 	/* In the case of an error dev_priv may not be be allocated yet */
-	if (dev_priv && dev_priv->card_type) {
+	if (dev_priv && dev_priv->card_type)
 		nouveau_card_takedown(dev);
-
-		if(dev_priv->fb_mtrr>0)
-		{
-			drm_mtrr_del(dev_priv->fb_mtrr, drm_get_resource_start(dev, 1),nouveau_mem_fb_amount(dev), DRM_MTRR_WC);
-			dev_priv->fb_mtrr=0;
-		}
-	}
 }
 
 /* KMS: we need mmio at load time, not when the first drm client opens. */
@@ -618,8 +626,8 @@ void nouveau_lastclose(struct drm_device *dev)
 int nouveau_unload(struct drm_device *dev)
 {
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
-		nv50_kms_destroy(dev);
 		nv50_fbcon_destroy(dev);
+		nv50_kms_destroy(dev);
 		nouveau_close(dev);
 	}
 
@@ -682,13 +690,10 @@ int nouveau_ioctl_getparam(struct drm_device *dev, void *data, struct drm_file *
 		getparam->value=dev_priv->gart_info.aper_size;
 		break;
 	case NOUVEAU_GETPARAM_MM_ENABLED:
-		getparam->value = 0;
+		getparam->value = dev_priv->mm_enabled;
 		break;
 	case NOUVEAU_GETPARAM_VM_VRAM_BASE:
-		if (dev_priv->card_type >= NV_50)
-			getparam->value = 0x20000000;
-		else
-			getparam->value = 0;
+		getparam->value = dev_priv->vm_vram_base;
 		break;
 	default:
 		DRM_ERROR("unknown parameter %lld\n", getparam->param);
@@ -698,7 +703,9 @@ int nouveau_ioctl_getparam(struct drm_device *dev, void *data, struct drm_file *
 	return 0;
 }
 
-int nouveau_ioctl_setparam(struct drm_device *dev, void *data, struct drm_file *file_priv)
+int
+nouveau_ioctl_setparam(struct drm_device *dev, void *data,
+		       struct drm_file *file_priv)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_nouveau_setparam *setparam = data;
@@ -718,6 +725,7 @@ int nouveau_ioctl_setparam(struct drm_device *dev, void *data, struct drm_file *
 					setparam->value);
 			return -EINVAL;
 		}
+
 		dev_priv->config.cmdbuf.location = setparam->value;
 		break;
 	case NOUVEAU_SETPARAM_CMDBUF_SIZE:

@@ -244,15 +244,18 @@ nv50_graph_destroy_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	int i, hdr;
 
 	DRM_DEBUG("ch%d\n", chan->id);
 
-	hdr = IS_G80 ? 0x200 : 0x20;
-	for (i=hdr; i<hdr+24; i+=4)
-		INSTANCE_WR(chan->ramin->gpuobj, i/4, 0);
+	if (chan->ramin && chan->ramin->gpuobj) {
+		int i, hdr;
 
-	nouveau_gpuobj_ref_del(dev, &chan->ramin_grctx);
+		hdr = IS_G80 ? 0x200 : 0x20;
+		for (i=hdr; i<hdr+24; i+=4)
+			INSTANCE_WR(chan->ramin->gpuobj, i/4, 0);
+
+		nouveau_gpuobj_ref_del(dev, &chan->ramin_grctx);
+	}
 }
 
 static int

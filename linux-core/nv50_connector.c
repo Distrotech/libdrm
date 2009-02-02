@@ -226,8 +226,10 @@ int nv50_connector_create(struct drm_device *dev, int bus, int i2c_index, int ty
 
 	connector->use_dithering = false;
 
-	if (i2c_index < 0xf)
+	if (i2c_index < 0xf) {
+		i2c_index = dev_priv->dcb_table.i2c_read[i2c_index];
 		connector->i2c_chan = nv50_i2c_channel_create(dev, i2c_index);
+	}
 
 	/* set function pointers */
 	connector->hpd_detect = nv50_connector_hpd_detect;

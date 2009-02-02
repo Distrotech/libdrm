@@ -32,10 +32,10 @@ typedef enum {
 } nouveau_subchannel_id_t;
 
 typedef enum {
-	NvM2MF		= 0x80039001,
-	NvDmaFB		= 0x8003d001,
-	NvDmaTT		= 0x8003d002,
-	NvNotify0       = 0x8003d003
+	NvM2MF		= 0x80000001,
+	NvDmaFB		= 0x80000002,
+	NvDmaTT		= 0x80000003,
+	NvNotify0       = 0x80000004
 } nouveau_object_handle_t;
 
 #define NV_MEMORY_TO_MEMORY_FORMAT                                    0x00000039
@@ -45,8 +45,8 @@ typedef enum {
 #define NV_MEMORY_TO_MEMORY_FORMAT_NOTIFY                             0x00000104
 #define NV_MEMORY_TO_MEMORY_FORMAT_NOTIFY_STYLE_WRITE                 0x00000000
 #define NV_MEMORY_TO_MEMORY_FORMAT_NOTIFY_STYLE_WRITE_LE_AWAKEN       0x00000001
-#define NV_MEMORY_TO_MEMORY_FORMAT_SET_DMA_NOTIFY                     0x00000180
-#define NV_MEMORY_TO_MEMORY_FORMAT_SET_DMA_SOURCE                     0x00000184
+#define NV_MEMORY_TO_MEMORY_FORMAT_DMA_NOTIFY                         0x00000180
+#define NV_MEMORY_TO_MEMORY_FORMAT_DMA_SOURCE                         0x00000184
 #define NV_MEMORY_TO_MEMORY_FORMAT_OFFSET_IN                          0x0000030c
 
 #define NV50_MEMORY_TO_MEMORY_FORMAT                                  0x00005039
@@ -55,43 +55,45 @@ typedef enum {
 #define NV50_MEMORY_TO_MEMORY_FORMAT_OFFSET_IN_HIGH                   0x00000238
 #define NV50_MEMORY_TO_MEMORY_FORMAT_OFFSET_OUT_HIGH                  0x0000023c
 
-#define BEGIN_RING(subc, mthd, cnt) do {                                       \
-	int push_size = (cnt) + 1;                                             \
-	if (dchan->push_free) {                                                \
-		DRM_ERROR("prior packet incomplete: %d\n", dchan->push_free);  \
-		break;                                                         \
-	}                                                                      \
-	if (dchan->free < push_size) {                                         \
-		if (nouveau_dma_wait(dev, push_size)) {                        \
-			DRM_ERROR("FIFO timeout\n");                           \
-			break;                                                 \
-		}                                                              \
-	}                                                                      \
-	dchan->free -= push_size;                                              \
-	dchan->push_free = push_size;                                          \
-	OUT_RING(((cnt)<<18) | ((subc)<<15) | mthd);                           \
-} while(0)
+static inline int
+RING_SPACE(struct nouveau_channel *chan, int size)
+{
+	if (chan->dma.free < size) {
+		int ret;
 
-#define OUT_RING(data) do {                                                    \
-	if (dchan->push_free == 0) {                                           \
-		DRM_ERROR("no space left in packet\n");                        \
-		break;                                                         \
-	}                                                                      \
-	dchan->pushbuf[dchan->cur++] = (data);                                 \
-	dchan->push_free--;                                                    \
-} while(0)
+		ret = nouveau_dma_wait(chan, size);
+		if (ret)
+			return ret;
+	}
 
-#define FIRE_RING() do {                                                       \
-	if (dchan->push_free) {                                                \
-		DRM_ERROR("packet incomplete: %d\n", dchan->push_free);        \
-		break;                                                         \
-	}                                                                      \
-	if (dchan->cur != dchan->put) {                                        \
-		DRM_MEMORYBARRIER();                                           \
-		dchan->put = dchan->cur;                                       \
-		NV_WRITE(dchan->chan->put, dchan->put << 2);                   \
-	}                                                                      \
-} while(0)
+	chan->dma.free -= size;
+	return 0;
+}
+
+static inline void
+OUT_RING(struct nouveau_channel *chan, int data)
+{
+	chan->dma.pushbuf[chan->dma.cur++] = data;
+}
+
+static inline void
+BEGIN_RING(struct nouveau_channel *chan, int subc, int mthd, int size)
+{
+	OUT_RING(chan, (subc << 13) | (size << 18) | mthd);
+}
+
+static inline void
+FIRE_RING(struct nouveau_channel *chan)
+{
+	struct drm_nouveau_private *dev_priv = chan->dev->dev_private;
+
+	if (chan->dma.cur == chan->dma.put)
+		return;
+
+	DRM_MEMORYBARRIER();
+	chan->dma.put = chan->dma.cur;
+	NV_WRITE(chan->put, (chan->dma.put << 2) + chan->pushbuf_base);
+}
 
 /* This should allow easy switching to a real fifo in the future. */
 #define OUT_MODE(mthd, val) do {				\

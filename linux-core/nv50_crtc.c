@@ -168,13 +168,16 @@ static int nv50_crtc_set_fb(struct nv50_crtc *crtc)
 static int nv50_crtc_blank(struct nv50_crtc *crtc, bool blanked)
 {
 	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct nouveau_gem_object *ngem = nouveau_gem_object(crtc->fb->gem);
 	uint32_t offset = crtc->index * 0x400;
+	uint32_t v_vram = ngem->bo->offset - dev_priv->vm_vram_base;
+	uint32_t v_lut = crtc->lut->bo->offset - dev_priv->vm_vram_base;
 
 	NV50_DEBUG("index %d\n", crtc->index);
 	NV50_DEBUG("%s\n", blanked ? "blanked" : "unblanked");
 
 	/* We really need a framebuffer. */
-	if (!crtc->fb->block && !blanked) {
+	if (!ngem && !blanked) {
 		DRM_ERROR("No framebuffer available on crtc %d\n", crtc->index);
 		return -EINVAL;
 	}
@@ -190,7 +193,7 @@ static int nv50_crtc_blank(struct nv50_crtc *crtc, bool blanked)
 		if (dev_priv->chipset != 0x50)
 			OUT_MODE(NV84_CRTC0_BLANK_UNK2 + offset, NV84_CRTC0_BLANK_UNK2_BLANK);
 	} else {
-		OUT_MODE(NV50_CRTC0_FB_OFFSET + offset, crtc->fb->block->start >> 8);
+		OUT_MODE(NV50_CRTC0_FB_OFFSET + offset, v_vram >> 8);
 		OUT_MODE(0x864 + offset, 0);
 
 		crtc->cursor->set_offset(crtc);
@@ -205,7 +208,7 @@ static int nv50_crtc_blank(struct nv50_crtc *crtc, bool blanked)
 
 		OUT_MODE(NV50_CRTC0_CLUT_MODE + offset, 
 			crtc->fb->depth == 8 ? NV50_CRTC0_CLUT_MODE_OFF : NV50_CRTC0_CLUT_MODE_ON);
-		OUT_MODE(NV50_CRTC0_CLUT_OFFSET + offset, crtc->lut->block->start >> 8);
+		OUT_MODE(NV50_CRTC0_CLUT_OFFSET + offset, v_lut >> 8);
 		if (dev_priv->chipset != 0x50)
 			OUT_MODE(NV84_CRTC0_BLANK_UNK1 + offset, NV84_CRTC0_BLANK_UNK1_UNBLANK);
 		OUT_MODE(NV50_CRTC0_BLANK_CTRL + offset, NV50_CRTC0_BLANK_CTRL_UNBLANK);

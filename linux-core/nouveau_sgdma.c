@@ -1,5 +1,6 @@
 #include "drmP.h"
 #include "nouveau_drv.h"
+#include <linux/pagemap.h>
 
 #define NV_CTXDMA_PAGE_SHIFT 12
 #define NV_CTXDMA_PAGE_SIZE  (1 << NV_CTXDMA_PAGE_SHIFT)
@@ -115,8 +116,17 @@ nouveau_sgdma_bind(struct drm_ttm_backend *be, struct drm_bo_mem_reg *mem)
 		if (dev_priv->card_type < NV_50) {
 			INSTANCE_WR(gpuobj, i, pteval | 3);
 		} else {
+			unsigned tile = 0;
+
+			if (mem->proposed_flags & DRM_NOUVEAU_BO_FLAG_TILE &&
+			    mem->proposed_flags & DRM_NOUVEAU_BO_FLAG_ZTILE)
+				tile = 0x2800;
+			else
+			if (mem->proposed_flags & DRM_NOUVEAU_BO_FLAG_TILE)
+				tile = 0x7000;
+
 			INSTANCE_WR(gpuobj, (i<<1)+0, pteval | 0x21);
-			INSTANCE_WR(gpuobj, (i<<1)+1, 0x00000000);
+			INSTANCE_WR(gpuobj, (i<<1)+1, tile);
 		}
 	}
 
@@ -313,6 +323,7 @@ nouveau_sgdma_nottm_hack_init(struct drm_device *dev)
 
 	mm_node.start = 0;
 	mem.mm_node = &mm_node;
+	mem.proposed_flags = 0;
 
 	if ((ret = be->func->bind(be, &mem))) {
 		DRM_ERROR("failed bind: %d\n", ret);

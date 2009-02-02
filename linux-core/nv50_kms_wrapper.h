@@ -92,4 +92,8 @@ bool nv50_kms_connector_get_digital(struct drm_connector *drm_connector);
 int nv50_kms_init(struct drm_device *dev);
 int nv50_kms_destroy(struct drm_device *dev);
 
+struct drm_framebuffer *
+nv50_framebuffer_create(struct drm_device *, struct drm_gem_object *,
+			struct drm_mode_fb_cmd *);
+
 #endif /* __NV50_KMS_WRAPPER_H__ */

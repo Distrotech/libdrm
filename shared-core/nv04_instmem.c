@@ -15,7 +15,17 @@ nv04_instmem_determine_amount(struct drm_device *dev)
 		 * of vram.  For now, only reserve a small piece until we know
 		 * more about what each chipset requires.
 		 */
-		dev_priv->ramin_rsvd_vram = (1*1024* 1024);
+		switch (dev_priv->chipset & 0xf0) {
+		case 0x40:
+		case 0x47:
+		case 0x49:
+		case 0x4b:
+			dev_priv->ramin_rsvd_vram = (2*1024* 1024);
+			break;
+		default:
+			dev_priv->ramin_rsvd_vram = (1*1024* 1024);
+			break;
+		}
 	} else {
 		/*XXX: what *are* the limits on <NV40 cards?, and does RAMIN
 		 *     exist in vram on those cards as well?

@@ -193,32 +193,59 @@ static void nv50_kms_mirror_routing(struct drm_device *dev)
  * FB functions.
  */
 
-static void nv50_kms_framebuffer_destroy(struct drm_framebuffer *drm_framebuffer)
+static void nv50_kms_framebuffer_destroy(struct drm_framebuffer *fb)
 {
-	drm_framebuffer_cleanup(drm_framebuffer);
+	struct nv50_framebuffer *nv50_fb = nv50_framebuffer(fb);
 
-	kfree(drm_framebuffer);
+	drm_gem_object_unreference(nv50_fb->gem);
+	drm_framebuffer_cleanup(&nv50_fb->base);
+	kfree(nv50_fb);
+}
+
+static int
+nv50_kms_framebuffer_create_handle(struct drm_framebuffer *fb,
+				   struct drm_file *file_priv,
+				   unsigned int *handle)
+{
+	struct nv50_framebuffer *nv50_fb = nv50_framebuffer(fb);
+
+	return drm_gem_handle_create(file_priv, nv50_fb->gem, handle);
 }
 
 static const struct drm_framebuffer_funcs nv50_kms_fb_funcs = {
 	.destroy = nv50_kms_framebuffer_destroy,
+	.create_handle = nv50_kms_framebuffer_create_handle,
 };
 
 /*
  * Mode config functions.
  */
 
-static struct drm_framebuffer *nv50_kms_framebuffer_create(struct drm_device *dev,
-						struct drm_file *file_priv, struct drm_mode_fb_cmd *mode_cmd)
+struct drm_framebuffer *
+nv50_framebuffer_create(struct drm_device *dev, struct drm_gem_object *gem,
+			struct drm_mode_fb_cmd *mode_cmd)
 {
-	struct drm_framebuffer *drm_framebuffer = kzalloc(sizeof(struct drm_framebuffer), GFP_KERNEL);
-	if (!drm_framebuffer)
+	struct nv50_framebuffer *nv50_fb;
+
+	nv50_fb = kzalloc(sizeof(struct nv50_framebuffer), GFP_KERNEL);
+	if (!nv50_fb)
 		return NULL;
 
-	drm_framebuffer_init(dev, drm_framebuffer, &nv50_kms_fb_funcs);
-	drm_helper_mode_fill_fb_struct(drm_framebuffer, mode_cmd);
+	drm_framebuffer_init(dev, &nv50_fb->base, &nv50_kms_fb_funcs);
+	drm_helper_mode_fill_fb_struct(&nv50_fb->base, mode_cmd);
 
-	return drm_framebuffer;
+	nv50_fb->gem = gem;
+	return &nv50_fb->base;
+}
+
+static struct drm_framebuffer *
+nv50_kms_framebuffer_create(struct drm_device *dev, struct drm_file *file_priv,
+			    struct drm_mode_fb_cmd *mode_cmd)
+{
+	struct drm_gem_object *gem;
+
+	gem = drm_gem_object_lookup(dev, file_priv, mode_cmd->handle);
+	return nv50_framebuffer_create(dev, gem, mode_cmd);
 }
 
 static int nv50_kms_fb_changed(struct drm_device *dev)
@@ -241,39 +268,38 @@ static int nv50_kms_crtc_cursor_set(struct drm_crtc *drm_crtc,
 				    uint32_t buffer_handle,
 				    uint32_t width, uint32_t height)
 {
+	struct drm_device *dev = drm_crtc->dev;
 	struct nv50_crtc *crtc = to_nv50_crtc(drm_crtc);
 	struct nv50_display *display = nv50_get_display(crtc->dev);
-	int rval = 0;
+	struct drm_gem_object *gem = NULL;
+	int ret = 0;
 
 	if (width != 64 || height != 64)
 		return -EINVAL;
 
-	/* set bo before doing show cursor */
 	if (buffer_handle) {
-		rval = crtc->cursor->set_bo(crtc, (drm_handle_t) buffer_handle);
-		if (rval != 0)
-			goto out;
+		gem = drm_gem_object_lookup(dev, file_priv, buffer_handle);
+		if (!gem)
+			return -EINVAL;
+
+		ret = nouveau_gem_pin(gem, NOUVEAU_GEM_DOMAIN_VRAM);
+		if (ret) {
+			mutex_lock(&dev->struct_mutex);
+			drm_gem_object_unreference(gem);
+			mutex_unlock(&dev->struct_mutex);
+			return ret;
+		}
+
+		crtc->cursor->set_bo(crtc, gem);
+		crtc->cursor->set_offset(crtc);
+		ret = crtc->cursor->show(crtc);
+	} else {
+		crtc->cursor->set_bo(crtc, NULL);
+		crtc->cursor->hide(crtc);
 	}
 
-	crtc->cursor->visible = buffer_handle ? true : false;
-
-	if (buffer_handle) {
-		rval = crtc->cursor->show(crtc);
-		if (rval != 0)
-			goto out;
-	} else { /* no handle implies hiding the cursor */
-		rval = crtc->cursor->hide(crtc);
-		goto out;
-	}
-
-	if (rval != 0)
-		return rval;
-
-out:
-	/* in case this triggers any other cursor changes */
 	display->update(display);
-
-	return rval;
+	return ret;
 }
 
 static int nv50_kms_crtc_cursor_move(struct drm_crtc *drm_crtc, int x, int y)
@@ -520,7 +546,7 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 
 		/* set private framebuffer */
 		crtc = to_nv50_crtc(set->crtc);
-		fb_info.block = find_block_by_handle(dev_priv->fb_heap, set->fb->mm_handle);
+		fb_info.gem = nv50_framebuffer(set->fb)->gem;
 		fb_info.width = set->fb->width;
 		fb_info.height = set->fb->height;
 		fb_info.depth = set->fb->depth;

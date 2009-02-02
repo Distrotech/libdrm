@@ -55,11 +55,7 @@ nouveau_bo_fence_type(struct drm_buffer_object *bo,
 		      uint32_t *fclass, uint32_t *type)
 {
 	/* When we get called, *fclass is set to the requested fence class */
-
-	if (bo->mem.proposed_flags & (DRM_BO_FLAG_READ | DRM_BO_FLAG_WRITE))
-		*type = 3;
-	else
-		*type = 1;
+	*type = 1;
 	return 0;
 
 }
@@ -93,6 +89,7 @@ nouveau_bo_init_mem_type(struct drm_device *dev, uint32_t type,
 		man->io_size = drm_get_resource_len(dev, 1);
 		if (man->io_size > nouveau_mem_fb_amount(dev))
 			man->io_size = nouveau_mem_fb_amount(dev);
+		man->gpu_offset = dev_priv->vm_vram_base;
 		break;
 	case DRM_BO_MEM_PRIV0:
 		/* Unmappable VRAM */
@@ -122,6 +119,7 @@ nouveau_bo_init_mem_type(struct drm_device *dev, uint32_t type,
 		man->io_offset  = dev_priv->gart_info.aper_base;
 		man->io_size    = dev_priv->gart_info.aper_size;
 		man->io_addr   = NULL;
+		man->gpu_offset = dev_priv->vm_gart_base;
 		break;
 	default:
 		DRM_ERROR("Unsupported memory type %u\n", (unsigned)type);
@@ -147,52 +145,66 @@ nouveau_bo_evict_flags(struct drm_buffer_object *bo)
 /* GPU-assisted copy using NV_MEMORY_TO_MEMORY_FORMAT, can access
  * DRM_BO_MEM_{VRAM,PRIV0,TT} directly.
  */
+static inline uint32_t
+nouveau_bo_mem_ctxdma(struct nouveau_channel *chan, struct drm_bo_mem_reg *mem)
+{
+	if (mem->mem_type == DRM_BO_MEM_TT)
+		return chan->gart_handle;
+
+	return chan->vram_handle;
+}
+
 static int
 nouveau_bo_move_m2mf(struct drm_buffer_object *bo, int evict, int no_wait,
+		     struct drm_bo_mem_reg *old_mem,
 		     struct drm_bo_mem_reg *new_mem)
 {
 	struct drm_device *dev = bo->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_drm_channel *dchan = &dev_priv->channel;
-	struct drm_bo_mem_reg *old_mem = &bo->mem;
-	uint32_t srch, dsth, page_count;
+	struct nouveau_channel *chan = dev_priv->fifos[bo->new_fence_class];
+	uint32_t page_count;
 
-	/* Can happen during init/takedown */
-	if (!dchan->chan)
-		return -EINVAL;
+	if (!chan) {
+		DRM_ERROR("channel %d non-existant, using kchan\n",
+			  bo->fence_class);
 
-	srch = old_mem->mem_type == DRM_BO_MEM_TT ? NvDmaTT : NvDmaFB;
-	dsth = new_mem->mem_type == DRM_BO_MEM_TT ? NvDmaTT : NvDmaFB;
-	if (srch != dchan->m2mf_dma_source || dsth != dchan->m2mf_dma_destin) {
-		dchan->m2mf_dma_source = srch;
-		dchan->m2mf_dma_destin = dsth;
-
-		BEGIN_RING(NvSubM2MF,
-			   NV_MEMORY_TO_MEMORY_FORMAT_SET_DMA_SOURCE, 2);
-		OUT_RING  (dchan->m2mf_dma_source);
-		OUT_RING  (dchan->m2mf_dma_destin);
+		chan = dev_priv->channel;
+		if (!chan)
+			return -EINVAL;
 	}
+
+	RING_SPACE(chan, 3);
+	BEGIN_RING(chan, NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_DMA_SOURCE, 2);
+	OUT_RING  (chan, nouveau_bo_mem_ctxdma(chan, old_mem));
+	OUT_RING  (chan, nouveau_bo_mem_ctxdma(chan, new_mem));
 
 	page_count = new_mem->num_pages;
 	while (page_count) {
 		int line_count = (page_count > 2047) ? 2047 : page_count;
 
-		BEGIN_RING(NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_OFFSET_IN, 8);
-		OUT_RING  (old_mem->mm_node->start << PAGE_SHIFT);
-		OUT_RING  (new_mem->mm_node->start << PAGE_SHIFT);
-		OUT_RING  (PAGE_SIZE); /* src_pitch */
-		OUT_RING  (PAGE_SIZE); /* dst_pitch */
-		OUT_RING  (PAGE_SIZE); /* line_length */
-		OUT_RING  (line_count);
-		OUT_RING  ((1<<8)|(1<<0));
-		OUT_RING  (0);
-		BEGIN_RING(NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_NOP, 1);
-		OUT_RING  (0);
+		RING_SPACE(chan, 11);
+		BEGIN_RING(chan, NvSubM2MF,
+				 NV_MEMORY_TO_MEMORY_FORMAT_OFFSET_IN, 8);
+		/*XXX: not correct on nv5x - these'd be offsets from
+		 *     the start of the memtype - not in the GPU
+		 *     address space.. sigh..  not used on nv5x currently
+		 *     due to other reasons anyhow, so, later!
+		 */
+		OUT_RING  (chan, old_mem->mm_node->start << PAGE_SHIFT);
+		OUT_RING  (chan, new_mem->mm_node->start << PAGE_SHIFT);
+		OUT_RING  (chan, PAGE_SIZE); /* src_pitch */
+		OUT_RING  (chan, PAGE_SIZE); /* dst_pitch */
+		OUT_RING  (chan, PAGE_SIZE); /* line_length */
+		OUT_RING  (chan, line_count);
+		OUT_RING  (chan, (1<<8)|(1<<0));
+		OUT_RING  (chan, 0);
+		BEGIN_RING(chan, NvSubM2MF, NV_MEMORY_TO_MEMORY_FORMAT_NOP, 1);
+		OUT_RING  (chan, 0);
 
 		page_count -= line_count;
 	}
 
-	return drm_bo_move_accel_cleanup(bo, evict, no_wait, dchan->chan->id,
+	return drm_bo_move_accel_cleanup(bo, evict, no_wait, chan->id,
 					 DRM_FENCE_TYPE_EXE, 0, new_mem);
 }
 
@@ -201,47 +213,127 @@ static int
 nouveau_bo_move_flipd(struct drm_buffer_object *bo, int evict, int no_wait,
 		      struct drm_bo_mem_reg *new_mem)
 {
-        struct drm_device *dev = bo->dev;
-        struct drm_bo_mem_reg tmp_mem;
-        int ret;
+	struct drm_device *dev = bo->dev;
+	struct drm_bo_mem_reg tmp_mem;
+	int ret;
 
-        tmp_mem = *new_mem;
-        tmp_mem.mm_node = NULL;
-        tmp_mem.proposed_flags = (DRM_BO_FLAG_MEM_TT |
+	tmp_mem = *new_mem;
+	tmp_mem.mm_node = NULL;
+	tmp_mem.proposed_flags = (DRM_BO_FLAG_MEM_TT |
 				  DRM_BO_FLAG_CACHED |
 				  DRM_BO_FLAG_FORCE_CACHING);
 
-        ret = drm_bo_mem_space(bo, &tmp_mem, no_wait);
-        if (ret)
-                return ret;
+	ret = drm_bo_mem_space(bo, &tmp_mem, no_wait);
+	if (ret)
+		return ret;
 
-        ret = drm_ttm_bind(bo->ttm, &tmp_mem);
-        if (ret)
-                goto out_cleanup;
+	ret = drm_ttm_bind(bo->ttm, &tmp_mem);
+	if (ret)
+		goto out_cleanup;
 
-        ret = nouveau_bo_move_m2mf(bo, 1, no_wait, &tmp_mem);
-        if (ret)
-                goto out_cleanup;
+	ret = nouveau_bo_move_m2mf(bo, 1, no_wait, &bo->mem, &tmp_mem);
+	if (ret)
+		goto out_cleanup;
 
-        ret = drm_bo_move_ttm(bo, evict, no_wait, new_mem);
+	ret = drm_bo_move_ttm(bo, evict, no_wait, new_mem);
 
 out_cleanup:
-        if (tmp_mem.mm_node) {
-                mutex_lock(&dev->struct_mutex);
-                if (tmp_mem.mm_node != bo->pinned_node)
-                        drm_mm_put_block(tmp_mem.mm_node);
-                tmp_mem.mm_node = NULL;
-                mutex_unlock(&dev->struct_mutex);
-        }
+	if (tmp_mem.mm_node) {
+		mutex_lock(&dev->struct_mutex);
+		if (tmp_mem.mm_node != bo->pinned_node)
+			drm_mm_put_block(tmp_mem.mm_node);
+		tmp_mem.mm_node = NULL;
+		mutex_unlock(&dev->struct_mutex);
+	}
 
-        return ret;
+	return ret;
+}
+
+static int
+nouveau_bo_move_flips(struct drm_buffer_object *bo, int evict, int no_wait,
+		      struct drm_bo_mem_reg *new_mem)
+{
+	struct drm_device *dev = bo->dev;
+	struct drm_bo_mem_reg tmp_mem;
+	int ret = 0;
+
+	tmp_mem = bo->mem;
+	tmp_mem.mm_node = NULL;
+	tmp_mem.proposed_flags = DRM_BO_FLAG_MEM_TT;
+	ret = drm_bo_mem_space(bo, &tmp_mem, no_wait);
+	if (ret)
+		return ret;
+
+	if (!bo->ttm) {
+		ret = drm_bo_add_ttm(bo);
+		if (ret)
+			goto out_cleanup;
+	}
+
+	ret = drm_bo_move_ttm(bo, evict, no_wait, &tmp_mem);
+	if (ret)
+		goto out_cleanup;
+
+	ret = nouveau_bo_move_m2mf(bo, 1, no_wait, &bo->mem, new_mem);
+	if (ret)
+		goto out_cleanup;
+
+out_cleanup:
+	if (tmp_mem.mm_node) {
+		mutex_lock(&dev->struct_mutex);
+		if (tmp_mem.mm_node != bo->pinned_node)
+			drm_mm_put_block(tmp_mem.mm_node);
+		tmp_mem.mm_node = NULL;
+		mutex_lock(&dev->struct_mutex);
+	}
+
+	return ret;
 }
 
 static int
 nouveau_bo_move(struct drm_buffer_object *bo, int evict, int no_wait,
 		struct drm_bo_mem_reg *new_mem)
 {
+	struct drm_nouveau_private *dev_priv = bo->dev->dev_private;
 	struct drm_bo_mem_reg *old_mem = &bo->mem;
+
+	if (dev_priv->init_state != NOUVEAU_CARD_INIT_DONE)
+		return drm_bo_move_memcpy(bo, evict, no_wait, new_mem);
+
+	if (dev_priv->card_type == NV_50 &&
+	    (new_mem->mem_type == DRM_BO_MEM_VRAM ||
+	     new_mem->mem_type == DRM_BO_MEM_PRIV0) &&
+	    !(new_mem->proposed_flags & DRM_NOUVEAU_BO_FLAG_NOVM)) {
+		struct nouveau_gpuobj *pt = dev_priv->vm_vram_pt;
+		unsigned offset = new_mem->mm_node->start << PAGE_SHIFT;
+		unsigned count = new_mem->size / 65536;
+		unsigned tile = 0;
+
+		if (new_mem->proposed_flags & DRM_NOUVEAU_BO_FLAG_TILE) {
+			if (new_mem->proposed_flags & DRM_NOUVEAU_BO_FLAG_ZTILE)
+				tile = 0x00002800;
+			else
+				tile = 0x00007000;
+		}
+
+		while (count--) {
+			unsigned pte = offset / 65536;
+
+			INSTANCE_WR(pt, (pte * 2) + 0, offset | 1);
+			INSTANCE_WR(pt, (pte * 2) + 1, 0x00000000 | tile);
+			offset += 65536;
+		}
+	}
+
+	if (old_mem->flags & DRM_BO_FLAG_CLEAN) {
+		return drm_bo_move_accel_cleanup(bo, 1, no_wait,
+						 bo->new_fence_class,
+						 DRM_FENCE_TYPE_EXE, 0,
+						 new_mem);
+	}
+
+	if (dev_priv->card_type == NV_50)
+		return drm_bo_move_memcpy(bo, evict, no_wait, new_mem);
 
 	if (new_mem->mem_type == DRM_BO_MEM_LOCAL) {
 		if (old_mem->mem_type == DRM_BO_MEM_LOCAL)
@@ -251,11 +343,11 @@ nouveau_bo_move(struct drm_buffer_object *bo, int evict, int no_wait,
 	}
 	else
 	if (old_mem->mem_type == DRM_BO_MEM_LOCAL) {
-		if (1 /*nouveau_bo_move_flips(bo, evict, no_wait, new_mem)*/)
+		if (nouveau_bo_move_flips(bo, evict, no_wait, new_mem))
 			return drm_bo_move_memcpy(bo, evict, no_wait, new_mem);
 	}
 	else {
-		if (nouveau_bo_move_m2mf(bo, evict, no_wait, new_mem))
+		if (nouveau_bo_move_m2mf(bo, evict, no_wait, old_mem, new_mem))
 			return drm_bo_move_memcpy(bo, evict, no_wait, new_mem);
 	}
 

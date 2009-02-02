@@ -32,7 +32,8 @@
 struct nv50_crtc;
 
 struct nv50_lut {
-	struct mem_block *block;
+	struct drm_buffer_object *bo;
+	struct drm_bo_kmap_obj kmap;
 
 	int depth; /* check against fb to see if it needs to be reuploaded */
 

@@ -33,10 +33,10 @@ int
 nouveau_notifier_init_channel(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	int flags, ret;
 
-	flags = (NOUVEAU_MEM_PCI | NOUVEAU_MEM_MAPPED |
-	         NOUVEAU_MEM_FB_ACCEPTABLE);
+	flags = NOUVEAU_MEM_FB | NOUVEAU_MEM_NOVM | NOUVEAU_MEM_MAPPED;
 
 	chan->notifier_block = nouveau_mem_alloc(dev, 0, PAGE_SIZE, flags,
 						 (struct drm_file *)-2);
@@ -45,6 +45,17 @@ nouveau_notifier_init_channel(struct nouveau_channel *chan)
 	DRM_DEBUG("Allocated notifier block in 0x%08x\n",
 		  chan->notifier_block->flags);
 
+	if (dev_priv->mm_enabled) {
+		ret = drm_addmap(dev, chan->notifier_block->start +
+				 dev_priv->fb_phys, chan->notifier_block->size,
+				 _DRM_FRAME_BUFFER, 0, &chan->notifier_map);
+		if (ret) {
+			nouveau_mem_free(dev, chan->notifier_block);
+			chan->notifier_block = NULL;
+			return ret;
+		}
+	}
+	
 	ret = nouveau_mem_init_heap(&chan->notifier_heap,
 				    0, chan->notifier_block->size);
 	if (ret)
