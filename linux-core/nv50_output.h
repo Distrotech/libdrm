@@ -33,10 +33,8 @@ struct nv50_output {
 	struct drm_encoder base;
 	struct list_head item;
 
-/*	struct drm_device *dev; IN BASE */
 	int bus;
 	int dcb_entry;
-/*	int type; IN BASE */
 
 	struct nv50_crtc *crtc;
 	struct drm_display_mode *native_mode;
@@ -47,7 +45,6 @@ struct nv50_output {
 	/* this is not a normal modeset call, it is a direct register write, so it's executed immediately */
 	int (*set_power_mode) (struct nv50_output *output, int mode);
 	int (*detect) (struct nv50_output *output);
-/*	int (*destroy) (struct nv50_output *output); IN BASE */
 };
 
 int nv50_output_or_offset(struct nv50_output *output);

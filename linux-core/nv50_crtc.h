@@ -37,9 +37,7 @@ struct nv50_crtc {
 	struct drm_crtc base;
 	struct list_head item;
 
-/*	struct drm_device *dev; IN BASE */
 	int index;
-/*	bool enabled; IN BASE */
 	bool blanked;
 
 	struct drm_display_mode *mode;
