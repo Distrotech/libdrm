@@ -344,10 +344,7 @@ struct drm_nouveau_private {
 	/* Hook these up to the "public interface" to accomodate a certain allocation style. */
 	/* This is to avoid polluting the internal interface. */
 	void *(*alloc_crtc) (struct drm_device *dev);
-	void *(*alloc_output) (struct drm_device *dev);
-
 	void (*free_crtc) (void *crtc);
-	void (*free_output) (void *output);
 
 	struct bios bios;
 

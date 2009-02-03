@@ -25,6 +25,7 @@
  */
 
 #include "nv50_output.h"
+#include "nv50_kms_wrapper.h"
 
 static int nv50_dac_validate_mode(struct nv50_output *output, struct nouveau_hw_mode *mode)
 {
@@ -41,7 +42,7 @@ static int nv50_dac_validate_mode(struct nv50_output *output, struct nouveau_hw_
 
 static int nv50_dac_execute_mode(struct nv50_output *output, bool disconnect)
 {
-	struct drm_nouveau_private *dev_priv = output->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = output->base.dev->dev_private;
 	struct nv50_crtc *crtc = output->crtc;
 	struct nouveau_hw_mode *desired_mode = NULL;
 
@@ -87,7 +88,7 @@ static int nv50_dac_execute_mode(struct nv50_output *output, bool disconnect)
 
 static int nv50_dac_set_clock_mode(struct nv50_output *output)
 {
-	struct drm_nouveau_private *dev_priv = output->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = output->base.dev->dev_private;
 
 	NV50_DEBUG("or %d\n", nv50_output_or_offset(output));
 
@@ -98,7 +99,7 @@ static int nv50_dac_set_clock_mode(struct nv50_output *output)
 
 static int nv50_dac_set_power_mode(struct nv50_output *output, int mode)
 {
-	struct drm_nouveau_private *dev_priv = output->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = output->base.dev->dev_private;
 	uint32_t val;
 	int or = nv50_output_or_offset(output);
 
@@ -135,7 +136,7 @@ static int nv50_dac_set_power_mode(struct nv50_output *output, int mode)
 
 static int nv50_dac_detect(struct nv50_output *output)
 {
-	struct drm_nouveau_private *dev_priv = output->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = output->base.dev->dev_private;
 	int or = nv50_output_or_offset(output);
 	bool present = 0;
 	uint32_t dpms_state, load_pattern, load_state;
@@ -173,25 +174,25 @@ static int nv50_dac_detect(struct nv50_output *output)
 	return present;
 }
 
-static int nv50_dac_destroy(struct nv50_output *output)
+static void nv50_dac_destroy(struct drm_encoder *drm_encoder)
 {
-	struct drm_device *dev = output->dev;
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nv50_display *display = nv50_get_display(dev);
+	struct nv50_output *output = to_nv50_output(drm_encoder);
 
 	NV50_DEBUG("\n");
 
-	if (!display || !output)
-		return -EINVAL;
+	if (!drm_encoder)
+		return;
+
+	drm_encoder_cleanup(&output->base);
 
 	list_del(&output->item);
-
 	kfree(output->native_mode);
-	if (dev_priv->free_output)
-		dev_priv->free_output(output);
-
-	return 0;
+	kfree(output);
 }
+
+static const struct drm_encoder_funcs nv50_dac_encoder_funcs = {
+	.destroy = nv50_dac_destroy,
+};
 
 int nv50_dac_create(struct drm_device *dev, int dcb_entry)
 {
@@ -199,51 +200,37 @@ int nv50_dac_create(struct drm_device *dev, int dcb_entry)
 	struct nv50_output *output = NULL;
 	struct nv50_display *display = NULL;
 	struct dcb_entry *entry = NULL;
-	int rval = 0;
 
 	NV50_DEBUG("\n");
 
-	/* This allows the public layer to do it's thing. */
-	if (dev_priv->alloc_output)
-		output = dev_priv->alloc_output(dev);
+	display = nv50_get_display(dev);
+	entry = &dev_priv->dcb_table.entry[dcb_entry];
+	if (!display || dcb_entry >= dev_priv->dcb_table.entries)
+		return -EINVAL;
 
+	switch (entry->type) {
+	case DCB_OUTPUT_ANALOG:
+		DRM_INFO("Detected a DAC output\n");
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	output = kzalloc(sizeof(*output), GFP_KERNEL);
 	if (!output)
 		return -ENOMEM;
 
-	output->dev = dev;
-
-	display = nv50_get_display(dev);
-	if (!display) {
-		rval = -EINVAL;
-		goto out;
+	output->native_mode = kzalloc(sizeof(*output->native_mode), GFP_KERNEL);
+	if (!output->native_mode) {
+		kfree(output);
+		return -ENOMEM;
 	}
 
-	entry = &dev_priv->dcb_table.entry[dcb_entry];
-	if (!entry) {
-		rval = -EINVAL;
-		goto out;
-	}
-
-	switch (entry->type) {
-		case DCB_OUTPUT_ANALOG:
-			output->type = OUTPUT_DAC;
-			DRM_INFO("Detected a DAC output\n");
-			break;
-		default:
-			rval = -EINVAL;
-			goto out;
-	}
-
+	output->type = OUTPUT_DAC;
 	output->dcb_entry = dcb_entry;
 	output->bus = entry->bus;
 
 	list_add_tail(&output->item, &display->outputs);
-
-	output->native_mode = kzalloc(sizeof(struct nouveau_hw_mode), GFP_KERNEL);
-	if (!output->native_mode) {
-		rval = -ENOMEM;
-		goto out;
-	}
 
 	/* Set function pointers. */
 	output->validate_mode = nv50_dac_validate_mode;
@@ -251,15 +238,12 @@ int nv50_dac_create(struct drm_device *dev, int dcb_entry)
 	output->set_clock_mode = nv50_dac_set_clock_mode;
 	output->set_power_mode = nv50_dac_set_power_mode;
 	output->detect = nv50_dac_detect;
-	output->destroy = nv50_dac_destroy;
 
+	drm_encoder_init(dev, &output->base, &nv50_dac_encoder_funcs,
+			 DRM_MODE_ENCODER_DAC);
+	/* I've never seen possible crtc's restricted. */
+	output->base.possible_crtcs = 3;
+	output->base.possible_clones = 0;
 	return 0;
-
-out:
-	if (output->native_mode)
-		kfree(output->native_mode);
-	if (dev_priv->free_output)
-		dev_priv->free_output(output);
-	return rval;
 }
 

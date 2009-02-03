@@ -697,18 +697,11 @@ int nv50_connector_create(struct drm_device *dev, int bus, int i2c_index, int ty
 
 	/* attach encoders, possibilities are analog + digital */
 	for (i = 0; i < 2; i++) {
-		struct drm_encoder *drm_encoder = NULL;
 		struct nv50_output *output = connector->to_output(connector, i);
 		if (!output)
 			continue;
 
-		drm_encoder = to_nv50_kms_encoder(output);
-		if (!drm_encoder) {
-			DRM_ERROR("No struct drm_connector to match struct nv50_output\n");
-			continue;
-		}
-
-		drm_mode_connector_attach_encoder(&connector->base, drm_encoder);
+		drm_mode_connector_attach_encoder(&connector->base, &output->base);
 	}
 
 	drm_sysfs_connector_add(&connector->base);

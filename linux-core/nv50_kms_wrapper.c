@@ -56,19 +56,6 @@ static void *nv50_kms_alloc_crtc(struct drm_device *dev)
 	return &(crtc->priv);
 }
 
-static void *nv50_kms_alloc_output(struct drm_device *dev)
-{
-	struct nv50_kms_priv *kms_priv = nv50_get_kms_priv(dev);
-	struct nv50_kms_encoder *encoder = kzalloc(sizeof(struct nv50_kms_encoder), GFP_KERNEL);
-
-	if (!encoder)
-		return NULL;
-
-	list_add_tail(&encoder->item, &kms_priv->encoders);
-
-	return &(encoder->priv);
-}
-
 static void nv50_kms_free_crtc(void *crtc)
 {
 	struct nv50_kms_crtc *kms_crtc = from_nv50_crtc(crtc);
@@ -76,15 +63,6 @@ static void nv50_kms_free_crtc(void *crtc)
 	list_del(&kms_crtc->item);
 
 	kfree(kms_crtc);
-}
-
-static void nv50_kms_free_output(void *output)
-{
-	struct nv50_kms_encoder *kms_encoder = from_nv50_output(output);
-
-	list_del(&kms_encoder->item);
-
-	kfree(kms_encoder);
 }
 
 /*
@@ -470,17 +448,9 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 				goto out;
 			}
 
-			/* find the encoder public structure that matches out output structure. */
-			drm_encoder = to_nv50_kms_encoder(output);
-
-			if (!drm_encoder) {
-				DRM_ERROR("No encoder\n");
-				goto out;
-			}
-
-			drm_encoder->crtc = set->crtc;
+			output->base.crtc = set->crtc;
 			set->crtc->enabled = true;
-			drm_connector->encoder = drm_encoder;
+			drm_connector->encoder = &output->base;
 		}
 	}
 
@@ -778,66 +748,6 @@ static int nv50_kms_crtcs_init(struct drm_device *dev)
 }
 
 /*
- * Encoder functions
- */
-
-static void nv50_kms_encoder_destroy(struct drm_encoder *drm_encoder)
-{
-	struct nv50_output *output = to_nv50_output(drm_encoder);
-
-	drm_encoder_cleanup(drm_encoder);
-
-	/* this will even destroy the public structure. */
-	output->destroy(output);
-}
-
-static const struct drm_encoder_funcs nv50_kms_encoder_funcs = {
-	.destroy = nv50_kms_encoder_destroy,
-};
-
-static int nv50_kms_encoders_init(struct drm_device *dev)
-{
-	struct nv50_display *display = nv50_get_display(dev);
-	struct nv50_output *output = NULL;
-
-	list_for_each_entry(output, &display->outputs, item) {
-		struct drm_encoder *drm_encoder = to_nv50_kms_encoder(output);
-		uint32_t type = DRM_MODE_ENCODER_NONE;
-
-		switch (output->type) {
-			case OUTPUT_DAC:
-				type = DRM_MODE_ENCODER_DAC;
-				break;
-			case OUTPUT_TMDS:
-				type = DRM_MODE_ENCODER_TMDS;
-				break;
-			case OUTPUT_LVDS:
-				type = DRM_MODE_ENCODER_LVDS;
-				break;
-			case OUTPUT_TV:
-				type = DRM_MODE_ENCODER_TVDAC;
-				break;
-			default:
-				type = DRM_MODE_ENCODER_NONE;
-				break;
-		}
-
-		if (type == DRM_MODE_ENCODER_NONE) {
-			DRM_ERROR("DRM_MODE_ENCODER_NONE encountered\n");
-			continue;
-		}
-
-		drm_encoder_init(dev, drm_encoder, &nv50_kms_encoder_funcs, type);
-
-		/* I've never seen possible crtc's restricted. */
-		drm_encoder->possible_crtcs = 3;
-		drm_encoder->possible_clones = 0;
-	}
-
-	return 0;
-}
-
-/*
  * Main functions
  */
 
@@ -856,10 +766,7 @@ int nv50_kms_init(struct drm_device *dev)
 	/* function pointers */
 	/* an allocation interface that deals with the outside world, without polluting the core. */
 	dev_priv->alloc_crtc = nv50_kms_alloc_crtc;
-	dev_priv->alloc_output = nv50_kms_alloc_output;
-
 	dev_priv->free_crtc = nv50_kms_free_crtc;
-	dev_priv->free_output = nv50_kms_free_output;
 
 	/* bios is needed for tables. */
 	rval = nouveau_parse_bios(dev);
@@ -885,7 +792,6 @@ int nv50_kms_init(struct drm_device *dev)
 
 	/* init kms lists */
 	INIT_LIST_HEAD(&kms_priv->crtcs);
-	INIT_LIST_HEAD(&kms_priv->encoders);
 
 	/* init the internal core, must be done first. */
 	rval = nv50_display_create(dev);
@@ -905,10 +811,6 @@ int nv50_kms_init(struct drm_device *dev)
 
 	/* init external layer */
 	rval = nv50_kms_crtcs_init(dev);
-	if (rval != 0)
-		goto out;
-
-	rval = nv50_kms_encoders_init(dev);
 	if (rval != 0)
 		goto out;
 

@@ -28,6 +28,6 @@
 
 int nv50_output_or_offset(struct nv50_output *output)
 {
-	struct drm_nouveau_private *dev_priv = output->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = output->base.dev->dev_private;
 	return ffs(dev_priv->dcb_table.entry[output->dcb_entry].or) - 1;
 }

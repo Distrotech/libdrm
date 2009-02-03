@@ -316,7 +316,7 @@ int nv50_display_destroy(struct drm_device *dev)
 	}
 
 	list_for_each_entry(output, &display->outputs, item) {
-		output->destroy(output);
+		output->base.funcs->destroy(&output->base);
 	}
 
 	list_for_each_entry(crtc, &display->crtcs, item) {
