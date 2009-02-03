@@ -286,4 +286,8 @@ static inline void set_page_locked(struct page *page)
 }
 #endif
 
+#ifndef current_euid
+#define current_euid() (current->euid)
+#endif
+
 #endif
