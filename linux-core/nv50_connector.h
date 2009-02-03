@@ -30,19 +30,12 @@
 #include "nv50_output.h"
 #include "nv50_i2c.h"
 
-#define CONNECTOR_UNKNOWN 0
-#define CONNECTOR_VGA 1
-#define CONNECTOR_DVI_D 2
-#define CONNECTOR_DVI_I 3
-#define CONNECTOR_LVDS 4
-#define CONNECTOR_TV 5
-
 struct nv50_connector {
 	struct drm_connector base;
 	struct list_head item;
 
 /*	struct drm_device *dev; IN BASE */
-	int type;
+/*	int type; IN BASE */
 
 	int bus;
 	struct nv50_i2c_channel *i2c_chan;

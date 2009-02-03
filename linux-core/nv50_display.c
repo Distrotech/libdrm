@@ -262,24 +262,27 @@ int nv50_display_create(struct drm_device *dev)
 			continue;
 
 		switch (type) {
-			case DCB_OUTPUT_TMDS:
-			case DCB_OUTPUT_ANALOG:
-				if ((bus_digital & (1 << bus)) && (bus_analog & (1 << bus)))
-					connector_type = CONNECTOR_DVI_I;
-				else if (bus_digital & (1 << bus))
-					connector_type = CONNECTOR_DVI_D;
-				else if (bus_analog & (1 << bus))
-					connector_type = CONNECTOR_VGA;
-				break;
-			case DCB_OUTPUT_LVDS:
-				connector_type = CONNECTOR_LVDS;
-				break;
-			default:
-				connector_type = CONNECTOR_UNKNOWN;
-				break;
+		case DCB_OUTPUT_TMDS:
+		case DCB_OUTPUT_ANALOG:
+			if ((bus_digital & (1 << bus)) &&
+			    (bus_analog & (1 << bus)))
+				connector_type = DRM_MODE_CONNECTOR_DVII;
+			else
+			if (bus_digital & (1 << bus))
+				connector_type = DRM_MODE_CONNECTOR_DVID;
+			else
+			if (bus_analog & (1 << bus))
+				connector_type = DRM_MODE_CONNECTOR_VGA;
+			break;
+		case DCB_OUTPUT_LVDS:
+			connector_type = DRM_MODE_CONNECTOR_LVDS;
+			break;
+		default:
+			connector_type = DRM_MODE_CONNECTOR_Unknown;
+			break;
 		}
 
-		if (connector_type == CONNECTOR_UNKNOWN)
+		if (connector_type == DRM_MODE_CONNECTOR_Unknown)
 			continue;
 
 		nv50_connector_create(dev, bus, dev_priv->dcb_table.entry[i].i2c_index, connector_type);

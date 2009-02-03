@@ -34,17 +34,17 @@ static struct nv50_output *nv50_connector_to_output(struct nv50_connector *conne
 	bool digital_possible = false;
 	bool analog_possible = false;
 
-	switch (connector->type) {
-	case CONNECTOR_VGA:
-	case CONNECTOR_TV:
+	switch (connector->base.connector_type) {
+	case DRM_MODE_CONNECTOR_VGA:
+	case DRM_MODE_CONNECTOR_SVIDEO:
 		analog_possible = true;
 		break;
-	case CONNECTOR_DVI_I:
+	case DRM_MODE_CONNECTOR_DVII:
 		analog_possible = true;
 		digital_possible = true;
 		break;
-	case CONNECTOR_DVI_D:
-	case CONNECTOR_LVDS:
+	case DRM_MODE_CONNECTOR_DVID:
+	case DRM_MODE_CONNECTOR_LVDS:
 		digital_possible = true;
 		break;
 	default:
@@ -91,7 +91,7 @@ static int nv50_connector_hpd_detect(struct nv50_connector *connector)
 	uint32_t reg = 0;
 
 	/* Assume connected for the moment. */
-	if (connector->type == CONNECTOR_LVDS) {
+	if (connector->base.connector_type == DRM_MODE_CONNECTOR_LVDS) {
 		NV50_DEBUG("LVDS is defaulting to connected for the moment.\n");
 		return 1;
 	}
@@ -484,7 +484,8 @@ static int nv50_kms_connector_set_property(struct drm_connector *drm_connector,
 		}
 
 		/* LVDS always needs gpu scaling */
-		if (connector->type == CONNECTOR_LVDS && internal_value == SCALE_NON_GPU)
+		if (connector->base.connector_type == DRM_MODE_CONNECTOR_LVDS &&
+		    internal_value == SCALE_NON_GPU)
 			return -EINVAL;
 
 		connector->requested_scaling_mode = internal_value;
@@ -598,7 +599,7 @@ int nv50_connector_create(struct drm_device *dev, int bus, int i2c_index, int ty
 	NV50_DEBUG("\n");
 
 	display = nv50_get_display(dev);
-	if (!display || type == CONNECTOR_UNKNOWN)
+	if (!display || type == DRM_MODE_CONNECTOR_Unknown)
 		return -EINVAL;
 
 	connector = kzalloc(sizeof(*connector), GFP_KERNEL);
@@ -608,22 +609,21 @@ int nv50_connector_create(struct drm_device *dev, int bus, int i2c_index, int ty
 	list_add_tail(&connector->item, &display->connectors);
 
 	connector->bus = bus;
-	connector->type = type;
 
 	switch (type) {
-	case CONNECTOR_VGA:
+	case DRM_MODE_CONNECTOR_VGA:
 		DRM_INFO("Detected a VGA connector\n");
 		break;
-	case CONNECTOR_DVI_D:
+	case DRM_MODE_CONNECTOR_DVID:
 		DRM_INFO("Detected a DVI-D connector\n");
 		break;
-	case CONNECTOR_DVI_I:
+	case DRM_MODE_CONNECTOR_DVII:
 		DRM_INFO("Detected a DVI-I connector\n");
 		break;
-	case CONNECTOR_LVDS:
+	case DRM_MODE_CONNECTOR_LVDS:
 		DRM_INFO("Detected a LVDS connector\n");
 		break;
-	case CONNECTOR_TV:
+	case DRM_MODE_CONNECTOR_SVIDEO:
 		DRM_INFO("Detected a TV connector\n");
 		break;
 	default:
@@ -632,10 +632,16 @@ int nv50_connector_create(struct drm_device *dev, int bus, int i2c_index, int ty
 	}
 
 	/* some reasonable defaults */
-	if (type == CONNECTOR_DVI_D || type == CONNECTOR_DVI_I || type == CONNECTOR_LVDS)
+	switch (type) {
+	case DRM_MODE_CONNECTOR_DVII:
+	case DRM_MODE_CONNECTOR_DVID:
+	case DRM_MODE_CONNECTOR_LVDS:
 		connector->requested_scaling_mode = SCALE_FULLSCREEN;
-	else
+		break;
+	default:
 		connector->requested_scaling_mode = SCALE_NON_GPU;
+		break;
+	}
 
 	connector->use_dithering = false;
 
@@ -648,27 +654,6 @@ int nv50_connector_create(struct drm_device *dev, int bus, int i2c_index, int ty
 	connector->hpd_detect = nv50_connector_hpd_detect;
 	connector->i2c_detect = nv50_connector_i2c_detect;
 	connector->to_output = nv50_connector_to_output;
-
-	switch (connector->type) {
-	case CONNECTOR_VGA:
-		type = DRM_MODE_CONNECTOR_VGA;
-		break;
-	case CONNECTOR_DVI_D:
-		type = DRM_MODE_CONNECTOR_DVID;
-		break;
-	case CONNECTOR_DVI_I:
-		type = DRM_MODE_CONNECTOR_DVII;
-		break;
-	case CONNECTOR_LVDS:
-		type = DRM_MODE_CONNECTOR_LVDS;
-		break;
-	case CONNECTOR_TV:
-		type = DRM_MODE_CONNECTOR_SVIDEO;
-		break;
-	default:
-		type = DRM_MODE_CONNECTOR_Unknown;
-		break;
-	}
 
 	/* It should be allowed sometimes, but let's be safe for the moment. */
 	connector->base.interlace_allowed = false;
