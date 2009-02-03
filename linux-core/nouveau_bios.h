@@ -68,7 +68,7 @@ struct bios {
 	uint16_t ram_restrict_tbl_ptr;
 
 	struct {
-		struct nouveau_hw_mode *native_mode;
+		struct drm_display_mode *native_mode;
 		uint8_t *edid;
 		uint16_t lvdsmanufacturerpointer;
 		uint16_t xlated_entry;

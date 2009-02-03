@@ -45,9 +45,9 @@ struct nv50_output {
 	int type;
 
 	struct nv50_crtc *crtc;
-	struct nouveau_hw_mode *native_mode;
+	struct drm_display_mode *native_mode;
 
-	int (*validate_mode) (struct nv50_output *output, struct nouveau_hw_mode *mode);
+	int (*validate_mode) (struct nv50_output *output, struct drm_display_mode *mode);
 	int (*execute_mode) (struct nv50_output *output, bool disconnect);
 	int (*set_clock_mode) (struct nv50_output *output);
 	/* this is not a normal modeset call, it is a direct register write, so it's executed immediately */

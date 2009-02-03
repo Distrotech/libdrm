@@ -42,8 +42,8 @@ struct nv50_crtc {
 /*	bool enabled; IN BASE */
 	bool blanked;
 
-	struct nouveau_hw_mode *mode;
-	struct nouveau_hw_mode *native_mode;
+	struct drm_display_mode *mode;
+	struct drm_display_mode *native_mode;
 
 	bool use_native_mode;
 	bool use_dithering;
@@ -57,8 +57,8 @@ struct nv50_crtc {
 	struct nv50_lut *lut;
 	struct nv50_fb *fb;
 
-	int (*validate_mode) (struct nv50_crtc *crtc, struct nouveau_hw_mode *mode);
-	int (*set_mode) (struct nv50_crtc *crtc, struct nouveau_hw_mode *mode);
+	int (*validate_mode) (struct nv50_crtc *crtc, struct drm_display_mode *mode);
+	int (*set_mode) (struct nv50_crtc *crtc, struct drm_display_mode *mode);
 	int (*execute_mode) (struct nv50_crtc *crtc);
 	int (*set_fb) (struct nv50_crtc *crtc);
 	int (*blank) (struct nv50_crtc *crtc, bool blanked);

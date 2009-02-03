@@ -25,11 +25,7 @@
  */
 
 #include "nv50_connector.h"
-
 #include "nv50_kms_wrapper.h"
-#undef to_nv50_connector
-#define to_nv50_connector(n) container_of((n), struct nv50_connector, base)
-extern struct nouveau_hw_mode *nv50_kms_to_hw_mode(struct drm_display_mode *);
 
 static struct nv50_output *nv50_connector_to_output(struct nv50_connector *connector, bool digital)
 {
@@ -370,27 +366,23 @@ static void nv50_kms_connector_fill_modes(struct drm_connector *drm_connector, u
 
 	list_for_each_entry_safe(mode, t, &drm_connector->modes, head) {
 		if (mode->status == MODE_OK) {
-			struct nouveau_hw_mode *hw_mode = nv50_kms_to_hw_mode(mode);
 			struct nv50_output *output = connector->to_output(connector, nv50_kms_connector_get_digital(drm_connector));
 
-			mode->status = output->validate_mode(output, hw_mode);
+			mode->status = output->validate_mode(output, mode);
 			/* find native mode, TODO: also check if we actually found one */
 			if (mode->status == MODE_OK) {
 				if (mode->type & DRM_MODE_TYPE_PREFERRED)
-					*output->native_mode = *hw_mode;
+					*output->native_mode = *mode;
 			}
-			kfree(hw_mode);
 		}
 	}
 
 	/* revalidate now that we have native mode */
 	list_for_each_entry_safe(mode, t, &drm_connector->modes, head) {
 		if (mode->status == MODE_OK) {
-			struct nouveau_hw_mode *hw_mode = nv50_kms_to_hw_mode(mode);
 			struct nv50_output *output = connector->to_output(connector, nv50_kms_connector_get_digital(drm_connector));
 
-			mode->status = output->validate_mode(output, hw_mode);
-			kfree(hw_mode);
+			mode->status = output->validate_mode(output, mode);
 		}
 	}
 
@@ -402,7 +394,6 @@ static void nv50_kms_connector_fill_modes(struct drm_connector *drm_connector, u
 
 	if (list_empty(&drm_connector->modes)) {
 		struct drm_display_mode *stdmode;
-		struct nouveau_hw_mode *hw_mode;
 		struct nv50_output *output;
 
 		NV50_DEBUG("No valid modes on %s\n", drm_get_connector_name(drm_connector));
@@ -422,11 +413,10 @@ static void nv50_kms_connector_fill_modes(struct drm_connector *drm_connector, u
 				     &drm_connector->modes);
 
 		/* also add it as native mode */
-		hw_mode = nv50_kms_to_hw_mode(mode);
 		output = connector->to_output(connector, nv50_kms_connector_get_digital(drm_connector));
 
-		if (hw_mode)
-			*output->native_mode = *hw_mode;
+		if (mode)
+			*output->native_mode = *mode;
 
 		DRM_DEBUG("Adding standard 640x480 @ 60Hz to %s\n",
 			  drm_get_connector_name(drm_connector));

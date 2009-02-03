@@ -40,39 +40,6 @@ struct nv50_kms_priv *nv50_get_kms_priv(struct drm_device *dev)
 }
 
 /*
- * Mode conversion functions.
- */
-
-struct nouveau_hw_mode *nv50_kms_to_hw_mode(struct drm_display_mode *mode)
-{
-	struct nouveau_hw_mode *hw_mode = kzalloc(sizeof(struct nouveau_hw_mode), GFP_KERNEL);
-	if (!hw_mode)
-		return NULL;
-
-	/* create hw values. */
-	hw_mode->clock = mode->clock;
-	hw_mode->flags = hw_mode->flags;
-
-	hw_mode->hdisplay = mode->hdisplay;
-	hw_mode->hsync_start = mode->hsync_start;
-	hw_mode->hsync_end = mode->hsync_end;
-	hw_mode->htotal = mode->htotal;
-
-	hw_mode->hblank_start = mode->hdisplay + 1;
-	hw_mode->hblank_end = mode->htotal;
-
-	hw_mode->vdisplay = mode->vdisplay;
-	hw_mode->vsync_start = mode->vsync_start;
-	hw_mode->vsync_end = mode->vsync_end;
-	hw_mode->vtotal = mode->vtotal;
-
-	hw_mode->vblank_start = mode->vdisplay + 1;
-	hw_mode->vblank_end = mode->vtotal;
-
-	return hw_mode;
-}
-
-/*
  * State mirroring functions.
  */
 

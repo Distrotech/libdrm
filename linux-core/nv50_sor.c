@@ -27,7 +27,8 @@
 #include "nv50_output.h"
 #include "nv50_kms_wrapper.h"
 
-static int nv50_sor_validate_mode(struct nv50_output *output, struct nouveau_hw_mode *mode)
+static int nv50_sor_validate_mode(struct nv50_output *output,
+				  struct drm_display_mode *mode)
 {
 	NV50_DEBUG("\n");
 
@@ -49,7 +50,7 @@ static int nv50_sor_execute_mode(struct nv50_output *output, bool disconnect)
 {
 	struct drm_nouveau_private *dev_priv = output->base.dev->dev_private;
 	struct nv50_crtc *crtc = output->crtc;
-	struct nouveau_hw_mode *desired_mode = NULL;
+	struct drm_display_mode *desired_mode = NULL;
 
 	uint32_t offset = nv50_output_or_offset(output) * 0x40;
 
@@ -93,9 +94,8 @@ static int nv50_sor_set_clock_mode(struct nv50_output *output)
 {
 	struct drm_nouveau_private *dev_priv = output->base.dev->dev_private;
 	struct nv50_crtc *crtc = output->crtc;
-
 	uint32_t limit = 165000;
-	struct nouveau_hw_mode *hw_mode;
+	struct drm_display_mode *mode;
 
 	NV50_DEBUG("or %d\n", nv50_output_or_offset(output));
 
@@ -104,13 +104,13 @@ static int nv50_sor_set_clock_mode(struct nv50_output *output)
 		return 0;
 
 	if (crtc->use_native_mode)
-		hw_mode = crtc->native_mode;
+		mode = crtc->native_mode;
 	else
-		hw_mode = crtc->mode;
+		mode = crtc->mode;
 
 	/* 0x70000 was a late addition to nv, mentioned as fixing tmds initialisation on certain gpu's. */
 	/* I presume it's some kind of clock setting, but what precisely i do not know. */
-	NV_WRITE(NV50_PDISPLAY_SOR_CLK_CLK_CTRL2(nv50_output_or_offset(output)), 0x70000 | ((hw_mode->clock > limit) ? 0x101 : 0));
+	NV_WRITE(NV50_PDISPLAY_SOR_CLK_CLK_CTRL2(nv50_output_or_offset(output)), 0x70000 | ((mode->clock > limit) ? 0x101 : 0));
 
 	return 0;
 }

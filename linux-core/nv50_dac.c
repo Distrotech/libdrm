@@ -27,7 +27,8 @@
 #include "nv50_output.h"
 #include "nv50_kms_wrapper.h"
 
-static int nv50_dac_validate_mode(struct nv50_output *output, struct nouveau_hw_mode *mode)
+static int nv50_dac_validate_mode(struct nv50_output *output,
+				  struct drm_display_mode *mode)
 {
 	NV50_DEBUG("\n");
 
@@ -44,10 +45,8 @@ static int nv50_dac_execute_mode(struct nv50_output *output, bool disconnect)
 {
 	struct drm_nouveau_private *dev_priv = output->base.dev->dev_private;
 	struct nv50_crtc *crtc = output->crtc;
-	struct nouveau_hw_mode *desired_mode = NULL;
-
+	struct drm_display_mode *desired_mode = NULL;
 	uint32_t offset = nv50_output_or_offset(output) * 0x80;
-
 	uint32_t mode_ctl = NV50_DAC_MODE_CTRL_OFF;
 	uint32_t mode_ctl2 = 0;
 

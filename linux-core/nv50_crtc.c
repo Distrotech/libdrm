@@ -29,10 +29,9 @@
 #include "nv50_lut.h"
 #include "nv50_fb.h"
 #include "nv50_kms_wrapper.h"
-extern struct nouveau_hw_mode *nv50_kms_to_hw_mode(struct drm_display_mode *);
 extern void nv50_kms_mirror_routing(struct drm_device *dev);
 
-static int nv50_crtc_validate_mode(struct nv50_crtc *crtc, struct nouveau_hw_mode *mode)
+static int nv50_crtc_validate_mode(struct nv50_crtc *crtc, struct drm_display_mode *mode)
 {
 	NV50_DEBUG("\n");
 
@@ -45,9 +44,9 @@ static int nv50_crtc_validate_mode(struct nv50_crtc *crtc, struct nouveau_hw_mod
 	return MODE_OK;
 }
 
-static int nv50_crtc_set_mode(struct nv50_crtc *crtc, struct nouveau_hw_mode *mode)
+static int nv50_crtc_set_mode(struct nv50_crtc *crtc, struct drm_display_mode *mode)
 {
-	struct nouveau_hw_mode *hw_mode = crtc->mode;
+	struct drm_display_mode *hw_mode = crtc->mode;
 	uint8_t rval;
 
 	NV50_DEBUG("index %d\n", crtc->index);
@@ -64,14 +63,13 @@ static int nv50_crtc_set_mode(struct nv50_crtc *crtc, struct nouveau_hw_mode *mo
 
 	/* copy values to mode */
 	*hw_mode = *mode;
-
 	return 0;
 }
 
 static int nv50_crtc_execute_mode(struct nv50_crtc *crtc)
 {
 	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
-	struct nouveau_hw_mode *hw_mode;
+	struct drm_display_mode *mode;
 	uint32_t hsync_dur,  vsync_dur, hsync_start_to_end, vsync_start_to_end;
 	uint32_t hunk1, vunk1, vunk2a, vunk2b;
 	uint32_t offset = crtc->index * 0x400;
@@ -80,29 +78,29 @@ static int nv50_crtc_execute_mode(struct nv50_crtc *crtc)
 	NV50_DEBUG("%s native mode\n", crtc->use_native_mode ? "using" : "not using");
 
 	if (crtc->use_native_mode)
-		hw_mode = crtc->native_mode;
+		mode = crtc->native_mode;
 	else
-		hw_mode = crtc->mode;
+		mode = crtc->mode;
 
-	hsync_dur = hw_mode->hsync_end - hw_mode->hsync_start;
-	vsync_dur = hw_mode->vsync_end - hw_mode->vsync_start;
-	hsync_start_to_end = hw_mode->hblank_end - hw_mode->hsync_start;
-	vsync_start_to_end = hw_mode->vblank_end - hw_mode->vsync_start;
+	hsync_dur = mode->hsync_end - mode->hsync_start;
+	vsync_dur = mode->vsync_end - mode->vsync_start;
+	hsync_start_to_end = mode->htotal - mode->hsync_start;
+	vsync_start_to_end = mode->vtotal - mode->vsync_start;
 	/* I can't give this a proper name, anyone else can? */
-	hunk1 = hw_mode->htotal - hw_mode->hsync_start + hw_mode->hblank_start;
-	vunk1 = hw_mode->vtotal - hw_mode->vsync_start + hw_mode->vblank_start;
+	hunk1 = mode->htotal - mode->hsync_start + mode->hdisplay + 1;
+	vunk1 = mode->vtotal - mode->vsync_start + mode->vdisplay + 1;
 	/* Another strange value, this time only for interlaced modes. */
-	vunk2a = 2*hw_mode->vtotal - hw_mode->vsync_start + hw_mode->vblank_start;
-	vunk2b = hw_mode->vtotal - hw_mode->vsync_start + hw_mode->vblank_end;
+	vunk2a = 2*mode->vtotal - mode->vsync_start + mode->vdisplay + 1;
+	vunk2b = mode->vtotal - mode->vsync_start + mode->vtotal;
 
-	if (hw_mode->flags & DRM_MODE_FLAG_INTERLACE) {
+	if (mode->flags & DRM_MODE_FLAG_INTERLACE) {
 		vsync_dur /= 2;
 		vsync_start_to_end  /= 2;
 		vunk1 /= 2;
 		vunk2a /= 2;
 		vunk2b /= 2;
 		/* magic */
-		if (hw_mode->flags & DRM_MODE_FLAG_DBLSCAN) {
+		if (mode->flags & DRM_MODE_FLAG_DBLSCAN) {
 			vsync_start_to_end -= 1;
 			vunk1 -= 1;
 			vunk2a -= 1;
@@ -110,15 +108,15 @@ static int nv50_crtc_execute_mode(struct nv50_crtc *crtc)
 		}
 	}
 
-	OUT_MODE(NV50_CRTC0_CLOCK + offset, hw_mode->clock | 0x800000);
-	OUT_MODE(NV50_CRTC0_INTERLACE + offset, (hw_mode->flags & DRM_MODE_FLAG_INTERLACE) ? 2 : 0);
+	OUT_MODE(NV50_CRTC0_CLOCK + offset, mode->clock | 0x800000);
+	OUT_MODE(NV50_CRTC0_INTERLACE + offset, (mode->flags & DRM_MODE_FLAG_INTERLACE) ? 2 : 0);
 	OUT_MODE(NV50_CRTC0_DISPLAY_START + offset, 0);
 	OUT_MODE(NV50_CRTC0_UNK82C + offset, 0);
-	OUT_MODE(NV50_CRTC0_DISPLAY_TOTAL + offset, hw_mode->vtotal << 16 | hw_mode->htotal);
+	OUT_MODE(NV50_CRTC0_DISPLAY_TOTAL + offset, mode->vtotal << 16 | mode->htotal);
 	OUT_MODE(NV50_CRTC0_SYNC_DURATION + offset, (vsync_dur - 1) << 16 | (hsync_dur - 1));
 	OUT_MODE(NV50_CRTC0_SYNC_START_TO_BLANK_END + offset, (vsync_start_to_end - 1) << 16 | (hsync_start_to_end - 1));
 	OUT_MODE(NV50_CRTC0_MODE_UNK1 + offset, (vunk1 - 1) << 16 | (hunk1 - 1));
-	if (hw_mode->flags & DRM_MODE_FLAG_INTERLACE) {
+	if (mode->flags & DRM_MODE_FLAG_INTERLACE) {
 		OUT_MODE(NV50_CRTC0_MODE_UNK2 + offset, (vunk2b - 1) << 16 | (vunk2a - 1));
 	}
 
@@ -302,7 +300,7 @@ static int nv50_crtc_set_scale(struct nv50_crtc *crtc)
 static int nv50_crtc_calc_clock(struct nv50_crtc *crtc, 
 	uint32_t *bestN1, uint32_t *bestN2, uint32_t *bestM1, uint32_t *bestM2, uint32_t *bestlog2P)
 {
-	struct nouveau_hw_mode *hw_mode;
+	struct drm_display_mode *mode;
 	struct pll_lims limits;
 	int clk, vco2, crystal;
 	int minvco1, minvco2, minU1, maxU1, minU2, maxU2, minM1, maxM1;
@@ -316,11 +314,11 @@ static int nv50_crtc_calc_clock(struct nv50_crtc *crtc,
 	NV50_DEBUG("\n");
 
 	if (crtc->use_native_mode)
-		hw_mode = crtc->native_mode;
+		mode = crtc->native_mode;
 	else
-		hw_mode = crtc->mode;
+		mode = crtc->mode;
 
-	clk = hw_mode->clock;
+	clk = mode->clock;
 
 	/* These are in the g80 bios tables, at least in mine. */
 	if (!get_pll_limits(crtc->base.dev, NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1(crtc->index), &limits))
@@ -541,7 +539,7 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 	struct nv50_crtc *crtc = NULL;
 	struct nv50_output *output = NULL;
 	struct nv50_connector *connector = NULL;
-	struct nouveau_hw_mode *hw_mode = NULL;
+	struct drm_display_mode *mode = NULL;
 	struct nv50_fb_info fb_info;
 
 	bool blank = false;
@@ -600,11 +598,11 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 
 	/* for switch_fb we verify if any important changes happened */
 	if (!blank) {
+		struct drm_display_mode *mode = set->mode;
+
 		/* Mode validation */
-		hw_mode = nv50_kms_to_hw_mode(set->mode);
 
-		rval = crtc->validate_mode(crtc, hw_mode);
-
+		rval = crtc->validate_mode(crtc, mode);
 		if (rval != MODE_OK) {
 			DRM_ERROR("Mode not ok\n");
 			goto out;
@@ -627,7 +625,7 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 				goto out;
 			}
 
-			rval = output->validate_mode(output, hw_mode);
+			rval = output->validate_mode(output, mode);
 			if (rval != MODE_OK) {
 				DRM_ERROR("Mode not ok\n");
 				goto out;
@@ -846,7 +844,7 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 
 		crtc = to_nv50_crtc(set->crtc);
 
-		rval = crtc->set_mode(crtc, hw_mode);
+		rval = crtc->set_mode(crtc, mode);
 		if (rval != 0) {
 			DRM_ERROR("crtc mode set failed\n");
 			goto out;
@@ -943,13 +941,9 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 		set->crtc->y = set->y;
 	}
 
-	kfree(hw_mode);
-
 	return 0;
 
 out:
-	kfree(hw_mode);
-
 	if (rval != 0)
 		return rval;
 	else
@@ -981,13 +975,13 @@ int nv50_crtc_create(struct drm_device *dev, int index)
 	if (!crtc)
 		return -ENOMEM;
 
-	crtc->mode = kzalloc(sizeof(struct nouveau_hw_mode), GFP_KERNEL);
+	crtc->mode = kzalloc(sizeof(*crtc->mode), GFP_KERNEL);
 	if (!crtc->mode) {
 		kfree(crtc);
 		return -ENOMEM;
 	}
 
-	crtc->native_mode = kzalloc(sizeof(struct nouveau_hw_mode), GFP_KERNEL);
+	crtc->native_mode = kzalloc(sizeof(*crtc->native_mode), GFP_KERNEL);
 	if (!crtc->native_mode) {
 		kfree(crtc->mode);
 		kfree(crtc);

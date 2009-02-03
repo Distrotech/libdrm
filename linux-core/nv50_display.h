@@ -37,14 +37,6 @@
 /* for convience, so you can see through the trees. */
 #define NV50_DEBUG DRM_ERROR
 
-struct nouveau_hw_mode {
-	unsigned int clock;
-	unsigned short hdisplay, hblank_start, hsync_start, hsync_end, hblank_end, htotal;
-	unsigned short vdisplay, vblank_start, vsync_start, vsync_end, vblank_end, vtotal;
-
-	unsigned int flags;
-};
-
 struct nv50_crtc;
 struct nv50_output;
 struct nv50_connector;
