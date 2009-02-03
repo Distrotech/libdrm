@@ -433,7 +433,8 @@ int drm_rmmap_locked(struct drm_device *dev, drm_local_map_t *map)
 		__drm_pci_free(dev, &dmah);
 		break;
 	case _DRM_TTM:
-		BUG_ON(1);
+	case _DRM_GEM:
+		BUG();
 	}
 	drm_free(map, sizeof(*map), DRM_MEM_MAPS);
 

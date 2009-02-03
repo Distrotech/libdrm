@@ -246,7 +246,6 @@ static bool drm_target_preferred(struct drm_device *dev, struct drm_display_mode
 				 bool *enabled, int width, int height)
 {
 	struct drm_connector *connector;
-	struct drm_display_mode *preferred;
 	int i = 0;
 	
 	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {

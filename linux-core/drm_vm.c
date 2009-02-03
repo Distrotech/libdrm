@@ -269,7 +269,8 @@ static void drm_vm_shm_close(struct vm_area_struct *vma)
 				__drm_pci_free(dev, &dmah);
 				break;
 			case _DRM_TTM:
-				BUG_ON(1);
+			case _DRM_GEM:
+				BUG();
 				break;
 			}
 			drm_free(map, sizeof(*map), DRM_MEM_MAPS);
