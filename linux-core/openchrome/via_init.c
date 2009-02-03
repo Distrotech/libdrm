@@ -663,7 +663,6 @@ int via_driver_load(struct drm_device *dev, unsigned long chipset)
 
 	hrtimer_init(&dev_priv->fence_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	dev_priv->fence_timer.function = via_ttm_fence_timer_func;
-	dev_priv->fence_timer.cb_mode = HRTIMER_CB_SOFTIRQ;
 
 	for (i = 0; i < VIA_NUM_ENGINES; ++i) {
 		atomic_set(&dev_priv->fence_seq[i], 0);
