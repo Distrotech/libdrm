@@ -199,8 +199,6 @@ int nv50_display_create(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nv50_display *display = kzalloc(sizeof(struct nv50_display), GFP_KERNEL);
 	int i, output_index;
-	/* DAC0, DAC1, DAC2, SOR0, SOR1*/
-	int or_counter[5] = {0, 0, 0, 0, 0};
 	uint32_t bus_mask = 0;
 	uint32_t bus_digital = 0, bus_analog = 0;
 
@@ -228,12 +226,10 @@ int nv50_display_create(struct drm_device *dev)
 		switch (entry->type) {
 		case DCB_OUTPUT_TMDS:
 		case DCB_OUTPUT_LVDS:
-			or_counter[output_index + 3] += 1;
 			bus_digital |= (1 << entry->bus);
 			nv50_sor_create(dev, i);
 			break;
 		case DCB_OUTPUT_ANALOG:
-			or_counter[output_index] += 1;
 			bus_analog |= (1 << entry->bus);
 			nv50_dac_create(dev, i);
 			break;
