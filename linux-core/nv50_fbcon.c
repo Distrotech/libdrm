@@ -439,7 +439,7 @@ int nv50_fbcon_init(struct drm_device *dev)
 	struct nv50_fbcon_par *par;
 	struct device *device = &dev->pdev->dev;
 	struct drm_framebuffer *drm_fb;
-	struct nv50_framebuffer *nv50_fb;
+	struct nv50_framebuffer *fb;
 	struct nouveau_gem_object *ngem;
 	int ret;
 
@@ -457,9 +457,9 @@ int nv50_fbcon_init(struct drm_device *dev)
 		DRM_ERROR("no drm_fb found\n");
 		return -EINVAL;
 	}
-	nv50_fb = nv50_framebuffer(drm_fb);
+	fb = to_nv50_framebuffer(drm_fb);
 
-	ngem = nouveau_gem_object(nv50_fb->gem);
+	ngem = nouveau_gem_object(fb->gem);
 	if (!ngem) {
 		DRM_ERROR("no buffer object for FB!\n");
 		return -EINVAL;
@@ -494,13 +494,13 @@ int nv50_fbcon_init(struct drm_device *dev)
 
 	info->flags = FBINFO_DEFAULT;
 
-	ret = drm_bo_kmap(ngem->bo, 0, ngem->bo->mem.num_pages, &nv50_fb->kmap);
+	ret = drm_bo_kmap(ngem->bo, 0, ngem->bo->mem.num_pages, &fb->kmap);
 	if (ret) {
 		DRM_ERROR("Error mapping framebuffer: %d\n", ret);
 		return ret;
 	}
 
- 	info->screen_base = nv50_fb->kmap.virtual;
+ 	info->screen_base = fb->kmap.virtual;
 	info->screen_size = info->fix.smem_len; /* FIXME */
 
 	info->pseudo_palette = drm_fb->pseudo_palette;
@@ -581,7 +581,7 @@ int nv50_fbcon_init(struct drm_device *dev)
 int nv50_fbcon_destroy(struct drm_device *dev)
 {
 	struct drm_framebuffer *drm_fb;
-	struct nv50_framebuffer *nv50_fb;
+	struct nv50_framebuffer *fb;
 	struct fb_info *info;
 
 	list_for_each_entry(drm_fb, &dev->mode_config.fb_kernel_list, filp_head) {
@@ -592,7 +592,7 @@ int nv50_fbcon_destroy(struct drm_device *dev)
 		DRM_ERROR("No framebuffer to destroy\n");
 		return -EINVAL;
 	}
-	nv50_fb = nv50_framebuffer(drm_fb);
+	fb = to_nv50_framebuffer(drm_fb);
 
 	info = drm_fb->fbdev;
 	if (!info) {
@@ -602,11 +602,11 @@ int nv50_fbcon_destroy(struct drm_device *dev)
 
 //	unregister_framebuffer(info);
 
-	if (nv50_fb->kmap.virtual)
-		drm_bo_kunmap(&nv50_fb->kmap);
-	if (nv50_fb->gem) {
+	if (fb->kmap.virtual)
+		drm_bo_kunmap(&fb->kmap);
+	if (fb->gem) {
 		mutex_lock(&dev->struct_mutex);
-		drm_gem_object_unreference(nv50_fb->gem);
+		drm_gem_object_unreference(fb->gem);
 		mutex_unlock(&dev->struct_mutex);
 	}
 

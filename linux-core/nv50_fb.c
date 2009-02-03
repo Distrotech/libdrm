@@ -29,36 +29,30 @@
 #include "nv50_crtc.h"
 #include "nv50_display.h"
 
-static int nv50_fb_bind(struct nv50_crtc *crtc, struct nv50_fb_info *info)
+static int nv50_fb_bind(struct nv50_crtc *crtc, struct drm_framebuffer *drm_fb,
+			int x, int y)
 {
+	struct nv50_framebuffer *fb = to_nv50_framebuffer(drm_fb);
 	int rval = 0;
 
 	NV50_DEBUG("\n");
 
-	if (!crtc || !info) {
-		DRM_ERROR("crtc %p info %p\n",crtc, info);
+	if (!crtc || !drm_fb) {
+		DRM_ERROR("crtc %p drm_fb %p\n", crtc, drm_fb);
 		return -EINVAL;
 	}
 
-	if (!info->gem || !info->width || !info->height || !info->depth ||
-	    !info->bpp || !info->pitch) {
-		DRM_ERROR("gem %p width %d height %d depth %d bpp %d pitch %d\n",
-			  info->gem, info->width, info->height, info->depth,
-			  info->bpp, info->pitch);
-		return -EINVAL;
-	}
+	crtc->fb->gem = fb->gem;
+	crtc->fb->width = drm_fb->width;
+	crtc->fb->height = drm_fb->height;
 
-	crtc->fb->gem = info->gem;
-	crtc->fb->width = info->width;
-	crtc->fb->height = info->height;
+	crtc->fb->x = x;
+	crtc->fb->y = y;
 
-	crtc->fb->y = info->x;
-	crtc->fb->x = info->y;
+	crtc->fb->depth = drm_fb->depth;
+	crtc->fb->bpp = drm_fb->bits_per_pixel;
 
-	crtc->fb->depth = info->depth;
-	crtc->fb->bpp = info->bpp;
-
-	crtc->fb->pitch = info->pitch;
+	crtc->fb->pitch = drm_fb->pitch;
 
 	/* update lut if needed */
 	if (crtc->fb->depth != crtc->lut->depth) {
@@ -67,22 +61,22 @@ static int nv50_fb_bind(struct nv50_crtc *crtc, struct nv50_fb_info *info)
 		int i;
 
 		switch (crtc->fb->depth) {
-			case 15:
-				r_size = 32;
-				g_size = 32;
-				b_size = 32;
-				break;
-			case 16:
-				r_size = 32;
-				g_size = 64;
-				b_size = 32;
-				break;
-			case 24:
-			default:
-				r_size = 256;
-				g_size = 256;
-				b_size = 256;
-				break;
+		case 15:
+			r_size = 32;
+			g_size = 32;
+			b_size = 32;
+			break;
+		case 16:
+			r_size = 32;
+			g_size = 64;
+			b_size = 32;
+			break;
+		case 24:
+		default:
+			r_size = 256;
+			g_size = 256;
+			b_size = 256;
+			break;
 		}
 
 		r_val = kmalloc(r_size * sizeof(uint16_t), GFP_KERNEL);

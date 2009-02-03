@@ -72,23 +72,23 @@ void nv50_kms_mirror_routing(struct drm_device *dev)
  * FB functions.
  */
 
-static void nv50_kms_framebuffer_destroy(struct drm_framebuffer *fb)
+static void nv50_kms_framebuffer_destroy(struct drm_framebuffer *drm_fb)
 {
-	struct nv50_framebuffer *nv50_fb = nv50_framebuffer(fb);
+	struct nv50_framebuffer *fb = to_nv50_framebuffer(drm_fb);
 
-	drm_gem_object_unreference(nv50_fb->gem);
-	drm_framebuffer_cleanup(&nv50_fb->base);
-	kfree(nv50_fb);
+	drm_gem_object_unreference(fb->gem);
+	drm_framebuffer_cleanup(&fb->base);
+	kfree(fb);
 }
 
 static int
-nv50_kms_framebuffer_create_handle(struct drm_framebuffer *fb,
+nv50_kms_framebuffer_create_handle(struct drm_framebuffer *drm_fb,
 				   struct drm_file *file_priv,
 				   unsigned int *handle)
 {
-	struct nv50_framebuffer *nv50_fb = nv50_framebuffer(fb);
+	struct nv50_framebuffer *fb = to_nv50_framebuffer(drm_fb);
 
-	return drm_gem_handle_create(file_priv, nv50_fb->gem, handle);
+	return drm_gem_handle_create(file_priv, fb->gem, handle);
 }
 
 static const struct drm_framebuffer_funcs nv50_kms_fb_funcs = {

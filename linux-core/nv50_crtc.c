@@ -540,7 +540,6 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 	struct nv50_output *output = NULL;
 	struct nv50_connector *connector = NULL;
 	struct drm_display_mode *mode = NULL;
-	struct nv50_fb_info fb_info;
 
 	bool blank = false;
 	bool switch_fb = false;
@@ -741,18 +740,7 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 		/* set framebuffer */
 		set->crtc->fb = set->fb;
 
-		/* set private framebuffer */
-		crtc = to_nv50_crtc(set->crtc);
-		fb_info.gem = nv50_framebuffer(set->fb)->gem;
-		fb_info.width = set->fb->width;
-		fb_info.height = set->fb->height;
-		fb_info.depth = set->fb->depth;
-		fb_info.bpp = set->fb->bits_per_pixel;
-		fb_info.pitch = set->fb->pitch;
-		fb_info.x = set->x;
-		fb_info.y = set->y;
-
-		rval = crtc->fb->bind(crtc, &fb_info);
+		rval = crtc->fb->bind(crtc, set->fb, set->x, set->y);
 		if (rval != 0) {
 			DRM_ERROR("fb_bind failed\n");
 			goto out;
