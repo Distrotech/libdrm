@@ -29,12 +29,6 @@
 
 #include "nv50_crtc.h"
 
-#define OUTPUT_UNKNOWN 0
-#define OUTPUT_DAC 1
-#define OUTPUT_TMDS 2
-#define OUTPUT_LVDS 3
-#define OUTPUT_TV 4
-
 struct nv50_output {
 	struct drm_encoder base;
 	struct list_head item;
@@ -42,7 +36,7 @@ struct nv50_output {
 /*	struct drm_device *dev; IN BASE */
 	int bus;
 	int dcb_entry;
-	int type;
+/*	int type; IN BASE */
 
 	struct nv50_crtc *crtc;
 	struct drm_display_mode *native_mode;

@@ -66,7 +66,7 @@ static int nv50_sor_execute_mode(struct nv50_output *output, bool disconnect)
 
 	desired_mode = (crtc->use_native_mode ? crtc->native_mode : crtc->mode);
 
-	if (output->type == OUTPUT_LVDS) {
+	if (output->base.encoder_type == DRM_MODE_ENCODER_LVDS) {
 		mode_ctl |= NV50_SOR_MODE_CTRL_LVDS;
 	} else {
 		mode_ctl |= NV50_SOR_MODE_CTRL_TMDS;
@@ -100,7 +100,7 @@ static int nv50_sor_set_clock_mode(struct nv50_output *output)
 	NV50_DEBUG("or %d\n", nv50_output_or_offset(output));
 
 	/* We don't yet know what to do, if anything at all. */
-	if (output->type == OUTPUT_LVDS)
+	if (output->base.encoder_type == DRM_MODE_ENCODER_LVDS)
 		return 0;
 
 	if (crtc->use_native_mode)
@@ -164,6 +164,7 @@ int nv50_sor_create(struct drm_device *dev, int dcb_entry)
 	struct nv50_output *output = NULL;
 	struct nv50_display *display = NULL;
 	struct dcb_entry *entry = NULL;
+	int type;
 
 	NV50_DEBUG("\n");
 
@@ -172,23 +173,22 @@ int nv50_sor_create(struct drm_device *dev, int dcb_entry)
 	if (!display || dcb_entry >= dev_priv->dcb_table.entries)
 		return -EINVAL;
 
+	switch (entry->type) {
+	case DCB_OUTPUT_TMDS:
+		DRM_INFO("Detected a TMDS output\n");
+		type = DRM_MODE_ENCODER_TMDS;
+		break;
+	case DCB_OUTPUT_LVDS:
+		DRM_INFO("Detected a LVDS output\n");
+		type = DRM_MODE_ENCODER_LVDS;
+		break;
+	default:
+		return -EINVAL;
+	}
+
 	output = kzalloc(sizeof(*output), GFP_KERNEL);
 	if (!output)
 		return -ENOMEM;
-
-	switch (entry->type) {
-	case DCB_OUTPUT_TMDS:
-		output->type = OUTPUT_TMDS;
-		DRM_INFO("Detected a TMDS output\n");
-		break;
-	case DCB_OUTPUT_LVDS:
-		output->type = OUTPUT_LVDS;
-		DRM_INFO("Detected a LVDS output\n");
-		break;
-	default:
-		kfree(output);
-		return -EINVAL;
-	}
 
 	output->native_mode = kzalloc(sizeof(*output->native_mode), GFP_KERNEL);
 	if (!output->native_mode) {
@@ -207,20 +207,14 @@ int nv50_sor_create(struct drm_device *dev, int dcb_entry)
 	output->set_power_mode = nv50_sor_set_power_mode;
 	output->detect = NULL;
 
-	if (output->type == OUTPUT_TMDS) {
-		drm_encoder_init(dev, &output->base, &nv50_sor_encoder_funcs,
-				 DRM_MODE_ENCODER_TMDS);
-	} else {
-		drm_encoder_init(dev, &output->base, &nv50_sor_encoder_funcs,
-				 DRM_MODE_ENCODER_LVDS);
-	}
+	drm_encoder_init(dev, &output->base, &nv50_sor_encoder_funcs, type);
 
 	/* I've never seen possible crtc's restricted. */
 	output->base.possible_crtcs = 3;
 	output->base.possible_clones = 0;
 
 	/* Some default state, unknown what it precisely means. */
-	if (output->type == OUTPUT_TMDS) {
+	if (output->base.encoder_type == DRM_MODE_ENCODER_TMDS) {
 		int or = nv50_output_or_offset(output);
 
 		NV_WRITE(NV50_PDISPLAY_SOR_REGS_UNK_00C(or), 0x03010700);

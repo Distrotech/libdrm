@@ -48,13 +48,10 @@ static struct nv50_output *nv50_connector_to_output(struct nv50_connector *conne
 		digital_possible = true;
 		break;
 	default:
-		break;
+		return NULL;
 	}
 
 	/* Return early on bad situations. */
-	if (!analog_possible && !digital_possible)
-		return NULL;
-
 	if (!analog_possible && !digital)
 		return NULL;
 
@@ -64,14 +61,24 @@ static struct nv50_output *nv50_connector_to_output(struct nv50_connector *conne
 	list_for_each_entry(output, &display->outputs, item) {
 		if (connector->bus != output->bus)
 			continue;
-		if (digital && output->type == OUTPUT_TMDS)
-			return output;
-		if (digital && output->type == OUTPUT_LVDS)
-			return output;
-		if (!digital && output->type == OUTPUT_DAC)
-			return output;
-		if (!digital && output->type == OUTPUT_TV)
-			return output;
+
+		if (digital) {
+			switch (output->base.encoder_type) {
+			case DRM_MODE_ENCODER_TMDS:
+			case DRM_MODE_ENCODER_LVDS:
+				return output;
+			default:
+				break;
+			}
+		} else {
+			switch (output->base.encoder_type) {
+			case DRM_MODE_ENCODER_DAC:
+			case DRM_MODE_ENCODER_TVDAC:
+				return output;
+			default:
+				break;
+			}
+		}
 	}
 
 	return NULL;

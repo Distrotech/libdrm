@@ -67,9 +67,10 @@ static int nv50_dac_execute_mode(struct nv50_output *output, bool disconnect)
 		mode_ctl |= NV50_DAC_MODE_CTRL_CRTC0;
 
 	/* Lacking a working tv-out, this is not a 100% sure. */
-	if (output->type == OUTPUT_DAC) {
+	if (output->base.encoder_type == DRM_MODE_ENCODER_DAC) {
 		mode_ctl |= 0x40;
-	} else if (output->type == OUTPUT_TV) {
+	} else
+	if (output->base.encoder_type == DRM_MODE_ENCODER_TVDAC) {
 		mode_ctl |= 0x100;
 	}
 
@@ -113,19 +114,19 @@ static int nv50_dac_set_power_mode(struct nv50_output *output, int mode)
 		val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_BLANKED;
 
 	switch (mode) {
-		case DRM_MODE_DPMS_STANDBY:
-			val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_HSYNC_OFF;
-			break;
-		case DRM_MODE_DPMS_SUSPEND:
-			val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_VSYNC_OFF;
-			break;
-		case DRM_MODE_DPMS_OFF:
-			val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_OFF;
-			val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_HSYNC_OFF;
-			val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_VSYNC_OFF;
-			break;
-		default:
-			break;
+	case DRM_MODE_DPMS_STANDBY:
+		val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_HSYNC_OFF;
+		break;
+	case DRM_MODE_DPMS_SUSPEND:
+		val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_VSYNC_OFF;
+		break;
+	case DRM_MODE_DPMS_OFF:
+		val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_OFF;
+		val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_HSYNC_OFF;
+		val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_VSYNC_OFF;
+		break;
+	default:
+		break;
 	}
 
 	NV_WRITE(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or), val | NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
@@ -225,7 +226,6 @@ int nv50_dac_create(struct drm_device *dev, int dcb_entry)
 		return -ENOMEM;
 	}
 
-	output->type = OUTPUT_DAC;
 	output->dcb_entry = dcb_entry;
 	output->bus = entry->bus;
 
