@@ -464,31 +464,23 @@ static int nv50_kms_connector_set_property(struct drm_connector *drm_connector,
 	if (property == dev->mode_config.scaling_mode_property) {
 		struct nv50_crtc *crtc = NULL;
 		struct nv50_display *display = nv50_get_display(dev);
-		int internal_value = 0;
 
 		switch (value) {
 		case DRM_MODE_SCALE_NON_GPU:
-			internal_value = SCALE_NON_GPU;
-			break;
 		case DRM_MODE_SCALE_FULLSCREEN:
-			internal_value = SCALE_FULLSCREEN;
-			break;
 		case DRM_MODE_SCALE_NO_SCALE:
-			internal_value = SCALE_NOSCALE;
-			break;
 		case DRM_MODE_SCALE_ASPECT:
-			internal_value = SCALE_ASPECT;
 			break;
 		default:
-			break;
+			return -EINVAL;
 		}
 
 		/* LVDS always needs gpu scaling */
 		if (connector->base.connector_type == DRM_MODE_CONNECTOR_LVDS &&
-		    internal_value == SCALE_NON_GPU)
+		    value == DRM_MODE_SCALE_NON_GPU)
 			return -EINVAL;
 
-		connector->requested_scaling_mode = internal_value;
+		connector->requested_scaling_mode = value;
 
 		if (drm_connector->encoder && drm_connector->encoder->crtc)
 			crtc = to_nv50_crtc(drm_connector->encoder->crtc);
@@ -498,9 +490,13 @@ static int nv50_kms_connector_set_property(struct drm_connector *drm_connector,
 
 		crtc->requested_scaling_mode = connector->requested_scaling_mode;
 
-		/* going from and to a gpu scaled regime requires a modesetting, so wait until next modeset */
-		if (crtc->scaling_mode == SCALE_NON_GPU || internal_value == SCALE_NON_GPU) {
-			DRM_INFO("Moving from or to a non-gpu scaled mode, this will be processed upon next modeset.");
+		/* going from and to a gpu scaled regime requires a
+		 * modesetting, so wait until next modeset
+		 */
+		if (crtc->scaling_mode == DRM_MODE_SCALE_NON_GPU ||
+		    value == DRM_MODE_SCALE_NON_GPU) {
+			DRM_INFO("Moving from or to a non-gpu scaled mode, "
+				 "this will be processed upon next modeset.");
 			delay_change = true;
 		}
 
@@ -560,7 +556,6 @@ static const struct drm_connector_funcs nv50_connector_funcs = {
 static int nv50_kms_get_scaling_mode(struct drm_connector *drm_connector)
 {
 	struct nv50_connector *connector = NULL;
-	int drm_mode = 0;
 
 	if (!drm_connector) {
 		DRM_ERROR("drm_connector is NULL\n");
@@ -568,25 +563,7 @@ static int nv50_kms_get_scaling_mode(struct drm_connector *drm_connector)
 	}
 
 	connector = to_nv50_connector(drm_connector);
-
-	switch (connector->requested_scaling_mode) {
-	case SCALE_NON_GPU:
-		drm_mode = DRM_MODE_SCALE_NON_GPU;
-		break;
-	case SCALE_FULLSCREEN:
-		drm_mode = DRM_MODE_SCALE_FULLSCREEN;
-		break;
-	case SCALE_NOSCALE:
-		drm_mode = DRM_MODE_SCALE_NO_SCALE;
-		break;
-	case SCALE_ASPECT:
-		drm_mode = DRM_MODE_SCALE_ASPECT;
-		break;
-	default:
-		break;
-	}
-
-	return drm_mode;
+	return connector->requested_scaling_mode;
 }
 
 int nv50_connector_create(struct drm_device *dev, int bus, int i2c_index, int type)
@@ -636,10 +613,10 @@ int nv50_connector_create(struct drm_device *dev, int bus, int i2c_index, int ty
 	case DRM_MODE_CONNECTOR_DVII:
 	case DRM_MODE_CONNECTOR_DVID:
 	case DRM_MODE_CONNECTOR_LVDS:
-		connector->requested_scaling_mode = SCALE_FULLSCREEN;
+		connector->requested_scaling_mode = DRM_MODE_SCALE_FULLSCREEN;
 		break;
 	default:
-		connector->requested_scaling_mode = SCALE_NON_GPU;
+		connector->requested_scaling_mode = DRM_MODE_SCALE_NON_GPU;
 		break;
 	}
 

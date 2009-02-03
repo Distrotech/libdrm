@@ -264,19 +264,19 @@ static int nv50_crtc_set_scale(struct nv50_crtc *crtc)
 	NV50_DEBUG("\n");
 
 	switch (crtc->requested_scaling_mode) {
-		case SCALE_ASPECT:
-			nv50_crtc_calc_scale(crtc, &outX, &outY);
-			break;
-		case SCALE_FULLSCREEN:
-			outX = crtc->native_mode->hdisplay;
-			outY = crtc->native_mode->vdisplay;
-			break;
-		case SCALE_NOSCALE:
-		case SCALE_NON_GPU:
-		default:
-			outX = crtc->mode->hdisplay;
-			outY = crtc->mode->vdisplay;
-			break;
+	case DRM_MODE_SCALE_ASPECT:
+		nv50_crtc_calc_scale(crtc, &outX, &outY);
+		break;
+	case DRM_MODE_SCALE_FULLSCREEN:
+		outX = crtc->native_mode->hdisplay;
+		outY = crtc->native_mode->vdisplay;
+		break;
+	case DRM_MODE_SCALE_NO_SCALE:
+	case DRM_MODE_SCALE_NON_GPU:
+	default:
+		outX = crtc->mode->hdisplay;
+		outY = crtc->mode->vdisplay;
+		break;
 	}
 
 	/* Got a better name for SCALER_ACTIVE? */
@@ -865,7 +865,7 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 				break;
 			}
 
-			if (crtc->requested_scaling_mode == SCALE_NON_GPU)
+			if (crtc->requested_scaling_mode == DRM_MODE_SCALE_NON_GPU)
 				crtc->use_native_mode = false;
 			else
 				crtc->use_native_mode = true;
@@ -991,8 +991,8 @@ int nv50_crtc_create(struct drm_device *dev, int index)
 	list_add_tail(&crtc->item, &display->crtcs);
 
 	crtc->index = index;
-	crtc->requested_scaling_mode = SCALE_INVALID;
-	crtc->scaling_mode = SCALE_INVALID;
+	crtc->requested_scaling_mode = DRM_MODE_SCALE_NO_SCALE;
+	crtc->scaling_mode = DRM_MODE_SCALE_NO_SCALE;
 
 	/* set function pointers */
 	crtc->validate_mode = nv50_crtc_validate_mode;

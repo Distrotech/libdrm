@@ -59,14 +59,6 @@ struct nv50_display {
 	struct list_head connectors;
 };
 
-enum scaling_modes {
-	SCALE_NON_GPU,
-	SCALE_FULLSCREEN,
-	SCALE_ASPECT,
-	SCALE_NOSCALE,
-	SCALE_INVALID
-};
-
 void nv50_display_command(struct drm_nouveau_private *dev_priv, uint32_t mthd, uint32_t val);
 struct nv50_display *nv50_get_display(struct drm_device *dev);
 int nv50_display_create(struct drm_device *dev);

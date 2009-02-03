@@ -197,13 +197,14 @@ static int nv50_display_update(struct nv50_display *display)
 int nv50_display_create(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nv50_display *display = kzalloc(sizeof(struct nv50_display), GFP_KERNEL);
+	struct nv50_display *display;
 	int i, output_index;
 	uint32_t bus_mask = 0;
 	uint32_t bus_digital = 0, bus_analog = 0;
 
 	NV50_DEBUG("\n");
 
+	display = kzalloc(sizeof(*display), GFP_KERNEL);
 	if (!display)
 		return -ENOMEM;
 
