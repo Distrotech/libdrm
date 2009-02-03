@@ -198,10 +198,9 @@ int nv50_display_create(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nv50_display *display = kzalloc(sizeof(struct nv50_display), GFP_KERNEL);
-	int i, type, output_index, bus;
+	int i, output_index;
 	/* DAC0, DAC1, DAC2, SOR0, SOR1*/
 	int or_counter[5] = {0, 0, 0, 0, 0};
-	int i2c_index[5] = {0, 0, 0, 0, 0};
 	uint32_t bus_mask = 0;
 	uint32_t bus_digital = 0, bus_analog = 0;
 
@@ -222,72 +221,69 @@ int nv50_display_create(struct drm_device *dev)
 
 	/* we setup the outputs up from the BIOS table */
 	for (i = 0 ; i < dev_priv->dcb_table.entries; i++) {
-		type = dev_priv->dcb_table.entry[i].type;
-		output_index = ffs(dev_priv->dcb_table.entry[i].or) - 1;
-		bus = dev_priv->dcb_table.entry[i].bus;
+		struct dcb_entry *entry = &dev_priv->dcb_table.entry[i];
 
-		switch (type) {
-			case DCB_OUTPUT_TMDS:
-			case DCB_OUTPUT_LVDS:
-				or_counter[output_index + 3] += 1;
-				i2c_index[output_index + 3] = dev_priv->dcb_table.entry[i].i2c_index;
-				bus_digital |= (1 << bus);
-				nv50_sor_create(dev, i);
-				break;
-			case DCB_OUTPUT_ANALOG:
-				or_counter[output_index] += 1;
-				i2c_index[output_index] = dev_priv->dcb_table.entry[i].i2c_index;
-				bus_analog |= (1 << bus);
-				nv50_dac_create(dev, i);
-				break;
-			default:
-				break;
+		output_index = ffs(entry->or) - 1;
+
+		switch (entry->type) {
+		case DCB_OUTPUT_TMDS:
+		case DCB_OUTPUT_LVDS:
+			or_counter[output_index + 3] += 1;
+			bus_digital |= (1 << entry->bus);
+			nv50_sor_create(dev, i);
+			break;
+		case DCB_OUTPUT_ANALOG:
+			or_counter[output_index] += 1;
+			bus_analog |= (1 << entry->bus);
+			nv50_dac_create(dev, i);
+			break;
+		default:
+			break;
 		}
-
 	}
 
 	/* setup the connectors based on the output tables. */
 	for (i = 0 ; i < dev_priv->dcb_table.entries; i++) {
-		int connector_type = 0;
-		type = dev_priv->dcb_table.entry[i].type;
-		bus = dev_priv->dcb_table.entry[i].bus;
+		struct dcb_entry *entry = &dev_priv->dcb_table.entry[i];
+		int connector = 0;
 
 		/* already done? */
-		if (bus_mask & (1 << bus))
+		if (bus_mask & (1 << entry->bus))
 			continue;
 
 		/* only do it for supported outputs */
-		if (type != DCB_OUTPUT_ANALOG && type != DCB_OUTPUT_TMDS
-			&& type != DCB_OUTPUT_LVDS)
+		if (entry->type != DCB_OUTPUT_ANALOG &&
+		    entry->type != DCB_OUTPUT_TMDS &&
+		    entry->type != DCB_OUTPUT_LVDS)
 			continue;
 
-		switch (type) {
+		switch (entry->type) {
 		case DCB_OUTPUT_TMDS:
 		case DCB_OUTPUT_ANALOG:
-			if ((bus_digital & (1 << bus)) &&
-			    (bus_analog & (1 << bus)))
-				connector_type = DRM_MODE_CONNECTOR_DVII;
+			if ((bus_digital & (1 << entry->bus)) &&
+			    (bus_analog & (1 << entry->bus)))
+				connector = DRM_MODE_CONNECTOR_DVII;
 			else
-			if (bus_digital & (1 << bus))
-				connector_type = DRM_MODE_CONNECTOR_DVID;
+			if (bus_digital & (1 << entry->bus))
+				connector = DRM_MODE_CONNECTOR_DVID;
 			else
-			if (bus_analog & (1 << bus))
-				connector_type = DRM_MODE_CONNECTOR_VGA;
+			if (bus_analog & (1 << entry->bus))
+				connector = DRM_MODE_CONNECTOR_VGA;
 			break;
 		case DCB_OUTPUT_LVDS:
-			connector_type = DRM_MODE_CONNECTOR_LVDS;
+			connector = DRM_MODE_CONNECTOR_LVDS;
 			break;
 		default:
-			connector_type = DRM_MODE_CONNECTOR_Unknown;
+			connector = DRM_MODE_CONNECTOR_Unknown;
 			break;
 		}
 
-		if (connector_type == DRM_MODE_CONNECTOR_Unknown)
+		if (connector == DRM_MODE_CONNECTOR_Unknown)
 			continue;
 
-		nv50_connector_create(dev, bus, dev_priv->dcb_table.entry[i].i2c_index, connector_type);
-
-		bus_mask |= (1 << bus);
+		nv50_connector_create(dev, entry->bus, entry->i2c_index,
+				      connector);
+		bus_mask |= (1 << entry->bus);
 	}
 
 	display->dev = dev;
