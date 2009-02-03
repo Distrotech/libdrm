@@ -169,6 +169,10 @@ static int nv50_crtc_blank(struct nv50_crtc *crtc, bool blanked)
 {
 	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
 	struct nouveau_gem_object *ngem = nouveau_gem_object(crtc->fb->gem);
+	if (!ngem || !ngem->bo) {
+		DRM_ERROR("no ngem/bo %p %p\n", ngem, ngem ? ngem->bo : NULL);
+		return -EINVAL;
+	}
 	uint32_t offset = crtc->index * 0x400;
 	uint32_t v_vram = ngem->bo->offset - dev_priv->vm_vram_base;
 	uint32_t v_lut = crtc->lut->bo->offset - dev_priv->vm_vram_base;

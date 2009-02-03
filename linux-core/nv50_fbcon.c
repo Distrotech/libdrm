@@ -600,14 +600,17 @@ int nv50_fbcon_destroy(struct drm_device *dev)
 		return -EINVAL;
 	}
 
-	unregister_framebuffer(info);
+//	unregister_framebuffer(info);
 
-	drm_bo_kunmap(&nv50_fb->kmap);
-	mutex_lock(&dev->struct_mutex);
-	drm_gem_object_unreference(nv50_fb->gem);
-	mutex_unlock(&dev->struct_mutex);
+	if (nv50_fb->kmap.virtual)
+		drm_bo_kunmap(&nv50_fb->kmap);
+	if (nv50_fb->gem) {
+		mutex_lock(&dev->struct_mutex);
+		drm_gem_object_unreference(nv50_fb->gem);
+		mutex_unlock(&dev->struct_mutex);
+	}
 
-	framebuffer_release(info);
+//	framebuffer_release(info);
 
 	return 0;
 }

@@ -345,11 +345,9 @@ struct drm_nouveau_private {
 	/* This is to avoid polluting the internal interface. */
 	void *(*alloc_crtc) (struct drm_device *dev);
 	void *(*alloc_output) (struct drm_device *dev);
-	void *(*alloc_connector) (struct drm_device *dev);
 
 	void (*free_crtc) (void *crtc);
 	void (*free_output) (void *output);
-	void (*free_connector) (void *connector);
 
 	struct bios bios;
 

@@ -312,7 +312,7 @@ int nv50_display_destroy(struct drm_device *dev)
 		display->disable(display);
 
 	list_for_each_entry(connector, &display->connectors, item) {
-		connector->destroy(connector);
+		connector->base.funcs->destroy(&connector->base);
 	}
 
 	list_for_each_entry(output, &display->outputs, item) {

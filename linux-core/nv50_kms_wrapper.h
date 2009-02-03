@@ -57,17 +57,9 @@ struct nv50_kms_encoder {
 	struct drm_encoder pub;
 };
 
-struct nv50_kms_connector {
-	struct list_head item;
-
-	struct nv50_connector priv;
-	struct drm_connector pub;
-};
-
 struct nv50_kms_priv {
 	struct list_head crtcs;
 	struct list_head encoders;
-	struct list_head connectors;
 };
 
 /* Get private functions. */
@@ -75,15 +67,12 @@ struct nv50_kms_priv {
 #define from_nv50_crtc(x) container_of(x, struct nv50_kms_crtc, priv)
 #define from_nv50_kms_encoder(x) container_of(x, struct nv50_kms_encoder, pub)
 #define from_nv50_output(x) container_of(x, struct nv50_kms_encoder, priv)
-#define from_nv50_kms_connector(x) container_of(x, struct nv50_kms_connector, pub)
-#define from_nv50_connector(x) container_of(x, struct nv50_kms_connector, priv)
 
 #define to_nv50_crtc(x) (&(from_nv50_kms_crtc(x)->priv))
 #define to_nv50_kms_crtc(x) (&(from_nv50_crtc(x)->pub))
 #define to_nv50_output(x) (&(from_nv50_kms_encoder(x)->priv))
 #define to_nv50_kms_encoder(x) (&(from_nv50_output(x)->pub))
-#define to_nv50_connector(x) (&(from_nv50_kms_connector(x)->priv))
-#define to_nv50_kms_connector(x) (&(from_nv50_connector(x)->pub))
+#define to_nv50_connector(x) container_of((x), struct nv50_connector, base)
 
 struct nv50_kms_priv *nv50_get_kms_priv(struct drm_device *dev);
 void nv50_kms_connector_detect_all(struct drm_device *dev);

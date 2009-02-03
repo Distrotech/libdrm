@@ -38,9 +38,10 @@
 #define CONNECTOR_TV 5
 
 struct nv50_connector {
+	struct drm_connector base;
 	struct list_head item;
 
-	struct drm_device *dev;
+/*	struct drm_device *dev; IN BASE */
 	int type;
 
 	int bus;
@@ -53,7 +54,7 @@ struct nv50_connector {
 
 	int (*hpd_detect) (struct nv50_connector *connector);
 	int (*i2c_detect) (struct nv50_connector *connector);
-	int (*destroy) (struct nv50_connector *connector);
+/*	int (*destroy) (struct nv50_connector *connector); IN BASE */
 	struct nv50_output *(*to_output) (struct nv50_connector *connector, bool digital);
 };
 
