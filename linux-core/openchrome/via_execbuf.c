@@ -931,7 +931,7 @@ int via_execbuffer(struct drm_device *dev, void *data,
 	 * Used to block command submission on vt switches.
 	 */
 
-	ret = ttm_read_lock(&dev_priv->ttm_lock, 1);
+	ret = ttm_read_lock(&dev_priv->ttm_lock, true);
 	if (unlikely(ret != 0))
 		goto out_err_ctx1;
 
