@@ -62,6 +62,7 @@ struct ttm_object_file {
 	rwlock_t lock;
 	struct list_head ref_list;
 	struct drm_open_hash ref_hash[TTM_REF_NUM];
+	struct kref refcount;
 };
 
 /**
@@ -113,6 +114,32 @@ struct ttm_ref_object {
 	struct ttm_object_file *tfile;
 };
 
+static inline struct ttm_object_file *
+ttm_object_file_ref(struct ttm_object_file *tfile)
+{
+	kref_get(&tfile->refcount);
+	return tfile;
+}
+
+static void ttm_object_file_destroy(struct kref *kref)
+{
+	struct ttm_object_file *tfile =
+		container_of(kref, struct ttm_object_file, refcount);
+
+	printk(KERN_INFO "Freeing 0x%08lx\n", (unsigned long) tfile);
+	kfree(tfile);
+}
+
+
+static inline void ttm_object_file_unref(struct ttm_object_file **p_tfile)
+{
+	struct ttm_object_file *tfile = *p_tfile;
+
+	*p_tfile = NULL;
+	kref_put(&tfile->refcount, ttm_object_file_destroy);
+}
+
+
 int ttm_base_object_init(struct ttm_object_file *tfile,
 			 struct ttm_base_object *base,
 			 int shareable,
@@ -125,7 +152,7 @@ int ttm_base_object_init(struct ttm_object_file *tfile,
 	int ret;
 
 	base->shareable = shareable;
-	base->tfile = tfile;
+	base->tfile = ttm_object_file_ref(tfile);
 	base->refcount_release = refcount_release;
 	base->ref_obj_release = ref_obj_release;
 	base->object_type = object_type;
@@ -159,8 +186,10 @@ static void ttm_release_base(struct kref *kref)
 
 	(void)drm_ht_remove_item(&tdev->object_hash, &base->hash);
 	write_unlock(&tdev->object_lock);
-	if (base->refcount_release)
+	if (base->refcount_release) {
+		ttm_object_file_unref(&base->tfile);
 		base->refcount_release(&base);
+	}
 	write_lock(&tdev->object_lock);
 }
 
@@ -320,11 +349,10 @@ void ttm_object_file_release(struct ttm_object_file **p_tfile)
 {
 	struct ttm_ref_object *ref;
 	struct list_head *list;
-	struct ttm_object_file *tfile = *p_tfile;
 	unsigned int i;
+	struct ttm_object_file *tfile = *p_tfile;
 
 	*p_tfile = NULL;
-
 	write_lock(&tfile->lock);
 
 	/*
@@ -343,7 +371,7 @@ void ttm_object_file_release(struct ttm_object_file **p_tfile)
 	}
 
 	write_unlock(&tfile->lock);
-	kfree(tfile);
+	ttm_object_file_unref(&tfile);
 }
 
 struct ttm_object_file *ttm_object_file_init(struct ttm_object_device *tdev,
@@ -359,6 +387,7 @@ struct ttm_object_file *ttm_object_file_init(struct ttm_object_device *tdev,
 
 	rwlock_init(&tfile->lock);
 	tfile->tdev = tdev;
+	kref_init(&tfile->refcount);
 	INIT_LIST_HEAD(&tfile->ref_list);
 
 	for (i = 0; i < TTM_REF_NUM; ++i) {
