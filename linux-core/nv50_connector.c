@@ -553,19 +553,6 @@ static const struct drm_connector_funcs nv50_connector_funcs = {
 	.set_property = nv50_kms_connector_set_property
 };
 
-static int nv50_kms_get_scaling_mode(struct drm_connector *drm_connector)
-{
-	struct nv50_connector *connector = NULL;
-
-	if (!drm_connector) {
-		DRM_ERROR("drm_connector is NULL\n");
-		return 0;
-	}
-
-	connector = to_nv50_connector(drm_connector);
-	return connector->requested_scaling_mode;
-}
-
 int nv50_connector_create(struct drm_device *dev, int bus, int i2c_index, int type)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
@@ -649,7 +636,7 @@ int nv50_connector_create(struct drm_device *dev, int bus, int i2c_index, int ty
 	 * internally and not expose them.
 	 */
 	if (type != DRM_MODE_CONNECTOR_SVIDEO) {
-		drm_connector_attach_property(&connector->base, dev->mode_config.scaling_mode_property, nv50_kms_get_scaling_mode(&connector->base));
+		drm_connector_attach_property(&connector->base, dev->mode_config.scaling_mode_property, connector->requested_scaling_mode);
 	}
 
 	drm_connector_attach_property(&connector->base, dev->mode_config.dithering_mode_property, connector->use_dithering ? DRM_MODE_DITHERING_ON : DRM_MODE_DITHERING_OFF);
