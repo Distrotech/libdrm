@@ -34,11 +34,12 @@ struct nv50_lut;
 struct nv50_fb;
 
 struct nv50_crtc {
+	struct drm_crtc base;
 	struct list_head item;
 
-	struct drm_device *dev;
+/*	struct drm_device *dev; IN BASE */
 	int index;
-	bool enabled;
+/*	bool enabled; IN BASE */
 	bool blanked;
 
 	struct nouveau_hw_mode *mode;

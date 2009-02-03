@@ -341,11 +341,6 @@ struct drm_nouveau_private {
 	void *display_priv; /* internal modesetting */
 	void *kms_priv; /* related to public interface */
 
-	/* Hook these up to the "public interface" to accomodate a certain allocation style. */
-	/* This is to avoid polluting the internal interface. */
-	void *(*alloc_crtc) (struct drm_device *dev);
-	void (*free_crtc) (void *crtc);
-
 	struct bios bios;
 
 	struct {

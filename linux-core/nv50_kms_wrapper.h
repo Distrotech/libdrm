@@ -43,23 +43,11 @@
 
 /* Link internal modesetting structure to interface. */
 
-struct nv50_kms_crtc {
-	struct list_head item;
-
-	struct nv50_crtc priv;
-	struct drm_crtc pub;
-};
-
 struct nv50_kms_priv {
 	struct list_head crtcs;
 };
 
-/* Get private functions. */
-#define from_nv50_kms_crtc(x) container_of(x, struct nv50_kms_crtc, pub)
-#define from_nv50_crtc(x) container_of(x, struct nv50_kms_crtc, priv)
-
-#define to_nv50_crtc(x) (&(from_nv50_kms_crtc(x)->priv))
-#define to_nv50_kms_crtc(x) (&(from_nv50_crtc(x)->pub))
+#define to_nv50_crtc(x) container_of((x), struct nv50_crtc, base)
 #define to_nv50_output(x) container_of((x), struct nv50_output, base)
 #define to_nv50_connector(x) container_of((x), struct nv50_connector, base)
 

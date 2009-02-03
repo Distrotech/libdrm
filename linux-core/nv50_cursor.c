@@ -30,7 +30,7 @@
 
 static int nv50_cursor_enable(struct nv50_crtc *crtc)
 {
-	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 
 	NV50_DEBUG("\n");
 
@@ -48,7 +48,7 @@ static int nv50_cursor_enable(struct nv50_crtc *crtc)
 
 static int nv50_cursor_disable(struct nv50_crtc *crtc)
 {
-	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 
 	NV50_DEBUG("\n");
 
@@ -63,7 +63,7 @@ static int nv50_cursor_disable(struct nv50_crtc *crtc)
 /* Calling update or changing the stored cursor state is left to the higher level ioctl's. */
 static int nv50_cursor_show(struct nv50_crtc *crtc)
 {
-	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 	uint32_t offset = crtc->index * 0x400;
 
 	NV50_DEBUG("\n");
@@ -83,7 +83,7 @@ static int nv50_cursor_show(struct nv50_crtc *crtc)
 
 static int nv50_cursor_hide(struct nv50_crtc *crtc)
 {
-	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 	uint32_t offset = crtc->index * 0x400;
 
 	NV50_DEBUG("\n");
@@ -96,7 +96,7 @@ static int nv50_cursor_hide(struct nv50_crtc *crtc)
 
 static int nv50_cursor_set_pos(struct nv50_crtc *crtc, int x, int y)
 {
-	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 
 	NV_WRITE(NV50_HW_CURSOR_POS(crtc->index), ((y & 0xFFFF) << 16) | (x & 0xFFFF));
 	/* Needed to make the cursor move. */
@@ -107,7 +107,7 @@ static int nv50_cursor_set_pos(struct nv50_crtc *crtc, int x, int y)
 
 static int nv50_cursor_set_offset(struct nv50_crtc *crtc)
 {
-	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 	struct nouveau_gem_object *ngem = nouveau_gem_object(crtc->cursor->gem);
 
 	NV50_DEBUG("\n");
@@ -128,9 +128,9 @@ nv50_cursor_set_bo(struct nv50_crtc *crtc, struct drm_gem_object *gem)
 	struct nv50_cursor *cursor = crtc->cursor;
 
 	if (cursor->gem) {
-		mutex_lock(&crtc->dev->struct_mutex);
+		mutex_lock(&crtc->base.dev->struct_mutex);
 		drm_gem_object_unreference(cursor->gem);
-		mutex_unlock(&crtc->dev->struct_mutex);
+		mutex_unlock(&crtc->base.dev->struct_mutex);
 
 		cursor->gem = NULL;
 	}

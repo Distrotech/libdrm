@@ -28,6 +28,9 @@
 #include "nv50_cursor.h"
 #include "nv50_lut.h"
 #include "nv50_fb.h"
+#include "nv50_kms_wrapper.h"
+extern struct nouveau_hw_mode *nv50_kms_to_hw_mode(struct drm_display_mode *);
+extern void nv50_kms_mirror_routing(struct drm_device *dev);
 
 static int nv50_crtc_validate_mode(struct nv50_crtc *crtc, struct nouveau_hw_mode *mode)
 {
@@ -67,7 +70,7 @@ static int nv50_crtc_set_mode(struct nv50_crtc *crtc, struct nouveau_hw_mode *mo
 
 static int nv50_crtc_execute_mode(struct nv50_crtc *crtc)
 {
-	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 	struct nouveau_hw_mode *hw_mode;
 	uint32_t hsync_dur,  vsync_dur, hsync_start_to_end, vsync_start_to_end;
 	uint32_t hunk1, vunk1, vunk2a, vunk2b;
@@ -134,7 +137,7 @@ static int nv50_crtc_execute_mode(struct nv50_crtc *crtc)
 
 static int nv50_crtc_set_fb(struct nv50_crtc *crtc)
 {
-	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 	uint32_t offset = crtc->index * 0x400;
 
 	NV50_DEBUG("\n");
@@ -167,7 +170,7 @@ static int nv50_crtc_set_fb(struct nv50_crtc *crtc)
 
 static int nv50_crtc_blank(struct nv50_crtc *crtc, bool blanked)
 {
-	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 	struct nouveau_gem_object *ngem = nouveau_gem_object(crtc->fb->gem);
 	if (!ngem || !ngem->bo) {
 		DRM_ERROR("no ngem/bo %p %p\n", ngem, ngem ? ngem->bo : NULL);
@@ -226,7 +229,7 @@ static int nv50_crtc_blank(struct nv50_crtc *crtc, bool blanked)
 
 static int nv50_crtc_set_dither(struct nv50_crtc *crtc)
 {
-	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 	uint32_t offset = crtc->index * 0x400;
 
 	NV50_DEBUG("\n");
@@ -256,7 +259,7 @@ static void nv50_crtc_calc_scale(struct nv50_crtc *crtc, uint32_t *outX, uint32_
 
 static int nv50_crtc_set_scale(struct nv50_crtc *crtc)
 {
-	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 	uint32_t offset = crtc->index * 0x400;
 	uint32_t outX, outY;
 
@@ -320,7 +323,7 @@ static int nv50_crtc_calc_clock(struct nv50_crtc *crtc,
 	clk = hw_mode->clock;
 
 	/* These are in the g80 bios tables, at least in mine. */
-	if (!get_pll_limits(crtc->dev, NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1(crtc->index), &limits))
+	if (!get_pll_limits(crtc->base.dev, NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1(crtc->index), &limits))
 		return -EINVAL;
 
 	minvco1 = limits.vco1.minfreq, maxvco1 = limits.vco1.maxfreq;
@@ -402,7 +405,7 @@ static int nv50_crtc_calc_clock(struct nv50_crtc *crtc,
 
 static int nv50_crtc_set_clock(struct nv50_crtc *crtc)
 {
-	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 
 	uint32_t pll_reg = NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1(crtc->index);
 
@@ -435,7 +438,7 @@ static int nv50_crtc_set_clock(struct nv50_crtc *crtc)
 
 static int nv50_crtc_set_clock_mode(struct nv50_crtc *crtc)
 {
-	struct drm_nouveau_private *dev_priv = crtc->dev->dev_private;
+	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 
 	NV50_DEBUG("\n");
 
@@ -445,16 +448,16 @@ static int nv50_crtc_set_clock_mode(struct nv50_crtc *crtc)
 	return 0;
 }
 
-static int nv50_crtc_destroy(struct nv50_crtc *crtc)
+static void nv50_crtc_destroy(struct drm_crtc *drm_crtc)
 {
-	struct drm_device *dev = crtc->dev;
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nv50_display *display = nv50_get_display(dev);
+	struct nv50_crtc *crtc = to_nv50_crtc(drm_crtc);
 
 	NV50_DEBUG("\n");
 
-	if (!display || !crtc)
-		return -EINVAL;
+	if (!crtc)
+		return;
+
+	drm_crtc_cleanup(&crtc->base);
 
 	list_del(&crtc->item);
 
@@ -464,55 +467,538 @@ static int nv50_crtc_destroy(struct nv50_crtc *crtc)
 
 	kfree(crtc->mode);
 	kfree(crtc->native_mode);
-
-	if (dev_priv->free_crtc)
-		dev_priv->free_crtc(crtc);
-
-	return 0;
+	kfree(crtc);
 }
 
-int nv50_crtc_create(struct drm_device *dev, int index)
+static int nv50_kms_crtc_cursor_set(struct drm_crtc *drm_crtc, 
+				    struct drm_file *file_priv,
+				    uint32_t buffer_handle,
+				    uint32_t width, uint32_t height)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nv50_crtc *crtc = NULL;
+	struct drm_device *dev = drm_crtc->dev;
+	struct nv50_crtc *crtc = to_nv50_crtc(drm_crtc);
+	struct nv50_display *display = nv50_get_display(crtc->base.dev);
+	struct drm_gem_object *gem = NULL;
+	int ret = 0;
+
+	if (width != 64 || height != 64)
+		return -EINVAL;
+
+	if (buffer_handle) {
+		gem = drm_gem_object_lookup(dev, file_priv, buffer_handle);
+		if (!gem)
+			return -EINVAL;
+
+		ret = nouveau_gem_pin(gem, NOUVEAU_GEM_DOMAIN_VRAM);
+		if (ret) {
+			mutex_lock(&dev->struct_mutex);
+			drm_gem_object_unreference(gem);
+			mutex_unlock(&dev->struct_mutex);
+			return ret;
+		}
+
+		crtc->cursor->set_bo(crtc, gem);
+		crtc->cursor->set_offset(crtc);
+		ret = crtc->cursor->show(crtc);
+	} else {
+		crtc->cursor->set_bo(crtc, NULL);
+		crtc->cursor->hide(crtc);
+	}
+
+	display->update(display);
+	return ret;
+}
+
+static int nv50_kms_crtc_cursor_move(struct drm_crtc *drm_crtc, int x, int y)
+{
+	struct nv50_crtc *crtc = to_nv50_crtc(drm_crtc);
+
+	return crtc->cursor->set_pos(crtc, x, y);
+}
+
+void nv50_kms_crtc_gamma_set(struct drm_crtc *drm_crtc, u16 *r, u16 *g, u16 *b,
+		uint32_t size)
+{
+	struct nv50_crtc *crtc = to_nv50_crtc(drm_crtc);
+
+	if (size != 256)
+		return;
+
+	crtc->lut->set(crtc, (uint16_t *)r, (uint16_t *)g, (uint16_t *)b);
+}
+
+int nv50_kms_crtc_set_config(struct drm_mode_set *set)
+{
+	int rval = 0, i;
+	uint32_t crtc_mask = 0;
+	struct drm_device *dev = NULL;
+	struct drm_nouveau_private *dev_priv = NULL;
 	struct nv50_display *display = NULL;
-	int rval = 0;
+	struct drm_connector *drm_connector = NULL;
+	struct drm_encoder *drm_encoder = NULL;
+	struct drm_crtc *drm_crtc = NULL;
+
+	struct nv50_crtc *crtc = NULL;
+	struct nv50_output *output = NULL;
+	struct nv50_connector *connector = NULL;
+	struct nouveau_hw_mode *hw_mode = NULL;
+	struct nv50_fb_info fb_info;
+
+	bool blank = false;
+	bool switch_fb = false;
+	bool modeset = false;
 
 	NV50_DEBUG("\n");
 
-	/* This allows the public layer to do it's thing. */
-	if (dev_priv->alloc_crtc)
-		crtc = dev_priv->alloc_crtc(dev);
+	/*
+	 * Supported operations:
+	 * - Switch mode.
+	 * - Switch framebuffer.
+	 * - Blank screen.
+	 */
 
+	/* Sanity checking */
+	if (!set) {
+		DRM_ERROR("Sanity check failed\n");
+		goto out;
+	}
+
+	if (!set->crtc) {
+		DRM_ERROR("Sanity check failed\n");
+		goto out;
+	}
+
+	if (set->mode) {
+		if (set->fb) {
+			if (!drm_mode_equal(set->mode, &set->crtc->mode))
+				modeset = true;
+
+			if (set->fb != set->crtc->fb)
+				switch_fb = true;
+
+			if (set->x != set->crtc->x || set->y != set->crtc->y)
+				switch_fb = true;
+		}
+	} else {
+		blank = true;
+	}
+
+	if (!set->connectors && !blank) {
+		DRM_ERROR("Sanity check failed\n");
+		goto out;
+	}
+
+	/* Basic variable setting */
+	dev = set->crtc->dev;
+	dev_priv = dev->dev_private;
+	display = nv50_get_display(dev);
+	crtc = to_nv50_crtc(set->crtc);
+
+	/**
+	 * Wiring up the encoders and connectors.
+	 */
+
+	/* for switch_fb we verify if any important changes happened */
+	if (!blank) {
+		/* Mode validation */
+		hw_mode = nv50_kms_to_hw_mode(set->mode);
+
+		rval = crtc->validate_mode(crtc, hw_mode);
+
+		if (rval != MODE_OK) {
+			DRM_ERROR("Mode not ok\n");
+			goto out;
+		}
+
+		for (i = 0; i < set->num_connectors; i++) {
+			drm_connector = set->connectors[i];
+			if (!drm_connector) {
+				DRM_ERROR("No connector\n");
+				goto out;
+			}
+			connector = to_nv50_connector(drm_connector);
+
+			/* This is to ensure it knows the connector subtype. */
+			drm_connector->funcs->fill_modes(drm_connector, 0, 0);
+
+			output = connector->to_output(connector, nv50_kms_connector_get_digital(drm_connector));
+			if (!output) {
+				DRM_ERROR("No output\n");
+				goto out;
+			}
+
+			rval = output->validate_mode(output, hw_mode);
+			if (rval != MODE_OK) {
+				DRM_ERROR("Mode not ok\n");
+				goto out;
+			}
+
+			/* verify if any "sneaky" changes happened */
+			if (output != connector->output)
+				modeset = true;
+
+			if (output->crtc != crtc)
+				modeset = true;
+		}
+	}
+
+	/* Now we verified if anything changed, fail if nothing has. */
+	if (!modeset && !switch_fb && !blank)
+		DRM_INFO("A seemingly empty modeset encountered, this could be a bug.\n");
+
+	/* Validation done, move on to cleaning of existing structures. */
+	if (modeset) {
+		/* find encoders that use this crtc. */
+		list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
+			if (drm_encoder->crtc == set->crtc) {
+				/* find the connector that goes with it */
+				list_for_each_entry(drm_connector, &dev->mode_config.connector_list, head) {
+					if (drm_connector->encoder == drm_encoder) {
+						drm_connector->encoder =  NULL;
+						break;
+					}
+				}
+				drm_encoder->crtc = NULL;
+			}
+		}
+
+		/* now find if our desired encoders or connectors are in use already. */
+		for (i = 0; i < set->num_connectors; i++) {
+			drm_connector = set->connectors[i];
+			if (!drm_connector) {
+				DRM_ERROR("No connector\n");
+				goto out;
+			}
+
+			if (!drm_connector->encoder)
+				continue;
+
+			drm_encoder = drm_connector->encoder;
+			drm_connector->encoder = NULL;
+
+			if (!drm_encoder->crtc)
+				continue;
+
+			drm_crtc = drm_encoder->crtc;
+			drm_encoder->crtc = NULL;
+
+			drm_crtc->enabled = false;
+		}
+
+		/* Time to wire up the public encoder, the private one will be handled later. */
+		for (i = 0; i < set->num_connectors; i++) {
+			drm_connector = set->connectors[i];
+			if (!drm_connector) {
+				DRM_ERROR("No connector\n");
+				goto out;
+			}
+
+			output = connector->to_output(connector, nv50_kms_connector_get_digital(drm_connector));
+			if (!output) {
+				DRM_ERROR("No output\n");
+				goto out;
+			}
+
+			output->base.crtc = set->crtc;
+			set->crtc->enabled = true;
+			drm_connector->encoder = &output->base;
+		}
+	}
+
+	/**
+	 * Disable crtc.
+	 */
+
+	if (blank) {
+		crtc = to_nv50_crtc(set->crtc);
+
+		set->crtc->enabled = false;
+
+		/* disconnect encoders and connectors */
+		for (i = 0; i < set->num_connectors; i++) {
+			drm_connector = set->connectors[i];
+
+			if (!drm_connector->encoder)
+				continue;
+
+			drm_connector->encoder->crtc = NULL;
+			drm_connector->encoder = NULL;
+		}
+	}
+
+	/**
+	 * All state should now be updated, now onto the real work.
+	 */
+
+	/* mirror everything to the private structs */
+	nv50_kms_mirror_routing(dev);
+
+	/**
+	 * Bind framebuffer.
+	 */
+
+	if (switch_fb) {
+		crtc = to_nv50_crtc(set->crtc);
+
+		/* set framebuffer */
+		set->crtc->fb = set->fb;
+
+		/* set private framebuffer */
+		crtc = to_nv50_crtc(set->crtc);
+		fb_info.gem = nv50_framebuffer(set->fb)->gem;
+		fb_info.width = set->fb->width;
+		fb_info.height = set->fb->height;
+		fb_info.depth = set->fb->depth;
+		fb_info.bpp = set->fb->bits_per_pixel;
+		fb_info.pitch = set->fb->pitch;
+		fb_info.x = set->x;
+		fb_info.y = set->y;
+
+		rval = crtc->fb->bind(crtc, &fb_info);
+		if (rval != 0) {
+			DRM_ERROR("fb_bind failed\n");
+			goto out;
+		}
+	}
+
+	/* this is !cursor_show */
+	if (!crtc->cursor->enabled) {
+		rval = crtc->cursor->enable(crtc);
+		if (rval != 0) {
+			DRM_ERROR("cursor_enable failed\n");
+			goto out;
+		}
+	}
+
+	/**
+	 * Blanking.
+	 */
+
+	if (blank) {
+		crtc = to_nv50_crtc(set->crtc);
+
+		rval = crtc->blank(crtc, true);
+		if (rval != 0) {
+			DRM_ERROR("blanking failed\n");
+			goto out;
+		}
+
+		/* detach any outputs that are currently unused */
+		list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
+			if (!drm_encoder->crtc) {
+				output = to_nv50_output(drm_encoder);
+
+				rval = output->execute_mode(output, true);
+				if (rval != 0) {
+					DRM_ERROR("detaching output failed\n");
+					goto out;
+				}
+			}
+		}
+	}
+
+	/**
+	 * Change framebuffer, without changing mode.
+	 */
+
+	if (switch_fb && !modeset && !blank) {
+		crtc = to_nv50_crtc(set->crtc);
+
+		rval = crtc->set_fb(crtc);
+		if (rval != 0) {
+			DRM_ERROR("set_fb failed\n");
+			goto out;
+		}
+
+		/* this also sets the fb offset */
+		rval = crtc->blank(crtc, false);
+		if (rval != 0) {
+			DRM_ERROR("unblanking failed\n");
+			goto out;
+		}
+	}
+
+	/**
+	 * Normal modesetting.
+	 */
+
+	if (modeset) {
+		crtc = to_nv50_crtc(set->crtc);
+
+		/* disconnect unused outputs */
+		list_for_each_entry(output, &display->outputs, item) {
+			if (output->crtc) {
+				crtc_mask |= 1 << output->crtc->index;
+			} else {
+				rval = output->execute_mode(output, true);
+				if (rval != 0) {
+					DRM_ERROR("detaching output failed\n");
+					goto out;
+				}
+			}
+		}
+
+		/* blank any unused crtcs */
+		list_for_each_entry(crtc, &display->crtcs, item) {
+			if (!(crtc_mask & (1 << crtc->index)))
+				crtc->blank(crtc, true);
+		}
+
+		crtc = to_nv50_crtc(set->crtc);
+
+		rval = crtc->set_mode(crtc, hw_mode);
+		if (rval != 0) {
+			DRM_ERROR("crtc mode set failed\n");
+			goto out;
+		}
+
+		/* find native mode. */
+		list_for_each_entry(output, &display->outputs, item) {
+			if (output->crtc != crtc)
+				continue;
+
+			*crtc->native_mode = *output->native_mode;
+			list_for_each_entry(connector, &display->connectors, item) {
+				if (connector->output != output)
+					continue;
+
+				crtc->requested_scaling_mode = connector->requested_scaling_mode;
+				crtc->use_dithering = connector->use_dithering;
+				break;
+			}
+
+			if (crtc->requested_scaling_mode == SCALE_NON_GPU)
+				crtc->use_native_mode = false;
+			else
+				crtc->use_native_mode = true;
+
+			break; /* no use in finding more than one mode */
+		}
+
+		rval = crtc->execute_mode(crtc);
+		if (rval != 0) {
+			DRM_ERROR("crtc execute mode failed\n");
+			goto out;
+		}
+
+		list_for_each_entry(output, &display->outputs, item) {
+			if (output->crtc != crtc)
+				continue;
+
+			rval = output->execute_mode(output, false);
+			if (rval != 0) {
+				DRM_ERROR("output execute mode failed\n");
+				goto out;
+			}
+		}
+
+		rval = crtc->set_scale(crtc);
+		if (rval != 0) {
+			DRM_ERROR("crtc set scale failed\n");
+			goto out;
+		}
+
+		/* next line changes crtc, so putting it here is important */
+		display->last_crtc = crtc->index;
+	}
+
+	/* always reset dpms, regardless if any other modesetting is done. */
+	if (!blank) {
+		/* this is executed immediately */
+		list_for_each_entry(output, &display->outputs, item) {
+			if (output->crtc != crtc)
+				continue;
+
+			rval = output->set_power_mode(output, DRM_MODE_DPMS_ON);
+			if (rval != 0) {
+				DRM_ERROR("output set power mode failed\n");
+				goto out;
+			}
+		}
+
+		/* update dpms state to DPMSModeOn */
+		for (i = 0; i < set->num_connectors; i++) {
+			drm_connector = set->connectors[i];
+			if (!drm_connector) {
+				DRM_ERROR("No connector\n");
+				goto out;
+			}
+
+			rval = drm_connector_property_set_value(drm_connector,
+					dev->mode_config.dpms_property,
+					DRM_MODE_DPMS_ON);
+			if (rval != 0) {
+				DRM_ERROR("failed to update dpms state\n");
+				goto out;
+			}
+		}
+	}
+
+	display->update(display);
+
+	/* Update the current mode, now that all has gone well. */
+	if (modeset) {
+		set->crtc->mode = *(set->mode);
+		set->crtc->x = set->x;
+		set->crtc->y = set->y;
+	}
+
+	kfree(hw_mode);
+
+	return 0;
+
+out:
+	kfree(hw_mode);
+
+	if (rval != 0)
+		return rval;
+	else
+		return -EINVAL;
+}
+
+static const struct drm_crtc_funcs nv50_kms_crtc_funcs = {
+	.save = NULL,
+	.restore = NULL,
+	.cursor_set = nv50_kms_crtc_cursor_set,
+	.cursor_move = nv50_kms_crtc_cursor_move,
+	.gamma_set = nv50_kms_crtc_gamma_set,
+	.set_config = nv50_kms_crtc_set_config,
+	.destroy = nv50_crtc_destroy,
+};
+
+int nv50_crtc_create(struct drm_device *dev, int index)
+{
+	struct nv50_crtc *crtc = NULL;
+	struct nv50_display *display = NULL;
+
+	NV50_DEBUG("\n");
+
+	display = nv50_get_display(dev);
+	if (!display)
+		return -EINVAL;
+
+	crtc = kzalloc(sizeof(*crtc), GFP_KERNEL);
 	if (!crtc)
 		return -ENOMEM;
 
-	crtc->dev = dev;
+	crtc->mode = kzalloc(sizeof(struct nouveau_hw_mode), GFP_KERNEL);
+	if (!crtc->mode) {
+		kfree(crtc);
+		return -ENOMEM;
+	}
 
-	display = nv50_get_display(dev);
-	if (!display) {
-		rval = -EINVAL;
-		goto out;
+	crtc->native_mode = kzalloc(sizeof(struct nouveau_hw_mode), GFP_KERNEL);
+	if (!crtc->native_mode) {
+		kfree(crtc->mode);
+		kfree(crtc);
+		return -ENOMEM;
 	}
 
 	list_add_tail(&crtc->item, &display->crtcs);
 
 	crtc->index = index;
-
-	crtc->mode = kzalloc(sizeof(struct nouveau_hw_mode), GFP_KERNEL);
-	crtc->native_mode = kzalloc(sizeof(struct nouveau_hw_mode), GFP_KERNEL);
-
 	crtc->requested_scaling_mode = SCALE_INVALID;
 	crtc->scaling_mode = SCALE_INVALID;
-
-	if (!crtc->mode || !crtc->native_mode) {
-		rval = -ENOMEM;
-		goto out;
-	}
-
-	nv50_fb_create(crtc);
-	nv50_lut_create(crtc);
-	nv50_cursor_create(crtc);
 
 	/* set function pointers */
 	crtc->validate_mode = nv50_crtc_validate_mode;
@@ -524,17 +1010,12 @@ int nv50_crtc_create(struct drm_device *dev, int index)
 	crtc->set_scale = nv50_crtc_set_scale;
 	crtc->set_clock = nv50_crtc_set_clock;
 	crtc->set_clock_mode = nv50_crtc_set_clock_mode;
-	crtc->destroy = nv50_crtc_destroy;
 
+	drm_crtc_init(dev, &crtc->base, &nv50_kms_crtc_funcs);
+	drm_mode_crtc_set_gamma_size(&crtc->base, 256);
+
+	nv50_fb_create(crtc);
+	nv50_lut_create(crtc);
+	nv50_cursor_create(crtc);
 	return 0;
-
-out:
-	if (crtc->mode)
-		kfree(crtc->mode);
-	if (crtc->native_mode)
-		kfree(crtc->native_mode);
-	if (dev_priv->free_crtc)
-		dev_priv->free_crtc(crtc);
-
-	return rval;
 }

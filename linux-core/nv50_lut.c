@@ -31,7 +31,7 @@
 
 static int nv50_lut_alloc(struct nv50_crtc *crtc)
 {
-	struct drm_device *dev = crtc->dev;
+	struct drm_device *dev = crtc->base.dev;
 	int ret;
 
 	NV50_DEBUG("\n");
