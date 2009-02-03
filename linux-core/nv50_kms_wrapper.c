@@ -30,16 +30,6 @@
 /* This file serves as the interface between the common kernel modesetting code and the device dependent implementation. */
 
 /*
- * Get private functions.
- */
-
-struct nv50_kms_priv *nv50_get_kms_priv(struct drm_device *dev)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	return dev_priv->kms_priv;
-}
-
-/*
  * State mirroring functions.
  */
 
@@ -155,19 +145,13 @@ static const struct drm_mode_config_funcs nv50_kms_mode_funcs = {
 int nv50_kms_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nv50_kms_priv *kms_priv = kzalloc(sizeof(struct nv50_kms_priv), GFP_KERNEL);
 	struct nv50_display *display = NULL;
 	int rval = 0;
-
-	if (!kms_priv)
-		return -ENOMEM;
-
-	dev_priv->kms_priv = kms_priv;
 
 	/* bios is needed for tables. */
 	rval = nouveau_parse_bios(dev);
 	if (rval != 0)
-		goto out;
+		return rval;
 
 	/* init basic kernel modesetting */
 	drm_mode_config_init(dev);
@@ -186,40 +170,28 @@ int nv50_kms_init(struct drm_device *dev)
 
 	dev->mode_config.fb_base = dev_priv->fb_phys;
 
-	/* init kms lists */
-	INIT_LIST_HEAD(&kms_priv->crtcs);
-
 	/* init the internal core, must be done first. */
 	rval = nv50_display_create(dev);
 	if (rval != 0)
-		goto out;
+		return rval;
 
 	display = nv50_get_display(dev);
-	if (!display) {
-		rval = -EINVAL;
-		goto out;
-	}
+	if (!display)
+		return -EINVAL;
 
 	/* pre-init now */
 	rval = display->pre_init(display);
 	if (rval != 0)
-		goto out;
+		return rval;
 
 	/* init now, this'll kill the textmode */
 	rval = display->init(display);
 	if (rval != 0)
-		goto out;
+		return rval;
 
 	/* process cmdbuffer */
 	display->update(display);
-
 	return 0;
-
-out:
-	kfree(kms_priv);
-	dev_priv->kms_priv = NULL;
-
-	return rval;
 }
 
 int nv50_kms_destroy(struct drm_device *dev)

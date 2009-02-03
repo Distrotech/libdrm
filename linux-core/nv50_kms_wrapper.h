@@ -41,17 +41,10 @@
 #include "drm_crtc.h"
 #include "drm_edid.h"
 
-/* Link internal modesetting structure to interface. */
-
-struct nv50_kms_priv {
-	struct list_head crtcs;
-};
-
 #define to_nv50_crtc(x) container_of((x), struct nv50_crtc, base)
 #define to_nv50_output(x) container_of((x), struct nv50_output, base)
 #define to_nv50_connector(x) container_of((x), struct nv50_connector, base)
 
-struct nv50_kms_priv *nv50_get_kms_priv(struct drm_device *dev);
 void nv50_kms_connector_detect_all(struct drm_device *dev);
 bool nv50_kms_connector_get_digital(struct drm_connector *drm_connector);
 

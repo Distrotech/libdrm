@@ -339,7 +339,6 @@ struct drm_nouveau_private {
 	struct list_head gpuobj_list;
 
 	void *display_priv; /* internal modesetting */
-	void *kms_priv; /* related to public interface */
 
 	struct bios bios;
 
