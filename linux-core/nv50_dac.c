@@ -46,11 +46,11 @@ static int nv50_dac_execute_mode(struct nv50_output *output, bool disconnect)
 	struct drm_nouveau_private *dev_priv = drm_encoder->dev->dev_private;
 	struct nv50_crtc *crtc = to_nv50_crtc(drm_encoder->crtc);
 	struct drm_display_mode *desired_mode = NULL;
-	uint32_t offset = nv50_output_or_offset(output) * 0x80;
+	uint32_t offset = output->or * 0x80;
 	uint32_t mode_ctl = NV50_DAC_MODE_CTRL_OFF;
 	uint32_t mode_ctl2 = 0;
 
-	NV50_DEBUG("or %d\n", nv50_output_or_offset(output));
+	NV50_DEBUG("or %d\n", output->or);
 
 	if (disconnect) {
 		NV50_DEBUG("Disconnecting DAC\n");
@@ -90,9 +90,9 @@ static int nv50_dac_set_clock_mode(struct nv50_output *output)
 {
 	struct drm_nouveau_private *dev_priv = output->base.dev->dev_private;
 
-	NV50_DEBUG("or %d\n", nv50_output_or_offset(output));
+	NV50_DEBUG("or %d\n", output->or);
 
-	NV_WRITE(NV50_PDISPLAY_DAC_CLK_CLK_CTRL2(nv50_output_or_offset(output)),  0);
+	NV_WRITE(NV50_PDISPLAY_DAC_CLK_CLK_CTRL2(output->or),  0);
 
 	return 0;
 }
@@ -101,7 +101,7 @@ static int nv50_dac_set_power_mode(struct nv50_output *output, int mode)
 {
 	struct drm_nouveau_private *dev_priv = output->base.dev->dev_private;
 	uint32_t val;
-	int or = nv50_output_or_offset(output);
+	int or = output->or;
 
 	NV50_DEBUG("or %d\n", or);
 
@@ -137,9 +137,9 @@ static int nv50_dac_set_power_mode(struct nv50_output *output, int mode)
 static int nv50_dac_detect(struct nv50_output *output)
 {
 	struct drm_nouveau_private *dev_priv = output->base.dev->dev_private;
-	int or = nv50_output_or_offset(output);
 	bool present = 0;
 	uint32_t dpms_state, load_pattern, load_state;
+	int or = output->or;
 
 	NV_WRITE(NV50_PDISPLAY_DAC_REGS_CLK_CTRL1(or), 0x00000001);
 	dpms_state = NV_READ(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or));
@@ -193,27 +193,12 @@ static const struct drm_encoder_funcs nv50_dac_encoder_funcs = {
 	.destroy = nv50_dac_destroy,
 };
 
-int nv50_dac_create(struct drm_device *dev, int dcb_entry)
+int nv50_dac_create(struct drm_device *dev, struct dcb_entry *entry)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nv50_output *output = NULL;
-	struct nv50_display *display = NULL;
-	struct dcb_entry *entry = NULL;
 
 	NV50_DEBUG("\n");
-
-	display = nv50_get_display(dev);
-	entry = &dev_priv->dcb_table.entry[dcb_entry];
-	if (!display || dcb_entry >= dev_priv->dcb_table.entries)
-		return -EINVAL;
-
-	switch (entry->type) {
-	case DCB_OUTPUT_ANALOG:
-		DRM_INFO("Detected a DAC output\n");
-		break;
-	default:
-		return -EINVAL;
-	}
+	DRM_INFO("Detected a DAC output\n");
 
 	output = kzalloc(sizeof(*output), GFP_KERNEL);
 	if (!output)
@@ -225,8 +210,8 @@ int nv50_dac_create(struct drm_device *dev, int dcb_entry)
 		return -ENOMEM;
 	}
 
-	output->dcb_entry = dcb_entry;
-	output->bus = entry->bus;
+	output->dcb_entry = entry;
+	output->or = ffs(entry->or) - 1;
 
 	/* Set function pointers. */
 	output->validate_mode = nv50_dac_validate_mode;

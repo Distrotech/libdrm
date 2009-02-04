@@ -275,7 +275,7 @@ int nv50_display_create(struct drm_device *dev)
 	struct nv50_display *display;
 	uint32_t bus_mask = 0;
 	uint32_t bus_digital = 0, bus_analog = 0;
-	int ret, i, output_index;
+	int ret, i;
 
 	NV50_DEBUG("\n");
 
@@ -310,17 +310,15 @@ int nv50_display_create(struct drm_device *dev)
 	for (i = 0 ; i < dev_priv->dcb_table.entries; i++) {
 		struct dcb_entry *entry = &dev_priv->dcb_table.entry[i];
 
-		output_index = ffs(entry->or) - 1;
-
 		switch (entry->type) {
 		case DCB_OUTPUT_TMDS:
 		case DCB_OUTPUT_LVDS:
 			bus_digital |= (1 << entry->bus);
-			nv50_sor_create(dev, i);
+			nv50_sor_create(dev, entry);
 			break;
 		case DCB_OUTPUT_ANALOG:
 			bus_analog |= (1 << entry->bus);
-			nv50_dac_create(dev, i);
+			nv50_dac_create(dev, entry);
 			break;
 		default:
 			break;

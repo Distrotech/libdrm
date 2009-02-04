@@ -51,12 +51,10 @@ static int nv50_sor_execute_mode(struct nv50_output *output, bool disconnect)
 	struct drm_nouveau_private *dev_priv = drm_encoder->dev->dev_private;
 	struct nv50_crtc *crtc = to_nv50_crtc(drm_encoder->crtc);
 	struct drm_display_mode *desired_mode = NULL;
-
-	uint32_t offset = nv50_output_or_offset(output) * 0x40;
-
+	uint32_t offset = output->or * 0x40;
 	uint32_t mode_ctl = NV50_SOR_MODE_CTRL_OFF;
 
-	NV50_DEBUG("or %d\n", nv50_output_or_offset(output));
+	NV50_DEBUG("or %d\n", output->or);
 
 	if (disconnect) {
 		NV50_DEBUG("Disconnecting SOR\n");
@@ -98,7 +96,7 @@ static int nv50_sor_set_clock_mode(struct nv50_output *output)
 	uint32_t limit = 165000;
 	struct drm_display_mode *mode;
 
-	NV50_DEBUG("or %d\n", nv50_output_or_offset(output));
+	NV50_DEBUG("or %d\n", output->or);
 
 	/* We don't yet know what to do, if anything at all. */
 	if (output->base.encoder_type == DRM_MODE_ENCODER_LVDS)
@@ -111,7 +109,7 @@ static int nv50_sor_set_clock_mode(struct nv50_output *output)
 
 	/* 0x70000 was a late addition to nv, mentioned as fixing tmds initialisation on certain gpu's. */
 	/* I presume it's some kind of clock setting, but what precisely i do not know. */
-	NV_WRITE(NV50_PDISPLAY_SOR_CLK_CLK_CTRL2(nv50_output_or_offset(output)), 0x70000 | ((mode->clock > limit) ? 0x101 : 0));
+	NV_WRITE(NV50_PDISPLAY_SOR_CLK_CLK_CTRL2(output->or), 0x70000 | ((mode->clock > limit) ? 0x101 : 0));
 
 	return 0;
 }
@@ -120,9 +118,9 @@ static int nv50_sor_set_power_mode(struct nv50_output *output, int mode)
 {
 	struct drm_nouveau_private *dev_priv = output->base.dev->dev_private;
 	uint32_t val;
-	int or = nv50_output_or_offset(output);
+	int or = output->or;
 
-	NV50_DEBUG("or %d\n", nv50_output_or_offset(output));
+	NV50_DEBUG("or %d\n", output->or);
 
 	/* wait for it to be done */
 	while (NV_READ(NV50_PDISPLAY_SOR_REGS_DPMS_CTRL(or)) & NV50_PDISPLAY_SOR_REGS_DPMS_CTRL_PENDING);
@@ -158,20 +156,13 @@ static const struct drm_encoder_funcs nv50_sor_encoder_funcs = {
 	.destroy = nv50_sor_destroy,
 };
 
-int nv50_sor_create(struct drm_device *dev, int dcb_entry)
+int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nv50_output *output = NULL;
-	struct nv50_display *display = NULL;
-	struct dcb_entry *entry = NULL;
 	int type;
 
 	NV50_DEBUG("\n");
-
-	display = nv50_get_display(dev);
-	entry = &dev_priv->dcb_table.entry[dcb_entry];
-	if (!display || dcb_entry >= dev_priv->dcb_table.entries)
-		return -EINVAL;
 
 	switch (entry->type) {
 	case DCB_OUTPUT_TMDS:
@@ -196,8 +187,8 @@ int nv50_sor_create(struct drm_device *dev, int dcb_entry)
 		return -ENOMEM;
 	}
 
-	output->dcb_entry = dcb_entry;
-	output->bus = entry->bus;
+	output->dcb_entry = entry;
+	output->or = ffs(entry->or) - 1;
 
 	/* Set function pointers. */
 	output->validate_mode = nv50_sor_validate_mode;
@@ -214,7 +205,7 @@ int nv50_sor_create(struct drm_device *dev, int dcb_entry)
 
 	/* Some default state, unknown what it precisely means. */
 	if (output->base.encoder_type == DRM_MODE_ENCODER_TMDS) {
-		int or = nv50_output_or_offset(output);
+		int or = output->or;
 
 		NV_WRITE(NV50_PDISPLAY_SOR_REGS_UNK_00C(or), 0x03010700);
 		NV_WRITE(NV50_PDISPLAY_SOR_REGS_UNK_010(or), 0x0000152f);

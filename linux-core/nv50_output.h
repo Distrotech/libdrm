@@ -32,8 +32,8 @@
 struct nv50_output {
 	struct drm_encoder base;
 
-	int bus;
-	int dcb_entry;
+	struct dcb_entry *dcb_entry;
+	int or;
 
 	struct drm_display_mode *native_mode;
 
@@ -46,8 +46,7 @@ struct nv50_output {
 };
 #define to_nv50_output(x) container_of((x), struct nv50_output, base)
 
-int nv50_output_or_offset(struct nv50_output *output);
-int nv50_sor_create(struct drm_device *dev, int dcb_entry);
-int nv50_dac_create(struct drm_device *dev, int dcb_entry);
+int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry);
+int nv50_dac_create(struct drm_device *dev, struct dcb_entry *entry);
 
 #endif /* __NV50_OUTPUT_H__ */

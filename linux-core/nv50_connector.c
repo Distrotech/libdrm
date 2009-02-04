@@ -61,7 +61,7 @@ static struct nv50_output *nv50_connector_to_output(struct nv50_connector *conne
 	list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
 		struct nv50_output *output = to_nv50_output(drm_encoder);
 
-		if (connector->bus != output->bus)
+		if (connector->bus != output->dcb_entry->bus)
 			continue;
 
 		if (digital) {
