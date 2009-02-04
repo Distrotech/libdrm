@@ -94,7 +94,7 @@ static int nv50_connector_hpd_detect(struct nv50_connector *connector)
 
 	/* Assume connected for the moment. */
 	if (connector->base.connector_type == DRM_MODE_CONNECTOR_LVDS) {
-		NV50_DEBUG("LVDS is defaulting to connected for the moment.\n");
+		DRM_DEBUG("LVDS is defaulting to connected for the moment.\n");
 		return 1;
 	}
 
@@ -116,9 +116,9 @@ static int nv50_connector_hpd_detect(struct nv50_connector *connector)
 		present = 1;
 
 	if (present)
-		NV50_DEBUG("Hotplug detect returned positive for bus %d\n", connector->bus);
+		DRM_DEBUG("Hotplug detect returned positive for bus %d\n", connector->bus);
 	else
-		NV50_DEBUG("Hotplug detect returned negative for bus %d\n", connector->bus);
+		DRM_DEBUG("Hotplug detect returned negative for bus %d\n", connector->bus);
 
 	return present;
 }
@@ -148,7 +148,7 @@ static int nv50_connector_i2c_detect(struct nv50_connector *connector)
 		return -EINVAL;
 
 	ret = i2c_transfer(&connector->i2c_chan->adapter, msgs, 2);
-	NV50_DEBUG("I2C detect returned %d\n", ret);
+	DRM_DEBUG("I2C detect returned %d\n", ret);
 
 	if (ret == 2)
 		return true;
@@ -162,7 +162,7 @@ static void nv50_connector_destroy(struct drm_connector *drm_connector)
 	struct drm_device *dev = connector->base.dev;
 	struct nv50_display *display = nv50_get_display(dev);
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (!display || !connector)
 		return;
@@ -336,7 +336,7 @@ static void nv50_connector_fill_modes(struct drm_connector *drm_connector, uint3
 	struct drm_display_mode *mode, *t;
 	struct edid *edid = NULL;
 
-	NV50_DEBUG("%s\n", drm_get_connector_name(drm_connector));
+	DRM_DEBUG("%s\n", drm_get_connector_name(drm_connector));
 	/* set all modes to the unverified state */
 	list_for_each_entry_safe(mode, t, &drm_connector->modes, head)
 		mode->status = MODE_UNVERIFIED;
@@ -345,9 +345,9 @@ static void nv50_connector_fill_modes(struct drm_connector *drm_connector, uint3
 		connected = true;
 
 	if (connected)
-		NV50_DEBUG("%s is connected\n", drm_get_connector_name(drm_connector));
+		DRM_DEBUG("%s is connected\n", drm_get_connector_name(drm_connector));
 	else
-		NV50_DEBUG("%s is disconnected\n", drm_get_connector_name(drm_connector));
+		DRM_DEBUG("%s is disconnected\n", drm_get_connector_name(drm_connector));
 
 	/* Not all connnectors have an i2c channel. */
 	if (connected && connector->i2c_chan)
@@ -403,7 +403,7 @@ static void nv50_connector_fill_modes(struct drm_connector *drm_connector, uint3
 		struct drm_display_mode *stdmode;
 		struct nv50_output *output;
 
-		NV50_DEBUG("No valid modes on %s\n", drm_get_connector_name(drm_connector));
+		DRM_DEBUG("No valid modes on %s\n", drm_get_connector_name(drm_connector));
 
 		/* Making up native modes for LVDS is a bad idea. */
 		if (drm_connector->connector_type == DRM_MODE_CONNECTOR_LVDS)
@@ -431,7 +431,7 @@ static void nv50_connector_fill_modes(struct drm_connector *drm_connector, uint3
 
 	drm_mode_sort(&drm_connector->modes);
 
-	NV50_DEBUG("Probed modes for %s\n", drm_get_connector_name(drm_connector));
+	DRM_DEBUG("Probed modes for %s\n", drm_get_connector_name(drm_connector));
 
 	list_for_each_entry_safe(mode, t, &drm_connector->modes, head) {
 		mode->vrefresh = drm_mode_vrefresh(mode);
@@ -560,7 +560,7 @@ int nv50_connector_create(struct drm_device *dev, int bus, int i2c_index, int ty
 	struct nv50_display *display = NULL;
 	int i;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	display = nv50_get_display(dev);
 	if (!display || type == DRM_MODE_CONNECTOR_Unknown)

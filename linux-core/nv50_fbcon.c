@@ -86,7 +86,7 @@ static int nv50_fbcon_check_var(struct fb_var_screeninfo *var, struct fb_info *i
 	struct drm_framebuffer *drm_fb = par->fb;
 	int depth;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (!var || !drm_fb || !info) {
 		DRM_ERROR("No var, drm_fb or info\n");
@@ -179,7 +179,7 @@ static int nv50_fbcon_set_par(struct fb_info *info)
 	int rval;
 	bool crtc_used[2] = {false, false};
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (!info) {
 		DRM_ERROR("No fb_info\n");

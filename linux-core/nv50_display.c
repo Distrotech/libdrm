@@ -38,7 +38,7 @@ static int nv50_display_pre_init(struct nv50_display *display)
 	int i;
 	uint32_t ram_amount;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	NV_WRITE(0x00610184, NV_READ(0x00614004));
 	/*
@@ -74,7 +74,7 @@ static int nv50_display_pre_init(struct nv50_display *display)
 	NV_WRITE(NV50_PDISPLAY_UNK_380, 0);
 	/* RAM is clamped to 256 MiB. */
 	ram_amount = nouveau_mem_fb_amount(display->dev);
-	NV50_DEBUG("ram_amount %d\n", ram_amount);
+	DRM_DEBUG("ram_amount %d\n", ram_amount);
 	if (ram_amount > 256*1024*1024)
 		ram_amount = 256*1024*1024;
 	NV_WRITE(NV50_PDISPLAY_RAM_AMOUNT, ram_amount - 1);
@@ -92,7 +92,7 @@ static int nv50_display_init(struct nv50_display *display)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t val;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	/* The precise purpose is unknown, i suspect it has something to do with text mode. */
 	if (NV_READ(NV50_PDISPLAY_SUPERVISOR) & 0x100) {
@@ -142,7 +142,7 @@ static int nv50_display_disable(struct nv50_display *display)
 	struct drm_crtc *drm_crtc;
 	int i;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
 		struct nv50_crtc *crtc = to_nv50_crtc(drm_crtc);
@@ -193,7 +193,7 @@ static int nv50_display_update(struct nv50_display *display)
 	struct drm_device *dev = display->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	OUT_MODE(NV50_UPDATE_DISPLAY, 0);
 
@@ -277,7 +277,7 @@ int nv50_display_create(struct drm_device *dev)
 	uint32_t bus_digital = 0, bus_analog = 0;
 	int ret, i;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	display = kzalloc(sizeof(*display), GFP_KERNEL);
 	if (!display)
@@ -394,7 +394,7 @@ int nv50_display_destroy(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nv50_display *display = nv50_get_display(dev);
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (display->init_done)
 		display->disable(display);

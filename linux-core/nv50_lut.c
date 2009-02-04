@@ -34,7 +34,7 @@ static int nv50_lut_alloc(struct nv50_crtc *crtc)
 	struct drm_device *dev = crtc->base.dev;
 	int ret;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	ret = drm_buffer_object_create(dev, 4096, drm_bo_type_kernel,
 				       DRM_BO_FLAG_MEM_VRAM |
@@ -57,7 +57,7 @@ static int nv50_lut_alloc(struct nv50_crtc *crtc)
 
 static int nv50_lut_free(struct nv50_crtc *crtc)
 {
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (crtc->lut->bo) {
 		drm_bo_kunmap(&crtc->lut->kmap);
@@ -75,7 +75,7 @@ static int nv50_lut_set(struct nv50_crtc *crtc,
 	uint32_t index = 0, i;
 	void __iomem *lut;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (!crtc->lut || !crtc->lut->bo) {
 		DRM_ERROR("Something wrong with the LUT\n");
@@ -127,7 +127,7 @@ int nv50_lut_create(struct nv50_crtc *crtc)
 {
 	int rval = 0;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (!crtc)
 		return -EINVAL;
@@ -161,7 +161,7 @@ int nv50_lut_destroy(struct nv50_crtc *crtc)
 {
 	int rval = 0;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (!crtc)
 		return -EINVAL;

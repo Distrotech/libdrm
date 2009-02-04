@@ -32,7 +32,7 @@
 
 static int nv50_crtc_validate_mode(struct nv50_crtc *crtc, struct drm_display_mode *mode)
 {
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (mode->clock > 400000)
 		return MODE_CLOCK_HIGH;
@@ -48,7 +48,7 @@ static int nv50_crtc_set_mode(struct nv50_crtc *crtc, struct drm_display_mode *m
 	struct drm_display_mode *hw_mode = crtc->mode;
 	uint8_t rval;
 
-	NV50_DEBUG("index %d\n", crtc->index);
+	DRM_DEBUG("index %d\n", crtc->index);
 
 	if (!mode) {
 		DRM_ERROR("No mode\n");
@@ -73,8 +73,8 @@ static int nv50_crtc_execute_mode(struct nv50_crtc *crtc)
 	uint32_t hunk1, vunk1, vunk2a, vunk2b;
 	uint32_t offset = crtc->index * 0x400;
 
-	NV50_DEBUG("index %d\n", crtc->index);
-	NV50_DEBUG("%s native mode\n", crtc->use_native_mode ? "using" : "not using");
+	DRM_DEBUG("index %d\n", crtc->index);
+	DRM_DEBUG("%s native mode\n", crtc->use_native_mode ? "using" : "not using");
 
 	if (crtc->use_native_mode)
 		mode = crtc->native_mode;
@@ -138,7 +138,7 @@ static int nv50_crtc_set_fb(struct nv50_crtc *crtc)
 	struct drm_framebuffer *drm_fb = crtc->base.fb;
 	uint32_t offset = crtc->index * 0x400;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	OUT_MODE(NV50_CRTC0_FB_SIZE + offset, drm_fb->height << 16 | drm_fb->width);
 
@@ -171,8 +171,8 @@ static int nv50_crtc_blank(struct nv50_crtc *crtc, bool blanked)
 	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 	uint32_t offset = crtc->index * 0x400;
 
-	NV50_DEBUG("index %d\n", crtc->index);
-	NV50_DEBUG("%s\n", blanked ? "blanked" : "unblanked");
+	DRM_DEBUG("index %d\n", crtc->index);
+	DRM_DEBUG("%s\n", blanked ? "blanked" : "unblanked");
 
 	if (blanked) {
 		crtc->cursor->hide(crtc);
@@ -222,7 +222,7 @@ static int nv50_crtc_set_dither(struct nv50_crtc *crtc)
 	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 	uint32_t offset = crtc->index * 0x400;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	OUT_MODE(NV50_CRTC0_DITHERING_CTRL + offset, crtc->use_dithering ? 
 			NV50_CRTC0_DITHERING_CTRL_ON : NV50_CRTC0_DITHERING_CTRL_OFF);
@@ -253,7 +253,7 @@ static int nv50_crtc_set_scale(struct nv50_crtc *crtc)
 	uint32_t offset = crtc->index * 0x400;
 	uint32_t outX, outY;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	switch (crtc->requested_scaling_mode) {
 	case DRM_MODE_SCALE_ASPECT:
@@ -303,7 +303,7 @@ static int nv50_crtc_calc_clock(struct nv50_crtc *crtc,
 	int delta, bestdelta = INT_MAX;
 	int bestclk = 0;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (crtc->use_native_mode)
 		mode = crtc->native_mode;
@@ -404,7 +404,7 @@ static int nv50_crtc_set_clock(struct nv50_crtc *crtc)
 	uint32_t reg1 = NV_READ(pll_reg + 4);
 	uint32_t reg2 = NV_READ(pll_reg + 8);
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	NV_WRITE(pll_reg, NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1_CONNECTED | 0x10000011);
 
@@ -415,7 +415,7 @@ static int nv50_crtc_set_clock(struct nv50_crtc *crtc)
 	if (!nv50_crtc_calc_clock(crtc, &N1, &N2, &M1, &M2, &log2P))
 		return -EINVAL;
 
-	NV50_DEBUG("N1 %d N2 %d M1 %d M2 %d log2P %d\n", N1, N2, M1, M2, log2P);
+	DRM_DEBUG("N1 %d N2 %d M1 %d M2 %d log2P %d\n", N1, N2, M1, M2, log2P);
 
 	reg1 |= (M1 << 16) | N1;
 	reg2 |= (log2P << 28) | (M2 << 16) | N2;
@@ -430,7 +430,7 @@ static int nv50_crtc_set_clock_mode(struct nv50_crtc *crtc)
 {
 	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	/* This acknowledges a clock request. */
 	NV_WRITE(NV50_PDISPLAY_CRTC_CLK_CLK_CTRL2(crtc->index), 0);
@@ -442,7 +442,7 @@ static void nv50_crtc_destroy(struct drm_crtc *drm_crtc)
 {
 	struct nv50_crtc *crtc = to_nv50_crtc(drm_crtc);
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (!crtc)
 		return;
@@ -533,7 +533,7 @@ int nv50_crtc_set_config(struct drm_mode_set *set)
 	bool switch_fb = false;
 	bool modeset = false;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	/*
 	 * Supported operations:
@@ -991,7 +991,7 @@ int nv50_crtc_create(struct drm_device *dev, int index)
 	struct nv50_crtc *crtc = NULL;
 	struct nv50_display *display = NULL;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	display = nv50_get_display(dev);
 	if (!display)

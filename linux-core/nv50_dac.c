@@ -29,7 +29,7 @@
 static int nv50_dac_validate_mode(struct nv50_output *output,
 				  struct drm_display_mode *mode)
 {
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (mode->clock > 400000) 
 		return MODE_CLOCK_HIGH;
@@ -50,10 +50,10 @@ static int nv50_dac_execute_mode(struct nv50_output *output, bool disconnect)
 	uint32_t mode_ctl = NV50_DAC_MODE_CTRL_OFF;
 	uint32_t mode_ctl2 = 0;
 
-	NV50_DEBUG("or %d\n", output->or);
+	DRM_DEBUG("or %d\n", output->or);
 
 	if (disconnect) {
-		NV50_DEBUG("Disconnecting DAC\n");
+		DRM_DEBUG("Disconnecting DAC\n");
 		OUT_MODE(NV50_DAC0_MODE_CTRL + offset, mode_ctl);
 		return 0;
 	}
@@ -90,7 +90,7 @@ static int nv50_dac_set_clock_mode(struct nv50_output *output)
 {
 	struct drm_nouveau_private *dev_priv = output->base.dev->dev_private;
 
-	NV50_DEBUG("or %d\n", output->or);
+	DRM_DEBUG("or %d\n", output->or);
 
 	NV_WRITE(NV50_PDISPLAY_DAC_CLK_CLK_CTRL2(output->or),  0);
 
@@ -103,7 +103,7 @@ static int nv50_dac_set_power_mode(struct nv50_output *output, int mode)
 	uint32_t val;
 	int or = output->or;
 
-	NV50_DEBUG("or %d\n", or);
+	DRM_DEBUG("or %d\n", or);
 
 	/* wait for it to be done */
 	while (NV_READ(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or)) & NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
@@ -150,10 +150,10 @@ static int nv50_dac_detect(struct nv50_output *output)
 	/* Use bios provided value if possible. */
 	if (dev_priv->bios.dactestval) {
 		load_pattern = dev_priv->bios.dactestval;
-		NV50_DEBUG("Using bios provided load_pattern of %d\n", load_pattern);
+		DRM_DEBUG("Using bios provided load_pattern of %d\n", load_pattern);
 	} else {
 		load_pattern = 340;
-		NV50_DEBUG("Using default load_pattern of %d\n", load_pattern);
+		DRM_DEBUG("Using default load_pattern of %d\n", load_pattern);
 	}
 
 	NV_WRITE(NV50_PDISPLAY_DAC_REGS_LOAD_CTRL(or), NV50_PDISPLAY_DAC_REGS_LOAD_CTRL_ACTIVE | load_pattern);
@@ -167,9 +167,9 @@ static int nv50_dac_detect(struct nv50_output *output)
 		present = 1;
 
 	if (present)
-		NV50_DEBUG("Load was detected on output with or %d\n", or);
+		DRM_DEBUG("Load was detected on output with or %d\n", or);
 	else
-		NV50_DEBUG("Load was not detected on output with or %d\n", or);
+		DRM_DEBUG("Load was not detected on output with or %d\n", or);
 
 	return present;
 }
@@ -178,7 +178,7 @@ static void nv50_dac_destroy(struct drm_encoder *drm_encoder)
 {
 	struct nv50_output *output = to_nv50_output(drm_encoder);
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (!drm_encoder)
 		return;
@@ -197,7 +197,7 @@ int nv50_dac_create(struct drm_device *dev, struct dcb_entry *entry)
 {
 	struct nv50_output *output = NULL;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 	DRM_INFO("Detected a DAC output\n");
 
 	output = kzalloc(sizeof(*output), GFP_KERNEL);

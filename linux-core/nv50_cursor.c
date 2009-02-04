@@ -32,7 +32,7 @@ static int nv50_cursor_enable(struct nv50_crtc *crtc)
 {
 	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	NV_WRITE(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index), 0x2000);
 	while(NV_READ(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index)) & NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK);
@@ -50,7 +50,7 @@ static int nv50_cursor_disable(struct nv50_crtc *crtc)
 {
 	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	NV_WRITE(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index), 0);
 	while(NV_READ(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index)) & NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK);
@@ -66,7 +66,7 @@ static int nv50_cursor_show(struct nv50_crtc *crtc)
 	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 	uint32_t offset = crtc->index * 0x400;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	/* Better not show the cursor when we have none. */
 	/* TODO: is cursor offset actually set? */
@@ -86,7 +86,7 @@ static int nv50_cursor_hide(struct nv50_crtc *crtc)
 	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 	uint32_t offset = crtc->index * 0x400;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	OUT_MODE(NV50_CRTC0_CURSOR_CTRL + offset, NV50_CRTC0_CURSOR_CTRL_HIDE);
 
@@ -110,7 +110,7 @@ static int nv50_cursor_set_offset(struct nv50_crtc *crtc)
 	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 	struct nouveau_gem_object *ngem = nouveau_gem_object(crtc->cursor->gem);
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (ngem) {
 		OUT_MODE(NV50_CRTC0_CURSOR_OFFSET + crtc->index * 0x400,
@@ -141,7 +141,7 @@ nv50_cursor_set_bo(struct nv50_crtc *crtc, struct drm_gem_object *gem)
 
 int nv50_cursor_create(struct nv50_crtc *crtc)
 {
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (!crtc)
 		return -EINVAL;
@@ -166,7 +166,7 @@ int nv50_cursor_destroy(struct nv50_crtc *crtc)
 {
 	int rval = 0;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (!crtc)
 		return -EINVAL;

@@ -34,9 +34,6 @@
 #include "nouveau_reg.h"
 #include "nv50_display_commands.h"
 
-/* for convience, so you can see through the trees. */
-#define NV50_DEBUG DRM_ERROR
-
 struct nv50_crtc;
 struct nv50_output;
 struct nv50_connector;

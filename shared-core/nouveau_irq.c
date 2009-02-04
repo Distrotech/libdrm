@@ -546,7 +546,7 @@ nouveau_nv50_display_irq_handler(struct drm_device *dev)
 	if (val & NV50_PDISPLAY_SUPERVISOR_CLK_MASK) {
 		uint32_t state = (val & NV50_PDISPLAY_SUPERVISOR_CLK_MASK) >> NV50_PDISPLAY_SUPERVISOR_CLK_MASK__SHIFT;
 
-		NV50_DEBUG("state %d\n", state);
+		DRM_DEBUG("state %d\n", state);
 
 		/* Set pll */
 		if (state == 2) {
@@ -582,7 +582,7 @@ nouveau_nv50_display_irq_handler(struct drm_device *dev)
 				if (clock_change)
 					crtc->set_clock(crtc);
 
-				NV50_DEBUG("index %d clock_change %d clock_ack %d\n", crtc_index, clock_change, clock_ack);
+				DRM_DEBUG("index %d clock_change %d clock_ack %d\n", crtc_index, clock_change, clock_ack);
 
 				if (!clock_ack)
 					continue;

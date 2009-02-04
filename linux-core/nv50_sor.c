@@ -29,7 +29,7 @@
 static int nv50_sor_validate_mode(struct nv50_output *output,
 				  struct drm_display_mode *mode)
 {
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (mode->clock > 165000) /* no dual link until we figure it out completely */
 		return MODE_CLOCK_HIGH;
@@ -54,10 +54,10 @@ static int nv50_sor_execute_mode(struct nv50_output *output, bool disconnect)
 	uint32_t offset = output->or * 0x40;
 	uint32_t mode_ctl = NV50_SOR_MODE_CTRL_OFF;
 
-	NV50_DEBUG("or %d\n", output->or);
+	DRM_DEBUG("or %d\n", output->or);
 
 	if (disconnect) {
-		NV50_DEBUG("Disconnecting SOR\n");
+		DRM_DEBUG("Disconnecting SOR\n");
 		OUT_MODE(NV50_SOR0_MODE_CTRL + offset, mode_ctl);
 		return 0;
 	}
@@ -96,7 +96,7 @@ static int nv50_sor_set_clock_mode(struct nv50_output *output)
 	uint32_t limit = 165000;
 	struct drm_display_mode *mode;
 
-	NV50_DEBUG("or %d\n", output->or);
+	DRM_DEBUG("or %d\n", output->or);
 
 	/* We don't yet know what to do, if anything at all. */
 	if (output->base.encoder_type == DRM_MODE_ENCODER_LVDS)
@@ -120,7 +120,7 @@ static int nv50_sor_set_power_mode(struct nv50_output *output, int mode)
 	uint32_t val;
 	int or = output->or;
 
-	NV50_DEBUG("or %d\n", output->or);
+	DRM_DEBUG("or %d\n", output->or);
 
 	/* wait for it to be done */
 	while (NV_READ(NV50_PDISPLAY_SOR_REGS_DPMS_CTRL(or)) & NV50_PDISPLAY_SOR_REGS_DPMS_CTRL_PENDING);
@@ -141,7 +141,7 @@ static void nv50_sor_destroy(struct drm_encoder *drm_encoder)
 {
 	struct nv50_output *output = to_nv50_output(drm_encoder);
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	if (!drm_encoder)
 		return;
@@ -162,7 +162,7 @@ int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry)
 	struct nv50_output *output = NULL;
 	int type;
 
-	NV50_DEBUG("\n");
+	DRM_DEBUG("\n");
 
 	switch (entry->type) {
 	case DCB_OUTPUT_TMDS:
