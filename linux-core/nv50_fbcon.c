@@ -606,7 +606,7 @@ int nv50_fbcon_destroy(struct drm_device *dev)
 		return -EINVAL;
 	}
 
-//	unregister_framebuffer(info);
+	unregister_framebuffer(info);
 
 	if (fb->kmap.virtual)
 		drm_bo_kunmap(&fb->kmap);
@@ -616,7 +616,7 @@ int nv50_fbcon_destroy(struct drm_device *dev)
 		mutex_unlock(&dev->struct_mutex);
 	}
 
-//	framebuffer_release(info);
+	framebuffer_release(info);
 
 	return 0;
 }
