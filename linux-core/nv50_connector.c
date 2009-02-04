@@ -29,8 +29,8 @@
 
 static struct nv50_output *nv50_connector_to_output(struct nv50_connector *connector, bool digital)
 {
-	struct nv50_display *display = nv50_get_display(connector->base.dev);
-	struct nv50_output *output = NULL;
+	struct drm_device *dev = connector->base.dev;
+	struct drm_encoder *drm_encoder;
 	bool digital_possible = false;
 	bool analog_possible = false;
 
@@ -58,7 +58,9 @@ static struct nv50_output *nv50_connector_to_output(struct nv50_connector *conne
 	if (!digital_possible && digital)
 		return NULL;
 
-	list_for_each_entry(output, &display->outputs, item) {
+	list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
+		struct nv50_output *output = to_nv50_output(drm_encoder);
+
 		if (connector->bus != output->bus)
 			continue;
 
@@ -164,8 +166,6 @@ static void nv50_connector_destroy(struct drm_connector *drm_connector)
 
 	if (!display || !connector)
 		return;
-
-	list_del(&connector->item);
 
 	if (connector->i2c_chan)
 		nv50_i2c_channel_destroy(connector->i2c_chan);
@@ -569,8 +569,6 @@ int nv50_connector_create(struct drm_device *dev, int bus, int i2c_index, int ty
 	connector = kzalloc(sizeof(*connector), GFP_KERNEL);
 	if (!connector)
 		return -ENOMEM;
-
-	list_add_tail(&connector->item, &display->connectors);
 
 	connector->bus = bus;
 

@@ -35,7 +35,6 @@ struct nv50_fb;
 
 struct nv50_crtc {
 	struct drm_crtc base;
-	struct list_head item;
 
 	int index;
 	bool blanked;

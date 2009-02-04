@@ -531,6 +531,8 @@ nouveau_nv50_display_irq_handler(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t val = NV_READ(NV50_PDISPLAY_SUPERVISOR);
+	struct drm_encoder *drm_encoder;
+	struct drm_crtc *drm_crtc;
 
 	DRM_INFO("NV50_PDISPLAY_SUPERVISOR - 0x%08X\n", val);
 
@@ -571,7 +573,8 @@ nouveau_nv50_display_irq_handler(struct drm_device *dev)
 				if (display->last_crtc == crtc_index)
 					clock_ack = true;
 
-				list_for_each_entry(crtc, &display->crtcs, item) {
+				list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
+					crtc = to_nv50_crtc(drm_crtc);
 					if (crtc->index == crtc_index)
 						break;
 				}
@@ -586,11 +589,13 @@ nouveau_nv50_display_irq_handler(struct drm_device *dev)
 
 				crtc->set_clock_mode(crtc);
 
-				list_for_each_entry(output, &display->outputs, item) {
-					if (!output->crtc)
+				list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
+					output = to_nv50_output(drm_encoder);
+
+					if (!drm_encoder->crtc)
 						continue;
 
-					if (output->crtc == crtc)
+					if (drm_encoder->crtc == drm_crtc)
 						output->set_clock_mode(output);
 				}
 			}

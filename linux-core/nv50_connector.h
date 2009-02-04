@@ -32,11 +32,9 @@
 
 struct nv50_connector {
 	struct drm_connector base;
-	struct list_head item;
 
 	int bus;
 	struct nv50_i2c_channel *i2c_chan;
-	struct nv50_output *output;
 
 	int requested_scaling_mode;
 

@@ -30,45 +30,6 @@
 /* This file serves as the interface between the common kernel modesetting code and the device dependent implementation. */
 
 /*
- * State mirroring functions.
- */
-
-void nv50_kms_mirror_routing(struct drm_device *dev)
-{
-	struct nv50_display *display = nv50_get_display(dev);
-	struct nv50_crtc *crtc = NULL;
-	struct nv50_output *output = NULL;
-	struct nv50_connector *connector = NULL;
-	struct drm_connector *drm_connector = NULL;
-
-	/* Wipe all previous connections. */
-	list_for_each_entry(connector, &display->connectors, item) {
-		connector->output = NULL;
-	}
-
-	list_for_each_entry(output, &display->outputs, item) {
-		output->crtc = NULL;
-	}
-
-	list_for_each_entry(drm_connector, &dev->mode_config.connector_list, head) {
-		if (drm_connector->encoder) {
-			output = to_nv50_output(drm_connector->encoder);
-			connector = to_nv50_connector(drm_connector);
-
-			/* hook up output to connector. */
-			connector->output = output;
-
-			if (drm_connector->encoder->crtc) {
-				crtc = to_nv50_crtc(drm_connector->encoder->crtc);
-
-				/* hook up output to crtc. */
-				output->crtc = crtc;
-			}
-		}
-	}
-}
-
-/*
  * FB functions.
  */
 

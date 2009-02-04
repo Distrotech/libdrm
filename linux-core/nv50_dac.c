@@ -43,8 +43,9 @@ static int nv50_dac_validate_mode(struct nv50_output *output,
 
 static int nv50_dac_execute_mode(struct nv50_output *output, bool disconnect)
 {
-	struct drm_nouveau_private *dev_priv = output->base.dev->dev_private;
-	struct nv50_crtc *crtc = output->crtc;
+	struct drm_encoder *drm_encoder = &output->base;
+	struct drm_nouveau_private *dev_priv = drm_encoder->dev->dev_private;
+	struct nv50_crtc *crtc = to_nv50_crtc(drm_encoder->crtc);
 	struct drm_display_mode *desired_mode = NULL;
 	uint32_t offset = nv50_output_or_offset(output) * 0x80;
 	uint32_t mode_ctl = NV50_DAC_MODE_CTRL_OFF;
@@ -185,7 +186,6 @@ static void nv50_dac_destroy(struct drm_encoder *drm_encoder)
 
 	drm_encoder_cleanup(&output->base);
 
-	list_del(&output->item);
 	kfree(output->native_mode);
 	kfree(output);
 }
@@ -228,8 +228,6 @@ int nv50_dac_create(struct drm_device *dev, int dcb_entry)
 
 	output->dcb_entry = dcb_entry;
 	output->bus = entry->bus;
-
-	list_add_tail(&output->item, &display->outputs);
 
 	/* Set function pointers. */
 	output->validate_mode = nv50_dac_validate_mode;

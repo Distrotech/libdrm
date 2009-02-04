@@ -53,10 +53,6 @@ struct nv50_display {
 	int (*init) (struct nv50_display *display);
 	int (*disable) (struct nv50_display *display);
 	int (*update) (struct nv50_display *display);
-
-	struct list_head crtcs;
-	struct list_head outputs;
-	struct list_head connectors;
 };
 
 void nv50_display_command(struct drm_nouveau_private *dev_priv, uint32_t mthd, uint32_t val);

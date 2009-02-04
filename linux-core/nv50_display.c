@@ -28,6 +28,7 @@
 #include "nv50_crtc.h"
 #include "nv50_output.h"
 #include "nv50_connector.h"
+#include "nv50_kms_wrapper.h"
 
 static int nv50_display_pre_init(struct nv50_display *display)
 {
@@ -137,19 +138,23 @@ static int nv50_display_disable(struct nv50_display *display)
 {
 	struct drm_device *dev = display->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nv50_crtc *crtc = NULL;
+	struct drm_crtc *drm_crtc;
 	int i;
 
 	NV50_DEBUG("\n");
 
-	list_for_each_entry(crtc, &display->crtcs, item) {
+	list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
+		struct nv50_crtc *crtc = to_nv50_crtc(drm_crtc);
+
 		crtc->blank(crtc, true);
 	}
 
 	display->update(display);
 
 	/* Almost like ack'ing a vblank interrupt, maybe in the spirit of cleaning up? */
-	list_for_each_entry(crtc, &display->crtcs, item) {
+	list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
+		struct nv50_crtc *crtc = to_nv50_crtc(drm_crtc);
+
 		if (crtc->base.enabled) {
 			uint32_t mask;
 
@@ -207,10 +212,6 @@ int nv50_display_create(struct drm_device *dev)
 	display = kzalloc(sizeof(*display), GFP_KERNEL);
 	if (!display)
 		return -ENOMEM;
-
-	INIT_LIST_HEAD(&display->crtcs);
-	INIT_LIST_HEAD(&display->outputs);
-	INIT_LIST_HEAD(&display->connectors);
 
 	dev_priv->display_priv = display;
 
@@ -298,26 +299,11 @@ int nv50_display_destroy(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nv50_display *display = nv50_get_display(dev);
-	struct nv50_crtc *crtc = NULL;
-	struct nv50_output *output = NULL;
-	struct nv50_connector *connector = NULL;
 
 	NV50_DEBUG("\n");
 
 	if (display->init_done)
 		display->disable(display);
-
-	list_for_each_entry(connector, &display->connectors, item) {
-		connector->base.funcs->destroy(&connector->base);
-	}
-
-	list_for_each_entry(output, &display->outputs, item) {
-		output->base.funcs->destroy(&output->base);
-	}
-
-	list_for_each_entry(crtc, &display->crtcs, item) {
-		crtc->destroy(crtc);
-	}
 
 	kfree(display);
 	dev_priv->display_priv = NULL;

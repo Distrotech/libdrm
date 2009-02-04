@@ -450,8 +450,6 @@ static void nv50_crtc_destroy(struct drm_crtc *drm_crtc)
 
 	drm_crtc_cleanup(&crtc->base);
 
-	list_del(&crtc->item);
-
 	nv50_lut_destroy(crtc);
 	nv50_cursor_destroy(crtc);
 
@@ -620,10 +618,10 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 			}
 
 			/* verify if any "sneaky" changes happened */
-			if (output != connector->output)
+			if (&output->base != drm_connector->encoder)
 				modeset = true;
 
-			if (output->crtc != crtc)
+			if (output->base.crtc != &crtc->base)
 				modeset = true;
 		}
 	}
@@ -715,9 +713,6 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 	/**
 	 * All state should now be updated, now onto the real work.
 	 */
-
-	/* mirror everything to the private structs */
-	nv50_kms_mirror_routing(dev);
 
 	/**
 	 * Bind framebuffer.
@@ -847,9 +842,12 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 		crtc = to_nv50_crtc(set->crtc);
 
 		/* disconnect unused outputs */
-		list_for_each_entry(output, &display->outputs, item) {
-			if (output->crtc) {
-				crtc_mask |= 1 << output->crtc->index;
+		list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
+			output = to_nv50_output(drm_encoder);
+
+			if (drm_encoder->crtc) {
+				crtc = to_nv50_crtc(drm_encoder->crtc);
+				crtc_mask |= 1 << crtc->index;
 			} else {
 				rval = output->execute_mode(output, true);
 				if (rval != 0) {
@@ -860,7 +858,8 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 		}
 
 		/* blank any unused crtcs */
-		list_for_each_entry(crtc, &display->crtcs, item) {
+		list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
+			crtc = to_nv50_crtc(drm_crtc);
 			if (!(crtc_mask & (1 << crtc->index)))
 				crtc->blank(crtc, true);
 		}
@@ -874,13 +873,15 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 		}
 
 		/* find native mode. */
-		list_for_each_entry(output, &display->outputs, item) {
-			if (output->crtc != crtc)
+		list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
+			output = to_nv50_output(drm_encoder);
+			if (drm_encoder->crtc != &crtc->base)
 				continue;
 
 			*crtc->native_mode = *output->native_mode;
-			list_for_each_entry(connector, &display->connectors, item) {
-				if (connector->output != output)
+			list_for_each_entry(drm_connector, &dev->mode_config.connector_list, head) {
+				connector = to_nv50_connector(drm_connector);
+				if (drm_connector->encoder != drm_encoder)
 					continue;
 
 				crtc->requested_scaling_mode = connector->requested_scaling_mode;
@@ -902,8 +903,10 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 			goto out;
 		}
 
-		list_for_each_entry(output, &display->outputs, item) {
-			if (output->crtc != crtc)
+
+		list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
+			output = to_nv50_output(drm_encoder);
+			if (drm_encoder->crtc != &crtc->base)
 				continue;
 
 			rval = output->execute_mode(output, false);
@@ -926,8 +929,9 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 	/* always reset dpms, regardless if any other modesetting is done. */
 	if (!blank) {
 		/* this is executed immediately */
-		list_for_each_entry(output, &display->outputs, item) {
-			if (output->crtc != crtc)
+		list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
+			output = to_nv50_output(drm_encoder);
+			if (drm_encoder->crtc != &crtc->base)
 				continue;
 
 			rval = output->set_power_mode(output, DRM_MODE_DPMS_ON);
@@ -1010,8 +1014,6 @@ int nv50_crtc_create(struct drm_device *dev, int index)
 		kfree(crtc);
 		return -ENOMEM;
 	}
-
-	list_add_tail(&crtc->item, &display->crtcs);
 
 	crtc->index = index;
 	crtc->requested_scaling_mode = DRM_MODE_SCALE_NO_SCALE;

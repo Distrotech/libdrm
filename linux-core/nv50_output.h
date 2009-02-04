@@ -31,12 +31,10 @@
 
 struct nv50_output {
 	struct drm_encoder base;
-	struct list_head item;
 
 	int bus;
 	int dcb_entry;
 
-	struct nv50_crtc *crtc;
 	struct drm_display_mode *native_mode;
 
 	int (*validate_mode) (struct nv50_output *output, struct drm_display_mode *mode);
