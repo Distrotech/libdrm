@@ -200,58 +200,58 @@ static int nv50_display_update(struct nv50_display *display)
 	return 0;
 }
 
-/*
- * FB functions.
- */
-
-static void nv50_kms_framebuffer_destroy(struct drm_framebuffer *drm_fb)
+static void nv50_user_framebuffer_destroy(struct drm_framebuffer *drm_fb)
 {
 	struct nv50_framebuffer *fb = to_nv50_framebuffer(drm_fb);
+	struct drm_device *dev = drm_fb->dev;
 
-	drm_gem_object_unreference(fb->gem);
-	drm_framebuffer_cleanup(&fb->base);
+	if (drm_fb->fbdev)
+		DRM_ERROR("radeonfb_remove(dev, drm_fb);\n");
+
+	if (fb->gem) {
+		mutex_lock(&dev->struct_mutex);
+		drm_gem_object_unreference(fb->gem);
+		mutex_unlock(&dev->struct_mutex);
+	}
+
+	drm_framebuffer_cleanup(drm_fb);
 	kfree(fb);
 }
 
-static int
-nv50_kms_framebuffer_create_handle(struct drm_framebuffer *drm_fb,
-				   struct drm_file *file_priv,
-				   unsigned int *handle)
+static int nv50_user_framebuffer_create_handle(struct drm_framebuffer *drm_fb,
+					       struct drm_file *file_priv,
+					       unsigned int *handle)
 {
 	struct nv50_framebuffer *fb = to_nv50_framebuffer(drm_fb);
 
 	return drm_gem_handle_create(file_priv, fb->gem, handle);
 }
 
-static const struct drm_framebuffer_funcs nv50_kms_fb_funcs = {
-	.destroy = nv50_kms_framebuffer_destroy,
-	.create_handle = nv50_kms_framebuffer_create_handle,
+static const struct drm_framebuffer_funcs nv50_framebuffer_funcs = {
+	.destroy = nv50_user_framebuffer_destroy,
+	.create_handle = nv50_user_framebuffer_create_handle,
 };
-
-/*
- * Mode config functions.
- */
 
 struct drm_framebuffer *
 nv50_framebuffer_create(struct drm_device *dev, struct drm_gem_object *gem,
 			struct drm_mode_fb_cmd *mode_cmd)
 {
-	struct nv50_framebuffer *nv50_fb;
+	struct nv50_framebuffer *fb;
 
-	nv50_fb = kzalloc(sizeof(struct nv50_framebuffer), GFP_KERNEL);
-	if (!nv50_fb)
+	fb = kzalloc(sizeof(struct nv50_framebuffer), GFP_KERNEL);
+	if (!fb)
 		return NULL;
 
-	drm_framebuffer_init(dev, &nv50_fb->base, &nv50_kms_fb_funcs);
-	drm_helper_mode_fill_fb_struct(&nv50_fb->base, mode_cmd);
+	drm_framebuffer_init(dev, &fb->base, &nv50_framebuffer_funcs);
+	drm_helper_mode_fill_fb_struct(&fb->base, mode_cmd);
 
-	nv50_fb->gem = gem;
-	return &nv50_fb->base;
+	fb->gem = gem;
+	return &fb->base;
 }
 
 static struct drm_framebuffer *
-nv50_kms_framebuffer_create(struct drm_device *dev, struct drm_file *file_priv,
-			    struct drm_mode_fb_cmd *mode_cmd)
+nv50_user_framebuffer_create(struct drm_device *dev, struct drm_file *file_priv,
+			     struct drm_mode_fb_cmd *mode_cmd)
 {
 	struct drm_gem_object *gem;
 
@@ -259,15 +259,14 @@ nv50_kms_framebuffer_create(struct drm_device *dev, struct drm_file *file_priv,
 	return nv50_framebuffer_create(dev, gem, mode_cmd);
 }
 
-static int nv50_kms_fb_changed(struct drm_device *dev)
+static int nv50_framebuffer_changed(struct drm_device *dev)
 {
 	return 0; /* not needed until nouveaufb? */
 }
 
-static const struct drm_mode_config_funcs nv50_kms_mode_funcs = {
-	.resize_fb = NULL,
-	.fb_create = nv50_kms_framebuffer_create,
-	.fb_changed = nv50_kms_fb_changed,
+static const struct drm_mode_config_funcs nv50_mode_config_funcs = {
+	.fb_create = nv50_user_framebuffer_create,
+	.fb_changed = nv50_framebuffer_changed,
 };
 
 int nv50_display_create(struct drm_device *dev)
@@ -295,7 +294,7 @@ int nv50_display_create(struct drm_device *dev)
 	dev->mode_config.min_width = 0;
 	dev->mode_config.min_height = 0;
 
-	dev->mode_config.funcs = (void *)&nv50_kms_mode_funcs;
+	dev->mode_config.funcs = (void *)&nv50_mode_config_funcs;
 
 	dev->mode_config.max_width = 8192;
 	dev->mode_config.max_height = 8192;

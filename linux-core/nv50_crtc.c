@@ -457,10 +457,10 @@ static void nv50_crtc_destroy(struct drm_crtc *drm_crtc)
 	kfree(crtc);
 }
 
-static int nv50_kms_crtc_cursor_set(struct drm_crtc *drm_crtc, 
-				    struct drm_file *file_priv,
-				    uint32_t buffer_handle,
-				    uint32_t width, uint32_t height)
+static int nv50_crtc_cursor_set(struct drm_crtc *drm_crtc,
+				struct drm_file *file_priv,
+				uint32_t buffer_handle,
+				uint32_t width, uint32_t height)
 {
 	struct drm_device *dev = drm_crtc->dev;
 	struct nv50_crtc *crtc = to_nv50_crtc(drm_crtc);
@@ -496,15 +496,15 @@ static int nv50_kms_crtc_cursor_set(struct drm_crtc *drm_crtc,
 	return ret;
 }
 
-static int nv50_kms_crtc_cursor_move(struct drm_crtc *drm_crtc, int x, int y)
+static int nv50_crtc_cursor_move(struct drm_crtc *drm_crtc, int x, int y)
 {
 	struct nv50_crtc *crtc = to_nv50_crtc(drm_crtc);
 
 	return crtc->cursor->set_pos(crtc, x, y);
 }
 
-void nv50_kms_crtc_gamma_set(struct drm_crtc *drm_crtc, u16 *r, u16 *g, u16 *b,
-		uint32_t size)
+void nv50_crtc_gamma_set(struct drm_crtc *drm_crtc, u16 *r, u16 *g, u16 *b,
+			 uint32_t size)
 {
 	struct nv50_crtc *crtc = to_nv50_crtc(drm_crtc);
 
@@ -514,7 +514,7 @@ void nv50_kms_crtc_gamma_set(struct drm_crtc *drm_crtc, u16 *r, u16 *g, u16 *b,
 	crtc->lut->set(crtc, (uint16_t *)r, (uint16_t *)g, (uint16_t *)b);
 }
 
-int nv50_kms_crtc_set_config(struct drm_mode_set *set)
+int nv50_crtc_set_config(struct drm_mode_set *set)
 {
 	int rval = 0, i;
 	uint32_t crtc_mask = 0;
@@ -604,7 +604,7 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 			/* This is to ensure it knows the connector subtype. */
 			drm_connector->funcs->fill_modes(drm_connector, 0, 0);
 
-			output = connector->to_output(connector, nv50_kms_connector_get_digital(drm_connector));
+			output = connector->to_output(connector, nv50_connector_get_digital(drm_connector));
 			if (!output) {
 				DRM_ERROR("No output\n");
 				goto out;
@@ -676,7 +676,7 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 				goto out;
 			}
 
-			output = connector->to_output(connector, nv50_kms_connector_get_digital(drm_connector));
+			output = connector->to_output(connector, nv50_connector_get_digital(drm_connector));
 			if (!output) {
 				DRM_ERROR("No output\n");
 				goto out;
@@ -976,13 +976,13 @@ out:
 		return -EINVAL;
 }
 
-static const struct drm_crtc_funcs nv50_kms_crtc_funcs = {
+static const struct drm_crtc_funcs nv50_crtc_funcs = {
 	.save = NULL,
 	.restore = NULL,
-	.cursor_set = nv50_kms_crtc_cursor_set,
-	.cursor_move = nv50_kms_crtc_cursor_move,
-	.gamma_set = nv50_kms_crtc_gamma_set,
-	.set_config = nv50_kms_crtc_set_config,
+	.cursor_set = nv50_crtc_cursor_set,
+	.cursor_move = nv50_crtc_cursor_move,
+	.gamma_set = nv50_crtc_gamma_set,
+	.set_config = nv50_crtc_set_config,
 	.destroy = nv50_crtc_destroy,
 };
 
@@ -1029,7 +1029,7 @@ int nv50_crtc_create(struct drm_device *dev, int index)
 	crtc->set_clock = nv50_crtc_set_clock;
 	crtc->set_clock_mode = nv50_crtc_set_clock_mode;
 
-	drm_crtc_init(dev, &crtc->base, &nv50_kms_crtc_funcs);
+	drm_crtc_init(dev, &crtc->base, &nv50_crtc_funcs);
 	drm_mode_crtc_set_gamma_size(&crtc->base, 256);
 
 	nv50_lut_create(crtc);

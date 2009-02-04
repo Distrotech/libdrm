@@ -624,7 +624,7 @@ nouveau_nv50_i2c_irq_handler(struct drm_device *dev)
 	NV_WRITE(NV50_PCONNECTOR_HOTPLUG_CTRL, 0x7FFF7FFF);
 
 	/* Do a "dumb" detect all */
-	nv50_kms_connector_detect_all(dev);
+	nv50_connector_detect_all(dev);
 }
 
 irqreturn_t
