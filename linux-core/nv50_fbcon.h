@@ -27,8 +27,6 @@
 #ifndef __NV50_FBCON_H__
 #define __NV50_FBCON_H__
 
-#include "nv50_kms_wrapper.h"
-
 struct nv50_fbcon_par {
 	struct drm_framebuffer *fb;
 	struct drm_device *dev;

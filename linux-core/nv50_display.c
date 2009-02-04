@@ -28,7 +28,8 @@
 #include "nv50_crtc.h"
 #include "nv50_output.h"
 #include "nv50_connector.h"
-#include "nv50_kms_wrapper.h"
+#include "nv50_fb.h"
+#include "drm_crtc_helper.h"
 
 static int nv50_display_pre_init(struct nv50_display *display)
 {
@@ -199,22 +200,109 @@ static int nv50_display_update(struct nv50_display *display)
 	return 0;
 }
 
+/*
+ * FB functions.
+ */
+
+static void nv50_kms_framebuffer_destroy(struct drm_framebuffer *drm_fb)
+{
+	struct nv50_framebuffer *fb = to_nv50_framebuffer(drm_fb);
+
+	drm_gem_object_unreference(fb->gem);
+	drm_framebuffer_cleanup(&fb->base);
+	kfree(fb);
+}
+
+static int
+nv50_kms_framebuffer_create_handle(struct drm_framebuffer *drm_fb,
+				   struct drm_file *file_priv,
+				   unsigned int *handle)
+{
+	struct nv50_framebuffer *fb = to_nv50_framebuffer(drm_fb);
+
+	return drm_gem_handle_create(file_priv, fb->gem, handle);
+}
+
+static const struct drm_framebuffer_funcs nv50_kms_fb_funcs = {
+	.destroy = nv50_kms_framebuffer_destroy,
+	.create_handle = nv50_kms_framebuffer_create_handle,
+};
+
+/*
+ * Mode config functions.
+ */
+
+struct drm_framebuffer *
+nv50_framebuffer_create(struct drm_device *dev, struct drm_gem_object *gem,
+			struct drm_mode_fb_cmd *mode_cmd)
+{
+	struct nv50_framebuffer *nv50_fb;
+
+	nv50_fb = kzalloc(sizeof(struct nv50_framebuffer), GFP_KERNEL);
+	if (!nv50_fb)
+		return NULL;
+
+	drm_framebuffer_init(dev, &nv50_fb->base, &nv50_kms_fb_funcs);
+	drm_helper_mode_fill_fb_struct(&nv50_fb->base, mode_cmd);
+
+	nv50_fb->gem = gem;
+	return &nv50_fb->base;
+}
+
+static struct drm_framebuffer *
+nv50_kms_framebuffer_create(struct drm_device *dev, struct drm_file *file_priv,
+			    struct drm_mode_fb_cmd *mode_cmd)
+{
+	struct drm_gem_object *gem;
+
+	gem = drm_gem_object_lookup(dev, file_priv, mode_cmd->handle);
+	return nv50_framebuffer_create(dev, gem, mode_cmd);
+}
+
+static int nv50_kms_fb_changed(struct drm_device *dev)
+{
+	return 0; /* not needed until nouveaufb? */
+}
+
+static const struct drm_mode_config_funcs nv50_kms_mode_funcs = {
+	.resize_fb = NULL,
+	.fb_create = nv50_kms_framebuffer_create,
+	.fb_changed = nv50_kms_fb_changed,
+};
+
 int nv50_display_create(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nv50_display *display;
-	int i, output_index;
 	uint32_t bus_mask = 0;
 	uint32_t bus_digital = 0, bus_analog = 0;
+	int ret, i, output_index;
 
 	NV50_DEBUG("\n");
 
 	display = kzalloc(sizeof(*display), GFP_KERNEL);
 	if (!display)
 		return -ENOMEM;
-
 	dev_priv->display_priv = display;
 
+	/* init basic kernel modesetting */
+	drm_mode_config_init(dev);
+
+	/* Initialise some optional connector properties. */
+	drm_mode_create_scaling_mode_property(dev);
+	drm_mode_create_dithering_property(dev);
+
+	dev->mode_config.min_width = 0;
+	dev->mode_config.min_height = 0;
+
+	dev->mode_config.funcs = (void *)&nv50_kms_mode_funcs;
+
+	dev->mode_config.max_width = 8192;
+	dev->mode_config.max_height = 8192;
+
+	dev->mode_config.fb_base = dev_priv->fb_phys;
+
+	/* Create CRTC objects */
 	for (i = 0; i < 2; i++) {
 		nv50_crtc_create(dev, i);
 	}
@@ -292,6 +380,15 @@ int nv50_display_create(struct drm_device *dev)
 	display->disable = nv50_display_disable;
 	display->update = nv50_display_update;
 
+	ret = display->pre_init(display);
+	if (ret)
+		return ret;
+
+	ret = display->init(display);
+	if (ret)
+		return ret;
+
+	display->update(display);
 	return 0;
 }
 
@@ -304,6 +401,8 @@ int nv50_display_destroy(struct drm_device *dev)
 
 	if (display->init_done)
 		display->disable(display);
+
+	drm_mode_config_cleanup(dev);
 
 	kfree(display);
 	dev_priv->display_priv = NULL;

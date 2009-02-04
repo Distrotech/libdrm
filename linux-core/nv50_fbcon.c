@@ -35,7 +35,13 @@
 #include <linux/fb.h>
 #include <linux/init.h>
 
+#include "drmP.h"
+#include "nouveau_drv.h"
+#include "nouveau_drm.h"
+
 #include "nv50_fbcon.h"
+#include "nv50_display.h"
+#include "nv50_fb.h"
 
 static int nv50_fbcon_setcolreg(unsigned regno, unsigned red, unsigned green,
 			unsigned blue, unsigned transp,

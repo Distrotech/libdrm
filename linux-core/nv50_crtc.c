@@ -28,8 +28,7 @@
 #include "nv50_cursor.h"
 #include "nv50_lut.h"
 #include "nv50_fb.h"
-#include "nv50_kms_wrapper.h"
-extern void nv50_kms_mirror_routing(struct drm_device *dev);
+#include "nv50_connector.h"
 
 static int nv50_crtc_validate_mode(struct nv50_crtc *crtc, struct drm_display_mode *mode)
 {

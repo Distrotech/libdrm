@@ -25,7 +25,6 @@
  */
 
 #include "nv50_output.h"
-#include "nv50_kms_wrapper.h"
 
 static int nv50_dac_validate_mode(struct nv50_output *output,
 				  struct drm_display_mode *mode)

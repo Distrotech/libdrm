@@ -44,6 +44,7 @@ struct nv50_output {
 	int (*set_power_mode) (struct nv50_output *output, int mode);
 	int (*detect) (struct nv50_output *output);
 };
+#define to_nv50_output(x) container_of((x), struct nv50_output, base)
 
 int nv50_output_or_offset(struct nv50_output *output);
 int nv50_sor_create(struct drm_device *dev, int dcb_entry);

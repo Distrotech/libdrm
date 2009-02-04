@@ -60,4 +60,8 @@ struct nv50_display *nv50_get_display(struct drm_device *dev);
 int nv50_display_create(struct drm_device *dev);
 int nv50_display_destroy(struct drm_device *dev);
 
+struct drm_framebuffer *
+nv50_framebuffer_create(struct drm_device *, struct drm_gem_object *,
+			struct drm_mode_fb_cmd *);
+
 #endif /* __NV50_DISPLAY_H__ */

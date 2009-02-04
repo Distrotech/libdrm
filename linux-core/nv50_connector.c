@@ -24,8 +24,8 @@
  *
  */
 
+#include "drm_edid.h"
 #include "nv50_connector.h"
-#include "nv50_kms_wrapper.h"
 
 static struct nv50_output *nv50_connector_to_output(struct nv50_connector *connector, bool digital)
 {

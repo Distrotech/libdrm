@@ -65,6 +65,7 @@ struct nv50_crtc {
 	int (*set_clock_mode) (struct nv50_crtc *crtc);
 	int (*destroy) (struct nv50_crtc *crtc);
 };
+#define to_nv50_crtc(x) container_of((x), struct nv50_crtc, base)
 
 int nv50_crtc_create(struct drm_device *dev, int index);
 

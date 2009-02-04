@@ -42,7 +42,7 @@
 #include "nv50_crtc.h"
 #include "nv50_output.h"
 /* needed for hotplug irq */
-#include "nv50_kms_wrapper.h"
+#include "nv50_connector.h"
 
 void
 nouveau_irq_preinstall(struct drm_device *dev)

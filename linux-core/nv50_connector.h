@@ -44,7 +44,10 @@ struct nv50_connector {
 	int (*i2c_detect) (struct nv50_connector *connector);
 	struct nv50_output *(*to_output) (struct nv50_connector *connector, bool digital);
 };
+#define to_nv50_connector(x) container_of((x), struct nv50_connector, base)
 
 int nv50_connector_create(struct drm_device *dev, int bus, int i2c_index, int type);
+void nv50_kms_connector_detect_all(struct drm_device *dev);
+bool nv50_kms_connector_get_digital(struct drm_connector *drm_connector);
 
 #endif /* __NV50_CONNECTOR_H__ */

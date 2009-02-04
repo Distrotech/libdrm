@@ -28,7 +28,7 @@
 #include "drm_sarea.h"
 #include "nouveau_drv.h"
 #include "nouveau_drm.h"
-#include "nv50_kms_wrapper.h"
+#include "nv50_display.h"
 #include "nv50_fbcon.h"
 
 static int nouveau_init_card_mappings(struct drm_device *dev)
@@ -371,15 +371,25 @@ nouveau_card_init(struct drm_device *dev)
 
 	mutex_init(&dev_priv->submit_mutex);
 
-	dev_priv->init_state = NOUVEAU_CARD_INIT_DONE;
+	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
+		ret = nouveau_parse_bios(dev);
+		if (ret)
+			return ret;
 
-	if (drm_core_check_feature(dev, DRIVER_MODESET))
 		if (dev_priv->card_type >= NV_50) {
-			nv50_kms_init(dev);
-			//nv50_kms_connector_detect_all(dev);
-			nv50_fbcon_init(dev);
-		}
+			ret = nv50_display_create(dev);
+			if (ret)
+				return ret;
 
+			ret = nv50_fbcon_init(dev);
+			if (ret) {
+				nv50_display_destroy(dev);
+				return ret;
+			}
+		}
+	}
+
+	dev_priv->init_state = NOUVEAU_CARD_INIT_DONE;
 	return 0;
 }
 
@@ -627,7 +637,7 @@ int nouveau_unload(struct drm_device *dev)
 {
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
 		nv50_fbcon_destroy(dev);
-		nv50_kms_destroy(dev);
+		nv50_display_destroy(dev);
 		nouveau_close(dev);
 	}
 
