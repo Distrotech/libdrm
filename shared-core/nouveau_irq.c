@@ -534,7 +534,7 @@ nouveau_nv50_display_irq_handler(struct drm_device *dev)
 	struct drm_encoder *drm_encoder;
 	struct drm_crtc *drm_crtc;
 
-	DRM_INFO("NV50_PDISPLAY_SUPERVISOR - 0x%08X\n", val);
+	DRM_DEBUG("NV50_PDISPLAY_SUPERVISOR - 0x%08X\n", val);
 
 	/* vblank interrupts */
 	if (val & NV50_PDISPLAY_SUPERVISOR_CRTCn) {
@@ -618,7 +618,8 @@ nouveau_nv50_i2c_irq_handler(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
-	DRM_INFO("NV50_PCONNECTOR_HOTPLUG_CTRL - 0x%08X\n", NV_READ(NV50_PCONNECTOR_HOTPLUG_CTRL));
+	DRM_DEBUG("NV50_PCONNECTOR_HOTPLUG_CTRL - 0x%08X\n",
+		  NV_READ(NV50_PCONNECTOR_HOTPLUG_CTRL));
 
 	/* This seems to be the way to acknowledge an interrupt. */
 	NV_WRITE(NV50_PCONNECTOR_HOTPLUG_CTRL, 0x7FFF7FFF);

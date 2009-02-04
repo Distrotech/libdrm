@@ -408,16 +408,17 @@ int nv50_display_destroy(struct drm_device *dev)
 }
 
 /* This can be replaced with a real fifo in the future. */
-void nv50_display_command(struct drm_nouveau_private *dev_priv, uint32_t mthd, uint32_t val)
+void nv50_display_command(struct drm_nouveau_private *dev_priv,
+			  uint32_t mthd, uint32_t val)
 {
 	uint32_t counter = 0;
 
-#if 1
-	DRM_INFO("mthd 0x%03X val 0x%08X\n", mthd, val);
-#endif
+	DRM_DEBUG("mthd 0x%03X val 0x%08X\n", mthd, val);
 
 	NV_WRITE(NV50_PDISPLAY_CTRL_VAL, val);
-	NV_WRITE(NV50_PDISPLAY_CTRL_STATE, NV50_PDISPLAY_CTRL_STATE_PENDING | 0x10000 | mthd | NV50_PDISPLAY_CTRL_STATE_ENABLE);
+	NV_WRITE(NV50_PDISPLAY_CTRL_STATE, NV50_PDISPLAY_CTRL_STATE_PENDING |
+					   NV50_PDISPLAY_CTRL_STATE_ENABLE |
+					   0x10000 | mthd);
 
 	while (NV_READ(NV50_PDISPLAY_CTRL_STATE) & NV50_PDISPLAY_CTRL_STATE_PENDING) {
 		counter++;
