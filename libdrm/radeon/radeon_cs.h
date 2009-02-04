@@ -79,7 +79,6 @@ struct radeon_cs {
 struct radeon_cs_funcs {
     struct radeon_cs *(*cs_create)(struct radeon_cs_manager *csm,
                                    uint32_t ndw);
-    int (*cs_write_dword)(struct radeon_cs *cs, uint32_t dword);
     int (*cs_write_reloc)(struct radeon_cs *cs,
                           struct radeon_bo *bo,
                           uint32_t read_domain,
@@ -115,11 +114,6 @@ static inline struct radeon_cs *radeon_cs_create(struct radeon_cs_manager *csm,
                                                  uint32_t ndw)
 {
     return csm->funcs->cs_create(csm, ndw);
-}
-
-static inline int radeon_cs_write_dword(struct radeon_cs *cs, uint32_t dword)
-{
-    return cs->csm->funcs->cs_write_dword(cs, dword);
 }
 
 static inline int radeon_cs_write_reloc(struct radeon_cs *cs,
@@ -192,4 +186,13 @@ static inline void radeon_cs_set_limit(struct radeon_cs *cs, uint32_t domain, ui
     else
 	cs->csm->gart_limit = limit;
 }
+
+static inline void radeon_cs_write_dword(struct radeon_cs *cs, uint32_t dword)
+{
+    cs->packets[cs->cdw++] = dword;
+    if (cs->section) {
+        cs->section_cdw++;
+    }
+}
+
 #endif

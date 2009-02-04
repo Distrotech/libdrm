@@ -106,25 +106,6 @@ static struct radeon_cs *cs_gem_create(struct radeon_cs_manager *csm,
     return (struct radeon_cs*)csg;
 }
 
-static int cs_gem_write_dword(struct radeon_cs *cs, uint32_t dword)
-{
-    struct cs_gem *csg = (struct cs_gem*)cs;
-    if (cs->cdw >= cs->ndw) {
-        uint32_t tmp, *ptr;
-        tmp = (cs->cdw + 1 + 0x3FF) & (~0x3FF);
-        ptr = (uint32_t*)realloc(cs->packets, 4 * tmp);
-        if (ptr == NULL) {
-            return -ENOMEM;
-        }
-        cs->packets = ptr;
-        cs->ndw = tmp;
-        csg->chunks[0].chunk_data = (uint64_t)(intptr_t)csg->base.packets;
-    }
-    cs->packets[cs->cdw++] = dword;
-    csg->chunks[0].length_dw += 1;
-    return 0;
-}
-
 static int cs_gem_write_reloc(struct radeon_cs *cs,
                               struct radeon_bo *bo,
                               uint32_t read_domain,
@@ -171,8 +152,8 @@ static int cs_gem_write_reloc(struct radeon_cs *cs,
             /* update flags */
             reloc->flags |= (flags & reloc->flags);
             /* write relocation packet */
-            cs_gem_write_dword(cs, 0xc0001000);
-            cs_gem_write_dword(cs, idx);
+            radeon_cs_write_dword(cs, 0xc0001000);
+            radeon_cs_write_dword(cs, idx);
             return 0;
         }
     }
@@ -205,8 +186,8 @@ static int cs_gem_write_reloc(struct radeon_cs *cs,
     csg->chunks[1].length_dw += RELOC_SIZE;
     radeon_bo_ref(bo);
     cs->relocs_total_size += bo->size;
-    cs_gem_write_dword(cs, 0xc0001000);
-    cs_gem_write_dword(cs, idx);
+    radeon_cs_write_dword(cs, 0xc0001000);
+    radeon_cs_write_dword(cs, idx);
     return 0;
 }
 
@@ -216,6 +197,35 @@ static int cs_gem_begin(struct radeon_cs *cs,
                         const char *func,
                         int line)
 {
+
+    if (cs->section) {
+        fprintf(stderr, "CS already in a section(%s,%s,%d)\n",
+                cs->section_file, cs->section_func, cs->section_line);
+        fprintf(stderr, "CS can't start section(%s,%s,%d)\n",
+                file, func, line);
+        return -EPIPE;
+    }
+    cs->section = 1;
+    cs->section_ndw = ndw;
+    cs->section_cdw = 0;
+    cs->section_file = file;
+    cs->section_func = func;
+    cs->section_line = line;
+
+
+    if (cs->cdw + ndw > cs->ndw) {
+        uint32_t tmp, *ptr;
+	int num = (ndw > 0x3FF) ? ndw : 0x3FF;
+
+        tmp = (cs->cdw + 1 + num) & (~num);
+        ptr = (uint32_t*)realloc(cs->packets, 4 * tmp);
+        if (ptr == NULL) {
+            return -ENOMEM;
+        }
+        cs->packets = ptr;
+        cs->ndw = tmp;
+    }
+
     return 0;
 }
 
@@ -225,7 +235,19 @@ static int cs_gem_end(struct radeon_cs *cs,
                       int line)
 
 {
+    if (!cs->section) {
+        fprintf(stderr, "CS no section to end at (%s,%s,%d)\n",
+                file, func, line);
+        return -EPIPE;
+    }
     cs->section = 0;
+    if (cs->section_ndw != cs->section_cdw) {
+        fprintf(stderr, "CS section size missmatch start at (%s,%s,%d) %d vs %d\n",
+                cs->section_file, cs->section_func, cs->section_line, cs->section_ndw, cs->section_cdw);
+        fprintf(stderr, "CS section end at (%s,%s,%d)\n",
+                file, func, line);
+        return -EPIPE;
+    }
     return 0;
 }
 
@@ -491,7 +513,6 @@ static int cs_gem_check_space(struct radeon_cs *cs, struct radeon_cs_space_check
 
 static struct radeon_cs_funcs radeon_cs_gem_funcs = {
     cs_gem_create,
-    cs_gem_write_dword,
     cs_gem_write_reloc,
     cs_gem_begin,
     cs_gem_end,
