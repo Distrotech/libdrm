@@ -88,6 +88,8 @@ struct ttm_lock {
 	wait_queue_head_t queue;
 	atomic_t write_lock_pending;
 	atomic_t readers;
+	bool kill_takers;
+	int signal;
 };
 
 /**
@@ -150,4 +152,30 @@ extern int ttm_write_lock(struct ttm_lock *lock, bool interruptible,
  */
 extern int ttm_write_unlock(struct ttm_lock *lock,
 			    struct ttm_object_file *tfile);
+
+/**
+ * ttm_lock_set_kill
+ *
+ * @lock: Pointer to a struct ttm_lock
+ * @val: Boolean whether to kill processes taking the lock.
+ * @signal: Signal to send to the process taking the lock.
+ *
+ * The kill-when-taking-lock functionality is used to kill processes that keep
+ * on using the TTM functionality when its resources has been taken down, for
+ * example when the X server exits. A typical sequence would look like this:
+ * - X server takes lock in write mode.
+ * - ttm_lock_set_kill() is called with @val set to true.
+ * - As part of X server exit, TTM resources are taken down.
+ * - X server releases the lock on file release.
+ * - Another dri client wants to render, takes the lock and is killed.
+ *
+ */
+
+static inline void ttm_lock_set_kill(struct ttm_lock *lock, bool val, int signal)
+{
+	lock->kill_takers = val;
+	if (val)
+		lock->signal = signal;
+}
+
 #endif

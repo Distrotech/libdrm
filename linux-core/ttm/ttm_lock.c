@@ -41,6 +41,8 @@ void ttm_lock_init(struct ttm_lock *lock)
 	init_waitqueue_head(&lock->queue);
 	atomic_set(&lock->write_lock_pending, 0);
 	atomic_set(&lock->readers, 0);
+	lock->kill_takers = false;
+	lock->signal = SIGKILL;
 }
 
 void ttm_read_unlock(struct ttm_lock *lock)
@@ -77,6 +79,13 @@ int ttm_read_lock(struct ttm_lock *lock, bool interruptible)
 		if (ret)
 			return -ERESTART;
 	}
+
+	if (unlikely(lock->kill_takers)) {
+		send_sig(lock->signal, current, 0);
+		ttm_read_unlock(lock);
+		return -ERESTART;
+	}
+
 	return 0;
 }
 
@@ -99,7 +108,8 @@ static void ttm_write_lock_remove(struct ttm_base_object **p_base)
 	BUG_ON(ret != 0);
 }
 
-int ttm_write_lock(struct ttm_lock *lock, bool interruptible,
+int ttm_write_lock(struct ttm_lock *lock,
+		   bool interruptible,
 		   struct ttm_object_file *tfile)
 {
 	int ret = 0;
@@ -116,14 +126,20 @@ int ttm_write_lock(struct ttm_lock *lock, bool interruptible,
 		    (lock->queue, atomic_read(&lock->readers) == 0);
 
 		if (ret) {
-			atomic_dec(&lock->write_lock_pending);
-			wake_up_all(&lock->queue);
+			if (atomic_dec_and_test(&lock->write_lock_pending))
+				wake_up_all(&lock->queue);
 			return -ERESTART;
 		}
 	}
 
 	if (atomic_dec_and_test(&lock->write_lock_pending))
 		wake_up_all(&lock->queue);
+
+	if (unlikely(lock->kill_takers)) {
+		send_sig(lock->signal, current, 0);
+		__ttm_write_unlock(lock);
+		return -ERESTART;
+	}
 
 	/*
 	 * Add a base-object, the destructor of which will
