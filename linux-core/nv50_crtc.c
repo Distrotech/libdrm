@@ -136,32 +136,33 @@ static int nv50_crtc_execute_mode(struct nv50_crtc *crtc)
 static int nv50_crtc_set_fb(struct nv50_crtc *crtc)
 {
 	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
+	struct drm_framebuffer *drm_fb = crtc->base.fb;
 	uint32_t offset = crtc->index * 0x400;
 
 	NV50_DEBUG("\n");
 
-	OUT_MODE(NV50_CRTC0_FB_SIZE + offset, crtc->fb->height << 16 | crtc->fb->width);
+	OUT_MODE(NV50_CRTC0_FB_SIZE + offset, drm_fb->height << 16 | drm_fb->width);
 
 	/* I suspect this flag indicates a linear fb. */
-	OUT_MODE(NV50_CRTC0_FB_PITCH + offset, crtc->fb->pitch | 0x100000);
+	OUT_MODE(NV50_CRTC0_FB_PITCH + offset, drm_fb->pitch | 0x100000);
 
-	switch (crtc->fb->depth) {
-		case 8:
-			OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_8BPP); 
-			break;
-		case 15:
-			OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_15BPP);
-			break;
-		case 16:
-			OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_16BPP);
-			break;
-		case 24:
-			OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_24BPP); 
-			break;
+	switch (drm_fb->depth) {
+	case 8:
+		OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_8BPP); 
+		break;
+	case 15:
+		OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_15BPP);
+		break;
+	case 16:
+		OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_16BPP);
+		break;
+	case 24:
+		OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_24BPP); 
+		break;
 	}
 
 	OUT_MODE(NV50_CRTC0_COLOR_CTRL + offset, NV50_CRTC_COLOR_CTRL_MODE_COLOR);
-	OUT_MODE(NV50_CRTC0_FB_POS + offset, (crtc->fb->y << 16) | (crtc->fb->x));
+	OUT_MODE(NV50_CRTC0_FB_POS + offset, (crtc->base.desired_y << 16) | (crtc->base.desired_x));
 
 	return 0;
 }
@@ -169,23 +170,10 @@ static int nv50_crtc_set_fb(struct nv50_crtc *crtc)
 static int nv50_crtc_blank(struct nv50_crtc *crtc, bool blanked)
 {
 	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
-	struct nouveau_gem_object *ngem = nouveau_gem_object(crtc->fb->gem);
-	if (!ngem || !ngem->bo) {
-		DRM_ERROR("no ngem/bo %p %p\n", ngem, ngem ? ngem->bo : NULL);
-		return -EINVAL;
-	}
 	uint32_t offset = crtc->index * 0x400;
-	uint32_t v_vram = ngem->bo->offset - dev_priv->vm_vram_base;
-	uint32_t v_lut = crtc->lut->bo->offset - dev_priv->vm_vram_base;
 
 	NV50_DEBUG("index %d\n", crtc->index);
 	NV50_DEBUG("%s\n", blanked ? "blanked" : "unblanked");
-
-	/* We really need a framebuffer. */
-	if (!ngem && !blanked) {
-		DRM_ERROR("No framebuffer available on crtc %d\n", crtc->index);
-		return -EINVAL;
-	}
 
 	if (blanked) {
 		crtc->cursor->hide(crtc);
@@ -198,6 +186,11 @@ static int nv50_crtc_blank(struct nv50_crtc *crtc, bool blanked)
 		if (dev_priv->chipset != 0x50)
 			OUT_MODE(NV84_CRTC0_BLANK_UNK2 + offset, NV84_CRTC0_BLANK_UNK2_BLANK);
 	} else {
+		struct nv50_framebuffer *fb = to_nv50_framebuffer(crtc->base.fb);
+		struct nouveau_gem_object *ngem = nouveau_gem_object(fb->gem);
+		uint32_t v_vram = ngem->bo->offset - dev_priv->vm_vram_base;
+		uint32_t v_lut = crtc->lut->bo->offset - dev_priv->vm_vram_base;
+
 		OUT_MODE(NV50_CRTC0_FB_OFFSET + offset, v_vram >> 8);
 		OUT_MODE(0x864 + offset, 0);
 
@@ -212,7 +205,7 @@ static int nv50_crtc_blank(struct nv50_crtc *crtc, bool blanked)
 			crtc->cursor->hide(crtc);
 
 		OUT_MODE(NV50_CRTC0_CLUT_MODE + offset, 
-			crtc->fb->depth == 8 ? NV50_CRTC0_CLUT_MODE_OFF : NV50_CRTC0_CLUT_MODE_ON);
+			fb->base.depth == 8 ? NV50_CRTC0_CLUT_MODE_OFF : NV50_CRTC0_CLUT_MODE_ON);
 		OUT_MODE(NV50_CRTC0_CLUT_OFFSET + offset, v_lut >> 8);
 		if (dev_priv->chipset != 0x50)
 			OUT_MODE(NV84_CRTC0_BLANK_UNK1 + offset, NV84_CRTC0_BLANK_UNK1_UNBLANK);
@@ -459,7 +452,6 @@ static void nv50_crtc_destroy(struct drm_crtc *drm_crtc)
 
 	list_del(&crtc->item);
 
-	nv50_fb_destroy(crtc);
 	nv50_lut_destroy(crtc);
 	nv50_cursor_destroy(crtc);
 
@@ -539,7 +531,6 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 	struct nv50_crtc *crtc = NULL;
 	struct nv50_output *output = NULL;
 	struct nv50_connector *connector = NULL;
-	struct drm_display_mode *mode = NULL;
 
 	bool blank = false;
 	bool switch_fb = false;
@@ -597,11 +588,9 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 
 	/* for switch_fb we verify if any important changes happened */
 	if (!blank) {
-		struct drm_display_mode *mode = set->mode;
-
 		/* Mode validation */
 
-		rval = crtc->validate_mode(crtc, mode);
+		rval = crtc->validate_mode(crtc, set->mode);
 		if (rval != MODE_OK) {
 			DRM_ERROR("Mode not ok\n");
 			goto out;
@@ -624,7 +613,7 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 				goto out;
 			}
 
-			rval = output->validate_mode(output, mode);
+			rval = output->validate_mode(output, set->mode);
 			if (rval != MODE_OK) {
 				DRM_ERROR("Mode not ok\n");
 				goto out;
@@ -735,16 +724,62 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 	 */
 
 	if (switch_fb) {
-		crtc = to_nv50_crtc(set->crtc);
+		struct nv50_crtc *crtc = to_nv50_crtc(set->crtc);
+		int r_size = 0, g_size = 0, b_size = 0;
+		uint16_t *r_val, *g_val, *b_val;
+		int i;
 
 		/* set framebuffer */
 		set->crtc->fb = set->fb;
+		set->crtc->desired_x = set->x;
+		set->crtc->desired_y = set->y;
 
-		rval = crtc->fb->bind(crtc, set->fb, set->x, set->y);
-		if (rval != 0) {
-			DRM_ERROR("fb_bind failed\n");
-			goto out;
+		switch (set->crtc->fb->depth) {
+		case 15:
+			r_size = 32;
+			g_size = 32;
+			b_size = 32;
+			break;
+		case 16:
+			r_size = 32;
+			g_size = 64;
+			b_size = 32;
+			break;
+		case 24:
+		default:
+			r_size = 256;
+			g_size = 256;
+			b_size = 256;
+			break;
 		}
+
+		r_val = kmalloc(r_size * sizeof(uint16_t), GFP_KERNEL);
+		g_val = kmalloc(g_size * sizeof(uint16_t), GFP_KERNEL);
+		b_val = kmalloc(b_size * sizeof(uint16_t), GFP_KERNEL);
+
+		if (!r_val || !g_val || !b_val)
+			return -ENOMEM;
+
+		/* Set the color indices. */
+		for (i = 0; i < r_size; i++) {
+			r_val[i] = i << 8;
+		}
+		for (i = 0; i < g_size; i++) {
+			g_val[i] = i << 8;
+		}
+		for (i = 0; i < b_size; i++) {
+			b_val[i] = i << 8;
+		}
+
+		rval = crtc->lut->set(crtc, r_val, g_val, b_val);
+
+		/* free before returning */
+		kfree(r_val);
+		kfree(g_val);
+		kfree(b_val);
+
+		if (rval != 0)
+			return rval;
 	}
 
 	/* this is !cursor_show */
@@ -832,7 +867,7 @@ int nv50_kms_crtc_set_config(struct drm_mode_set *set)
 
 		crtc = to_nv50_crtc(set->crtc);
 
-		rval = crtc->set_mode(crtc, mode);
+		rval = crtc->set_mode(crtc, set->mode);
 		if (rval != 0) {
 			DRM_ERROR("crtc mode set failed\n");
 			goto out;
@@ -996,7 +1031,6 @@ int nv50_crtc_create(struct drm_device *dev, int index)
 	drm_crtc_init(dev, &crtc->base, &nv50_kms_crtc_funcs);
 	drm_mode_crtc_set_gamma_size(&crtc->base, 256);
 
-	nv50_fb_create(crtc);
 	nv50_lut_create(crtc);
 	nv50_cursor_create(crtc);
 	return 0;

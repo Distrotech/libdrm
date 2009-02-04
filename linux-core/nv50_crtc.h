@@ -53,7 +53,7 @@ struct nv50_crtc {
 
 	struct nv50_cursor *cursor;
 	struct nv50_lut *lut;
-	struct nv50_fb *fb;
+//	struct nv50_fb *fb;
 
 	int (*validate_mode) (struct nv50_crtc *crtc, struct drm_display_mode *mode);
 	int (*set_mode) (struct nv50_crtc *crtc, struct drm_display_mode *mode);

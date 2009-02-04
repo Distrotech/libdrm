@@ -29,21 +29,6 @@
 
 #include "nv50_display.h"
 
-struct nv50_crtc;
-
-struct nv50_fb {
-	struct drm_gem_object *gem;
-	int width, height;
-	int bpp, depth;
-	int pitch;
-
-	int x,y;
-
-	/* function points */
-	int (*bind) (struct nv50_crtc *crtc, struct drm_framebuffer *drm_fb,
-		     int x, int y);
-};
-
 struct nv50_framebuffer {
 	struct drm_framebuffer base;
 	struct drm_gem_object *gem;
@@ -51,8 +36,5 @@ struct nv50_framebuffer {
 };
 
 #define to_nv50_framebuffer(x) container_of((x), struct nv50_framebuffer, base)
-
-int nv50_fb_create(struct nv50_crtc *crtc);
-int nv50_fb_destroy(struct nv50_crtc *crtc);
 
 #endif /* __NV50_FB_H__ */

@@ -68,8 +68,10 @@ static int nv50_lut_free(struct nv50_crtc *crtc)
 }
 
 #define NV50_LUT_INDEX(val, w) ((val << (8 - w)) | (val >> ((w << 1) - 8)))
-static int nv50_lut_set(struct nv50_crtc *crtc, uint16_t *red, uint16_t *green, uint16_t *blue)
+static int nv50_lut_set(struct nv50_crtc *crtc,
+			uint16_t *red, uint16_t *green, uint16_t *blue)
 {
+	struct drm_framebuffer *drm_fb = crtc->base.fb;
 	uint32_t index = 0, i;
 	void __iomem *lut;
 
@@ -83,42 +85,41 @@ static int nv50_lut_set(struct nv50_crtc *crtc, uint16_t *red, uint16_t *green, 
 
 	/* 16 bits, red, green, blue, unused, total of 64 bits per index */
 	/* 10 bits lut, with 14 bits values. */
-	switch (crtc->fb->depth) {
-		case 15:
-			/* R5G5B5 */
-			for (i = 0; i < 32; i++) {
-				index = NV50_LUT_INDEX(i, 5);
-				writew(red[i] >> 2, lut + 8*index + 0);
-				writew(green[i] >> 2, lut + 8*index + 2);
-				writew(blue[i] >> 2, lut + 8*index + 4);
-			}
-			break;
-		case 16:
-			/* R5G6B5 */
-			for (i = 0; i < 32; i++) {
-				index = NV50_LUT_INDEX(i, 5);
-				writew(red[i] >> 2, lut + 8*index + 0);
-				writew(blue[i] >> 2, lut + 8*index + 4);
-			}
+	switch (drm_fb->depth) {
+	case 15:
+		/* R5G5B5 */
+		for (i = 0; i < 32; i++) {
+			index = NV50_LUT_INDEX(i, 5);
+			writew(red[i] >> 2, lut + 8*index + 0);
+			writew(green[i] >> 2, lut + 8*index + 2);
+			writew(blue[i] >> 2, lut + 8*index + 4);
+		}
+		break;
+	case 16:
+		/* R5G6B5 */
+		for (i = 0; i < 32; i++) {
+			index = NV50_LUT_INDEX(i, 5);
+			writew(red[i] >> 2, lut + 8*index + 0);
+			writew(blue[i] >> 2, lut + 8*index + 4);
+		}
 
-			/* Green has an extra bit. */
-			for (i = 0; i < 64; i++) {
-				index = NV50_LUT_INDEX(i, 6);
-				writew(green[i] >> 2, lut + 8*index + 2);
-			}
-			break;
-		default:
-			/* R8G8B8 */
-			for (i = 0; i < 256; i++) {
-				writew(red[i] >> 2, lut + 8*i + 0);
-				writew(green[i] >> 2, lut + 8*i + 2);
-				writew(blue[i] >> 2, lut + 8*i + 4);
-			}
-			break;
+		/* Green has an extra bit. */
+		for (i = 0; i < 64; i++) {
+			index = NV50_LUT_INDEX(i, 6);
+			writew(green[i] >> 2, lut + 8*index + 2);
+		}
+		break;
+	default:
+		/* R8G8B8 */
+		for (i = 0; i < 256; i++) {
+			writew(red[i] >> 2, lut + 8*i + 0);
+			writew(green[i] >> 2, lut + 8*i + 2);
+			writew(blue[i] >> 2, lut + 8*i + 4);
+		}
+		break;
 	}
 
-	crtc->lut->depth = crtc->fb->depth;
-
+	crtc->lut->depth = drm_fb->depth;
 	return 0;
 }
 
