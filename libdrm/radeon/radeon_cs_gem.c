@@ -283,6 +283,10 @@ static int cs_gem_emit(struct radeon_cs *cs)
         radeon_bo_unref(csg->relocs_bo[i]);
         csg->relocs_bo[i] = NULL;
     }
+
+    cs->csm->read_used = 0;
+    cs->csm->vram_write_used = 0;
+    cs->csm->gart_write_used = 0;
     return r;
 }
 
