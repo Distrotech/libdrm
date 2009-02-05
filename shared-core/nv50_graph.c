@@ -164,7 +164,7 @@ nv50_graph_create_context(struct nouveau_channel *chan)
 	struct nouveau_engine *engine = &dev_priv->Engine;
 	uint32_t *ctxvals = NULL;
 	int grctx_size = 0x70000, hdr;
-	int ret;
+	int ret, pos;
 
 	DRM_DEBUG("ch%d\n", chan->id);
 
@@ -207,27 +207,13 @@ nv50_graph_create_context(struct nouveau_channel *chan)
 		break;
 	}
 
-	if (ctxvals) {
-		int pos = 0;
+	pos = 0;
+	while (*ctxvals) {
+		int cnt = *ctxvals++;
 
-		while (*ctxvals) {
-			int cnt = *ctxvals++;
-
-			while (cnt--)
-				INSTANCE_WR(ctx, pos++, *ctxvals);
-			ctxvals++;
-		}
-	} else {
-		/* This is complete crack, it accidently used to make at
-		 * least some G8x cards work partially somehow, though there's
-		 * no good reason why - and it stopped working as the rest
-		 * of the code got off the drugs..
-		 */
-		ret = engine->graph.load_context(chan);
-		if (ret) {
-			DRM_ERROR("Error hacking up context: %d\n", ret);
-			return ret;
-		}
+		while (cnt--)
+			INSTANCE_WR(ctx, pos++, *ctxvals);
+		ctxvals++;
 	}
 
 	INSTANCE_WR(ctx, 0x00000/4, chan->ramin->instance >> 12);
