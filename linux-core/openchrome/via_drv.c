@@ -116,6 +116,33 @@ static struct drm_ioctl_desc via_ioctls[] = {
 		      DRM_AUTH)
 };
 
+static long via_unlocked_ioctl(struct file *filp, unsigned int cmd,
+			      unsigned long arg)
+{
+	struct drm_file *file_priv = filp->private_data;
+	struct drm_device *dev = file_priv->minor->dev;
+	unsigned int nr = DRM_IOCTL_NR(cmd);
+	long ret;
+
+	/*
+	 * The driver private ioctls and TTM ioctls should be
+	 * thread-safe.
+	 */
+
+	if ((nr >= DRM_COMMAND_BASE) && (nr < DRM_COMMAND_END)
+	    && (nr < DRM_COMMAND_BASE + dev->driver->num_ioctls))
+		return drm_unlocked_ioctl(filp, cmd, arg);
+
+	/*
+	 * Not all old drm ioctls are thread-safe.
+	 */
+
+	lock_kernel();
+	ret = drm_unlocked_ioctl(filp, cmd, arg);
+	unlock_kernel();
+	return ret;
+}
+
 static int probe(struct pci_dev *pdev, const struct pci_device_id *ent);
 static struct drm_driver driver = {
 	.driver_features =
@@ -147,7 +174,7 @@ static struct drm_driver driver = {
 		 .owner = THIS_MODULE,
 		 .open = via_open,
 		 .release = via_release,
-		 .unlocked_ioctl = drm_unlocked_ioctl,
+		 .unlocked_ioctl = via_unlocked_ioctl,
 		 .mmap = via_mmap,
 		 .poll = drm_poll,
 		 .fasync = drm_fasync,
