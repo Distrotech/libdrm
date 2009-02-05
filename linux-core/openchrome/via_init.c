@@ -561,6 +561,7 @@ static int via_ttm_init(struct drm_device *dev)
 		goto out_err0;
 	}
 	ttm_lock_init(&dev_priv->ttm_lock);
+	ttm_lock_set_kill(&dev_priv->ttm_lock, true, SIGTERM);
 
 	ret = ttm_bo_init_mm(&dev_priv->bdev, TTM_PL_VRAM,
 			     DEV_VRAM_OFFSET >> PAGE_SHIFT,
@@ -789,6 +790,8 @@ static int via_firstopen_locked(struct drm_device *dev)
 	if (ret)
 		goto out_err2;
 
+	ttm_lock_set_kill(&dev_priv->ttm_lock, false, SIGTERM);
+
 	return 0;
       out_err2:
 	(void)drm_irq_uninstall(dev);
@@ -830,6 +833,7 @@ void via_lastclose(struct drm_device *dev)
 	dev_priv->sarea = NULL;
 	dev_priv->sarea_priv = NULL;
 
+	ttm_lock_set_kill(&dev_priv->ttm_lock, true, SIGTERM);
 	via_ttm_signal_fences(dev_priv);
 	(void)ttm_bo_evict_mm(&dev_priv->bdev, TTM_PL_VRAM);
 	(void)ttm_bo_evict_mm(&dev_priv->bdev, TTM_PL_TT);
@@ -868,6 +872,8 @@ static int via_leavevt(struct drm_device *dev, struct drm_file *file_priv)
 			     via_fpriv(file_priv)->tfile);
 	if (ret)
 		return ret;
+
+	ttm_lock_set_kill(&dev_priv->ttm_lock, true, SIGTERM);
 
 	/*
 	 * Clear and disable the VIA_AGP memory type.
