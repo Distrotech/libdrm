@@ -139,7 +139,7 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	 * consider those bits protected by
 	 * the bo->mutex, as we should be the only writers.
 	 * There shouldn't really be any readers of these bits except
-	 * within vm_insert_pfn()? fork?
+	 * within vm_insert_mixed()? fork?
 	 *
 	 * TODO: Add a list of vmas to the bo, and change the
 	 * vma->vm_page_prot when the object changes caching policy, with
@@ -177,7 +177,7 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 			pfn = page_to_pfn(page);
 		}
 
-		ret = vm_insert_pfn(vma, address, pfn);
+		ret = vm_insert_mixed(vma, address, pfn);
 
 		/*
 		 * Somebody beat us to this PTE or prefaulting to
@@ -276,7 +276,7 @@ static unsigned long ttm_bo_vm_nopfn(struct vm_area_struct *vma,
 	 * consider those bits protected by
 	 * the bo->mutex, as we should be the only writers.
 	 * There shouldn't really be any readers of these bits except
-	 * within vm_insert_pfn()? fork?
+	 * within vm_insert_mixed()? fork?
 	 *
 	 * TODO: Add a list of vmas to the bo, and change the
 	 * vma->vm_page_prot when the object changes caching policy, with
@@ -314,7 +314,7 @@ static unsigned long ttm_bo_vm_nopfn(struct vm_area_struct *vma,
 			pfn = page_to_pfn(page);
 		}
 
-		ret = vm_insert_pfn(vma, address, pfn);
+		ret = vm_insert_mixed(vma, address, pfn);
 		if (unlikely(ret == -EBUSY || (ret != 0 && i != 0)))
 			break;
 
@@ -407,7 +407,7 @@ int ttm_bo_mmap(struct file *filp, struct vm_area_struct *vma,
 	 */
 
 	vma->vm_private_data = bo;
-	vma->vm_flags |= VM_RESERVED | VM_IO | VM_PFNMAP | VM_DONTEXPAND;
+	vma->vm_flags |= VM_RESERVED | VM_IO | VM_MIXEDMAP | VM_DONTEXPAND;
 	return 0;
       out_unref:
 	ttm_bo_unref(&bo);
@@ -421,7 +421,7 @@ int ttm_fbdev_mmap(struct vm_area_struct *vma, struct ttm_buffer_object *bo)
 
 	vma->vm_ops = &ttm_bo_vm_ops;
 	vma->vm_private_data = ttm_bo_reference(bo);
-	vma->vm_flags |= VM_RESERVED | VM_IO | VM_PFNMAP | VM_DONTEXPAND;
+	vma->vm_flags |= VM_RESERVED | VM_IO | VM_MIXEDMAP | VM_DONTEXPAND;
 
 	return 0;
 }
