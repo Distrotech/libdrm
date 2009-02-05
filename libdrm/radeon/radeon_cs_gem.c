@@ -251,16 +251,6 @@ static int cs_gem_end(struct radeon_cs *cs,
     return 0;
 }
 
-
-static void dump_cmdbuf(struct radeon_cs *cs)
-{
-  int i;
-  for (i = 0; i < cs->cdw; i++){
-    fprintf(stderr,"%x: %08x\n", i, cs->packets[i]);
-  }
-
-}
-
 static int cs_gem_emit(struct radeon_cs *cs)
 {
     struct cs_gem *csg = (struct cs_gem*)cs;
@@ -268,7 +258,6 @@ static int cs_gem_emit(struct radeon_cs *cs)
     unsigned i;
     int r;
 
-    dump_cmdbuf(cs);
     csg->chunks[0].length_dw = cs->cdw;
 
     chunk_array[0] = (uint64_t)(intptr_t)&csg->chunks[0];
