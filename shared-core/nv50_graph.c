@@ -161,7 +161,6 @@ nv50_graph_create_context(struct nouveau_channel *chan)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_gpuobj *ramin = chan->ramin->gpuobj;
 	struct nouveau_gpuobj *ctx;
-	struct nouveau_engine *engine = &dev_priv->Engine;
 	uint32_t *ctxvals = NULL;
 	int grctx_size = 0x70000, hdr;
 	int ret, pos;

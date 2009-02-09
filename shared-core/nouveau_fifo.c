@@ -293,6 +293,8 @@ nouveau_fifo_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	chan->id = channel;
 	chan->file_priv = file_priv;
 	chan->pushbuf_mem = pushbuf;
+	chan->vram_handle = vram_handle;
+	chan->gart_handle = tt_handle;
 
 	DRM_INFO("Allocating FIFO number %d\n", channel);
 
