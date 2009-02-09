@@ -380,16 +380,17 @@ nouveau_card_init(struct drm_device *dev)
 			ret = nv50_display_create(dev);
 			if (ret)
 				return ret;
-
-			ret = nv50_fbcon_init(dev);
-			if (ret) {
-				nv50_display_destroy(dev);
-				return ret;
-			}
 		}
 	}
 
 	dev_priv->init_state = NOUVEAU_CARD_INIT_DONE;
+
+	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
+		ret = nv50_fbcon_init(dev);
+		if (ret)
+			return ret;
+	}
+
 	return 0;
 }
 
