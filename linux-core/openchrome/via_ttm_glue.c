@@ -103,6 +103,7 @@ int via_pl_create_ioctl(struct drm_device *dev, void *data,
  * situations.
  */
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26))
 static int via_ttm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	struct ttm_buffer_object *bo = (struct ttm_buffer_object *)
@@ -121,6 +122,28 @@ static int via_ttm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 	return ret;
 }
+
+#else
+
+static unsigned long via_ttm_nopfn(struct vm_area_struct *vma, unsigned long address)
+{
+	struct ttm_buffer_object *bo = (struct ttm_buffer_object *)
+	    vma->vm_private_data;
+	struct drm_via_private *dev_priv =
+	    container_of(bo->bdev, struct drm_via_private, bdev);
+	int ret;
+
+	ret = ttm_read_lock(&dev_priv->ttm_lock, true);
+	if (unlikely(ret != 0))
+		return NOPFN_REFAULT;
+
+	ret = ttm_vm_ops->nopfn(vma, address);
+
+	ttm_read_unlock(&dev_priv->ttm_lock);
+
+	return ret;
+}
+#endif
 
 int via_mmap(struct file *filp, struct vm_area_struct *vma)
 {
@@ -141,7 +164,11 @@ int via_mmap(struct file *filp, struct vm_area_struct *vma)
 	if (unlikely(ttm_vm_ops == NULL)) {
 		ttm_vm_ops = vma->vm_ops;
 		via_ttm_vm_ops = *ttm_vm_ops;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26))
 		via_ttm_vm_ops.fault = &via_ttm_fault;
+#else
+		via_ttm_vm_ops.nopfn = &via_ttm_nopfn;
+#endif
 	}
 
 	vma->vm_ops = &via_ttm_vm_ops;
