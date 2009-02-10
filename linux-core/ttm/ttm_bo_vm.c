@@ -30,12 +30,17 @@
  * Authors: Thomas Hellstrom <thomas-at-tungstengraphics-dot-com>
  */
 
+
 #include "ttm/ttm_bo_driver.h"
 #include "ttm/ttm_placement_common.h"
 #include <linux/mm.h>
 #include <linux/version.h>
 #include <linux/rbtree.h>
 #include <asm/uaccess.h>
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,25))
+#error "TTM doesn't build on kernel versions below 2.6.25."
+#endif
 
 #define TTM_BO_VM_NUM_PREFAULT 16
 
@@ -70,7 +75,7 @@ static struct ttm_buffer_object *ttm_bo_vm_lookup_rb(struct ttm_bo_device *bdev,
 	return best_bo;
 }
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,25))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26))
 static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	struct ttm_buffer_object *bo = (struct ttm_buffer_object *)
@@ -104,9 +109,6 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	if (bo->priv_flags & TTM_BO_PRIV_FLAG_MOVING) {
 		ret = ttm_bo_wait(bo, 0, 1, 0);
 		if (unlikely(ret != 0)) {
-			if (ret == -ERESTART)
-				printk(KERN_INFO "Restart nopage.\n");
-
 			retval = (ret != -ERESTART) ?
 			    VM_FAULT_SIGBUS : VM_FAULT_NOPAGE;
 			goto out_unlock;
@@ -177,8 +179,11 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 			pfn = page_to_pfn(page);
 		}
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
 		ret = vm_insert_mixed(vma, address, pfn);
-
+#else
+		ret = vm_insert_pfn(vma, address, pfn);
+#endif
 		/*
 		 * Somebody beat us to this PTE or prefaulting to
 		 * an already populated PTE, or prefaulting error.
@@ -314,7 +319,7 @@ static unsigned long ttm_bo_vm_nopfn(struct vm_area_struct *vma,
 			pfn = page_to_pfn(page);
 		}
 
-		ret = vm_insert_mixed(vma, address, pfn);
+		ret = vm_insert_pfn(vma, address, pfn);
 		if (unlikely(ret == -EBUSY || (ret != 0 && i != 0)))
 			break;
 
@@ -361,7 +366,7 @@ static void ttm_bo_vm_close(struct vm_area_struct *vma)
 }
 
 static struct vm_operations_struct ttm_bo_vm_ops = {
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,25))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26))
 	.fault = ttm_bo_vm_fault,
 #else
 	.nopfn = ttm_bo_vm_nopfn,
@@ -407,7 +412,11 @@ int ttm_bo_mmap(struct file *filp, struct vm_area_struct *vma,
 	 */
 
 	vma->vm_private_data = bo;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
 	vma->vm_flags |= VM_RESERVED | VM_IO | VM_MIXEDMAP | VM_DONTEXPAND;
+#else
+	vma->vm_flags |= VM_RESERVED | VM_IO | VM_PFNMAP | VM_DONTEXPAND;
+#endif
 	return 0;
       out_unref:
 	ttm_bo_unref(&bo);
@@ -421,8 +430,11 @@ int ttm_fbdev_mmap(struct vm_area_struct *vma, struct ttm_buffer_object *bo)
 
 	vma->vm_ops = &ttm_bo_vm_ops;
 	vma->vm_private_data = ttm_bo_reference(bo);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
 	vma->vm_flags |= VM_RESERVED | VM_IO | VM_MIXEDMAP | VM_DONTEXPAND;
-
+#else
+	vma->vm_flags |= VM_RESERVED | VM_IO | VM_PFNMAP | VM_DONTEXPAND;
+#endif
 	return 0;
 }
 
