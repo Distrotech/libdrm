@@ -74,7 +74,7 @@ void* drmAllocCpy(void *array, int count, int entry_size)
  * A couple of free functions.
  */
 
-void drmModeFreeModeInfo(struct drm_mode_modeinfo *ptr)
+void drmModeFreeModeInfo(drmModeModeInfoPtr ptr)
 {
 	if (!ptr)
 		return;
@@ -271,7 +271,7 @@ drmModeCrtcPtr drmModeGetCrtc(int fd, uint32_t crtcId)
 
 int drmModeSetCrtc(int fd, uint32_t crtcId, uint32_t bufferId,
                    uint32_t x, uint32_t y, uint32_t *connectors, int count,
-		   struct drm_mode_modeinfo *mode)
+		   drmModeModeInfoPtr mode)
 {
 	struct drm_mode_crtc crtc;
 
@@ -417,7 +417,7 @@ err_allocs:
 	return r;
 }
 
-int drmModeAttachMode(int fd, uint32_t connector_id, struct drm_mode_modeinfo *mode_info)
+int drmModeAttachMode(int fd, uint32_t connector_id, drmModeModeInfoPtr mode_info)
 {
 	struct drm_mode_mode_cmd res;
 
@@ -427,7 +427,7 @@ int drmModeAttachMode(int fd, uint32_t connector_id, struct drm_mode_modeinfo *m
 	return ioctl(fd, DRM_IOCTL_MODE_ATTACHMODE, &res);
 }
 
-int drmModeDetachMode(int fd, uint32_t connector_id, struct drm_mode_modeinfo *mode_info)
+int drmModeDetachMode(int fd, uint32_t connector_id, drmModeModeInfoPtr mode_info)
 {
 	struct drm_mode_mode_cmd res;
 
