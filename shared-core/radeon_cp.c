@@ -255,17 +255,30 @@ static int radeon_do_wait_for_fifo(drm_radeon_private_t * dev_priv, int entries)
 
 	dev_priv->stats.boxes |= RADEON_BOX_WAIT_IDLE;
 
-	for (i = 0; i < dev_priv->usec_timeout; i++) {
-		int slots = (RADEON_READ(RADEON_RBBM_STATUS)
-			     & RADEON_RBBM_FIFOCNT_MASK);
-		if (slots >= entries)
-			return 0;
-		DRM_UDELAY(1);
-	}
-	DRM_INFO("wait for fifo failed status : 0x%08X 0x%08X\n",
-		 RADEON_READ(RADEON_RBBM_STATUS),
-		 RADEON_READ(R300_VAP_CNTL_STATUS));
+	if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600) {
+		for (i = 0; i < dev_priv->usec_timeout; i++) {
+			int slots = (RADEON_READ(R600_GRBM_STATUS)
+				     & R600_CMDFIFO_AVAIL_MASK);
+			if (slots >= entries)
+				return 0;
+			DRM_UDELAY(1);
+		}
+		DRM_INFO("wait for fifo failed status : 0x%08X 0x%08X\n",
+			 RADEON_READ(R600_GRBM_STATUS),
+			 RADEON_READ(R600_GRBM_STATUS2));
+	} else {
+		for (i = 0; i < dev_priv->usec_timeout; i++) {
+			int slots = (RADEON_READ(RADEON_RBBM_STATUS)
+				     & RADEON_RBBM_FIFOCNT_MASK);
+			if (slots >= entries)
+				return 0;
+			DRM_UDELAY(1);
+		}
+		DRM_INFO("wait for fifo failed status : 0x%08X 0x%08X\n",
+			 RADEON_READ(RADEON_RBBM_STATUS),
+			 RADEON_READ(R300_VAP_CNTL_STATUS));
 
+	}
 #if RADEON_FIFO_DEBUG
 	DRM_ERROR("failed!\n");
 	radeon_status(dev_priv);
@@ -279,22 +292,37 @@ static int radeon_do_wait_for_idle(drm_radeon_private_t * dev_priv)
 
 	dev_priv->stats.boxes |= RADEON_BOX_WAIT_IDLE;
 
-	ret = radeon_do_wait_for_fifo(dev_priv, 64);
-	if (ret)
-		return ret;
-
-	for (i = 0; i < dev_priv->usec_timeout; i++) {
-		if (!(RADEON_READ(RADEON_RBBM_STATUS)
-		      & RADEON_RBBM_ACTIVE)) {
-			radeon_do_pixcache_flush(dev_priv);
-			return 0;
+	if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600) {
+		ret = radeon_do_wait_for_fifo(dev_priv, 16);
+		if (ret)
+			return ret;
+		for (i = 0; i < dev_priv->usec_timeout; i++) {
+			if (!(RADEON_READ(R600_GRBM_STATUS)
+			      & R600_GUI_ACTIVE))
+				return 0;
+			DRM_UDELAY(1);
 		}
-		DRM_UDELAY(1);
-	}
-	DRM_INFO("wait idle failed status : 0x%08X 0x%08X\n",
-		 RADEON_READ(RADEON_RBBM_STATUS),
-		 RADEON_READ(R300_VAP_CNTL_STATUS));
+		DRM_INFO("wait idle failed status : 0x%08X 0x%08X\n",
+			 RADEON_READ(R600_GRBM_STATUS),
+			 RADEON_READ(R600_GRBM_STATUS2));
+	} else {
+		ret = radeon_do_wait_for_fifo(dev_priv, 64);
+		if (ret)
+			return ret;
 
+		for (i = 0; i < dev_priv->usec_timeout; i++) {
+			if (!(RADEON_READ(RADEON_RBBM_STATUS)
+			      & RADEON_RBBM_ACTIVE)) {
+				radeon_do_pixcache_flush(dev_priv);
+				return 0;
+			}
+			DRM_UDELAY(1);
+		}
+		DRM_INFO("wait idle failed status : 0x%08X 0x%08X\n",
+			 RADEON_READ(RADEON_RBBM_STATUS),
+			 RADEON_READ(R300_VAP_CNTL_STATUS));
+
+	}
 #if RADEON_FIFO_DEBUG
 	DRM_ERROR("failed!\n");
 	radeon_status(dev_priv);
@@ -457,15 +485,24 @@ int radeon_do_cp_idle(drm_radeon_private_t * dev_priv)
 	RING_LOCALS;
 	DRM_DEBUG("\n");
 
-	/* XXX fixme */
-	if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600)
-	        return 0;
+	if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600) {
+		BEGIN_RING(5);
+		OUT_RING(CP_PACKET3(R600_IT_EVENT_WRITE, 0));
+		OUT_RING(R600_CACHE_FLUSH_AND_INV_EVENT);
+		// wait for 3D idle clean
+		OUT_RING(CP_PACKET3(R600_IT_SET_CONFIG_REG, 1));
+		OUT_RING((R600_WAIT_UNTIL - R600_SET_CONFIG_REG_OFFSET) >> 2);
+		OUT_RING(RADEON_WAIT_3D_IDLE | RADEON_WAIT_3D_IDLECLEAN);
 
-	BEGIN_RING(6);
+	} else {
 
-	RADEON_PURGE_CACHE();
-	RADEON_PURGE_ZCACHE();
-	RADEON_WAIT_UNTIL_IDLE();
+		BEGIN_RING(6);
+
+		RADEON_PURGE_CACHE();
+		RADEON_PURGE_ZCACHE();
+		RADEON_WAIT_UNTIL_IDLE();
+
+	}
 
 	ADVANCE_RING();
 	COMMIT_RING();
@@ -1445,9 +1482,10 @@ int radeon_cp_stop(struct drm_device *dev, void *data, struct drm_file *file_pri
 		radeon_do_cp_stop(dev_priv);
 
 	/* Reset the engine */
-	/* XXX: fix me for r6xx */
 	if ((dev_priv->flags & RADEON_FAMILY_MASK) < CHIP_R600)
 	        radeon_do_engine_reset(dev);
+	else
+		r600_engine_reset(dev);
 
 	return 0;
 }
@@ -1546,9 +1584,13 @@ int radeon_cp_resume(struct drm_device *dev, void *data, struct drm_file *file_p
 
 int radeon_engine_reset(struct drm_device *dev, void *data, struct drm_file *file_priv)
 {
+	drm_radeon_private_t *dev_priv = dev->dev_private;
 	DRM_DEBUG("\n");
 
 	LOCK_TEST_WITH_RETURN(dev, file_priv);
+
+	if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600)
+		return r600_engine_reset(dev);
 
 	return radeon_do_engine_reset(dev);
 }

@@ -454,6 +454,8 @@ int r600_do_resume_cp(struct drm_device * dev);
 void r600_do_cp_start(drm_radeon_private_t * dev_priv);
 int r600_cp_indirect(struct drm_device *dev, struct drm_buf *buf, drm_radeon_indirect_t *indirect);
 void r600_do_cp_stop(drm_radeon_private_t * dev_priv);
+int r600_engine_reset(struct drm_device * dev);
+
 /* Flags for stats.boxes
  */
 #define RADEON_BOX_DMA_IDLE      0x1
@@ -1045,6 +1047,9 @@ void r600_do_cp_stop(drm_radeon_private_t * dev_priv);
 #	define R600_IT_INDIRECT_BUFFER		0x00003200
 #	define R600_IT_ME_INITIALIZE		0x00004400
 #              define R600_ME_INITIALIZE_DEVICE_ID(x) ((x) << 16)
+#	define R600_IT_EVENT_WRITE		0x00004600
+#	define R600_IT_SET_CONFIG_REG		0x00006800
+#       define R600_SET_CONFIG_REG_OFFSET       0x00008000
 
 #define RADEON_CP_PACKET_MASK		0xC0000000
 #define RADEON_CP_PACKET_COUNT_MASK	0x3fff0000
@@ -1308,7 +1313,13 @@ void r600_do_cp_stop(drm_radeon_private_t * dev_priv);
 #define R600_CP_ME_RAM_WADDR                                       0xc15c
 #define R600_CP_ME_RAM_DATA                                        0xc160
 
+#define R600_GRBM_STATUS                                   	   0x8010
+#       define R600_CMDFIFO_AVAIL_MASK                             0x1f
+#       define R600_GUI_ACTIVE                                     (1 << 31)
+#define R600_GRBM_STATUS2                                   	   0x8014
 
+#define R600_VGT_EVENT_INITIATOR                                   0x28a90
+#       define R600_CACHE_FLUSH_AND_INV_EVENT                      (0x16 << 0)
 
 /* Constants */
 #define RADEON_MAX_USEC_TIMEOUT		100000	/* 100 ms */

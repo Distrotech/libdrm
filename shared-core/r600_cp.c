@@ -165,7 +165,6 @@
 
 #define R600_GRBM_CNTL                                   	0x8000
 #       define R600_GRBM_READ_TIMEOUT(x)                        ((x) << 0)
-#define R600_GRBM_STATUS                                   	0x8010
 #define R600_GRBM_SOFT_RESET                               	0x8020
 #       define R600_SOFT_RESET_CP                               (1 << 0)
 
@@ -915,31 +914,33 @@ static void r600_test_writeback(drm_radeon_private_t * dev_priv)
 	}
 }
 
-static void r600_engine_reset(struct drm_device * dev,
-			      drm_radeon_private_t * dev_priv)
+int r600_engine_reset(struct drm_device * dev)
 {
-    u32 cp_ptr, cp_me_cntl, cp_rb_cntl;
+	drm_radeon_private_t *dev_priv = dev->dev_private;
+	u32 cp_ptr, cp_me_cntl, cp_rb_cntl;
 
-    DRM_INFO("Resetting GPU\n");
+	DRM_INFO("Resetting GPU\n");
 
-    cp_ptr = RADEON_READ(R600_CP_RB_WPTR);
-    cp_me_cntl = RADEON_READ(R600_CP_ME_CNTL);
-    RADEON_WRITE(R600_CP_ME_CNTL, R600_CP_ME_HALT);
+	cp_ptr = RADEON_READ(R600_CP_RB_WPTR);
+	cp_me_cntl = RADEON_READ(R600_CP_ME_CNTL);
+	RADEON_WRITE(R600_CP_ME_CNTL, R600_CP_ME_HALT);
 
-    RADEON_WRITE(R600_GRBM_SOFT_RESET, 0x7fff);
-    RADEON_READ(R600_GRBM_SOFT_RESET);
-    DRM_UDELAY(50);
-    RADEON_WRITE(R600_GRBM_SOFT_RESET, 0);
-    RADEON_READ(R600_GRBM_SOFT_RESET);
+	RADEON_WRITE(R600_GRBM_SOFT_RESET, 0x7fff);
+	RADEON_READ(R600_GRBM_SOFT_RESET);
+	DRM_UDELAY(50);
+	RADEON_WRITE(R600_GRBM_SOFT_RESET, 0);
+	RADEON_READ(R600_GRBM_SOFT_RESET);
 
-    RADEON_WRITE(R600_CP_RB_WPTR_DELAY, 0);
-    cp_rb_cntl = RADEON_READ(R600_CP_RB_CNTL);
-    RADEON_WRITE(R600_CP_RB_CNTL, R600_RB_RPTR_WR_ENA);
+	RADEON_WRITE(R600_CP_RB_WPTR_DELAY, 0);
+	cp_rb_cntl = RADEON_READ(R600_CP_RB_CNTL);
+	RADEON_WRITE(R600_CP_RB_CNTL, R600_RB_RPTR_WR_ENA);
 
-    RADEON_WRITE(R600_CP_RB_RPTR_WR, cp_ptr);
-    RADEON_WRITE(R600_CP_RB_WPTR, cp_ptr);
-    RADEON_WRITE(R600_CP_RB_CNTL, cp_rb_cntl);
-    RADEON_WRITE(R600_CP_ME_CNTL, cp_me_cntl);
+	RADEON_WRITE(R600_CP_RB_RPTR_WR, cp_ptr);
+	RADEON_WRITE(R600_CP_RB_WPTR, cp_ptr);
+	RADEON_WRITE(R600_CP_RB_CNTL, cp_rb_cntl);
+	RADEON_WRITE(R600_CP_ME_CNTL, cp_me_cntl);
+
+	return 0;
 
 }
 
@@ -2125,7 +2126,7 @@ static void r600_cp_init_ring_buffer(struct drm_device * dev,
 
 	r600_do_wait_for_idle(dev_priv);
 
-	r600_engine_reset(dev, dev_priv);
+	r600_engine_reset(dev);
 
 }
 
