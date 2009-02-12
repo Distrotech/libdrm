@@ -1316,6 +1316,7 @@ void r600_do_cp_reset(drm_radeon_private_t * dev_priv);
 
 #define R600_GRBM_STATUS                                   	   0x8010
 #       define R600_CMDFIFO_AVAIL_MASK                             0x1f
+#       define R700_CMDFIFO_AVAIL_MASK                             0xf
 #       define R600_GUI_ACTIVE                                     (1 << 31)
 #define R600_GRBM_STATUS2                                   	   0x8014
 

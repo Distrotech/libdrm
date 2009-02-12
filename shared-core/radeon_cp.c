@@ -257,8 +257,13 @@ static int radeon_do_wait_for_fifo(drm_radeon_private_t * dev_priv, int entries)
 
 	if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600) {
 		for (i = 0; i < dev_priv->usec_timeout; i++) {
-			int slots = (RADEON_READ(R600_GRBM_STATUS)
-				     & R600_CMDFIFO_AVAIL_MASK);
+			int slots;
+			if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_RV770)
+				slots = (RADEON_READ(R600_GRBM_STATUS)
+					 & R700_CMDFIFO_AVAIL_MASK);
+			else
+				slots = (RADEON_READ(R600_GRBM_STATUS)
+					 & R600_CMDFIFO_AVAIL_MASK);
 			if (slots >= entries)
 				return 0;
 			DRM_UDELAY(1);
@@ -293,7 +298,10 @@ static int radeon_do_wait_for_idle(drm_radeon_private_t * dev_priv)
 	dev_priv->stats.boxes |= RADEON_BOX_WAIT_IDLE;
 
 	if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600) {
-		ret = radeon_do_wait_for_fifo(dev_priv, 16);
+		if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_RV770)
+			ret = radeon_do_wait_for_fifo(dev_priv, 8);
+		else
+			ret = radeon_do_wait_for_fifo(dev_priv, 16);
 		if (ret)
 			return ret;
 		for (i = 0; i < dev_priv->usec_timeout; i++) {
