@@ -1552,7 +1552,10 @@ int radeon_cp_reset(struct drm_device *dev, void *data, struct drm_file *file_pr
 		return -EINVAL;
 	}
 
-	radeon_do_cp_reset(dev_priv);
+	if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600)
+		r600_do_cp_reset(dev_priv);
+	else
+		radeon_do_cp_reset(dev_priv);
 
 	/* The CP is no longer running after an engine reset */
 	dev_priv->cp_running = 0;

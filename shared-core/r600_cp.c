@@ -2536,6 +2536,16 @@ void r600_do_cp_start(drm_radeon_private_t * dev_priv)
 
 }
 
+void r600_do_cp_reset(drm_radeon_private_t * dev_priv)
+{
+	u32 cur_read_ptr;
+	DRM_DEBUG("\n");
+
+	cur_read_ptr = RADEON_READ(R600_CP_RB_RPTR);
+	RADEON_WRITE(R600_CP_RB_WPTR, cur_read_ptr);
+	SET_RING_HEAD(dev_priv, cur_read_ptr);
+	dev_priv->ring.tail = cur_read_ptr;
+}
 
 void r600_do_cp_stop(drm_radeon_private_t * dev_priv)
 {
