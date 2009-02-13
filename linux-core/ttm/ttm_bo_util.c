@@ -51,7 +51,7 @@ void ttm_bo_free_old_node(struct ttm_buffer_object *bo)
 }
 
 int ttm_bo_move_ttm(struct ttm_buffer_object *bo,
-		    int evict, int no_wait, struct ttm_mem_reg *new_mem)
+		    bool evict, bool no_wait, struct ttm_mem_reg *new_mem)
 {
 	struct ttm_tt *ttm = bo->ttm;
 	struct ttm_mem_reg *old_mem = &bo->mem;
@@ -181,7 +181,7 @@ static int ttm_copy_ttm_io_page(struct ttm_tt *ttm, void *dst,
 }
 
 int ttm_bo_move_memcpy(struct ttm_buffer_object *bo,
-		       int evict, int no_wait, struct ttm_mem_reg *new_mem)
+		       bool evict, bool no_wait, struct ttm_mem_reg *new_mem)
 {
 	struct ttm_bo_device *bdev = bo->bdev;
 	struct ttm_mem_type_manager *man = &bdev->man[new_mem->mem_type];
@@ -479,7 +479,7 @@ int ttm_bo_pfn_prot(struct ttm_buffer_object *bo,
 int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
 			      void *sync_obj,
 			      void *sync_obj_arg,
-			      int evict, int no_wait,
+			      bool evict, bool no_wait,
 			      struct ttm_mem_reg *new_mem)
 {
 	struct ttm_bo_device * bdev = bo->bdev;
@@ -495,7 +495,7 @@ int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
 	bo->sync_obj = driver->sync_obj_ref(sync_obj);
 	bo->sync_obj_arg = sync_obj_arg;
 	if (evict) {
-		ret = ttm_bo_wait(bo, 0, 0, 0);
+		ret = ttm_bo_wait(bo, false, false, false);
 		if (ret)
 			return ret;
 		ttm_bo_free_old_node(bo);

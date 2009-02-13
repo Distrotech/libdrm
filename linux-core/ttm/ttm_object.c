@@ -265,12 +265,12 @@ int ttm_ref_object_add(struct ttm_object_file *tfile,
 		}
 
 		read_unlock(&tfile->lock);
-		ret = ttm_mem_global_alloc(mem_glob, sizeof(*ref), 0, 0, 0);
+		ret = ttm_mem_global_alloc(mem_glob, sizeof(*ref), false, false, false);
 		if (unlikely(ret != 0))
 			return ret;
 		ref = kmalloc(sizeof(*ref), GFP_KERNEL);
 		if (unlikely(ref == NULL)) {
-			ttm_mem_global_free(mem_glob, sizeof(*ref), 0);
+			ttm_mem_global_free(mem_glob, sizeof(*ref), false);
 			return -ENOMEM;
 		}
 
@@ -295,7 +295,7 @@ int ttm_ref_object_add(struct ttm_object_file *tfile,
 		write_unlock(&tfile->lock);
 		BUG_ON(ret != -EINVAL);
 
-		ttm_mem_global_free(mem_glob, sizeof(*ref), 0);
+		ttm_mem_global_free(mem_glob, sizeof(*ref), false);
 		kfree(ref);
 	}
 
@@ -320,7 +320,7 @@ static void ttm_ref_object_release(struct kref *kref)
 		base->ref_obj_release(base, ref->ref_type);
 
 	ttm_base_object_unref(&ref->obj);
-	ttm_mem_global_free(mem_glob, sizeof(*ref), 0);
+	ttm_mem_global_free(mem_glob, sizeof(*ref), false);
 	kfree(ref);
 	write_lock(&tfile->lock);
 }

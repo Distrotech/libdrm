@@ -282,8 +282,8 @@ extern int via_invalidate_caches(struct ttm_bo_device *bdev,
 extern int via_init_mem_type(struct ttm_bo_device *dev, uint32_t type,
 			     struct ttm_mem_type_manager *man);
 extern uint32_t via_evict_flags(struct ttm_buffer_object *bo);
-extern int via_bo_move(struct ttm_buffer_object *bo, int evict,
-		       int interruptible, int no_wait, struct ttm_mem_reg *new_mem);
+extern int via_bo_move(struct ttm_buffer_object *bo, bool evict,
+		       bool interruptible, bool no_wait, struct ttm_mem_reg *new_mem);
 extern void via_dma_initialize(struct drm_via_private *dev_priv);
 extern void via_dma_takedown(struct drm_via_private *dev_priv);
 extern void via_wait_idle(struct drm_via_private *dev_priv);

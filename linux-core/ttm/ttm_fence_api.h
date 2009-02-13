@@ -228,7 +228,7 @@ extern void ttm_fence_object_unref(struct ttm_fence_object **p_fence);
  * an implicit fence flush.
  */
 
-extern int
+extern bool
 ttm_fence_object_signaled(struct ttm_fence_object *fence, uint32_t mask);
 
 /**
@@ -267,7 +267,7 @@ static inline uint32_t ttm_fence_types(const struct ttm_fence_object *fence)
  * a fence_type argument.
  */
 
-extern int ttm_fence_sync_obj_signaled(void *sync_obj, void *sync_arg);
+extern bool ttm_fence_sync_obj_signaled(void *sync_obj, void *sync_arg);
 extern int ttm_fence_sync_obj_wait(void *sync_obj, void *sync_arg,
 				   int lazy, int interruptible);
 extern int ttm_fence_sync_obj_flush(void *sync_obj, void *sync_arg);

@@ -217,8 +217,8 @@ struct ttm_mem_type_manager {
 	 * No protection. Constant from start.
 	 */
 
-	int has_type;
-	int use_type;
+	bool has_type;
+	bool use_type;
 	uint32_t flags;
 	unsigned long gpu_offset;
 	unsigned long io_offset;
@@ -318,8 +318,8 @@ struct ttm_bo_driver {
 	 * Move a buffer between two memory regions.
 	 */
 	int (*move) (struct ttm_buffer_object * bo,
-		     int evict, int interruptible,
-		     int no_wait, struct ttm_mem_reg * new_mem);
+		     bool evict, bool interruptible,
+		     bool no_wait, struct ttm_mem_reg * new_mem);
 
 	/**
 	 * struct ttm_bo_driver_member verify_access
@@ -348,7 +348,7 @@ struct ttm_bo_driver {
 
 	int (*sync_obj_signaled) (void *sync_obj, void *sync_arg);
 	int (*sync_obj_wait) (void *sync_obj, void *sync_arg,
-			      int lazy, int interruptible);
+			      bool lazy, bool interruptible);
 	int (*sync_obj_flush) (void *sync_obj, void *sync_arg);
 	void (*sync_obj_unref) (void **sync_obj);
 	void *(*sync_obj_ref) (void *sync_obj);
@@ -420,7 +420,7 @@ struct ttm_bo_device {
 	 * Protected by load / firstopen / lastclose /unload sync.
 	 */
 
-	int nice_mode;
+	bool nice_mode;
 	struct address_space *dev_mapping;
 
 	/*
@@ -564,11 +564,11 @@ extern int ttm_tt_swapout(struct ttm_tt *ttm,
  * @bdev: Pointer to a struct ttm_bo_device.
  * @mem: A valid struct ttm_mem_reg.
  *
- * Returns 1 if the memory described by @mem is PCI memory,
- * 0 otherwise.
+ * Returns true if the memory described by @mem is PCI memory,
+ * false otherwise.
  */
-extern int ttm_mem_reg_is_pci(struct ttm_bo_device *bdev,
-			      struct ttm_mem_reg *mem);
+extern bool ttm_mem_reg_is_pci(struct ttm_bo_device *bdev,
+				   struct ttm_mem_reg *mem);
 
 /**
  * ttm_bo_mem_space
@@ -591,7 +591,7 @@ extern int ttm_mem_reg_is_pci(struct ttm_bo_device *bdev,
  */
 extern int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 			    struct ttm_mem_reg *mem,
-			    int interruptible, int no_wait);
+			    bool interruptible, bool no_wait);
 /**
  * ttm_bo_wait_for_cpu
  *
@@ -604,7 +604,7 @@ extern int ttm_bo_mem_space(struct ttm_buffer_object *bo,
  * -ERESTART: An interruptible sleep was interrupted by a signal.
  */
 
-extern int ttm_bo_wait_cpu(struct ttm_buffer_object *bo, int no_wait);
+extern int ttm_bo_wait_cpu(struct ttm_buffer_object *bo, bool no_wait);
 
 /**
  * ttm_bo_pci_offset - Get the PCI offset for the buffer object memory.
@@ -697,8 +697,8 @@ extern int ttm_bo_device_init(struct ttm_bo_device *bdev,
  * a signal. Release all buffer reservations and return to user-space.
  */
 extern int ttm_bo_reserve(struct ttm_buffer_object *bo,
-			  int interruptible,
-			  int no_wait, int use_sequence, uint32_t sequence);
+			  bool interruptible,
+			  bool no_wait, bool use_sequence, uint32_t sequence);
 
 /**
  * ttm_bo_unreserve
@@ -719,7 +719,7 @@ extern void ttm_bo_unreserve(struct ttm_buffer_object *bo);
  * a potential deadlock condition backoff.
  */
 extern int ttm_bo_wait_unreserved(struct ttm_buffer_object *bo,
-				  int interruptible);
+				  bool interruptible);
 
 /**
  * ttm_bo_block_reservation
@@ -736,7 +736,7 @@ extern int ttm_bo_wait_unreserved(struct ttm_buffer_object *bo,
  * -ERESTART: If interruptible == 1 and the process received a signal while sleeping.
  */
 extern int ttm_bo_block_reservation(struct ttm_buffer_object *bo,
-				    int interruptible, int no_wait);
+				    bool interruptible, bool no_wait);
 
 /**
  * ttm_bo_unblock_reservation
@@ -770,7 +770,7 @@ extern void ttm_bo_unblock_reservation(struct ttm_buffer_object *bo);
  */
 
 extern int ttm_bo_move_ttm(struct ttm_buffer_object *bo,
-			   int evict, int no_wait, struct ttm_mem_reg *new_mem);
+			   bool evict, bool no_wait, struct ttm_mem_reg *new_mem);
 
 /**
  * ttm_bo_move_memcpy
@@ -791,8 +791,8 @@ extern int ttm_bo_move_ttm(struct ttm_buffer_object *bo,
  */
 
 extern int ttm_bo_move_memcpy(struct ttm_buffer_object *bo,
-			      int evict,
-			      int no_wait, struct ttm_mem_reg *new_mem);
+			      bool evict,
+			      bool no_wait, struct ttm_mem_reg *new_mem);
 
 /**
  * ttm_bo_free_old_node
@@ -825,7 +825,7 @@ extern void ttm_bo_free_old_node(struct ttm_buffer_object *bo);
 extern int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
 				     void *sync_obj,
 				     void *sync_obj_arg,
-				     int evict, int no_wait,
+				     bool evict, bool no_wait,
 				     struct ttm_mem_reg *new_mem);
 /**
  * ttm_io_prot

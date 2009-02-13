@@ -147,8 +147,8 @@ static inline void ttm_mem_unregister_shrink(struct ttm_mem_global *glob,
 extern int ttm_mem_global_init(struct ttm_mem_global *glob);
 extern void ttm_mem_global_release(struct ttm_mem_global *glob);
 extern int ttm_mem_global_alloc(struct ttm_mem_global *glob, uint64_t memory,
-				int no_wait, int interruptible, int himem);
+				bool no_wait, bool interruptible, bool himem);
 extern void ttm_mem_global_free(struct ttm_mem_global *glob,
-				uint64_t amount, int himem);
+				uint64_t amount, bool himem);
 extern size_t ttm_round_pot(size_t size);
 #endif

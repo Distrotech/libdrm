@@ -181,7 +181,7 @@ ssize_t via_ttm_write(struct file * filp, const char __user * buf,
 	struct drm_file *file_priv = (struct drm_file *)filp->private_data;
 	struct drm_via_private *dev_priv = via_priv(file_priv->minor->dev);
 
-	return ttm_bo_io(&dev_priv->bdev, filp, buf, NULL, count, f_pos, 1);
+	return ttm_bo_io(&dev_priv->bdev, filp, buf, NULL, count, f_pos, true);
 }
 
 ssize_t via_ttm_read(struct file * filp, char __user * buf,
@@ -190,7 +190,7 @@ ssize_t via_ttm_read(struct file * filp, char __user * buf,
 	struct drm_file *file_priv = (struct drm_file *)filp->private_data;
 	struct drm_via_private *dev_priv = via_priv(file_priv->minor->dev);
 
-	return ttm_bo_io(&dev_priv->bdev, filp, NULL, buf, count, f_pos, 1);
+	return ttm_bo_io(&dev_priv->bdev, filp, NULL, buf, count, f_pos, false);
 }
 
 int via_verify_access(struct ttm_buffer_object *bo, struct file *filp)

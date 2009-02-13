@@ -252,7 +252,7 @@ static int via_exec_init(struct drm_device *dev)
 {
 	struct drm_via_private *dev_priv = via_priv(dev);
 	int ret;
-	int dummy;
+	bool dummy;
 
 	memset(dev_priv->barriers, 0, sizeof(dev_priv->barriers));
 
@@ -264,7 +264,7 @@ static int via_exec_init(struct drm_device *dev)
 				       ttm_bo_type_kernel,
 				       TTM_PL_FLAG_VRAM |
 				       TTM_PL_FLAG_NO_EVICT,
-				       0, 0, 0, NULL, &dev_priv->fence_bo);
+				       0, 0, false, NULL, &dev_priv->fence_bo);
 	if (unlikely(ret))
 		return ret;
 
@@ -286,7 +286,7 @@ static int via_exec_init(struct drm_device *dev)
 				       ttm_bo_type_kernel,
 				       TTM_PL_FLAG_VRAM |
 				       TTM_PL_FLAG_NO_EVICT,
-				       0, 0, 0, NULL, &dev_priv->vq_bo);
+				       0, 0, false, NULL, &dev_priv->vq_bo);
 	if (unlikely(ret))
 		goto out_err1;
 
@@ -300,7 +300,7 @@ static int via_exec_init(struct drm_device *dev)
 				       ttm_bo_type_kernel,
 				       TTM_PL_FLAG_TT |
 				       TTM_PL_FLAG_NO_EVICT,
-				       0, 0, 0, NULL, &dev_priv->agpc_bo);
+				       0, 0, false, NULL, &dev_priv->agpc_bo);
 	if (unlikely(ret))
 		goto out_err2;
 
@@ -774,7 +774,7 @@ static int via_firstopen_locked(struct drm_device *dev)
 				       ttm_bo_type_kernel,
 				       TTM_PL_FLAG_TT |
 				       TTM_PL_FLAG_NO_EVICT,
-				       0, 0, 0, NULL, &dev_priv->agp_bo);
+				       0, 0, false, NULL, &dev_priv->agp_bo);
 	if (ret)
 		return ret;
 

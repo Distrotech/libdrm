@@ -169,7 +169,7 @@ struct ttm_buffer_object {
 	unsigned long offset;
 	struct ttm_mem_reg mem;
 	uint32_t val_seq;
-	int seq_valid;
+	bool seq_valid;
 
 	struct list_head lru;
 	struct list_head ddestroy;
@@ -251,8 +251,8 @@ static inline struct ttm_buffer_object *ttm_bo_reference(struct
  * Returns -EBUSY if no_wait is true and the buffer is busy.
  * Returns -ERESTART if interrupted by a signal.
  */
-extern int ttm_bo_wait(struct ttm_buffer_object *bo, int lazy,
-		       int interruptible, int no_wait);
+extern int ttm_bo_wait(struct ttm_buffer_object *bo, bool lazy,
+		       bool interruptible, bool no_wait);
 /**
  * ttm_buffer_object_validate
  *
@@ -269,7 +269,7 @@ extern int ttm_bo_wait(struct ttm_buffer_object *bo, int lazy,
  * -ERESTART if interrupted by a signal.
  */
 extern int ttm_buffer_object_validate(struct ttm_buffer_object *bo,
-				      int interruptible, int no_wait);
+				      bool interruptible, bool no_wait);
 /**
  * ttm_bo_unref
  *
@@ -293,7 +293,7 @@ extern void ttm_bo_unref(struct ttm_buffer_object **bo);
  * -ERESTART if interrupted by a signal.
  */
 
-extern int ttm_bo_synccpu_write_grab(struct ttm_buffer_object *bo, int no_wait);
+extern int ttm_bo_synccpu_write_grab(struct ttm_buffer_object *bo, bool no_wait);
 /**
  * ttm_bo_synccpu_write_release:
  *
@@ -342,7 +342,7 @@ extern int ttm_buffer_object_init(struct ttm_bo_device *bdev,
 				  uint32_t flags,
 				  uint32_t page_alignment,
 				  unsigned long buffer_start,
-				  int interrubtible,
+				  bool interrubtible,
 				  struct file *persistant_swap_storage,
 				  size_t acc_size,
 				  void (*destroy) (struct ttm_buffer_object *));
@@ -381,7 +381,7 @@ extern int ttm_buffer_object_create(struct ttm_bo_device *bdev,
 				    uint32_t flags,
 				    uint32_t page_alignment,
 				    unsigned long buffer_start,
-				    int interruptible,
+				    bool interruptible,
 				    struct file *persistant_swap_storage,
 				    struct ttm_buffer_object **p_bo);
 
@@ -483,7 +483,7 @@ extern int ttm_bo_evict_mm(struct ttm_bo_device *bdev, unsigned mem_type);
  */
 
 static inline void *ttm_kmap_obj_virtual(struct ttm_bo_kmap_obj *map,
-					 int *is_iomem)
+					 bool *is_iomem)
 {
 	*is_iomem = (map->bo_kmap_type == ttm_bo_map_iomap ||
 		     map->bo_kmap_type == ttm_bo_map_premapped);
@@ -571,7 +571,7 @@ extern int ttm_bo_mmap(struct file *filp, struct vm_area_struct *vma,
 
 extern ssize_t ttm_bo_io(struct ttm_bo_device *bdev, struct file *filp,
 			 const char __user * wbuf, char __user * rbuf,
-			 size_t count, loff_t * f_pos, int write);
+			 size_t count, loff_t * f_pos, bool write);
 
 extern void ttm_bo_swapout_all(struct ttm_bo_device *bdev);
 

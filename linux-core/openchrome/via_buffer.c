@@ -128,7 +128,7 @@ uint32_t via_evict_flags(struct ttm_buffer_object * bo)
 }
 
 static int via_move_dmablit(struct ttm_buffer_object *bo,
-			    int evict, int no_wait, struct ttm_mem_reg *new_mem)
+			    bool evict, bool no_wait, struct ttm_mem_reg *new_mem)
 {
 	struct drm_via_private *dev_priv =
 	    container_of(bo->bdev, struct drm_via_private, bdev);
@@ -165,7 +165,7 @@ static int via_move_dmablit(struct ttm_buffer_object *bo,
 }
 
 static int via_move_vram_tt(struct ttm_buffer_object *bo,
-			    int evict, int no_wait, struct ttm_mem_reg *new_mem)
+			    bool evict, bool no_wait, struct ttm_mem_reg *new_mem)
 {
 	struct ttm_mem_reg *old_mem = &bo->mem;
 	int ret;
@@ -191,7 +191,7 @@ static int via_move_vram_tt(struct ttm_buffer_object *bo,
 		tmp_mem.proposed_flags |= (TTM_PL_FLAG_SYSTEM |
 					   TTM_PL_FLAG_CACHED);
 		tmp_mem.mem_type = TTM_PL_SYSTEM;
-		ret = via_move_dmablit(bo, 1, no_wait, &tmp_mem);
+		ret = via_move_dmablit(bo, true, no_wait, &tmp_mem);
 		if (ret)
 			return ret;
 		return ttm_bo_move_ttm(bo, evict, no_wait, new_mem);
@@ -212,7 +212,7 @@ static void via_move_null(struct ttm_buffer_object *bo,
 }
 
 int via_bo_move(struct ttm_buffer_object *bo,
-		int evict, int interruptible, int no_wait,
+		bool evict, bool interruptible, bool no_wait,
 		struct ttm_mem_reg *new_mem)
 {
 	struct ttm_mem_reg *old_mem = &bo->mem;

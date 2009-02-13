@@ -69,11 +69,11 @@ int ttm_eu_reserve_buffers(struct list_head *list, uint32_t val_seq)
 		struct ttm_buffer_object *bo = entry->bo;
 
 		entry->reserved = 0;
-		ret = ttm_bo_reserve(bo, 1, 0, 1, val_seq);
+		ret = ttm_bo_reserve(bo, true, false, true, val_seq);
 		if (ret != 0) {
 			ttm_eu_backoff_reservation(list);
 			if (ret == -EAGAIN) {
-				ret = ttm_bo_wait_unreserved(bo, 1);
+				ret = ttm_bo_wait_unreserved(bo, true);
 				if (unlikely(ret != 0))
 					return ret;
 				goto retry;
@@ -84,7 +84,7 @@ int ttm_eu_reserve_buffers(struct list_head *list, uint32_t val_seq)
 		entry->reserved = 1;
 		if (unlikely(atomic_read(&bo->cpu_writers) > 0)) {
 			ttm_eu_backoff_reservation(list);
-			ret = ttm_bo_wait_cpu(bo, 0);
+			ret = ttm_bo_wait_cpu(bo, false);
 			if (ret)
 				return ret;
 			goto retry;

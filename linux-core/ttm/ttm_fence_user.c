@@ -84,7 +84,7 @@ static void ttm_fence_user_destroy(struct ttm_fence_object *fence)
 	struct ttm_fence_user_object *ufence =
 	    container_of(fence, struct ttm_fence_user_object, fence);
 
-	ttm_mem_global_free(fence->fdev->mem_glob, sizeof(*ufence), 0);
+	ttm_mem_global_free(fence->fdev->mem_glob, sizeof(*ufence), false);
 	kfree(ufence);
 }
 
@@ -121,13 +121,13 @@ ttm_fence_user_create(struct ttm_fence_device *fdev,
 	struct ttm_fence_object *tmp;
 	struct ttm_fence_user_object *ufence;
 
-	ret = ttm_mem_global_alloc(fdev->mem_glob, sizeof(*ufence), 0, 0, 0);
+	ret = ttm_mem_global_alloc(fdev->mem_glob, sizeof(*ufence), false, false, false);
 	if (unlikely(ret != 0))
 		return -ENOMEM;
 
 	ufence = kmalloc(sizeof(*ufence), GFP_KERNEL);
 	if (unlikely(ufence == NULL)) {
-		ttm_mem_global_free(fdev->mem_glob, sizeof(*ufence), 0);
+		ttm_mem_global_free(fdev->mem_glob, sizeof(*ufence), false);
 		return -ENOMEM;
 	}
 
@@ -164,7 +164,7 @@ ttm_fence_user_create(struct ttm_fence_device *fdev,
 	ttm_fence_object_unref(&tmp);
 	return ret;
       out_err0:
-	ttm_mem_global_free(fdev->mem_glob, sizeof(*ufence), 0);
+	ttm_mem_global_free(fdev->mem_glob, sizeof(*ufence), false);
 	kfree(ufence);
 	return ret;
 }

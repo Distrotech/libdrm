@@ -42,7 +42,7 @@
  * many threads may try to swap out at any given time.
  */
 
-static void ttm_shrink(struct ttm_mem_global *glob, int from_workqueue)
+static void ttm_shrink(struct ttm_mem_global *glob, bool from_workqueue)
 {
 	int ret;
 	struct ttm_mem_shrink *shrink;
@@ -82,7 +82,7 @@ static void ttm_shrink_work(struct work_struct *work)
 	struct ttm_mem_global *glob =
 	    container_of(work, struct ttm_mem_global, work);
 
-	ttm_shrink(glob, 1);
+	ttm_shrink(glob, true);
 }
 
 int ttm_mem_global_init(struct ttm_mem_global *glob)
@@ -134,7 +134,7 @@ void ttm_mem_global_release(struct ttm_mem_global *glob)
 
 static inline void ttm_check_swapping(struct ttm_mem_global *glob)
 {
-	int needs_swapping;
+	bool needs_swapping;
 
 	spin_lock(&glob->lock);
 	needs_swapping = (glob->used_memory > glob->swap_limit ||
@@ -148,7 +148,7 @@ static inline void ttm_check_swapping(struct ttm_mem_global *glob)
 }
 
 void ttm_mem_global_free(struct ttm_mem_global *glob,
-			 uint64_t amount, int himem)
+			 uint64_t amount, bool himem)
 {
 	spin_lock(&glob->lock);
 	glob->used_total_memory -= amount;
@@ -159,7 +159,7 @@ void ttm_mem_global_free(struct ttm_mem_global *glob,
 }
 
 static int ttm_mem_global_reserve(struct ttm_mem_global *glob,
-				  uint64_t amount, int himem, int reserve)
+				  uint64_t amount, bool himem, bool reserve)
 {
 	uint64_t limit;
 	uint64_t lomem_limit;
@@ -194,16 +194,16 @@ static int ttm_mem_global_reserve(struct ttm_mem_global *glob,
 }
 
 int ttm_mem_global_alloc(struct ttm_mem_global *glob, uint64_t memory,
-			 int no_wait, int interruptible, int himem)
+			 bool no_wait, bool interruptible, bool himem)
 {
 	int count = TTM_MEMORY_ALLOC_RETRIES;
 
-	while (unlikely(ttm_mem_global_reserve(glob, memory, himem, 1) != 0)) {
+	while (unlikely(ttm_mem_global_reserve(glob, memory, himem, true) != 0)) {
 		if (no_wait)
 			return -ENOMEM;
 		if (unlikely(count-- == 0))
 			return -ENOMEM;
-		ttm_shrink(glob, 0);
+		ttm_shrink(glob, false);
 	}
 
 	return 0;

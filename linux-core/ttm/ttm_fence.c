@@ -220,10 +220,10 @@ static void ttm_fence_unring(struct ttm_fence_object *fence)
 	write_unlock_irqrestore(&fc->lock, irq_flags);
 }
 
-int ttm_fence_object_signaled(struct ttm_fence_object *fence, uint32_t mask)
+bool ttm_fence_object_signaled(struct ttm_fence_object *fence, uint32_t mask)
 {
 	unsigned long flags;
-	int signaled;
+	bool signaled;
 	const struct ttm_fence_driver *driver = ttm_fence_driver(fence);
 	struct ttm_fence_class_manager *fc = ttm_fence_fc(fence);
 
@@ -458,7 +458,7 @@ int ttm_fence_object_create(struct ttm_fence_device *fdev,
 	struct ttm_fence_object *fence;
 	int ret;
 
-	ret = ttm_mem_global_alloc(fdev->mem_glob, sizeof(*fence), 0, 0, 0);
+	ret = ttm_mem_global_alloc(fdev->mem_glob, sizeof(*fence), false, false, false);
 	if (unlikely(ret != 0)) {
 		printk(KERN_ERR "Out of memory creating fence object\n");
 		return ret;
@@ -467,7 +467,7 @@ int ttm_fence_object_create(struct ttm_fence_device *fdev,
 	fence = kmalloc(sizeof(*fence), GFP_KERNEL);
 	if (!fence) {
 		printk(KERN_ERR "Out of memory creating fence object\n");
-		ttm_mem_global_free(fdev->mem_glob, sizeof(*fence), 0);
+		ttm_mem_global_free(fdev->mem_glob, sizeof(*fence), false);
 		return -ENOMEM;
 	}
 
@@ -497,7 +497,7 @@ static void ttm_fence_object_destroy(struct kref *kref)
 	if (fence->destroy)
 		fence->destroy(fence);
 	else {
-		ttm_mem_global_free(fence->fdev->mem_glob, sizeof(*fence), 0);
+		ttm_mem_global_free(fence->fdev->mem_glob, sizeof(*fence), false);
 		kfree(fence);
 	}
 }
@@ -570,7 +570,7 @@ void ttm_fence_object_unref(struct ttm_fence_object **p_fence)
  * Placement / BO sync object glue.
  */
 
-int ttm_fence_sync_obj_signaled(void *sync_obj, void *sync_arg)
+bool ttm_fence_sync_obj_signaled(void *sync_obj, void *sync_arg)
 {
 	struct ttm_fence_object *fence = (struct ttm_fence_object *)sync_obj;
 	uint32_t fence_types = (uint32_t) (unsigned long)sync_arg;

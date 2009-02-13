@@ -97,7 +97,7 @@ static void ttm_bo_user_destroy(struct ttm_buffer_object *bo)
 	struct ttm_bo_user_object *user_bo =
 	    container_of(bo, struct ttm_bo_user_object, bo);
 
-	ttm_mem_global_free(bo->bdev->mem_glob, bo->acc_size, 0);
+	ttm_mem_global_free(bo->bdev->mem_glob, bo->acc_size, false);
 	kfree(user_bo);
 }
 
@@ -162,28 +162,28 @@ int ttm_pl_create_ioctl(struct ttm_object_file *tfile,
 	struct ttm_mem_global *mem_glob = bdev->mem_glob;
 	size_t acc_size =
 	    ttm_pl_size(bdev, (req->size + PAGE_SIZE - 1) >> PAGE_SHIFT);
-	ret = ttm_mem_global_alloc(mem_glob, acc_size, 0, 0, 0);
+	ret = ttm_mem_global_alloc(mem_glob, acc_size, false, false, false);
 	if (unlikely(ret != 0))
 		return ret;
 
 	flags = req->placement;
 	user_bo = kzalloc(sizeof(*user_bo), GFP_KERNEL);
 	if (unlikely(user_bo == NULL)) {
-		ttm_mem_global_free(mem_glob, acc_size, 0);
+		ttm_mem_global_free(mem_glob, acc_size, false);
 		return -ENOMEM;
 	}
 
 	bo = &user_bo->bo;
 	ret = ttm_read_lock(lock, true);
 	if (unlikely(ret != 0)) {
-		ttm_mem_global_free(mem_glob, acc_size, 0);
+		ttm_mem_global_free(mem_glob, acc_size, false);
 		kfree(user_bo);
 		return ret;
 	}
 
 	ret = ttm_buffer_object_init(bdev, bo, req->size,
 				     ttm_bo_type_device, flags,
-				     req->page_alignment, 0, 1,
+				     req->page_alignment, 0, true,
 				     NULL, acc_size, &ttm_bo_user_destroy);
 	ttm_read_unlock(lock);
 
@@ -231,19 +231,19 @@ int ttm_pl_ub_create_ioctl(struct ttm_object_file *tfile,
 	struct ttm_mem_global *mem_glob = bdev->mem_glob;
 	size_t acc_size =
 	    ttm_pl_size(bdev, (req->size + PAGE_SIZE - 1) >> PAGE_SHIFT);
-	ret = ttm_mem_global_alloc(mem_glob, acc_size, 0, 0, 0);
+	ret = ttm_mem_global_alloc(mem_glob, acc_size, false, false, false);
 	if (unlikely(ret != 0))
 		return ret;
 
 	flags = req->placement;
 	user_bo = kzalloc(sizeof(*user_bo), GFP_KERNEL);
 	if (unlikely(user_bo == NULL)) {
-		ttm_mem_global_free(mem_glob, acc_size, 0);
+		ttm_mem_global_free(mem_glob, acc_size, false);
 		return -ENOMEM;
 	}
 	ret = ttm_read_lock(lock, true);
 	if (unlikely(ret != 0)) {
-		ttm_mem_global_free(mem_glob, acc_size, 0);
+		ttm_mem_global_free(mem_glob, acc_size, false);
 		kfree(user_bo);
 		return ret;
 	}
@@ -251,7 +251,7 @@ int ttm_pl_ub_create_ioctl(struct ttm_object_file *tfile,
 	ret = ttm_buffer_object_init(bdev, bo, req->size,
 				     ttm_bo_type_user, flags,
 				     req->page_alignment, req->user_address,
-				     1, NULL, acc_size, &ttm_bo_user_destroy);
+				     true, NULL, acc_size, &ttm_bo_user_destroy);
 
 	/*
 	 * Note that the ttm_buffer_object_init function
@@ -389,11 +389,11 @@ int ttm_pl_setstatus_ioctl(struct ttm_object_file *tfile,
 	if (unlikely(ret != 0))
 		goto out_err0;
 
-	ret = ttm_bo_reserve(bo, 1, 0, 0, 0);
+	ret = ttm_bo_reserve(bo, true, false, false, 0);
 	if (unlikely(ret != 0))
 		goto out_err1;
 
-	ret = ttm_bo_wait_cpu(bo, 0);
+	ret = ttm_bo_wait_cpu(bo, false);
 	if (unlikely(ret != 0))
 		goto out_err2;
 
@@ -405,7 +405,7 @@ int ttm_pl_setstatus_ioctl(struct ttm_object_file *tfile,
 
 	bo->proposed_flags = (bo->proposed_flags | req->set_placement)
 	    & ~req->clr_placement;
-	ret = ttm_buffer_object_validate(bo, 1, 0);
+	ret = ttm_buffer_object_validate(bo, true, false);
 	if (unlikely(ret != 0))
 		goto out_err2;
 
@@ -433,14 +433,14 @@ int ttm_pl_waitidle_ioctl(struct ttm_object_file *tfile, void *data)
 	}
 
 	ret =
-	    ttm_bo_block_reservation(bo, 1,
+	    ttm_bo_block_reservation(bo, true,
 				     arg->mode & TTM_PL_WAITIDLE_MODE_NO_BLOCK);
 	if (unlikely(ret != 0))
 		goto out;
 	mutex_lock(&bo->mutex);
 	ret = ttm_bo_wait(bo,
 			  arg->mode & TTM_PL_WAITIDLE_MODE_LAZY,
-			  1, arg->mode & TTM_PL_WAITIDLE_MODE_NO_BLOCK);
+			  true, arg->mode & TTM_PL_WAITIDLE_MODE_NO_BLOCK);
 	mutex_unlock(&bo->mutex);
 	ttm_bo_unblock_reservation(bo);
       out:

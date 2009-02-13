@@ -91,11 +91,11 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	struct page *page;
 	int ret;
 	int i;
-	int is_iomem;
+	bool is_iomem;
 	unsigned long address = (unsigned long)vmf->virtual_address;
 	int retval = VM_FAULT_NOPAGE;
 
-	ret = ttm_bo_reserve(bo, 1, 0, 0, 0);
+	ret = ttm_bo_reserve(bo, true, false, false, 0);
 	if (unlikely(ret != 0))
 		return VM_FAULT_NOPAGE;
 
@@ -107,7 +107,7 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	 */
 
 	if (bo->priv_flags & TTM_BO_PRIV_FLAG_MOVING) {
-		ret = ttm_bo_wait(bo, 0, 1, 0);
+		ret = ttm_bo_wait(bo, false, true, false);
 		if (unlikely(ret != 0)) {
 			retval = (ret != -ERESTART) ?
 			    VM_FAULT_SIGBUS : VM_FAULT_NOPAGE;
@@ -227,10 +227,10 @@ static unsigned long ttm_bo_vm_nopfn(struct vm_area_struct *vma,
 	struct page *page;
 	int ret;
 	int i;
-	int is_iomem;
+	bool is_iomem;
 	unsigned long retval = NOPFN_REFAULT;
 
-	ret = ttm_bo_reserve(bo, 1, 0, 0, 0);
+	ret = ttm_bo_reserve(bo, true, false, false, 0);
 	if (unlikely(ret != 0))
 		return NOPFN_REFAULT;
 
@@ -242,7 +242,7 @@ static unsigned long ttm_bo_vm_nopfn(struct vm_area_struct *vma,
 	 */
 
 	if (bo->priv_flags & TTM_BO_PRIV_FLAG_MOVING) {
-		ret = ttm_bo_wait(bo, 0, 1, 0);
+		ret = ttm_bo_wait(bo, false, true, false);
 		if (unlikely(ret != 0)) {
 			retval = (ret != -ERESTART) ?
 			    NOPFN_SIGBUS : NOPFN_REFAULT;
@@ -440,7 +440,7 @@ int ttm_fbdev_mmap(struct vm_area_struct *vma, struct ttm_buffer_object *bo)
 
 ssize_t ttm_bo_io(struct ttm_bo_device * bdev, struct file * filp,
 		  const char __user * wbuf, char __user * rbuf, size_t count,
-		  loff_t * f_pos, int write)
+		  loff_t * f_pos, bool write)
 {
 	struct ttm_buffer_object *bo;
 	struct ttm_bo_driver *driver;
@@ -453,8 +453,8 @@ ssize_t ttm_bo_io(struct ttm_bo_device * bdev, struct file * filp,
 	unsigned int page_offset;
 	char *virtual;
 	int ret;
-	int no_wait = 0;
-	int dummy;
+	bool no_wait = false;
+	bool dummy;
 
 	driver = bo->bdev->driver;
 	read_lock(&bdev->vm_lock);
@@ -488,7 +488,7 @@ ssize_t ttm_bo_io(struct ttm_bo_device * bdev, struct file * filp,
 	kmap_end = (*f_pos + count - 1) >> PAGE_SHIFT;
 	kmap_num = kmap_end - kmap_offset + 1;
 
-	ret = ttm_bo_reserve(bo, 1, no_wait, 0, 0);
+	ret = ttm_bo_reserve(bo, true, no_wait, false, 0);
 
 	switch (ret) {
 	case 0:
@@ -532,7 +532,7 @@ ssize_t ttm_bo_io(struct ttm_bo_device * bdev, struct file * filp,
 
 ssize_t ttm_bo_fbdev_io(struct ttm_buffer_object * bo, const char __user * wbuf,
 			char __user * rbuf, size_t count, loff_t * f_pos,
-			int write)
+			bool write)
 {
 	struct ttm_bo_kmap_obj map;
 	unsigned long kmap_offset;
@@ -542,8 +542,8 @@ ssize_t ttm_bo_fbdev_io(struct ttm_buffer_object * bo, const char __user * wbuf,
 	unsigned int page_offset;
 	char *virtual;
 	int ret;
-	int no_wait = 0;
-	int dummy;
+	bool no_wait = false;
+	bool dummy;
 
 	kmap_offset = (*f_pos >> PAGE_SHIFT);
 	if (unlikely(kmap_offset) >= bo->num_pages)
@@ -558,7 +558,7 @@ ssize_t ttm_bo_fbdev_io(struct ttm_buffer_object * bo, const char __user * wbuf,
 	kmap_end = (*f_pos + count - 1) >> PAGE_SHIFT;
 	kmap_num = kmap_end - kmap_offset + 1;
 
-	ret = ttm_bo_reserve(bo, 1, no_wait, 0, 0);
+	ret = ttm_bo_reserve(bo, true, no_wait, false, 0);
 
 	switch (ret) {
 	case 0:

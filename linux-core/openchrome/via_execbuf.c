@@ -105,7 +105,7 @@ via_placement_fence_type(struct ttm_buffer_object *bo,
 	if (old_fence && ((new_fence_class != old_fence->fence_class) ||
 			  ((n_fence_type ^ old_fence_types) &
 			   old_fence_types))) {
-		ret = ttm_bo_wait(bo, 0, 0, 0);
+		ret = ttm_bo_wait(bo, false, false, false);
 		if (unlikely(ret != 0))
 			return ret;
 	}
@@ -559,7 +559,7 @@ static int via_validate_buffer_list(struct drm_file *file_priv,
 		if (unlikely(ret != 0))
 			goto out_err;
 
-		ret = ttm_buffer_object_validate(bo, 1, 0);
+		ret = ttm_buffer_object_validate(bo, true, false);
 
 		if (unlikely(ret != 0))
 			goto out_err;
