@@ -218,7 +218,7 @@ int ttm_fence_finish_ioctl(struct ttm_object_file *tfile, void *data)
 
 	ret = ttm_fence_object_wait(fence,
 				    arg->req.mode & TTM_FENCE_FINISH_MODE_LAZY,
-				    1, arg->req.fence_type);
+				    true, arg->req.fence_type);
 	if (likely(ret == 0)) {
 		struct ttm_fence_info info = ttm_fence_get_info(fence);
 

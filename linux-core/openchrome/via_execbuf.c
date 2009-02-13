@@ -814,7 +814,7 @@ static int via_wait_single_barrier(struct drm_via_private *dev_priv,
 	if (likely(dev_priv->barriers[barrier] == NULL))
 		return 0;
 
-	ret = ttm_fence_object_wait(dev_priv->barriers[barrier], 0, 1,
+	ret = ttm_fence_object_wait(dev_priv->barriers[barrier], false, true,
 				    barrier_type);
 	if (unlikely(ret != 0))
 		return ret;

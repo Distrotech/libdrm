@@ -158,8 +158,8 @@ void via_ttm_fence_dmablit_handler(struct drm_via_private *dev_priv, int engine)
 	write_unlock(&fc->lock);
 }
 
-static int via_ttm_fence_has_irq(struct ttm_fence_device *fdev,
-				 uint32_t engine, uint32_t flags)
+static bool via_ttm_fence_has_irq(struct ttm_fence_device *fdev,
+				      uint32_t engine, uint32_t flags)
 {
 	struct drm_via_private *dev_priv =
 	    container_of(fdev, struct drm_via_private, fdev);
@@ -226,5 +226,5 @@ int via_ttm_fence_device_init(struct drm_via_private *dev_priv)
 	return ttm_fence_device_init(5,
 				     dev_priv->mem_global_ref.object,
 				     &dev_priv->fdev,
-				     &fci, 1, &via_ttm_fence_driver);
+				     &fci, true, &via_ttm_fence_driver);
 }

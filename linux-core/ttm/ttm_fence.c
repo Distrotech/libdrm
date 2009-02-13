@@ -63,8 +63,8 @@ static void ttm_fence_lockup(struct ttm_fence_object *fence, uint32_t mask)
  * need polling.
  */
 
-int ttm_fence_wait_polling(struct ttm_fence_object *fence, int lazy,
-			   int interruptible, uint32_t mask)
+int ttm_fence_wait_polling(struct ttm_fence_object *fence, bool lazy,
+			   bool interruptible, uint32_t mask)
 {
 	struct ttm_fence_class_manager *fc = ttm_fence_fc(fence);
 	const struct ttm_fence_driver *driver = ttm_fence_driver(fence);
@@ -123,7 +123,7 @@ void ttm_fence_handler(struct ttm_fence_device *fdev, uint32_t fence_class,
 	const struct ttm_fence_driver *driver = ttm_fence_driver_from_dev(fdev);
 	struct list_head *head;
 	struct ttm_fence_object *fence, *next;
-	int found = 0;
+	bool found = false;
 
 	if (list_empty(&fc->ring))
 		return;
@@ -131,7 +131,7 @@ void ttm_fence_handler(struct ttm_fence_device *fdev, uint32_t fence_class,
 	list_for_each_entry(fence, &fc->ring, ring) {
 		diff = (sequence - fence->sequence) & fc->sequence_mask;
 		if (diff > fc->wrap_diff) {
-			found = 1;
+			found = true;
 			break;
 		}
 	}
@@ -247,7 +247,7 @@ int ttm_fence_object_flush(struct ttm_fence_object *fence, uint32_t type)
 	unsigned long irq_flags;
 	uint32_t saved_pending_flush;
 	uint32_t diff;
-	int call_flush;
+	bool call_flush;
 
 	if (type & ~fence->fence_type) {
 		DRM_ERROR("Flush trying to extend fence type, "
@@ -277,7 +277,7 @@ int ttm_fence_object_flush(struct ttm_fence_object *fence, uint32_t type)
 		driver->poll(fence->fdev, fence->fence_class,
 			     fence->waiting_types);
 
-	call_flush = fc->pending_flush;
+	call_flush = (fc->pending_flush != 0);
 	write_unlock_irqrestore(&fc->lock, irq_flags);
 
 	if (call_flush && driver->flush)
@@ -298,7 +298,7 @@ void ttm_fence_flush_old(struct ttm_fence_device *fdev,
 	struct ttm_fence_object *fence;
 	unsigned long irq_flags;
 	const struct ttm_fence_driver *driver = fdev->driver;
-	int call_flush;
+	bool call_flush;
 
 	uint32_t diff;
 
@@ -319,7 +319,7 @@ void ttm_fence_flush_old(struct ttm_fence_device *fdev,
 	if (driver->poll)
 		driver->poll(fdev, fence_class, fc->waiting_types);
 
-	call_flush = fc->pending_flush;
+	call_flush = (fc->pending_flush != 0);
 	write_unlock_irqrestore(&fc->lock, irq_flags);
 
 	if (call_flush && driver->flush)
@@ -332,7 +332,7 @@ void ttm_fence_flush_old(struct ttm_fence_device *fdev,
 }
 
 int ttm_fence_object_wait(struct ttm_fence_object *fence,
-			  int lazy, int interruptible, uint32_t mask)
+			  bool lazy, bool interruptible, uint32_t mask)
 {
 	const struct ttm_fence_driver *driver = ttm_fence_driver(fence);
 	struct ttm_fence_class_manager *fc = ttm_fence_fc(fence);
@@ -512,7 +512,7 @@ ttm_fence_device_init(int num_classes,
 		      struct ttm_mem_global *mem_glob,
 		      struct ttm_fence_device *fdev,
 		      const struct ttm_fence_class_init *init,
-		      int replicate_init, const struct ttm_fence_driver *driver)
+		      bool replicate_init, const struct ttm_fence_driver *driver)
 {
 	struct ttm_fence_class_manager *fc;
 	const struct ttm_fence_class_init *fci;
@@ -579,7 +579,7 @@ bool ttm_fence_sync_obj_signaled(void *sync_obj, void *sync_arg)
 }
 
 int ttm_fence_sync_obj_wait(void *sync_obj, void *sync_arg,
-			    int lazy, int interruptible)
+			    bool lazy, bool interruptible)
 {
 	struct ttm_fence_object *fence = (struct ttm_fence_object *)sync_obj;
 	uint32_t fence_types = (uint32_t) (unsigned long)sync_arg;

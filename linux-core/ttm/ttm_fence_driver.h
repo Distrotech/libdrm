@@ -183,7 +183,7 @@ struct ttm_fence_class_init {
  */
 
 struct ttm_fence_driver {
-	int (*has_irq) (struct ttm_fence_device * fdev,
+	bool (*has_irq) (struct ttm_fence_device * fdev,
 			uint32_t fence_class, uint32_t flags);
 	int (*emit) (struct ttm_fence_device * fdev,
 		     uint32_t fence_class,
@@ -194,8 +194,8 @@ struct ttm_fence_driver {
 		      uint32_t fence_class, uint32_t types);
 	 uint32_t(*needed_flush)
 	 (struct ttm_fence_object * fence);
-	int (*wait) (struct ttm_fence_object * fence, int lazy,
-		     int interruptible, uint32_t mask);
+	int (*wait) (struct ttm_fence_object * fence, bool lazy,
+		     bool interruptible, uint32_t mask);
 	void (*signaled) (struct ttm_fence_object * fence);
 	void (*lockup) (struct ttm_fence_object * fence, uint32_t fence_types);
 };
@@ -218,7 +218,7 @@ ttm_fence_device_init(int num_classes,
 		      struct ttm_mem_global *mem_glob,
 		      struct ttm_fence_device *fdev,
 		      const struct ttm_fence_class_init *init,
-		      int replicate_init,
+		      bool replicate_init,
 		      const struct ttm_fence_driver *driver);
 
 /**
