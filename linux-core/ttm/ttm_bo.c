@@ -1637,7 +1637,7 @@ static int ttm_bo_swapout(struct ttm_mem_shrink *shrink)
 
 		bo = list_first_entry(&bdev->swap_lru,
 				      struct ttm_buffer_object, swap);
-		ttm_bo_reference(bo);
+		kref_get(&bo->list_kref);
 
 		/**
 		 * Reserve buffer. Since we unlock while sleeping, we need
@@ -1649,6 +1649,7 @@ static int ttm_bo_swapout(struct ttm_mem_shrink *shrink)
 		if (unlikely(ret == -EBUSY)) {
 			spin_unlock(&bdev->lru_lock);
 			ttm_bo_wait_unreserved(bo, false);
+			kref_put(&bo->list_kref, ttm_bo_release_list);
 			spin_lock(&bdev->lru_lock);
 		}
 	}
@@ -1703,7 +1704,7 @@ static int ttm_bo_swapout(struct ttm_mem_shrink *shrink)
 
 	atomic_set(&bo->reserved, 0);
 	wake_up_all(&bo->event_queue);
-	ttm_bo_unref(&bo);
+	kref_put(&bo->list_kref, ttm_bo_release_list);
 	return ret;
 }
 
