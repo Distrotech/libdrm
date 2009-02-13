@@ -148,7 +148,7 @@ ttm_fence_user_create(struct ttm_fence_device *fdev,
 
 	tmp = ttm_fence_object_ref(&ufence->fence);
 	ret = ttm_base_object_init(tfile, &ufence->base,
-				   0, ttm_fence_type,
+				   false, ttm_fence_type,
 				   &ttm_fence_user_release, NULL);
 
 	if (unlikely(ret != 0))

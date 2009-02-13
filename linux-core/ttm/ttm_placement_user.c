@@ -328,7 +328,7 @@ int ttm_pl_synccpu_ioctl(struct ttm_object_file *tfile, void *data)
 	struct ttm_bo_user_object *user_bo;
 	struct ttm_buffer_object *bo;
 	struct ttm_base_object *base;
-	int existed;
+	bool existed;
 	int ret;
 
 	switch (arg->op) {

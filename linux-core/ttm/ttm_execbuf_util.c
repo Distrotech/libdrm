@@ -42,7 +42,7 @@ void ttm_eu_backoff_reservation(struct list_head *list)
 		if (!entry->reserved)
 			continue;
 
-		entry->reserved = 0;
+		entry->reserved = false;
 		ttm_bo_unreserve(bo);
 	}
 }
@@ -68,7 +68,7 @@ int ttm_eu_reserve_buffers(struct list_head *list, uint32_t val_seq)
 	list_for_each_entry(entry, list, head) {
 		struct ttm_buffer_object *bo = entry->bo;
 
-		entry->reserved = 0;
+		entry->reserved = false;
 		ret = ttm_bo_reserve(bo, true, false, true, val_seq);
 		if (ret != 0) {
 			ttm_eu_backoff_reservation(list);
@@ -81,7 +81,7 @@ int ttm_eu_reserve_buffers(struct list_head *list, uint32_t val_seq)
 				return ret;
 		}
 
-		entry->reserved = 1;
+		entry->reserved = true;
 		if (unlikely(atomic_read(&bo->cpu_writers) > 0)) {
 			ttm_eu_backoff_reservation(list);
 			ret = ttm_bo_wait_cpu(bo, false);
@@ -108,7 +108,7 @@ void ttm_eu_fence_buffer_objects(struct list_head *list, void *sync_obj)
 		bo->sync_obj_arg = entry->new_sync_obj_arg;
 		mutex_unlock(&bo->mutex);
 		ttm_bo_unreserve(bo);
-		entry->reserved = 0;
+		entry->reserved = false;
 		if (old_sync_obj)
 			driver->sync_obj_unref(&old_sync_obj);
 	}

@@ -120,7 +120,7 @@ struct ttm_object_device;
 struct ttm_base_object {
 	struct drm_hash_item hash;
 	enum ttm_object_type object_type;
-	int shareable;
+	bool shareable;
 	struct ttm_object_file *tfile;
 	struct kref refcount;
 	void (*refcount_release) (struct ttm_base_object ** base);
@@ -144,7 +144,7 @@ struct ttm_base_object {
 
 extern int ttm_base_object_init(struct ttm_object_file *tfile,
 				struct ttm_base_object *base,
-				int shareable,
+				bool shareable,
 				enum ttm_object_type type,
 				void (*refcount_release) (struct ttm_base_object
 							  **),
@@ -199,7 +199,7 @@ extern void ttm_base_object_unref(struct ttm_base_object **p_base);
  */
 extern int ttm_ref_object_add(struct ttm_object_file *tfile,
 			      struct ttm_base_object *base,
-			      enum ttm_ref_type ref_type, int *existed);
+			      enum ttm_ref_type ref_type, bool *existed);
 /**
  * ttm_ref_object_base_unref
  *

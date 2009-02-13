@@ -147,7 +147,7 @@ int ttm_write_lock(struct ttm_lock *lock,
 	 * while holding it.
 	 */
 
-	ret = ttm_base_object_init(tfile, &lock->base, 0,
+	ret = ttm_base_object_init(tfile, &lock->base, false,
 				   ttm_lock_type, &ttm_write_lock_remove, NULL);
 	if (ret)
 		(void)__ttm_write_unlock(lock);

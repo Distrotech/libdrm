@@ -142,7 +142,7 @@ static inline void ttm_object_file_unref(struct ttm_object_file **p_tfile)
 
 int ttm_base_object_init(struct ttm_object_file *tfile,
 			 struct ttm_base_object *base,
-			 int shareable,
+			 bool shareable,
 			 enum ttm_object_type object_type,
 			 void (*refcount_release) (struct ttm_base_object **),
 			 void (*ref_obj_release) (struct ttm_base_object *,
@@ -242,7 +242,7 @@ struct ttm_base_object *ttm_base_object_lookup(struct ttm_object_file *tfile,
 
 int ttm_ref_object_add(struct ttm_object_file *tfile,
 		       struct ttm_base_object *base,
-		       enum ttm_ref_type ref_type, int *existed)
+		       enum ttm_ref_type ref_type, bool *existed)
 {
 	struct drm_open_hash *ht = &tfile->ref_hash[ref_type];
 	struct ttm_ref_object *ref;
@@ -251,7 +251,7 @@ int ttm_ref_object_add(struct ttm_object_file *tfile,
 	int ret = -EINVAL;
 
 	if (existed != NULL)
-		*existed = 1;
+		*existed = true;
 
 	while (ret == -EINVAL) {
 		read_lock(&tfile->lock);
@@ -288,7 +288,7 @@ int ttm_ref_object_add(struct ttm_object_file *tfile,
 			kref_get(&base->refcount);
 			write_unlock(&tfile->lock);
 			if (existed != NULL)
-				*existed = 0;
+				*existed = false;
 			break;
 		}
 

@@ -51,7 +51,7 @@ struct ttm_validate_buffer {
 	struct list_head head;
 	struct ttm_buffer_object *bo;
 	void *new_sync_obj_arg;
-	int reserved;
+	bool reserved;
 };
 
 /**
