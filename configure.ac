@@ -118,6 +118,7 @@ AC_OUTPUT([
 	libdrm/Makefile
 	libdrm/intel/Makefile
 	libdrm/radeon/Makefile
+	libdrm/radeon/libdrm_radeon.pc
 	libdrm/nouveau/Makefile
 	libdrm/nouveau/libdrm_nouveau.pc
 	shared-core/Makefile

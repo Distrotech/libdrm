@@ -46,3 +46,8 @@ libdrm_radeoninclude_HEADERS = \
 	radeon_bo_gem.h \
 	radeon_cs_gem.h \
 	radeon_track.h
+
+pkgconfigdir = @pkgconfigdir@
+pkgconfig_DATA = libdrm_radeon.pc
+
+EXTRA_DIST = libdrm_radeon.pc.in
