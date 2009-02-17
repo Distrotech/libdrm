@@ -2516,17 +2516,17 @@ void r600_do_cp_start(drm_radeon_private_t * dev_priv)
 	OUT_RING(R600_ME_INITIALIZE_DEVICE_ID(1));
 	OUT_RING(0x00000000);
 	OUT_RING(0x00000000);
-	OUT_RING(0x80000000); //[NOP]
-	OUT_RING(0x80000000); //[NOP]
-	OUT_RING(0x80000000); //[NOP]
-	OUT_RING(0x80000000); //[NOP]
-	OUT_RING(0x80000000); //[NOP]
-	OUT_RING(0x80000000); //[NOP]
-	OUT_RING(0x00012140); //[TYPE0]
+	OUT_RING(CP_PACKET2()); //[NOP]
+	OUT_RING(CP_PACKET2()); //[NOP]
+	OUT_RING(CP_PACKET2()); //[NOP]
+	OUT_RING(CP_PACKET2()); //[NOP]
+	OUT_RING(CP_PACKET2()); //[NOP]
+	OUT_RING(CP_PACKET2()); //[NOP]
+	OUT_RING(CP_PACKET0(R600_SCRATCH_REG0, 1)); //[TYPE0]
 	OUT_RING(0x00000001); //[mmSCRATCH_REG0]
 	OUT_RING(0x00000000); //[mmSCRATCH_REG1]
 	ADVANCE_RING();
-	R600_COMMIT_RING();
+        COMMIT_RING();
 
 	/* set the mux and reset the halt bit */
 	cp_me = 0xff;
@@ -2629,6 +2629,6 @@ int r600_cp_indirect(struct drm_device *dev, struct drm_buf *buf, drm_radeon_ind
 	if (indirect->discard)
 		r600_cp_discard_buffer(dev, buf);
 
-	R600_COMMIT_RING();
+	COMMIT_RING();
 	return 0;
 }
