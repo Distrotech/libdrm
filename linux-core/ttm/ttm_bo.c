@@ -143,6 +143,7 @@ int ttm_bo_reserve_locked(struct ttm_buffer_object *bo,
 			  bool no_wait, bool use_sequence, uint32_t sequence)
 {
 	struct ttm_bo_device *bdev = bo->bdev;
+	int ret;
 
 	while (unlikely(atomic_cmpxchg(&bo->reserved, 0, 1) != 0)) {
 		if (use_sequence && bo->seq_valid &&
@@ -154,11 +155,11 @@ int ttm_bo_reserve_locked(struct ttm_buffer_object *bo,
 			return -EBUSY;
 
 		spin_unlock(&bdev->lru_lock);
-
-		if (ttm_bo_wait_unreserved(bo, interruptible) != 0)
-			return -ERESTART;
-
+		ret = ttm_bo_wait_unreserved(bo, interruptible);
 		spin_lock(&bdev->lru_lock);
+
+		if (unlikely(ret))
+			return ret;
 	}
 
 	if (use_sequence) {
