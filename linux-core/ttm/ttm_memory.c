@@ -42,7 +42,8 @@
  * many threads may try to swap out at any given time.
  */
 
-static void ttm_shrink(struct ttm_mem_global *glob, bool from_workqueue)
+static void ttm_shrink(struct ttm_mem_global *glob, bool from_workqueue,
+		       uint64_t extra)
 {
 	int ret;
 	struct ttm_mem_shrink *shrink;
@@ -64,6 +65,9 @@ static void ttm_shrink(struct ttm_mem_global *glob, bool from_workqueue)
 		target = glob->max_memory;
 	}
 
+	total_target = (extra >= total_target) ? 0: total_target - extra;	
+	target = (extra >= target) ? 0: target - extra;
+
 	while (glob->used_memory > target ||
 	       glob->used_total_memory > total_target) {
 		shrink = glob->shrink;
@@ -82,7 +86,7 @@ static void ttm_shrink_work(struct work_struct *work)
 	struct ttm_mem_global *glob =
 	    container_of(work, struct ttm_mem_global, work);
 
-	ttm_shrink(glob, true);
+	ttm_shrink(glob, true, 0ULL);
 }
 
 int ttm_mem_global_init(struct ttm_mem_global *glob)
@@ -203,7 +207,7 @@ int ttm_mem_global_alloc(struct ttm_mem_global *glob, uint64_t memory,
 			return -ENOMEM;
 		if (unlikely(count-- == 0))
 			return -ENOMEM;
-		ttm_shrink(glob, false);
+		ttm_shrink(glob, false, memory + (memory >> 2) + 16);
 	}
 
 	return 0;
