@@ -940,6 +940,15 @@ int r600_engine_reset(struct drm_device * dev)
 	RADEON_WRITE(R600_CP_RB_CNTL, cp_rb_cntl);
 	RADEON_WRITE(R600_CP_ME_CNTL, cp_me_cntl);
 
+	/* Reset the CP ring */
+	r600_do_cp_reset(dev_priv);
+
+	/* The CP is no longer running after an engine reset */
+	dev_priv->cp_running = 0;
+
+	/* Reset any pending vertex, indirect buffers */
+	radeon_freelist_reset(dev);
+
 	return 0;
 
 }
@@ -2126,8 +2135,6 @@ static void r600_cp_init_ring_buffer(struct drm_device * dev,
 
 	r600_do_wait_for_idle(dev_priv);
 
-	r600_engine_reset(dev);
-
 }
 
 static int r600_do_cleanup_cp(struct drm_device * dev)
@@ -2466,6 +2473,7 @@ int r600_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init)
 
 	dev_priv->last_buf = 0;
 
+	r600_engine_reset(dev);
 	r600_test_writeback(dev_priv);
 
 	return 0;
@@ -2481,6 +2489,7 @@ int r600_do_resume_cp(struct drm_device * dev)
 	else
 	    r600_cp_load_microcode(dev_priv);
 	r600_cp_init_ring_buffer(dev, dev_priv);
+	r600_engine_reset(dev);
 
 	return 0;
 }
