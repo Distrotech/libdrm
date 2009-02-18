@@ -383,6 +383,11 @@ nouveau_card_init(struct drm_device *dev)
 		}
 	}
 
+	ret = nouveau_backlight_init(dev);
+	if (ret)
+		DRM_ERROR("Error code %d when trying to register backlight\n",
+			  ret);
+
 	dev_priv->init_state = NOUVEAU_CARD_INIT_DONE;
 
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
@@ -402,6 +407,8 @@ static void nouveau_card_takedown(struct drm_device *dev)
 	DRM_DEBUG("prev state = %d\n", dev_priv->init_state);
 
 	if (dev_priv->init_state != NOUVEAU_CARD_INIT_DOWN) {
+		nouveau_backlight_exit(dev);
+
 		nouveau_dma_channel_takedown(dev);
 
 		engine->fifo.takedown(dev);

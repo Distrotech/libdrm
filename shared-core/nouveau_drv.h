@@ -358,6 +358,8 @@ struct drm_nouveau_private {
 	} susres;
 
 	struct mutex submit_mutex;
+
+	struct backlight_device *backlight;
 };
 
 #define NOUVEAU_CHECK_INITIALISED_WITH_RETURN do {         \
@@ -524,6 +526,10 @@ extern int  nouveau_dma_channel_init(struct drm_device *);
 extern void nouveau_dma_channel_takedown(struct drm_device *);
 extern int  nouveau_dma_channel_setup(struct nouveau_channel *);
 extern int  nouveau_dma_wait(struct nouveau_channel *, int size);
+
+/* nouveau_backlight.c */
+extern int nouveau_backlight_init(struct drm_device *);
+extern void nouveau_backlight_exit(struct drm_device *);
 
 /* nv04_fb.c */
 extern int  nv04_fb_init(struct drm_device *);

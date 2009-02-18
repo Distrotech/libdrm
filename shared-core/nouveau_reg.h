@@ -100,6 +100,8 @@
  * the card will hang early on in the X init process.
  */
 #    define NV_PMC_ENABLE_UNK13                               (1<<13)
+#define NV40_PMC_BACKLIGHT				   0x000015f0
+#	define NV40_PMC_BACKLIGHT_MASK			   0x001f0000
 #define NV40_PMC_1700                                      0x00001700
 #define NV40_PMC_1704                                      0x00001704
 #define NV40_PMC_1708                                      0x00001708
@@ -543,6 +545,9 @@
 
 /* This name is a partial guess. */
 #define NV50_DISPLAY_SUPERVISOR                     0x00610024
+
+#define NV50_PDISPLAY_BACKLIGHT				0x0061c084
+#	define NV50_PDISPLAY_BACKLIGHT_ENABLE		0x80000000
 
 #define NV04_PRAMIN						0x00700000
 
