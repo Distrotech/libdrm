@@ -2137,7 +2137,7 @@ static void r600_cp_init_ring_buffer(struct drm_device * dev,
 
 }
 
-static int r600_do_cleanup_cp(struct drm_device * dev)
+int r600_do_cleanup_cp(struct drm_device * dev)
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	DRM_DEBUG("\n");

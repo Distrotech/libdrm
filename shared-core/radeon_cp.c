@@ -1523,21 +1523,28 @@ void radeon_do_release(struct drm_device * dev)
 #endif
 #endif
 			}
-			radeon_do_cp_stop(dev_priv);
-			radeon_do_engine_reset(dev);
+			if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600) {
+				r600_do_cp_stop(dev_priv);
+				r600_engine_reset(dev);
+			} else {
+				radeon_do_cp_stop(dev_priv);
+				radeon_do_engine_reset(dev);
+			}
 		}
 
-		/* Disable *all* interrupts */
-		if (dev_priv->mmio)	/* remove this after permanent addmaps */
-			RADEON_WRITE(RADEON_GEN_INT_CNTL, 0);
+		if ((dev_priv->flags & RADEON_FAMILY_MASK) < CHIP_R600) {
+			/* Disable *all* interrupts */
+			if (dev_priv->mmio)	/* remove this after permanent addmaps */
+				RADEON_WRITE(RADEON_GEN_INT_CNTL, 0);
 
-		if (dev_priv->mmio) {	/* remove all surfaces */
-			for (i = 0; i < RADEON_MAX_SURFACES; i++) {
-				RADEON_WRITE(RADEON_SURFACE0_INFO + 16 * i, 0);
-				RADEON_WRITE(RADEON_SURFACE0_LOWER_BOUND +
-					     16 * i, 0);
-				RADEON_WRITE(RADEON_SURFACE0_UPPER_BOUND +
-					     16 * i, 0);
+			if (dev_priv->mmio) {	/* remove all surfaces */
+				for (i = 0; i < RADEON_MAX_SURFACES; i++) {
+					RADEON_WRITE(RADEON_SURFACE0_INFO + 16 * i, 0);
+					RADEON_WRITE(RADEON_SURFACE0_LOWER_BOUND +
+						     16 * i, 0);
+					RADEON_WRITE(RADEON_SURFACE0_UPPER_BOUND +
+						     16 * i, 0);
+				}
 			}
 		}
 
@@ -1546,7 +1553,10 @@ void radeon_do_release(struct drm_device * dev)
 		radeon_mem_takedown(&(dev_priv->fb_heap));
 
 		/* deallocate kernel resources */
-		radeon_do_cleanup_cp(dev);
+		if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600)
+			r600_do_cleanup_cp(dev);
+		else
+			radeon_do_cleanup_cp(dev);
 	}
 }
 

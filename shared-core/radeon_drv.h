@@ -456,6 +456,7 @@ int r600_cp_indirect(struct drm_device *dev, struct drm_buf *buf, drm_radeon_ind
 void r600_do_cp_stop(drm_radeon_private_t * dev_priv);
 int r600_engine_reset(struct drm_device * dev);
 void r600_do_cp_reset(drm_radeon_private_t * dev_priv);
+int r600_do_cleanup_cp(struct drm_device * dev);
 
 /* Flags for stats.boxes
  */
