@@ -2572,22 +2572,19 @@ static void r600_cp_discard_buffer(struct drm_device * dev, struct drm_buf * buf
 	buf_priv->age = ++dev_priv->sarea_priv->last_dispatch;
 
 	/* Emit the vertex buffer age */
-	BEGIN_RING(2);
+	BEGIN_RING(8);
 	R600_DISPATCH_AGE(buf_priv->age);
+	OUT_RING(CP_PACKET2());
+	OUT_RING(CP_PACKET2());
+	OUT_RING(CP_PACKET2());
+	OUT_RING(CP_PACKET2());
+	OUT_RING(CP_PACKET2());
+	OUT_RING(CP_PACKET2());
 	ADVANCE_RING();
 
 	buf->pending = 1;
 	buf->used = 0;
 }
-
-#define R600_VB_AGE_TEST_WITH_RETURN( dev_priv )				\
-do {									\
-	drm_radeon_sarea_t *sarea_priv = dev_priv->sarea_priv;		\
-	if ( sarea_priv->last_dispatch >= RADEON_MAX_VB_AGE ) {		\
-		sarea_priv->last_dispatch = 0;				\
-		radeon_freelist_reset( dev );				\
-	}								\
-} while (0)
 
 int r600_cp_indirect(struct drm_device *dev, struct drm_buf *buf, drm_radeon_indirect_t *indirect)
 {
@@ -2596,7 +2593,7 @@ int r600_cp_indirect(struct drm_device *dev, struct drm_buf *buf, drm_radeon_ind
 	RING_LOCALS;
 
 	RING_SPACE_TEST_WITH_RETURN(dev_priv);
-	R600_VB_AGE_TEST_WITH_RETURN(dev_priv);
+	VB_AGE_TEST_WITH_RETURN(dev_priv);
 
 	buf->used = indirect->end;
 
