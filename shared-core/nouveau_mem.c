@@ -647,11 +647,6 @@ int nouveau_mem_init(struct drm_device *dev)
 	/* Init FB */
 	dev_priv->fb_phys=drm_get_resource_start(dev,1);
 	fb_size = nouveau_mem_fb_amount(dev);
-	/* On G80, limit VRAM to 512MiB temporarily due to limits in how
-	 * we handle VRAM page tables.
-	 */
-	if (dev_priv->card_type >= NV_50 && fb_size > (512 * 1024 * 1024))
-		fb_size = (512 * 1024 * 1024);
 	/* On at least NV40, RAMIN is actually at the end of vram.
 	 * We don't want to allocate this... */
 	if (dev_priv->card_type >= NV_40)
