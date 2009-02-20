@@ -407,6 +407,8 @@ extern int  nouveau_ioctl_getparam(struct drm_device *, void *data,
 				   struct drm_file *);
 extern int  nouveau_ioctl_setparam(struct drm_device *, void *data,
 				   struct drm_file *);
+extern bool nouveau_wait_until(struct drm_device *, uint64_t timeout,
+			       uint32_t reg, uint32_t mask, uint32_t val);
 extern void nouveau_wait_for_idle(struct drm_device *);
 extern int  nouveau_card_init(struct drm_device *);
 extern int  nouveau_ioctl_card_init(struct drm_device *, void *data,
@@ -709,6 +711,8 @@ extern int nouveau_gem_ioctl_cpu_fini(struct drm_device *, void *,
 #define nv_wr16(reg,val) nv_out16(dev_priv->mmio, (reg), (val))
 #define nv_rd08(reg) nv_in08(dev_priv->mmio, (reg))
 #define nv_wr08(reg,val) nv_out08(dev_priv->mmio, (reg), (val))
+#define nv_wait(reg,mask,val) nouveau_wait_until(dev, 1000000000ULL, (reg),    \
+						 (mask), (val))
 /* PRAMIN access */
 #define nv_ri32(reg) nv_in32(dev_priv->ramin, (reg))
 #define nv_wi32(reg,val) nv_out32(dev_priv->ramin, (reg), (val))

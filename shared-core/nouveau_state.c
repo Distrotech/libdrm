@@ -723,33 +723,38 @@ nouveau_ioctl_setparam(struct drm_device *dev, void *data,
 	return 0;
 }
 
-/* waits for idle */
+/* Wait until (value(reg) & mask) == val, up until timeout has hit */
+bool nouveau_wait_until(struct drm_device *dev, uint64_t timeout,
+			uint32_t reg, uint32_t mask, uint32_t val)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_timer_engine *ptimer = &dev_priv->Engine.timer;
+	uint64_t start = ptimer->read(dev);
+
+	do {
+		if ((nv_rd32(reg) & mask) == val)
+			return true;
+	} while (ptimer->read(dev) - start < timeout);
+
+	return false;
+}
+
+/* Waits for PGRAPH to go completely idle */
 void nouveau_wait_for_idle(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv=dev->dev_private;
+	bool ret = true;
+
 	switch(dev_priv->card_type) {
 	case NV_50:
 		break;
-	default: {
-		/* This stuff is more or less a copy of what is seen
-		 * in nv28 kmmio dump.
-		 */
-		uint64_t started = dev_priv->Engine.timer.read(dev);
-		uint64_t stopped = started;
-		uint32_t status;
-		do {
-			uint32_t pmc_e = nv_rd32(NV03_PMC_ENABLE);
-			(void)pmc_e;
-			status = nv_rd32(NV04_PGRAPH_STATUS);
-			if (!status)
-				break;
-			stopped = dev_priv->Engine.timer.read(dev);
-		/* It'll never wrap anyway... */
-		} while (stopped - started < 1000000000ULL);
-		if (status)
+	default:
+		ret = nouveau_wait_until(dev, 1000000000ULL, NV04_PGRAPH_STATUS,
+					 0xFFFFFFFF, 0x00000000);
+		if (ret) {
 			DRM_ERROR("timed out with status 0x%08x\n",
-			          status);
-	}
+				  nv_rd32(NV04_PGRAPH_STATUS));
+		}
 	}
 }
 
