@@ -577,6 +577,8 @@ int nv50_fbcon_init(struct drm_device *dev)
 	par->dev = dev;
 	par->fb = drm_fb;
 
+	nv50_fbcon_accel_init(info);
+
 	register_framebuffer(info);
 
 	DRM_INFO("nv50drmfb initialised\n");

@@ -35,6 +35,7 @@ struct nv50_fbcon_par {
 
 int nv50_fbcon_init(struct drm_device *dev);
 int nv50_fbcon_destroy(struct drm_device *dev);
+int nv50_fbcon_accel_init(struct fb_info *info);
 
 #endif /* __NV50_FBCON_H__ */
 
