@@ -688,23 +688,31 @@ extern int nouveau_gem_ioctl_cpu_fini(struct drm_device *, void *,
 				      struct drm_file *);
 
 #if defined(__powerpc__)
-#define NV_READ(reg)        in_be32((void __iomem *)(dev_priv->mmio)->handle + (reg) )
-#define NV_WRITE(reg,val)   out_be32((void __iomem *)(dev_priv->mmio)->handle + (reg) , (val) )
+#define nv_out32(map,reg,val) out_be32((void __iomem *)(map)->handle + (reg), (val))
+#define nv_out16(map,reg,val) out_be16((void __iomem *)(map)->handle + (reg), (val))
+#define nv_in32(map,reg) in_be32((void __iomem *)(map)->handle + (reg))
+#define nv_in16(map,reg) in_be16((void __iomem *)(map)->handle + (reg))
 #else
-#define NV_READ(reg)        DRM_READ32(  dev_priv->mmio, (reg) )
-#define NV_WRITE(reg,val)   DRM_WRITE32( dev_priv->mmio, (reg), (val) )
+#define nv_out32(map,reg,val) DRM_WRITE32((map), (reg), (val))
+#define nv_out16(map,reg,val) DRM_WRITE16((map), (reg), (val))
+#define nv_in32(map,reg) DRM_READ32((map), (reg))
+#define nv_in16(map,reg) DRM_READ16((map), (reg))
 #endif
+#define nv_out08(map,rev,val) DRM_WRITE8((map), (reg), (val))
+#define nv_in08(map,reg) DRM_READ8((map), (reg))
 
+/* register access */
+#define nv_rd32(reg) nv_in32(dev_priv->mmio, (reg))
+#define nv_wr32(reg,val) nv_out32(dev_priv->mmio, (reg), (val))
+#define nv_rd16(reg) nv_in16(dev_priv->mmio, (reg))
+#define nv_wr16(reg,val) nv_out16(dev_priv->mmio, (reg), (val))
+#define nv_rd08(reg) nv_in08(dev_priv->mmio, (reg))
+#define nv_wr08(reg,val) nv_out08(dev_priv->mmio, (reg), (val))
 /* PRAMIN access */
-#if defined(__powerpc__)
-#define NV_RI32(o) in_be32((void __iomem *)(dev_priv->ramin)->handle+(o))
-#define NV_WI32(o,v) out_be32((void __iomem*)(dev_priv->ramin)->handle+(o), (v))
-#else
-#define NV_RI32(o) DRM_READ32(dev_priv->ramin, (o))
-#define NV_WI32(o,v) DRM_WRITE32(dev_priv->ramin, (o), (v))
-#endif
-
-#define INSTANCE_RD(o,i) NV_RI32((o)->im_pramin->start + ((i)<<2))
-#define INSTANCE_WR(o,i,v) NV_WI32((o)->im_pramin->start + ((i)<<2), (v))
+#define nv_ri32(reg) nv_in32(dev_priv->ramin, (reg))
+#define nv_wi32(reg,val) nv_out32(dev_priv->ramin, (reg), (val))
+/* object access */
+#define INSTANCE_RD(o,i) nv_ri32((o)->im_pramin->start + ((i)<<2))
+#define INSTANCE_WR(o,i,v) nv_wi32((o)->im_pramin->start + ((i)<<2), (v))
 
 #endif /* __NOUVEAU_DRV_H__ */

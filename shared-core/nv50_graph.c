@@ -39,8 +39,8 @@ nv50_graph_init_reset(struct drm_device *dev)
 
 	DRM_DEBUG("\n");
 
-	NV_WRITE(NV03_PMC_ENABLE, NV_READ(NV03_PMC_ENABLE) & ~pmc_e);
-	NV_WRITE(NV03_PMC_ENABLE, NV_READ(NV03_PMC_ENABLE) |  pmc_e);
+	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) & ~pmc_e);
+	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) |  pmc_e);
 }
 
 static void
@@ -49,9 +49,9 @@ nv50_graph_init_intr(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
 	DRM_DEBUG("\n");
-	NV_WRITE(NV03_PGRAPH_INTR, 0xffffffff);
-	NV_WRITE(0x400138, 0xffffffff);
-	NV_WRITE(NV40_PGRAPH_INTR_EN, 0xffffffff);
+	nv_wr32(NV03_PGRAPH_INTR, 0xffffffff);
+	nv_wr32(0x400138, 0xffffffff);
+	nv_wr32(NV40_PGRAPH_INTR_EN, 0xffffffff);
 }
 
 static void
@@ -61,17 +61,17 @@ nv50_graph_init_regs__nv(struct drm_device *dev)
 
 	DRM_DEBUG("\n");
 
-	NV_WRITE(0x400804, 0xc0000000);
-	NV_WRITE(0x406800, 0xc0000000);
-	NV_WRITE(0x400c04, 0xc0000000);
-	NV_WRITE(0x401804, 0xc0000000);
-	NV_WRITE(0x405018, 0xc0000000);
-	NV_WRITE(0x402000, 0xc0000000);
+	nv_wr32(0x400804, 0xc0000000);
+	nv_wr32(0x406800, 0xc0000000);
+	nv_wr32(0x400c04, 0xc0000000);
+	nv_wr32(0x401804, 0xc0000000);
+	nv_wr32(0x405018, 0xc0000000);
+	nv_wr32(0x402000, 0xc0000000);
 
-	NV_WRITE(0x400108, 0xffffffff);
+	nv_wr32(0x400108, 0xffffffff);
 
-	NV_WRITE(0x400824, 0x00004000);
-	NV_WRITE(0x400500, 0x00010001);
+	nv_wr32(0x400824, 0x00004000);
+	nv_wr32(0x400500, 0x00010001);
 }
 
 static void
@@ -81,7 +81,7 @@ nv50_graph_init_regs(struct drm_device *dev)
 
 	DRM_DEBUG("\n");
 
-	NV_WRITE(NV04_PGRAPH_DEBUG_3, (1<<2) /* HW_CONTEXT_SWITCH_ENABLED */);
+	nv_wr32(NV04_PGRAPH_DEBUG_3, (1<<2) /* HW_CONTEXT_SWITCH_ENABLED */);
 }
 
 static int
@@ -123,15 +123,15 @@ nv50_graph_init_ctxctl(struct drm_device *dev)
 		return -EINVAL;
 	}
 
-	NV_WRITE(NV40_PGRAPH_CTXCTL_UCODE_INDEX, 0);
+	nv_wr32(NV40_PGRAPH_CTXCTL_UCODE_INDEX, 0);
 	while (*voodoo != ~0) {
-		NV_WRITE(NV40_PGRAPH_CTXCTL_UCODE_DATA, *voodoo);
+		nv_wr32(NV40_PGRAPH_CTXCTL_UCODE_DATA, *voodoo);
 		voodoo++;
 	}
 
-	NV_WRITE(0x400320, 4);
-	NV_WRITE(NV40_PGRAPH_CTXCTL_CUR, 0);
-	NV_WRITE(NV20_PGRAPH_CHANNEL_CTX_POINTER, 0);
+	nv_wr32(0x400320, 4);
+	nv_wr32(NV40_PGRAPH_CTXCTL_CUR, 0);
+	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_POINTER, 0);
 
 	return 0;
 }
@@ -268,23 +268,23 @@ nv50_graph_transfer_context(struct drm_device *dev, uint32_t inst, int save)
 
 	DRM_DEBUG("inst=0x%08x, save=%d\n", inst, save);
 
-	old_cp = NV_READ(NV20_PGRAPH_CHANNEL_CTX_POINTER);
-	NV_WRITE(NV20_PGRAPH_CHANNEL_CTX_POINTER, inst);
-	NV_WRITE(0x400824, NV_READ(0x400824) |
+	old_cp = nv_rd32(NV20_PGRAPH_CHANNEL_CTX_POINTER);
+	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_POINTER, inst);
+	nv_wr32(0x400824, nv_rd32(0x400824) |
 		 (save ? NV40_PGRAPH_CTXCTL_0310_XFER_SAVE :
 			 NV40_PGRAPH_CTXCTL_0310_XFER_LOAD));
-	NV_WRITE(NV40_PGRAPH_CTXCTL_0304, NV40_PGRAPH_CTXCTL_0304_XFER_CTX);
+	nv_wr32(NV40_PGRAPH_CTXCTL_0304, NV40_PGRAPH_CTXCTL_0304_XFER_CTX);
 
 	for (i = 0; i < tv; i++) {
-		if (NV_READ(NV40_PGRAPH_CTXCTL_030C) == 0)
+		if (nv_rd32(NV40_PGRAPH_CTXCTL_030C) == 0)
 			break;
 	}
-	NV_WRITE(NV20_PGRAPH_CHANNEL_CTX_POINTER, old_cp);
+	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_POINTER, old_cp);
 
 	if (i == tv) {
 		DRM_ERROR("failed: inst=0x%08x save=%d\n", inst, save);
 		DRM_ERROR("0x40030C = 0x%08x\n",
-			  NV_READ(NV40_PGRAPH_CTXCTL_030C));
+			  nv_rd32(NV40_PGRAPH_CTXCTL_030C));
 		return -EBUSY;
 	}
 
@@ -306,9 +306,9 @@ nv50_graph_load_context(struct nouveau_channel *chan)
 		return ret;
 #endif
 
-	NV_WRITE(NV20_PGRAPH_CHANNEL_CTX_POINTER, inst);
-	NV_WRITE(0x400320, 4);
-	NV_WRITE(NV40_PGRAPH_CTXCTL_CUR, inst | (1<<31));
+	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_POINTER, inst);
+	nv_wr32(0x400320, 4);
+	nv_wr32(NV40_PGRAPH_CTXCTL_CUR, inst | (1<<31));
 
 	return 0;
 }

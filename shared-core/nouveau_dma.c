@@ -146,8 +146,8 @@ nouveau_dma_channel_setup(struct nouveau_channel *chan)
 	return 0;
 }
 
-#define READ_GET() ((NV_READ(chan->get) - chan->pushbuf_base) >> 2)
-#define WRITE_PUT(val) NV_WRITE(chan->put, ((val) << 2) + chan->pushbuf_base)
+#define READ_GET() ((nv_rd32(chan->get) - chan->pushbuf_base) >> 2)
+#define WRITE_PUT(val) nv_wr32(chan->put, ((val) << 2) + chan->pushbuf_base)
 
 int
 nouveau_dma_wait(struct nouveau_channel *chan, int size)

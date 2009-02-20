@@ -54,9 +54,9 @@ nv50_fifo_init_thingo(struct drm_device *dev)
 			INSTANCE_WR(cur->gpuobj, nr++, i);
 		}
 	}
-	NV_WRITE(0x32f4, cur->instance >> 12);
-	NV_WRITE(0x32ec, nr);
-	NV_WRITE(0x2500, 0x101);
+	nv_wr32(0x32f4, cur->instance >> 12);
+	nv_wr32(0x32ec, nr);
+	nv_wr32(0x2500, 0x101);
 }
 
 static int
@@ -73,7 +73,7 @@ nv50_fifo_channel_enable(struct drm_device *dev, int channel, int nt)
 
 	if (IS_G80) inst = chan->ramfc->instance >> 12;
 	else        inst = chan->ramfc->instance >> 8;
-	NV_WRITE(NV50_PFIFO_CTX_TABLE(channel),
+	nv_wr32(NV50_PFIFO_CTX_TABLE(channel),
 		 inst | NV50_PFIFO_CTX_TABLE_CHANNEL_ENABLED);
 
 	if (!nt) nv50_fifo_init_thingo(dev);
@@ -90,7 +90,7 @@ nv50_fifo_channel_disable(struct drm_device *dev, int channel, int nt)
 
 	if (IS_G80) inst = NV50_PFIFO_CTX_TABLE_INSTANCE_MASK_G80;
 	else        inst = NV50_PFIFO_CTX_TABLE_INSTANCE_MASK_G84;
-	NV_WRITE(NV50_PFIFO_CTX_TABLE(channel), inst);
+	nv_wr32(NV50_PFIFO_CTX_TABLE(channel), inst);
 
 	if (!nt) nv50_fifo_init_thingo(dev);
 }
@@ -103,8 +103,8 @@ nv50_fifo_init_reset(struct drm_device *dev)
 
 	DRM_DEBUG("\n");
 
-	NV_WRITE(NV03_PMC_ENABLE, NV_READ(NV03_PMC_ENABLE) & ~pmc_e);
-	NV_WRITE(NV03_PMC_ENABLE, NV_READ(NV03_PMC_ENABLE) |  pmc_e);
+	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) & ~pmc_e);
+	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) |  pmc_e);
 }
 
 static void
@@ -114,8 +114,8 @@ nv50_fifo_init_intr(struct drm_device *dev)
 
 	DRM_DEBUG("\n");
 
-	NV_WRITE(NV03_PFIFO_INTR_0, 0xFFFFFFFF);
-	NV_WRITE(NV03_PFIFO_INTR_EN_0, 0xFFFFFFFF);
+	nv_wr32(NV03_PFIFO_INTR_0, 0xFFFFFFFF);
+	nv_wr32(NV03_PFIFO_INTR_EN_0, 0xFFFFFFFF);
 }
 
 static void
@@ -137,7 +137,7 @@ nv50_fifo_init_regs__nv(struct drm_device *dev)
 
 	DRM_DEBUG("\n");
 
-	NV_WRITE(0x250c, 0x6f3cfc34);
+	nv_wr32(0x250c, 0x6f3cfc34);
 }
 
 static void
@@ -147,12 +147,12 @@ nv50_fifo_init_regs(struct drm_device *dev)
 
 	DRM_DEBUG("\n");
 
-	NV_WRITE(0x2500, 0);
-	NV_WRITE(0x3250, 0);
-	NV_WRITE(0x3220, 0);
-	NV_WRITE(0x3204, 0);
-	NV_WRITE(0x3210, 0);
-	NV_WRITE(0x3270, 0);
+	nv_wr32(0x2500, 0);
+	nv_wr32(0x3250, 0);
+	nv_wr32(0x3220, 0);
+	nv_wr32(0x3204, 0);
+	nv_wr32(0x3210, 0);
+	nv_wr32(0x3270, 0);
 
 	/* Enable dummy channels setup by nv50_instmem.c */
 	nv50_fifo_channel_enable(dev, 0, 1);
@@ -220,7 +220,7 @@ nv50_fifo_channel_id(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
-	return (NV_READ(NV03_PFIFO_CACHE1_PUSH1) &
+	return (nv_rd32(NV03_PFIFO_CACHE1_PUSH1) &
 			NV50_PFIFO_CACHE1_PUSH1_CHID_MASK);
 }
 
@@ -299,8 +299,8 @@ nv50_fifo_destroy_context(struct nouveau_channel *chan)
 	if (chan->id == 0)
 		nv50_fifo_channel_disable(dev, 127, 0);
 
-	if ((NV_READ(NV03_PFIFO_CACHE1_PUSH1) & 0xffff) == chan->id)
-		NV_WRITE(NV03_PFIFO_CACHE1_PUSH1, 127);
+	if ((nv_rd32(NV03_PFIFO_CACHE1_PUSH1) & 0xffff) == chan->id)
+		nv_wr32(NV03_PFIFO_CACHE1_PUSH1, 127);
 
 	nouveau_gpuobj_ref_del(dev, &chan->ramfc);
 }
@@ -316,21 +316,21 @@ nv50_fifo_load_context(struct nouveau_channel *chan)
 
 	/*XXX: incomplete, only touches the regs that NV does */
 
-	NV_WRITE(0x3244, INSTANCE_RD(ramfc, 0x08/4));
-	NV_WRITE(0x3240, INSTANCE_RD(ramfc, 0x10/4));
+	nv_wr32(0x3244, INSTANCE_RD(ramfc, 0x08/4));
+	nv_wr32(0x3240, INSTANCE_RD(ramfc, 0x10/4));
 
-	NV_WRITE(0x3224, INSTANCE_RD(ramfc, 0x3c/4));
-	NV_WRITE(NV04_PFIFO_CACHE1_DMA_INSTANCE, INSTANCE_RD(ramfc, 0x48/4));
-	NV_WRITE(0x3234, INSTANCE_RD(ramfc, 0x4c/4));
-	NV_WRITE(0x3254, 1);
-	NV_WRITE(NV03_PFIFO_RAMHT, INSTANCE_RD(ramfc, 0x80/4));
+	nv_wr32(0x3224, INSTANCE_RD(ramfc, 0x3c/4));
+	nv_wr32(NV04_PFIFO_CACHE1_DMA_INSTANCE, INSTANCE_RD(ramfc, 0x48/4));
+	nv_wr32(0x3234, INSTANCE_RD(ramfc, 0x4c/4));
+	nv_wr32(0x3254, 1);
+	nv_wr32(NV03_PFIFO_RAMHT, INSTANCE_RD(ramfc, 0x80/4));
 
 	if (!IS_G80) {
-		NV_WRITE(0x340c, INSTANCE_RD(ramfc, 0x88/4));
-		NV_WRITE(0x3410, INSTANCE_RD(ramfc, 0x98/4));
+		nv_wr32(0x340c, INSTANCE_RD(ramfc, 0x88/4));
+		nv_wr32(0x3410, INSTANCE_RD(ramfc, 0x98/4));
 	}
 
-	NV_WRITE(NV03_PFIFO_CACHE1_PUSH1, chan->id | (1<<16));
+	nv_wr32(NV03_PFIFO_CACHE1_PUSH1, chan->id | (1<<16));
 	return 0;
 }
 

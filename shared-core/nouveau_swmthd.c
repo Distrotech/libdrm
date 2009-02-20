@@ -48,7 +48,7 @@ typedef struct{
 One function for all because they are very similar.*/
 static void nouveau_NV04_setcontext_sw_method(struct drm_device *dev, uint32_t oclass, uint32_t mthd) {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	uint32_t inst_loc = NV_READ(NV04_PGRAPH_CTX_SWITCH4) & 0xFFFF;
+	uint32_t inst_loc = nv_rd32(NV04_PGRAPH_CTX_SWITCH4) & 0xFFFF;
 	uint32_t value_to_set = 0, bit_to_set = 0;
 
 	switch ( oclass ) {
@@ -62,7 +62,7 @@ static void nouveau_NV04_setcontext_sw_method(struct drm_device *dev, uint32_t o
 					bit_to_set = 1 << 24; /*PATCH_STATUS_VALID*/
 					break;
 				case 0x2fc :
-					bit_to_set = NV_READ(NV04_PGRAPH_TRAPPED_DATA) << 15; /*PATCH_CONFIG = NV04_PGRAPH_TRAPPED_DATA*/
+					bit_to_set = nv_rd32(NV04_PGRAPH_TRAPPED_DATA) << 15; /*PATCH_CONFIG = NV04_PGRAPH_TRAPPED_DATA*/
 					break;
 				default : ;
 				};
@@ -80,7 +80,7 @@ static void nouveau_NV04_setcontext_sw_method(struct drm_device *dev, uint32_t o
 					bit_to_set = 1 << 24; /*PATCH_STATUS_VALID*/
 					break;
 				case 0x2fc :
-					bit_to_set = NV_READ(NV04_PGRAPH_TRAPPED_DATA) << 15; /*PATCH_CONFIG = NV04_PGRAPH_TRAPPED_DATA*/
+					bit_to_set = nv_rd32(NV04_PGRAPH_TRAPPED_DATA) << 15; /*PATCH_CONFIG = NV04_PGRAPH_TRAPPED_DATA*/
 					break;
 			};
 			break;
@@ -100,7 +100,7 @@ static void nouveau_NV04_setcontext_sw_method(struct drm_device *dev, uint32_t o
 					bit_to_set = 1 << 24; /*PATCH_STATUS_VALID*/
 					break;
 				case 0x2fc :
-					bit_to_set = NV_READ(NV04_PGRAPH_TRAPPED_DATA) << 15; /*PATCH_CONFIG = NV04_PGRAPH_TRAPPED_DATA*/
+					bit_to_set = nv_rd32(NV04_PGRAPH_TRAPPED_DATA) << 15; /*PATCH_CONFIG = NV04_PGRAPH_TRAPPED_DATA*/
 					break;
 			};
 			break;
@@ -117,7 +117,7 @@ static void nouveau_NV04_setcontext_sw_method(struct drm_device *dev, uint32_t o
 					bit_to_set = 1 << 24; /*PATCH_STATUS_VALID*/
 					break;
 				case 0x2fc :
-					bit_to_set = NV_READ(NV04_PGRAPH_TRAPPED_DATA) << 15; /*PATCH_CONFIG = NV04_PGRAPH_TRAPPED_DATA*/
+					bit_to_set = nv_rd32(NV04_PGRAPH_TRAPPED_DATA) << 15; /*PATCH_CONFIG = NV04_PGRAPH_TRAPPED_DATA*/
 					break;
 			};
 			break;
@@ -127,24 +127,24 @@ static void nouveau_NV04_setcontext_sw_method(struct drm_device *dev, uint32_t o
 					bit_to_set = 1 << 24; /*PATCH_STATUS_VALID*/
 					break;
 				case 0x304 :
-					bit_to_set = NV_READ(NV04_PGRAPH_TRAPPED_DATA) << 15; //PATCH_CONFIG
+					bit_to_set = nv_rd32(NV04_PGRAPH_TRAPPED_DATA) << 15; //PATCH_CONFIG
 					break;
 			};
 			break;
 		default :;
 		};
 
-	value_to_set = (NV_READ(0x00700000 | inst_loc << 4))| bit_to_set;
+	value_to_set = (nv_rd32(0x00700000 | inst_loc << 4))| bit_to_set;
 
 	/*RAMIN*/
 	nouveau_wait_for_idle(dev);
-	NV_WRITE(0x00700000 | inst_loc << 4, value_to_set);
+	nv_wr32(0x00700000 | inst_loc << 4, value_to_set);
 
-	/*DRM_DEBUG("CTX_SWITCH1 value is %#x\n", NV_READ(NV04_PGRAPH_CTX_SWITCH1));*/
-	NV_WRITE(NV04_PGRAPH_CTX_SWITCH1, value_to_set);
+	/*DRM_DEBUG("CTX_SWITCH1 value is %#x\n", nv_rd32(NV04_PGRAPH_CTX_SWITCH1));*/
+	nv_wr32(NV04_PGRAPH_CTX_SWITCH1, value_to_set);
 
-	/*DRM_DEBUG("CTX_CACHE1 + xxx value is %#x\n", NV_READ(NV04_PGRAPH_CTX_CACHE1 + (((NV_READ(NV04_PGRAPH_TRAPPED_ADDR) >> 13) & 0x7) << 2)));*/
-	NV_WRITE(NV04_PGRAPH_CTX_CACHE1 + (((NV_READ(NV04_PGRAPH_TRAPPED_ADDR) >> 13) & 0x7) << 2), value_to_set);
+	/*DRM_DEBUG("CTX_CACHE1 + xxx value is %#x\n", nv_rd32(NV04_PGRAPH_CTX_CACHE1 + (((nv_rd32(NV04_PGRAPH_TRAPPED_ADDR) >> 13) & 0x7) << 2)));*/
+	nv_wr32(NV04_PGRAPH_CTX_CACHE1 + (((nv_rd32(NV04_PGRAPH_TRAPPED_ADDR) >> 13) & 0x7) << 2), value_to_set);
 }
 
  nouveau_software_method_t nouveau_sw_methods[] = {

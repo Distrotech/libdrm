@@ -40,46 +40,46 @@ static int nv50_display_pre_init(struct nv50_display *display)
 
 	DRM_DEBUG("\n");
 
-	NV_WRITE(0x00610184, NV_READ(0x00614004));
+	nv_wr32(0x00610184, nv_rd32(0x00614004));
 	/*
 	 * I think the 0x006101XX range is some kind of main control area that enables things.
 	 */
 	/* CRTC? */
-	NV_WRITE(0x00610190 + 0 * 0x10, NV_READ(0x00616100 + 0 * 0x800));
-	NV_WRITE(0x00610190 + 1 * 0x10, NV_READ(0x00616100 + 1 * 0x800));
-	NV_WRITE(0x00610194 + 0 * 0x10, NV_READ(0x00616104 + 0 * 0x800));
-	NV_WRITE(0x00610194 + 1 * 0x10, NV_READ(0x00616104 + 1 * 0x800));
-	NV_WRITE(0x00610198 + 0 * 0x10, NV_READ(0x00616108 + 0 * 0x800));
-	NV_WRITE(0x00610198 + 1 * 0x10, NV_READ(0x00616108 + 1 * 0x800));
-	NV_WRITE(0x0061019c + 0 * 0x10, NV_READ(0x0061610c + 0 * 0x800));
-	NV_WRITE(0x0061019c + 1 * 0x10, NV_READ(0x0061610c + 1 * 0x800));
+	nv_wr32(0x00610190 + 0 * 0x10, nv_rd32(0x00616100 + 0 * 0x800));
+	nv_wr32(0x00610190 + 1 * 0x10, nv_rd32(0x00616100 + 1 * 0x800));
+	nv_wr32(0x00610194 + 0 * 0x10, nv_rd32(0x00616104 + 0 * 0x800));
+	nv_wr32(0x00610194 + 1 * 0x10, nv_rd32(0x00616104 + 1 * 0x800));
+	nv_wr32(0x00610198 + 0 * 0x10, nv_rd32(0x00616108 + 0 * 0x800));
+	nv_wr32(0x00610198 + 1 * 0x10, nv_rd32(0x00616108 + 1 * 0x800));
+	nv_wr32(0x0061019c + 0 * 0x10, nv_rd32(0x0061610c + 0 * 0x800));
+	nv_wr32(0x0061019c + 1 * 0x10, nv_rd32(0x0061610c + 1 * 0x800));
 	/* DAC */
-	NV_WRITE(0x006101d0 + 0 * 0x4, NV_READ(0x0061a000 + 0 * 0x800));
-	NV_WRITE(0x006101d0 + 1 * 0x4, NV_READ(0x0061a000 + 1 * 0x800));
-	NV_WRITE(0x006101d0 + 2 * 0x4, NV_READ(0x0061a000 + 2 * 0x800));
+	nv_wr32(0x006101d0 + 0 * 0x4, nv_rd32(0x0061a000 + 0 * 0x800));
+	nv_wr32(0x006101d0 + 1 * 0x4, nv_rd32(0x0061a000 + 1 * 0x800));
+	nv_wr32(0x006101d0 + 2 * 0x4, nv_rd32(0x0061a000 + 2 * 0x800));
 	/* SOR */
-	NV_WRITE(0x006101e0 + 0 * 0x4, NV_READ(0x0061c000 + 0 * 0x800));
-	NV_WRITE(0x006101e0 + 1 * 0x4, NV_READ(0x0061c000 + 1 * 0x800));
+	nv_wr32(0x006101e0 + 0 * 0x4, nv_rd32(0x0061c000 + 0 * 0x800));
+	nv_wr32(0x006101e0 + 1 * 0x4, nv_rd32(0x0061c000 + 1 * 0x800));
 	/* Something not yet in use, tv-out maybe. */
-	NV_WRITE(0x006101f0 + 0 * 0x4, NV_READ(0x0061e000 + 0 * 0x800));
-	NV_WRITE(0x006101f0 + 1 * 0x4, NV_READ(0x0061e000 + 1 * 0x800));
-	NV_WRITE(0x006101f0 + 2 * 0x4, NV_READ(0x0061e000 + 2 * 0x800));
+	nv_wr32(0x006101f0 + 0 * 0x4, nv_rd32(0x0061e000 + 0 * 0x800));
+	nv_wr32(0x006101f0 + 1 * 0x4, nv_rd32(0x0061e000 + 1 * 0x800));
+	nv_wr32(0x006101f0 + 2 * 0x4, nv_rd32(0x0061e000 + 2 * 0x800));
 
 	for (i = 0; i < 3; i++) {
-		NV_WRITE(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(i), 0x00550000 | NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
-		NV_WRITE(NV50_PDISPLAY_DAC_REGS_CLK_CTRL1(i), 0x00000001);
+		nv_wr32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(i), 0x00550000 | NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
+		nv_wr32(NV50_PDISPLAY_DAC_REGS_CLK_CTRL1(i), 0x00000001);
 	}
 
 	/* This used to be in crtc unblank, but seems out of place there. */
-	NV_WRITE(NV50_PDISPLAY_UNK_380, 0);
+	nv_wr32(NV50_PDISPLAY_UNK_380, 0);
 	/* RAM is clamped to 256 MiB. */
 	ram_amount = nouveau_mem_fb_amount(display->dev);
 	DRM_DEBUG("ram_amount %d\n", ram_amount);
 	if (ram_amount > 256*1024*1024)
 		ram_amount = 256*1024*1024;
-	NV_WRITE(NV50_PDISPLAY_RAM_AMOUNT, ram_amount - 1);
-	NV_WRITE(NV50_PDISPLAY_UNK_388, 0x150000);
-	NV_WRITE(NV50_PDISPLAY_UNK_38C, 0);
+	nv_wr32(NV50_PDISPLAY_RAM_AMOUNT, ram_amount - 1);
+	nv_wr32(NV50_PDISPLAY_UNK_388, 0x150000);
+	nv_wr32(NV50_PDISPLAY_UNK_38C, 0);
 
 	display->preinit_done = true;
 
@@ -95,26 +95,26 @@ static int nv50_display_init(struct nv50_display *display)
 	DRM_DEBUG("\n");
 
 	/* The precise purpose is unknown, i suspect it has something to do with text mode. */
-	if (NV_READ(NV50_PDISPLAY_SUPERVISOR) & 0x100) {
-		NV_WRITE(NV50_PDISPLAY_SUPERVISOR, 0x100);
-		NV_WRITE(0x006194e8, NV_READ(0x006194e8) & ~1);
-		while (NV_READ(0x006194e8) & 2);
+	if (nv_rd32(NV50_PDISPLAY_SUPERVISOR) & 0x100) {
+		nv_wr32(NV50_PDISPLAY_SUPERVISOR, 0x100);
+		nv_wr32(0x006194e8, nv_rd32(0x006194e8) & ~1);
+		while (nv_rd32(0x006194e8) & 2);
 	}
 
 	/* taken from nv bug #12637 */
-	NV_WRITE(NV50_PDISPLAY_UNK200_CTRL, 0x2b00);
+	nv_wr32(NV50_PDISPLAY_UNK200_CTRL, 0x2b00);
 	do {
-		val = NV_READ(NV50_PDISPLAY_UNK200_CTRL);
+		val = nv_rd32(NV50_PDISPLAY_UNK200_CTRL);
 		if ((val & 0x9f0000) == 0x20000)
-			NV_WRITE(NV50_PDISPLAY_UNK200_CTRL, val | 0x800000);
+			nv_wr32(NV50_PDISPLAY_UNK200_CTRL, val | 0x800000);
 
 		if ((val & 0x3f0000) == 0x30000)
-			NV_WRITE(NV50_PDISPLAY_UNK200_CTRL, val | 0x200000);
+			nv_wr32(NV50_PDISPLAY_UNK200_CTRL, val | 0x200000);
 	} while (val & 0x1e0000);
 
-	NV_WRITE(NV50_PDISPLAY_CTRL_STATE, NV50_PDISPLAY_CTRL_STATE_ENABLE);
-	NV_WRITE(NV50_PDISPLAY_UNK200_CTRL, 0x1000b03);
-	while (!(NV_READ(NV50_PDISPLAY_UNK200_CTRL) & 0x40000000));
+	nv_wr32(NV50_PDISPLAY_CTRL_STATE, NV50_PDISPLAY_CTRL_STATE_ENABLE);
+	nv_wr32(NV50_PDISPLAY_UNK200_CTRL, 0x1000b03);
+	while (!(nv_rd32(NV50_PDISPLAY_UNK200_CTRL) & 0x40000000));
 
 	/* For the moment this is just a wrapper, which should be replaced with a real fifo at some point. */
 	OUT_MODE(NV50_UNK84, 0);
@@ -125,10 +125,10 @@ static int nv50_display_init(struct nv50_display *display)
 	OUT_MODE(NV50_CRTC0_UNK82C, 0);
 
 	/* enable clock change interrupts. */
-	NV_WRITE(NV50_PDISPLAY_SUPERVISOR_INTR, NV_READ(NV50_PDISPLAY_SUPERVISOR_INTR) | 0x70);
+	nv_wr32(NV50_PDISPLAY_SUPERVISOR_INTR, nv_rd32(NV50_PDISPLAY_SUPERVISOR_INTR) | 0x70);
 
 	/* enable hotplug interrupts */
-	NV_WRITE(NV50_PCONNECTOR_HOTPLUG_INTR, 0x7FFF7FFF);
+	nv_wr32(NV50_PCONNECTOR_HOTPLUG_INTR, 0x7FFF7FFF);
 
 	display->init_done = true;
 
@@ -164,24 +164,24 @@ static int nv50_display_disable(struct nv50_display *display)
 			else
 				mask = NV50_PDISPLAY_SUPERVISOR_CRTC0;
 
-			NV_WRITE(NV50_PDISPLAY_SUPERVISOR, mask);
-			while (!(NV_READ(NV50_PDISPLAY_SUPERVISOR) & mask));
+			nv_wr32(NV50_PDISPLAY_SUPERVISOR, mask);
+			while (!(nv_rd32(NV50_PDISPLAY_SUPERVISOR) & mask));
 		}
 	}
 
-	NV_WRITE(NV50_PDISPLAY_UNK200_CTRL, 0);
-	NV_WRITE(NV50_PDISPLAY_CTRL_STATE, 0);
-	while ((NV_READ(NV50_PDISPLAY_UNK200_CTRL) & 0x1e0000) != 0);
+	nv_wr32(NV50_PDISPLAY_UNK200_CTRL, 0);
+	nv_wr32(NV50_PDISPLAY_CTRL_STATE, 0);
+	while ((nv_rd32(NV50_PDISPLAY_UNK200_CTRL) & 0x1e0000) != 0);
 
 	for (i = 0; i < 2; i++) {
-		while (NV_READ(NV50_PDISPLAY_SOR_REGS_DPMS_STATE(i)) & NV50_PDISPLAY_SOR_REGS_DPMS_STATE_WAIT);
+		while (nv_rd32(NV50_PDISPLAY_SOR_REGS_DPMS_STATE(i)) & NV50_PDISPLAY_SOR_REGS_DPMS_STATE_WAIT);
 	}
 
 	/* disable clock change interrupts. */
-	NV_WRITE(NV50_PDISPLAY_SUPERVISOR_INTR, NV_READ(NV50_PDISPLAY_SUPERVISOR_INTR) & ~0x70);
+	nv_wr32(NV50_PDISPLAY_SUPERVISOR_INTR, nv_rd32(NV50_PDISPLAY_SUPERVISOR_INTR) & ~0x70);
 
 	/* disable hotplug interrupts */
-	NV_WRITE(NV50_PCONNECTOR_HOTPLUG_INTR, 0);
+	nv_wr32(NV50_PCONNECTOR_HOTPLUG_INTR, 0);
 
 	display->init_done = false;
 
@@ -415,12 +415,12 @@ void nv50_display_command(struct drm_nouveau_private *dev_priv,
 
 	DRM_DEBUG("mthd 0x%03X val 0x%08X\n", mthd, val);
 
-	NV_WRITE(NV50_PDISPLAY_CTRL_VAL, val);
-	NV_WRITE(NV50_PDISPLAY_CTRL_STATE, NV50_PDISPLAY_CTRL_STATE_PENDING |
+	nv_wr32(NV50_PDISPLAY_CTRL_VAL, val);
+	nv_wr32(NV50_PDISPLAY_CTRL_STATE, NV50_PDISPLAY_CTRL_STATE_PENDING |
 					   NV50_PDISPLAY_CTRL_STATE_ENABLE |
 					   0x10000 | mthd);
 
-	while (NV_READ(NV50_PDISPLAY_CTRL_STATE) & NV50_PDISPLAY_CTRL_STATE_PENDING) {
+	while (nv_rd32(NV50_PDISPLAY_CTRL_STATE) & NV50_PDISPLAY_CTRL_STATE_PENDING) {
 		counter++;
 		if (counter > 1000000) {
 			DRM_ERROR("You probably need a reboot now\n");

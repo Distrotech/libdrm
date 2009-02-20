@@ -34,11 +34,11 @@ static int nv50_cursor_enable(struct nv50_crtc *crtc)
 
 	DRM_DEBUG("\n");
 
-	NV_WRITE(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index), 0x2000);
-	while(NV_READ(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index)) & NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK);
+	nv_wr32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index), 0x2000);
+	while(nv_rd32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index)) & NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK);
 
-	NV_WRITE(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index), NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_ON);
-	while((NV_READ(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index)) & NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK)
+	nv_wr32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index), NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_ON);
+	while((nv_rd32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index)) & NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK)
 		!= NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_ACTIVE);
 
 	crtc->cursor->enabled = true;
@@ -52,8 +52,8 @@ static int nv50_cursor_disable(struct nv50_crtc *crtc)
 
 	DRM_DEBUG("\n");
 
-	NV_WRITE(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index), 0);
-	while(NV_READ(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index)) & NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK);
+	nv_wr32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index), 0);
+	while(nv_rd32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index)) & NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK);
 
 	crtc->cursor->enabled = false;
 
@@ -98,9 +98,9 @@ static int nv50_cursor_set_pos(struct nv50_crtc *crtc, int x, int y)
 {
 	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 
-	NV_WRITE(NV50_HW_CURSOR_POS(crtc->index), ((y & 0xFFFF) << 16) | (x & 0xFFFF));
+	nv_wr32(NV50_HW_CURSOR_POS(crtc->index), ((y & 0xFFFF) << 16) | (x & 0xFFFF));
 	/* Needed to make the cursor move. */
-	NV_WRITE(NV50_HW_CURSOR_POS_CTRL(crtc->index), 0);
+	nv_wr32(NV50_HW_CURSOR_POS_CTRL(crtc->index), 0);
 
 	return 0;
 }

@@ -69,20 +69,20 @@ static void nv_shadow_bios_rom(struct drm_device *dev, uint8_t *data)
 	int i;
 
 	/* enable access to rom */
-	NV_WRITE(NV04_PBUS_PCI_NV_20, NV04_PBUS_PCI_NV_20_ROM_SHADOW_DISABLED);
+	nv_wr32(NV04_PBUS_PCI_NV_20, NV04_PBUS_PCI_NV_20_ROM_SHADOW_DISABLED);
 
 	/* This is also valid for pre-NV50, it just happened to be the only define already present. */
 	for (i=0; i < NV50_PROM__ESIZE; i++) {
 		/* Appearantly needed for a 6600GT/6800LE bug. */
-		data[i] = DRM_READ8(dev_priv->mmio, NV50_PROM + i);
-		data[i] = DRM_READ8(dev_priv->mmio, NV50_PROM + i);
-		data[i] = DRM_READ8(dev_priv->mmio, NV50_PROM + i);
-		data[i] = DRM_READ8(dev_priv->mmio, NV50_PROM + i);
-		data[i] = DRM_READ8(dev_priv->mmio, NV50_PROM + i);
+		data[i] = nv_rd08(NV50_PROM + i);
+		data[i] = nv_rd08(NV50_PROM + i);
+		data[i] = nv_rd08(NV50_PROM + i);
+		data[i] = nv_rd08(NV50_PROM + i);
+		data[i] = nv_rd08(NV50_PROM + i);
 	}
 
 	/* disable access to rom */
-	NV_WRITE(NV04_PBUS_PCI_NV_20, NV04_PBUS_PCI_NV_20_ROM_SHADOW_ENABLED);
+	nv_wr32(NV04_PBUS_PCI_NV_20, NV04_PBUS_PCI_NV_20_ROM_SHADOW_ENABLED);
 }
 
 static void nv_shadow_bios_ramin(struct drm_device *dev, uint8_t *data)
@@ -93,20 +93,20 @@ static void nv_shadow_bios_ramin(struct drm_device *dev, uint8_t *data)
 
 	/* Move the bios copy to the start of ramin? */
 	if (dev_priv->card_type >= NV_50) {
-		uint32_t vbios_vram = (NV_READ(0x619f04) & ~0xff) << 8;
+		uint32_t vbios_vram = (nv_rd32(0x619f04) & ~0xff) << 8;
 
 		if (!vbios_vram)
-			vbios_vram = (NV_READ(0x1700) << 16) + 0xf0000;
+			vbios_vram = (nv_rd32(0x1700) << 16) + 0xf0000;
 
-		old_bar0_pramin = NV_READ(0x1700);
-		NV_WRITE(0x1700, vbios_vram >> 16);
+		old_bar0_pramin = nv_rd32(0x1700);
+		nv_wr32(0x1700, vbios_vram >> 16);
 	}
 
 	for (i=0; i < NV50_PROM__ESIZE; i++)
-		data[i] = DRM_READ8(dev_priv->mmio, NV04_PRAMIN + i);
+		data[i] = nv_rd08(NV04_PRAMIN + i);
 
 	if (dev_priv->card_type >= NV_50)
-		NV_WRITE(0x1700, old_bar0_pramin);
+		nv_wr32(0x1700, old_bar0_pramin);
 }
 
 static bool nv_shadow_bios(struct drm_device *dev, uint8_t *data)
@@ -640,7 +640,7 @@ bool get_pll_limits(struct drm_device *dev, uint32_t limit_match, struct pll_lim
 	if (bios->chip_version > 0x10 && bios->chip_version != 0x15 &&
 		bios->chip_version != 0x1a && bios->chip_version != 0x20)
 		crystal_strap_mask |= 1 << 22;
-	crystal_straps = NV_READ(NV50_PEXTDEV + 0x0) & crystal_strap_mask;
+	crystal_straps = nv_rd32(NV50_PEXTDEV + 0x0) & crystal_strap_mask;
 
 	switch (pll_lim_ver) {
 	/* we use version 0 to indicate a pre limit table bios (single stage pll)

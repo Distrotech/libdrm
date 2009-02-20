@@ -92,7 +92,7 @@ static int nv50_dac_set_clock_mode(struct nv50_output *output)
 
 	DRM_DEBUG("or %d\n", output->or);
 
-	NV_WRITE(NV50_PDISPLAY_DAC_CLK_CLK_CTRL2(output->or),  0);
+	nv_wr32(NV50_PDISPLAY_DAC_CLK_CLK_CTRL2(output->or),  0);
 
 	return 0;
 }
@@ -106,9 +106,9 @@ static int nv50_dac_set_power_mode(struct nv50_output *output, int mode)
 	DRM_DEBUG("or %d\n", or);
 
 	/* wait for it to be done */
-	while (NV_READ(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or)) & NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
+	while (nv_rd32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or)) & NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
 
-	val = NV_READ(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or)) & ~0x7F;
+	val = nv_rd32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or)) & ~0x7F;
 
 	if (mode != DRM_MODE_DPMS_ON)
 		val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_BLANKED;
@@ -129,7 +129,7 @@ static int nv50_dac_set_power_mode(struct nv50_output *output, int mode)
 		break;
 	}
 
-	NV_WRITE(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or), val | NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
+	nv_wr32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or), val | NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
 
 	return 0;
 }
@@ -141,11 +141,11 @@ static int nv50_dac_detect(struct nv50_output *output)
 	uint32_t dpms_state, load_pattern, load_state;
 	int or = output->or;
 
-	NV_WRITE(NV50_PDISPLAY_DAC_REGS_CLK_CTRL1(or), 0x00000001);
-	dpms_state = NV_READ(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or));
+	nv_wr32(NV50_PDISPLAY_DAC_REGS_CLK_CTRL1(or), 0x00000001);
+	dpms_state = nv_rd32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or));
 
-	NV_WRITE(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or), 0x00150000 | NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
-	while (NV_READ(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or)) & NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
+	nv_wr32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or), 0x00150000 | NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
+	while (nv_rd32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or)) & NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
 
 	/* Use bios provided value if possible. */
 	if (dev_priv->bios.dactestval) {
@@ -156,12 +156,12 @@ static int nv50_dac_detect(struct nv50_output *output)
 		DRM_DEBUG("Using default load_pattern of %d\n", load_pattern);
 	}
 
-	NV_WRITE(NV50_PDISPLAY_DAC_REGS_LOAD_CTRL(or), NV50_PDISPLAY_DAC_REGS_LOAD_CTRL_ACTIVE | load_pattern);
+	nv_wr32(NV50_PDISPLAY_DAC_REGS_LOAD_CTRL(or), NV50_PDISPLAY_DAC_REGS_LOAD_CTRL_ACTIVE | load_pattern);
 	udelay(10000); /* give it some time to process */
-	load_state = NV_READ(NV50_PDISPLAY_DAC_REGS_LOAD_CTRL(or));
+	load_state = nv_rd32(NV50_PDISPLAY_DAC_REGS_LOAD_CTRL(or));
 
-	NV_WRITE(NV50_PDISPLAY_DAC_REGS_LOAD_CTRL(or), 0);
-	NV_WRITE(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or), dpms_state);
+	nv_wr32(NV50_PDISPLAY_DAC_REGS_LOAD_CTRL(or), 0);
+	nv_wr32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or), dpms_state);
 
 	if ((load_state & NV50_PDISPLAY_DAC_REGS_LOAD_CTRL_PRESENT) == NV50_PDISPLAY_DAC_REGS_LOAD_CTRL_PRESENT)
 		present = 1;

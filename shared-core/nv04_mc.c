@@ -11,7 +11,7 @@ nv04_mc_init(struct drm_device *dev)
 	/* Power up everything, resetting each individual unit will
 	 * be done later if needed.
 	 */
-	NV_WRITE(NV03_PMC_ENABLE, 0xFFFFFFFF);
+	nv_wr32(NV03_PMC_ENABLE, 0xFFFFFFFF);
 
 	return 0;
 }

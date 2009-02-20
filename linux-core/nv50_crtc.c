@@ -401,12 +401,12 @@ static int nv50_crtc_set_clock(struct nv50_crtc *crtc)
 
 	uint32_t N1 = 0, N2 = 0, M1 = 0, M2 = 0, log2P = 0;
 
-	uint32_t reg1 = NV_READ(pll_reg + 4);
-	uint32_t reg2 = NV_READ(pll_reg + 8);
+	uint32_t reg1 = nv_rd32(pll_reg + 4);
+	uint32_t reg2 = nv_rd32(pll_reg + 8);
 
 	DRM_DEBUG("\n");
 
-	NV_WRITE(pll_reg, NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1_CONNECTED | 0x10000011);
+	nv_wr32(pll_reg, NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1_CONNECTED | 0x10000011);
 
 	/* The other bits are typically empty, but let's be on the safe side. */
 	reg1 &= 0xff00ff00;
@@ -420,8 +420,8 @@ static int nv50_crtc_set_clock(struct nv50_crtc *crtc)
 	reg1 |= (M1 << 16) | N1;
 	reg2 |= (log2P << 28) | (M2 << 16) | N2;
 
-	NV_WRITE(pll_reg + 4, reg1);
-	NV_WRITE(pll_reg + 8, reg2);
+	nv_wr32(pll_reg + 4, reg1);
+	nv_wr32(pll_reg + 8, reg2);
 
 	return 0;
 }
@@ -433,7 +433,7 @@ static int nv50_crtc_set_clock_mode(struct nv50_crtc *crtc)
 	DRM_DEBUG("\n");
 
 	/* This acknowledges a clock request. */
-	NV_WRITE(NV50_PDISPLAY_CRTC_CLK_CLK_CTRL2(crtc->index), 0);
+	nv_wr32(NV50_PDISPLAY_CRTC_CLK_CLK_CTRL2(crtc->index), 0);
 
 	return 0;
 }

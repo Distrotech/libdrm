@@ -379,7 +379,7 @@ void nouveau_nv04_context_switch(struct drm_device *dev)
 		return;
 	}
 
-	chid = (NV_READ(NV04_PGRAPH_CTX_USER) >> 24) & (engine->fifo.channels - 1);
+	chid = (nv_rd32(NV04_PGRAPH_CTX_USER) >> 24) & (engine->fifo.channels - 1);
 	last = dev_priv->fifos[chid];
 
 	if (!last) {
@@ -390,32 +390,32 @@ void nouveau_nv04_context_switch(struct drm_device *dev)
 		         last->id, next->id);
 	}
 
-/*	NV_WRITE(NV03_PFIFO_CACHES, 0x0);
-	NV_WRITE(NV04_PFIFO_CACHE0_PULL0, 0x0);
-	NV_WRITE(NV04_PFIFO_CACHE1_PULL0, 0x0);*/
-	NV_WRITE(NV04_PGRAPH_FIFO,0x0);
+/*	nv_wr32(NV03_PFIFO_CACHES, 0x0);
+	nv_wr32(NV04_PFIFO_CACHE0_PULL0, 0x0);
+	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x0);*/
+	nv_wr32(NV04_PGRAPH_FIFO,0x0);
 
 	if (last)
 		nv04_graph_save_context(last);
 
 	nouveau_wait_for_idle(dev);
 
-	NV_WRITE(NV04_PGRAPH_CTX_CONTROL, 0x10000000);
-	NV_WRITE(NV04_PGRAPH_CTX_USER, (NV_READ(NV04_PGRAPH_CTX_USER) & 0xffffff) | (0x0f << 24));
+	nv_wr32(NV04_PGRAPH_CTX_CONTROL, 0x10000000);
+	nv_wr32(NV04_PGRAPH_CTX_USER, (nv_rd32(NV04_PGRAPH_CTX_USER) & 0xffffff) | (0x0f << 24));
 
 	nouveau_wait_for_idle(dev);
 
 	nv04_graph_load_context(next);
 
-	NV_WRITE(NV04_PGRAPH_CTX_CONTROL, 0x10010100);
-	NV_WRITE(NV04_PGRAPH_CTX_USER, next->id << 24);
-	NV_WRITE(NV04_PGRAPH_FFINTFC_ST2, NV_READ(NV04_PGRAPH_FFINTFC_ST2)&0x000FFFFF);
+	nv_wr32(NV04_PGRAPH_CTX_CONTROL, 0x10010100);
+	nv_wr32(NV04_PGRAPH_CTX_USER, next->id << 24);
+	nv_wr32(NV04_PGRAPH_FFINTFC_ST2, nv_rd32(NV04_PGRAPH_FFINTFC_ST2)&0x000FFFFF);
 
-/*	NV_WRITE(NV04_PGRAPH_FIFO,0x0);
-	NV_WRITE(NV04_PFIFO_CACHE0_PULL0, 0x0);
-	NV_WRITE(NV04_PFIFO_CACHE1_PULL0, 0x1);
-	NV_WRITE(NV03_PFIFO_CACHES, 0x1);*/
-	NV_WRITE(NV04_PGRAPH_FIFO,0x1);
+/*	nv_wr32(NV04_PGRAPH_FIFO,0x0);
+	nv_wr32(NV04_PFIFO_CACHE0_PULL0, 0x0);
+	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x1);
+	nv_wr32(NV03_PFIFO_CACHES, 0x1);*/
+	nv_wr32(NV04_PGRAPH_FIFO,0x1);
 }
 
 int nv04_graph_create_context(struct nouveau_channel *chan) {
@@ -431,8 +431,8 @@ int nv04_graph_create_context(struct nouveau_channel *chan) {
 	//dev_priv->fifos[channel].pgraph_ctx_user = channel << 24;
 	pgraph_ctx->nv04[0] = 0x0001ffff;
 	/* is it really needed ??? */
-	//dev_priv->fifos[channel].pgraph_ctx[1] = NV_READ(NV_PGRAPH_DEBUG_4);
-	//dev_priv->fifos[channel].pgraph_ctx[2] = NV_READ(0x004006b0);
+	//dev_priv->fifos[channel].pgraph_ctx[1] = nv_rd32(NV_PGRAPH_DEBUG_4);
+	//dev_priv->fifos[channel].pgraph_ctx[2] = nv_rd32(0x004006b0);
 
 	return 0;
 }
@@ -453,7 +453,7 @@ int nv04_graph_load_context(struct nouveau_channel *chan)
 	int i;
 
 	for (i = 0; i < sizeof(nv04_graph_ctx_regs)/sizeof(nv04_graph_ctx_regs[0]); i++)
-		NV_WRITE(nv04_graph_ctx_regs[i], pgraph_ctx->nv04[i]);
+		nv_wr32(nv04_graph_ctx_regs[i], pgraph_ctx->nv04[i]);
 
 	return 0;
 }
@@ -466,7 +466,7 @@ int nv04_graph_save_context(struct nouveau_channel *chan)
 	int i;
 
 	for (i = 0; i < sizeof(nv04_graph_ctx_regs)/sizeof(nv04_graph_ctx_regs[0]); i++)
-		pgraph_ctx->nv04[i] = NV_READ(nv04_graph_ctx_regs[i]);
+		pgraph_ctx->nv04[i] = nv_rd32(nv04_graph_ctx_regs[i]);
 
 	return 0;
 }
@@ -474,39 +474,39 @@ int nv04_graph_save_context(struct nouveau_channel *chan)
 int nv04_graph_init(struct drm_device *dev) {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
-	NV_WRITE(NV03_PMC_ENABLE, NV_READ(NV03_PMC_ENABLE) &
+	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) &
 			~NV_PMC_ENABLE_PGRAPH);
-	NV_WRITE(NV03_PMC_ENABLE, NV_READ(NV03_PMC_ENABLE) |
+	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) |
 			 NV_PMC_ENABLE_PGRAPH);
 
 	/* Enable PGRAPH interrupts */
-	NV_WRITE(NV03_PGRAPH_INTR, 0xFFFFFFFF);
-	NV_WRITE(NV03_PGRAPH_INTR_EN, 0xFFFFFFFF);
+	nv_wr32(NV03_PGRAPH_INTR, 0xFFFFFFFF);
+	nv_wr32(NV03_PGRAPH_INTR_EN, 0xFFFFFFFF);
 
-	NV_WRITE(NV04_PGRAPH_VALID1, 0);
-	NV_WRITE(NV04_PGRAPH_VALID2, 0);
-	/*NV_WRITE(NV04_PGRAPH_DEBUG_0, 0x000001FF);
-	NV_WRITE(NV04_PGRAPH_DEBUG_0, 0x001FFFFF);*/
-	NV_WRITE(NV04_PGRAPH_DEBUG_0, 0x1231c000);
+	nv_wr32(NV04_PGRAPH_VALID1, 0);
+	nv_wr32(NV04_PGRAPH_VALID2, 0);
+	/*nv_wr32(NV04_PGRAPH_DEBUG_0, 0x000001FF);
+	nv_wr32(NV04_PGRAPH_DEBUG_0, 0x001FFFFF);*/
+	nv_wr32(NV04_PGRAPH_DEBUG_0, 0x1231c000);
 	/*1231C000 blob, 001 haiku*/
 	//*V_WRITE(NV04_PGRAPH_DEBUG_1, 0xf2d91100);*/
-	NV_WRITE(NV04_PGRAPH_DEBUG_1, 0x72111100);
+	nv_wr32(NV04_PGRAPH_DEBUG_1, 0x72111100);
 	/*0x72111100 blob , 01 haiku*/
-	/*NV_WRITE(NV04_PGRAPH_DEBUG_2, 0x11d5f870);*/
-	NV_WRITE(NV04_PGRAPH_DEBUG_2, 0x11d5f071);
+	/*nv_wr32(NV04_PGRAPH_DEBUG_2, 0x11d5f870);*/
+	nv_wr32(NV04_PGRAPH_DEBUG_2, 0x11d5f071);
 	/*haiku same*/
 
-	/*NV_WRITE(NV04_PGRAPH_DEBUG_3, 0xfad4ff31);*/
-	NV_WRITE(NV04_PGRAPH_DEBUG_3, 0xf0d4ff31);
+	/*nv_wr32(NV04_PGRAPH_DEBUG_3, 0xfad4ff31);*/
+	nv_wr32(NV04_PGRAPH_DEBUG_3, 0xf0d4ff31);
 	/*haiku and blob 10d4*/
 
-	NV_WRITE(NV04_PGRAPH_STATE        , 0xFFFFFFFF);
-	NV_WRITE(NV04_PGRAPH_CTX_CONTROL  , 0x10010100);
-	NV_WRITE(NV04_PGRAPH_FIFO         , 0x00000001);
+	nv_wr32(NV04_PGRAPH_STATE        , 0xFFFFFFFF);
+	nv_wr32(NV04_PGRAPH_CTX_CONTROL  , 0x10010100);
+	nv_wr32(NV04_PGRAPH_FIFO         , 0x00000001);
 
 	/* These don't belong here, they're part of a per-channel context */
-	NV_WRITE(NV04_PGRAPH_PATTERN_SHAPE, 0x00000000);
-	NV_WRITE(NV04_PGRAPH_BETA_AND     , 0xFFFFFFFF);
+	nv_wr32(NV04_PGRAPH_PATTERN_SHAPE, 0x00000000);
+	nv_wr32(NV04_PGRAPH_BETA_AND     , 0xFFFFFFFF);
 
 	return 0;
 }

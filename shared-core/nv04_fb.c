@@ -12,7 +12,7 @@ nv04_fb_init(struct drm_device *dev)
 	 * nvidia reading PFB_CFG_0, then writing back its original value.
 	 * (which was 0x701114 in this case)
 	 */
-	NV_WRITE(NV04_PFB_CFG0, 0x1114);
+	nv_wr32(NV04_PFB_CFG0, 0x1114);
 
 	return 0;
 }

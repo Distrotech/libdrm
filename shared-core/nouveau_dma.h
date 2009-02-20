@@ -92,7 +92,7 @@ FIRE_RING(struct nouveau_channel *chan)
 
 	DRM_MEMORYBARRIER();
 	chan->dma.put = chan->dma.cur;
-	NV_WRITE(chan->put, (chan->dma.put << 2) + chan->pushbuf_base);
+	nv_wr32(chan->put, (chan->dma.put << 2) + chan->pushbuf_base);
 }
 
 /* This should allow easy switching to a real fifo in the future. */

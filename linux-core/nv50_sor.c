@@ -109,7 +109,7 @@ static int nv50_sor_set_clock_mode(struct nv50_output *output)
 
 	/* 0x70000 was a late addition to nv, mentioned as fixing tmds initialisation on certain gpu's. */
 	/* I presume it's some kind of clock setting, but what precisely i do not know. */
-	NV_WRITE(NV50_PDISPLAY_SOR_CLK_CLK_CTRL2(output->or), 0x70000 | ((mode->clock > limit) ? 0x101 : 0));
+	nv_wr32(NV50_PDISPLAY_SOR_CLK_CLK_CTRL2(output->or), 0x70000 | ((mode->clock > limit) ? 0x101 : 0));
 
 	return 0;
 }
@@ -123,16 +123,16 @@ static int nv50_sor_set_power_mode(struct nv50_output *output, int mode)
 	DRM_DEBUG("or %d\n", output->or);
 
 	/* wait for it to be done */
-	while (NV_READ(NV50_PDISPLAY_SOR_REGS_DPMS_CTRL(or)) & NV50_PDISPLAY_SOR_REGS_DPMS_CTRL_PENDING);
+	while (nv_rd32(NV50_PDISPLAY_SOR_REGS_DPMS_CTRL(or)) & NV50_PDISPLAY_SOR_REGS_DPMS_CTRL_PENDING);
 
-	val = NV_READ(NV50_PDISPLAY_SOR_REGS_DPMS_CTRL(or));
+	val = nv_rd32(NV50_PDISPLAY_SOR_REGS_DPMS_CTRL(or));
 
 	if (mode == DRM_MODE_DPMS_ON)
 		val |= NV50_PDISPLAY_SOR_REGS_DPMS_CTRL_ON;
 	else
 		val &= ~NV50_PDISPLAY_SOR_REGS_DPMS_CTRL_ON;
 
-	NV_WRITE(NV50_PDISPLAY_SOR_REGS_DPMS_CTRL(or), val | NV50_PDISPLAY_SOR_REGS_DPMS_CTRL_PENDING);
+	nv_wr32(NV50_PDISPLAY_SOR_REGS_DPMS_CTRL(or), val | NV50_PDISPLAY_SOR_REGS_DPMS_CTRL_PENDING);
 
 	return 0;
 }
@@ -207,10 +207,10 @@ int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry)
 	if (output->base.encoder_type == DRM_MODE_ENCODER_TMDS) {
 		int or = output->or;
 
-		NV_WRITE(NV50_PDISPLAY_SOR_REGS_UNK_00C(or), 0x03010700);
-		NV_WRITE(NV50_PDISPLAY_SOR_REGS_UNK_010(or), 0x0000152f);
-		NV_WRITE(NV50_PDISPLAY_SOR_REGS_UNK_014(or), 0x00000000);
-		NV_WRITE(NV50_PDISPLAY_SOR_REGS_UNK_018(or), 0x00245af8);
+		nv_wr32(NV50_PDISPLAY_SOR_REGS_UNK_00C(or), 0x03010700);
+		nv_wr32(NV50_PDISPLAY_SOR_REGS_UNK_010(or), 0x0000152f);
+		nv_wr32(NV50_PDISPLAY_SOR_REGS_UNK_014(or), 0x00000000);
+		nv_wr32(NV50_PDISPLAY_SOR_REGS_UNK_018(or), 0x00245af8);
 	}
 
 	return 0;

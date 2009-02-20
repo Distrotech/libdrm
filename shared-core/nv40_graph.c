@@ -1532,35 +1532,35 @@ nv40_graph_transfer_context(struct drm_device *dev, uint32_t inst, int save)
 	uint32_t old_cp, tv = 1000, tmp;
 	int i;
 
-	old_cp = NV_READ(NV20_PGRAPH_CHANNEL_CTX_POINTER);
-	NV_WRITE(NV20_PGRAPH_CHANNEL_CTX_POINTER, inst);
+	old_cp = nv_rd32(NV20_PGRAPH_CHANNEL_CTX_POINTER);
+	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_POINTER, inst);
 
-	tmp  = NV_READ(NV40_PGRAPH_CTXCTL_0310);
+	tmp  = nv_rd32(NV40_PGRAPH_CTXCTL_0310);
 	tmp |= save ? NV40_PGRAPH_CTXCTL_0310_XFER_SAVE :
 		      NV40_PGRAPH_CTXCTL_0310_XFER_LOAD;
-	NV_WRITE(NV40_PGRAPH_CTXCTL_0310, tmp);
+	nv_wr32(NV40_PGRAPH_CTXCTL_0310, tmp);
 
-	tmp  = NV_READ(NV40_PGRAPH_CTXCTL_0304);
+	tmp  = nv_rd32(NV40_PGRAPH_CTXCTL_0304);
 	tmp |= NV40_PGRAPH_CTXCTL_0304_XFER_CTX;
-	NV_WRITE(NV40_PGRAPH_CTXCTL_0304, tmp);
+	nv_wr32(NV40_PGRAPH_CTXCTL_0304, tmp);
 
 	nouveau_wait_for_idle(dev);
 
 	for (i = 0; i < tv; i++) {
-		if (NV_READ(NV40_PGRAPH_CTXCTL_030C) == 0)
+		if (nv_rd32(NV40_PGRAPH_CTXCTL_030C) == 0)
 			break;
 	}
 
-	NV_WRITE(NV20_PGRAPH_CHANNEL_CTX_POINTER, old_cp);
+	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_POINTER, old_cp);
 
 	if (i == tv) {
-		uint32_t ucstat = NV_READ(NV40_PGRAPH_CTXCTL_UCODE_STAT);
+		uint32_t ucstat = nv_rd32(NV40_PGRAPH_CTXCTL_UCODE_STAT);
 		DRM_ERROR("Failed: Instance=0x%08x Save=%d\n", inst, save);
 		DRM_ERROR("IP: 0x%02x, Opcode: 0x%08x\n",
 			  ucstat >> NV40_PGRAPH_CTXCTL_UCODE_STAT_IP_SHIFT,
 			  ucstat  & NV40_PGRAPH_CTXCTL_UCODE_STAT_OP_MASK);
 		DRM_ERROR("0x40030C = 0x%08x\n",
-			  NV_READ(NV40_PGRAPH_CTXCTL_030C));
+			  nv_rd32(NV40_PGRAPH_CTXCTL_030C));
 		return -EBUSY;
 	}
 
@@ -1603,15 +1603,15 @@ nv40_graph_load_context(struct nouveau_channel *chan)
 	 * unknown as to what bit 24 does.  The nv ddx has it set, so we will
 	 * set it here too.
 	 */
-	NV_WRITE(NV20_PGRAPH_CHANNEL_CTX_POINTER, inst);
-	NV_WRITE(NV40_PGRAPH_CTXCTL_CUR,
+	nv_wr32(NV20_PGRAPH_CHANNEL_CTX_POINTER, inst);
+	nv_wr32(NV40_PGRAPH_CTXCTL_CUR,
 		 (inst & NV40_PGRAPH_CTXCTL_CUR_INST_MASK) |
 		  NV40_PGRAPH_CTXCTL_CUR_LOADED);
 	/* 0x32E0 records the instance address of the active FIFO's PGRAPH
 	 * context.  If at any time this doesn't match 0x40032C, you will
 	 * recieve PGRAPH_INTR_CONTEXT_SWITCH
 	 */
-	NV_WRITE(NV40_PFIFO_GRCTX_INSTANCE, inst);
+	nv_wr32(NV40_PFIFO_GRCTX_INSTANCE, inst);
 	return 0;
 }
 
@@ -1960,9 +1960,9 @@ nv40_graph_init(struct drm_device *dev)
 	uint32_t vramsz, tmp;
 	int i, j;
 
-	NV_WRITE(NV03_PMC_ENABLE, NV_READ(NV03_PMC_ENABLE) &
+	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) &
 			~NV_PMC_ENABLE_PGRAPH);
-	NV_WRITE(NV03_PMC_ENABLE, NV_READ(NV03_PMC_ENABLE) |
+	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) |
 			 NV_PMC_ENABLE_PGRAPH);
 
 	switch (dev_priv->chipset) {
@@ -1989,110 +1989,110 @@ nv40_graph_init(struct drm_device *dev)
 	DRM_DEBUG("Loading context program\n");
 
 	i = 0;
-	NV_WRITE(NV40_PGRAPH_CTXCTL_UCODE_INDEX, 0);
+	nv_wr32(NV40_PGRAPH_CTXCTL_UCODE_INDEX, 0);
 	while (ctx_prog[i] != ~0) {
-		NV_WRITE(NV40_PGRAPH_CTXCTL_UCODE_DATA, ctx_prog[i]);
+		nv_wr32(NV40_PGRAPH_CTXCTL_UCODE_DATA, ctx_prog[i]);
 		i++;
 	}
 
 	/* No context present currently */
-	NV_WRITE(NV40_PGRAPH_CTXCTL_CUR, 0x00000000);
+	nv_wr32(NV40_PGRAPH_CTXCTL_CUR, 0x00000000);
 
-	NV_WRITE(NV03_PGRAPH_INTR   , 0xFFFFFFFF);
-	NV_WRITE(NV40_PGRAPH_INTR_EN, 0xFFFFFFFF);
+	nv_wr32(NV03_PGRAPH_INTR   , 0xFFFFFFFF);
+	nv_wr32(NV40_PGRAPH_INTR_EN, 0xFFFFFFFF);
 
-	NV_WRITE(NV04_PGRAPH_DEBUG_0, 0xFFFFFFFF);
-	NV_WRITE(NV04_PGRAPH_DEBUG_0, 0x00000000);
-	NV_WRITE(NV04_PGRAPH_DEBUG_1, 0x401287c0);
-	NV_WRITE(NV04_PGRAPH_DEBUG_3, 0xe0de8055);
-	NV_WRITE(NV10_PGRAPH_DEBUG_4, 0x00008000);
-	NV_WRITE(NV04_PGRAPH_LIMIT_VIOL_PIX, 0x00be3c5f);
+	nv_wr32(NV04_PGRAPH_DEBUG_0, 0xFFFFFFFF);
+	nv_wr32(NV04_PGRAPH_DEBUG_0, 0x00000000);
+	nv_wr32(NV04_PGRAPH_DEBUG_1, 0x401287c0);
+	nv_wr32(NV04_PGRAPH_DEBUG_3, 0xe0de8055);
+	nv_wr32(NV10_PGRAPH_DEBUG_4, 0x00008000);
+	nv_wr32(NV04_PGRAPH_LIMIT_VIOL_PIX, 0x00be3c5f);
 
-	NV_WRITE(NV10_PGRAPH_CTX_CONTROL, 0x10010100);
-	NV_WRITE(NV10_PGRAPH_STATE      , 0xFFFFFFFF);
-	NV_WRITE(NV04_PGRAPH_FIFO       , 0x00000001);
+	nv_wr32(NV10_PGRAPH_CTX_CONTROL, 0x10010100);
+	nv_wr32(NV10_PGRAPH_STATE      , 0xFFFFFFFF);
+	nv_wr32(NV04_PGRAPH_FIFO       , 0x00000001);
 
-	j = NV_READ(0x1540) & 0xff;
+	j = nv_rd32(0x1540) & 0xff;
 	if (j) {
 		for (i=0; !(j&1); j>>=1, i++);
-		NV_WRITE(0x405000, i);
+		nv_wr32(0x405000, i);
 	}
 
 	if (dev_priv->chipset == 0x40) {
-		NV_WRITE(0x4009b0, 0x83280fff);
-		NV_WRITE(0x4009b4, 0x000000a0);
+		nv_wr32(0x4009b0, 0x83280fff);
+		nv_wr32(0x4009b4, 0x000000a0);
 	} else {
-		NV_WRITE(0x400820, 0x83280eff);
-		NV_WRITE(0x400824, 0x000000a0);
+		nv_wr32(0x400820, 0x83280eff);
+		nv_wr32(0x400824, 0x000000a0);
 	}
 
 	switch (dev_priv->chipset) {
 	case 0x40:
 	case 0x45:
-		NV_WRITE(0x4009b8, 0x0078e366);
-		NV_WRITE(0x4009bc, 0x0000014c);
+		nv_wr32(0x4009b8, 0x0078e366);
+		nv_wr32(0x4009bc, 0x0000014c);
 		break;
 	case 0x41:
 	case 0x42: /* pciid also 0x00Cx */
 //	case 0x0120: //XXX (pciid)
-		NV_WRITE(0x400828, 0x007596ff);
-		NV_WRITE(0x40082c, 0x00000108);
+		nv_wr32(0x400828, 0x007596ff);
+		nv_wr32(0x40082c, 0x00000108);
 		break;
 	case 0x43:
-		NV_WRITE(0x400828, 0x0072cb77);
-		NV_WRITE(0x40082c, 0x00000108);
+		nv_wr32(0x400828, 0x0072cb77);
+		nv_wr32(0x40082c, 0x00000108);
 		break;
 	case 0x44:
 	case 0x46: /* G72 */
 	case 0x4a:
 	case 0x4c: /* G7x-based C51 */
 	case 0x4e:
-		NV_WRITE(0x400860, 0);
-		NV_WRITE(0x400864, 0);
+		nv_wr32(0x400860, 0);
+		nv_wr32(0x400864, 0);
 		break;
 	case 0x47: /* G70 */
 	case 0x49: /* G71 */
 	case 0x4b: /* G73 */
-		NV_WRITE(0x400828, 0x07830610);
-		NV_WRITE(0x40082c, 0x0000016A);
+		nv_wr32(0x400828, 0x07830610);
+		nv_wr32(0x40082c, 0x0000016A);
 		break;
 	default:
 		break;
 	}
 
-	NV_WRITE(0x400b38, 0x2ffff800);
-	NV_WRITE(0x400b3c, 0x00006000);
+	nv_wr32(0x400b38, 0x2ffff800);
+	nv_wr32(0x400b3c, 0x00006000);
 
 	/* copy tile info from PFB */
 	switch (dev_priv->chipset) {
 	case 0x40: /* vanilla NV40 */
 		for (i=0; i<NV10_PFB_TILE__SIZE; i++) {
-			tmp = NV_READ(NV10_PFB_TILE(i));
-			NV_WRITE(NV40_PGRAPH_TILE0(i), tmp);
-			NV_WRITE(NV40_PGRAPH_TILE1(i), tmp);
-			tmp = NV_READ(NV10_PFB_TLIMIT(i));
-			NV_WRITE(NV40_PGRAPH_TLIMIT0(i), tmp);
-			NV_WRITE(NV40_PGRAPH_TLIMIT1(i), tmp);
-			tmp = NV_READ(NV10_PFB_TSIZE(i));
-			NV_WRITE(NV40_PGRAPH_TSIZE0(i), tmp);
-			NV_WRITE(NV40_PGRAPH_TSIZE1(i), tmp);
-			tmp = NV_READ(NV10_PFB_TSTATUS(i));
-			NV_WRITE(NV40_PGRAPH_TSTATUS0(i), tmp);
-			NV_WRITE(NV40_PGRAPH_TSTATUS1(i), tmp);
+			tmp = nv_rd32(NV10_PFB_TILE(i));
+			nv_wr32(NV40_PGRAPH_TILE0(i), tmp);
+			nv_wr32(NV40_PGRAPH_TILE1(i), tmp);
+			tmp = nv_rd32(NV10_PFB_TLIMIT(i));
+			nv_wr32(NV40_PGRAPH_TLIMIT0(i), tmp);
+			nv_wr32(NV40_PGRAPH_TLIMIT1(i), tmp);
+			tmp = nv_rd32(NV10_PFB_TSIZE(i));
+			nv_wr32(NV40_PGRAPH_TSIZE0(i), tmp);
+			nv_wr32(NV40_PGRAPH_TSIZE1(i), tmp);
+			tmp = nv_rd32(NV10_PFB_TSTATUS(i));
+			nv_wr32(NV40_PGRAPH_TSTATUS0(i), tmp);
+			nv_wr32(NV40_PGRAPH_TSTATUS1(i), tmp);
 		}
 		break;
 	case 0x44:
 	case 0x4a:
 	case 0x4e: /* NV44-based cores don't have 0x406900? */
 		for (i=0; i<NV40_PFB_TILE__SIZE_0; i++) {
-			tmp = NV_READ(NV40_PFB_TILE(i));
-			NV_WRITE(NV40_PGRAPH_TILE0(i), tmp);
-			tmp = NV_READ(NV40_PFB_TLIMIT(i));
-			NV_WRITE(NV40_PGRAPH_TLIMIT0(i), tmp);
-			tmp = NV_READ(NV40_PFB_TSIZE(i));
-			NV_WRITE(NV40_PGRAPH_TSIZE0(i), tmp);
-			tmp = NV_READ(NV40_PFB_TSTATUS(i));
-			NV_WRITE(NV40_PGRAPH_TSTATUS0(i), tmp);
+			tmp = nv_rd32(NV40_PFB_TILE(i));
+			nv_wr32(NV40_PGRAPH_TILE0(i), tmp);
+			tmp = nv_rd32(NV40_PFB_TLIMIT(i));
+			nv_wr32(NV40_PGRAPH_TLIMIT0(i), tmp);
+			tmp = nv_rd32(NV40_PFB_TSIZE(i));
+			nv_wr32(NV40_PGRAPH_TSIZE0(i), tmp);
+			tmp = nv_rd32(NV40_PFB_TSTATUS(i));
+			nv_wr32(NV40_PGRAPH_TSTATUS0(i), tmp);
 		}
 		break;
 	case 0x46:
@@ -2100,34 +2100,34 @@ nv40_graph_init(struct drm_device *dev)
 	case 0x49:
 	case 0x4b: /* G7X-based cores */
 		for (i=0; i<NV40_PFB_TILE__SIZE_1; i++) {
-			tmp = NV_READ(NV40_PFB_TILE(i));
-			NV_WRITE(NV47_PGRAPH_TILE0(i), tmp);
-			NV_WRITE(NV40_PGRAPH_TILE1(i), tmp);
-			tmp = NV_READ(NV40_PFB_TLIMIT(i));
-			NV_WRITE(NV47_PGRAPH_TLIMIT0(i), tmp);
-			NV_WRITE(NV40_PGRAPH_TLIMIT1(i), tmp);
-			tmp = NV_READ(NV40_PFB_TSIZE(i));
-			NV_WRITE(NV47_PGRAPH_TSIZE0(i), tmp);
-			NV_WRITE(NV40_PGRAPH_TSIZE1(i), tmp);
-			tmp = NV_READ(NV40_PFB_TSTATUS(i));
-			NV_WRITE(NV47_PGRAPH_TSTATUS0(i), tmp);
-			NV_WRITE(NV40_PGRAPH_TSTATUS1(i), tmp);
+			tmp = nv_rd32(NV40_PFB_TILE(i));
+			nv_wr32(NV47_PGRAPH_TILE0(i), tmp);
+			nv_wr32(NV40_PGRAPH_TILE1(i), tmp);
+			tmp = nv_rd32(NV40_PFB_TLIMIT(i));
+			nv_wr32(NV47_PGRAPH_TLIMIT0(i), tmp);
+			nv_wr32(NV40_PGRAPH_TLIMIT1(i), tmp);
+			tmp = nv_rd32(NV40_PFB_TSIZE(i));
+			nv_wr32(NV47_PGRAPH_TSIZE0(i), tmp);
+			nv_wr32(NV40_PGRAPH_TSIZE1(i), tmp);
+			tmp = nv_rd32(NV40_PFB_TSTATUS(i));
+			nv_wr32(NV47_PGRAPH_TSTATUS0(i), tmp);
+			nv_wr32(NV40_PGRAPH_TSTATUS1(i), tmp);
 		}
 		break;
 	default: /* everything else */
 		for (i=0; i<NV40_PFB_TILE__SIZE_0; i++) {
-			tmp = NV_READ(NV40_PFB_TILE(i));
-			NV_WRITE(NV40_PGRAPH_TILE0(i), tmp);
-			NV_WRITE(NV40_PGRAPH_TILE1(i), tmp);
-			tmp = NV_READ(NV40_PFB_TLIMIT(i));
-			NV_WRITE(NV40_PGRAPH_TLIMIT0(i), tmp);
-			NV_WRITE(NV40_PGRAPH_TLIMIT1(i), tmp);
-			tmp = NV_READ(NV40_PFB_TSIZE(i));
-			NV_WRITE(NV40_PGRAPH_TSIZE0(i), tmp);
-			NV_WRITE(NV40_PGRAPH_TSIZE1(i), tmp);
-			tmp = NV_READ(NV40_PFB_TSTATUS(i));
-			NV_WRITE(NV40_PGRAPH_TSTATUS0(i), tmp);
-			NV_WRITE(NV40_PGRAPH_TSTATUS1(i), tmp);
+			tmp = nv_rd32(NV40_PFB_TILE(i));
+			nv_wr32(NV40_PGRAPH_TILE0(i), tmp);
+			nv_wr32(NV40_PGRAPH_TILE1(i), tmp);
+			tmp = nv_rd32(NV40_PFB_TLIMIT(i));
+			nv_wr32(NV40_PGRAPH_TLIMIT0(i), tmp);
+			nv_wr32(NV40_PGRAPH_TLIMIT1(i), tmp);
+			tmp = nv_rd32(NV40_PFB_TSIZE(i));
+			nv_wr32(NV40_PGRAPH_TSIZE0(i), tmp);
+			nv_wr32(NV40_PGRAPH_TSIZE1(i), tmp);
+			tmp = nv_rd32(NV40_PFB_TSTATUS(i));
+			nv_wr32(NV40_PGRAPH_TSTATUS0(i), tmp);
+			nv_wr32(NV40_PGRAPH_TSTATUS1(i), tmp);
 		}
 		break;
 	}
@@ -2136,14 +2136,14 @@ nv40_graph_init(struct drm_device *dev)
 	vramsz = drm_get_resource_len(dev, 0) - 1;
 	switch (dev_priv->chipset) {
 	case 0x40:
-		NV_WRITE(0x4009A4, NV_READ(NV04_PFB_CFG0));
-		NV_WRITE(0x4009A8, NV_READ(NV04_PFB_CFG1));
-		NV_WRITE(0x4069A4, NV_READ(NV04_PFB_CFG0));
-		NV_WRITE(0x4069A8, NV_READ(NV04_PFB_CFG1));
-		NV_WRITE(0x400820, 0);
-		NV_WRITE(0x400824, 0);
-		NV_WRITE(0x400864, vramsz);
-		NV_WRITE(0x400868, vramsz);
+		nv_wr32(0x4009A4, nv_rd32(NV04_PFB_CFG0));
+		nv_wr32(0x4009A8, nv_rd32(NV04_PFB_CFG1));
+		nv_wr32(0x4069A4, nv_rd32(NV04_PFB_CFG0));
+		nv_wr32(0x4069A8, nv_rd32(NV04_PFB_CFG1));
+		nv_wr32(0x400820, 0);
+		nv_wr32(0x400824, 0);
+		nv_wr32(0x400864, vramsz);
+		nv_wr32(0x400868, vramsz);
 		break;
 	default:
 		switch (dev_priv->chipset) {
@@ -2151,36 +2151,36 @@ nv40_graph_init(struct drm_device *dev)
 		case 0x47:
 		case 0x49:
 		case 0x4b:
-			NV_WRITE(0x400DF0, NV_READ(NV04_PFB_CFG0));
-			NV_WRITE(0x400DF4, NV_READ(NV04_PFB_CFG1));
+			nv_wr32(0x400DF0, nv_rd32(NV04_PFB_CFG0));
+			nv_wr32(0x400DF4, nv_rd32(NV04_PFB_CFG1));
 			break;
 		default:
-			NV_WRITE(0x4009F0, NV_READ(NV04_PFB_CFG0));
-			NV_WRITE(0x4009F4, NV_READ(NV04_PFB_CFG1));
+			nv_wr32(0x4009F0, nv_rd32(NV04_PFB_CFG0));
+			nv_wr32(0x4009F4, nv_rd32(NV04_PFB_CFG1));
 			break;
 		}
-		NV_WRITE(0x4069F0, NV_READ(NV04_PFB_CFG0));
-		NV_WRITE(0x4069F4, NV_READ(NV04_PFB_CFG1));
-		NV_WRITE(0x400840, 0);
-		NV_WRITE(0x400844, 0);
-		NV_WRITE(0x4008A0, vramsz);
-		NV_WRITE(0x4008A4, vramsz);
+		nv_wr32(0x4069F0, nv_rd32(NV04_PFB_CFG0));
+		nv_wr32(0x4069F4, nv_rd32(NV04_PFB_CFG1));
+		nv_wr32(0x400840, 0);
+		nv_wr32(0x400844, 0);
+		nv_wr32(0x4008A0, vramsz);
+		nv_wr32(0x4008A4, vramsz);
 		break;
 	}
 
 	/* per-context state, doesn't belong here */
-	NV_WRITE(0x400B20, 0x00000000);
-	NV_WRITE(0x400B04, 0xFFFFFFFF);
+	nv_wr32(0x400B20, 0x00000000);
+	nv_wr32(0x400B04, 0xFFFFFFFF);
 
-	tmp = NV_READ(NV10_PGRAPH_SURFACE) & 0x0007ff00;
-	NV_WRITE(NV10_PGRAPH_SURFACE, tmp);
-	tmp = NV_READ(NV10_PGRAPH_SURFACE) | 0x00020100;
-	NV_WRITE(NV10_PGRAPH_SURFACE, tmp);
+	tmp = nv_rd32(NV10_PGRAPH_SURFACE) & 0x0007ff00;
+	nv_wr32(NV10_PGRAPH_SURFACE, tmp);
+	tmp = nv_rd32(NV10_PGRAPH_SURFACE) | 0x00020100;
+	nv_wr32(NV10_PGRAPH_SURFACE, tmp);
 
-	NV_WRITE(NV03_PGRAPH_ABS_UCLIP_XMIN, 0);
-	NV_WRITE(NV03_PGRAPH_ABS_UCLIP_YMIN, 0);
-	NV_WRITE(NV03_PGRAPH_ABS_UCLIP_XMAX, 0x7fff);
-	NV_WRITE(NV03_PGRAPH_ABS_UCLIP_YMAX, 0x7fff);
+	nv_wr32(NV03_PGRAPH_ABS_UCLIP_XMIN, 0);
+	nv_wr32(NV03_PGRAPH_ABS_UCLIP_YMIN, 0);
+	nv_wr32(NV03_PGRAPH_ABS_UCLIP_XMAX, 0x7fff);
+	nv_wr32(NV03_PGRAPH_ABS_UCLIP_YMAX, 0x7fff);
 
 	return 0;
 }

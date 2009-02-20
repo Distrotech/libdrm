@@ -93,7 +93,7 @@ nouveau_fence_poll(struct drm_device *dev, uint32_t class, uint32_t waiting_type
 	}
 
 	if (1) {
-		uint32_t sequence = NV_READ(chan->ref_cnt);
+		uint32_t sequence = nv_rd32(chan->ref_cnt);
 
 		DRM_DEBUG("got 0x%08x\n", sequence);
 		drm_fence_handler(dev, class, sequence, waiting_types, 0);

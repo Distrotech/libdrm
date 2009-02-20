@@ -111,7 +111,7 @@ static int nv50_connector_hpd_detect(struct nv50_connector *connector)
 	}
 
 	/* Check hotplug pins. */
-	reg = NV_READ(NV50_PCONNECTOR_HOTPLUG_STATE);
+	reg = nv_rd32(NV50_PCONNECTOR_HOTPLUG_STATE);
 	if (reg & (NV50_PCONNECTOR_HOTPLUG_STATE_PIN_CONNECTED_I2C0 << (4 * connector->i2c_chan->index)))
 		present = 1;
 

@@ -71,7 +71,7 @@ static void nv50_i2c_set_bits(struct nv50_i2c_channel *chan, int clock_high, int
 	if (!port)
 		return;
 
-	NV_WRITE(port, 4 | (data_high << 1) | clock_high);
+	nv_wr32(port, 4 | (data_high << 1) | clock_high);
 }
 
 static void nv50_i2c_get_bits(struct nv50_i2c_channel *chan, int *clock_high, int *data_high)
@@ -83,7 +83,7 @@ static void nv50_i2c_get_bits(struct nv50_i2c_channel *chan, int *clock_high, in
 	if (!port)
 		return;
 
-	val = NV_READ(port);
+	val = nv_rd32(port);
 
 	if (val & 1)
 		*clock_high = 1;

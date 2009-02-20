@@ -50,13 +50,13 @@ static int nouveau_fifo_instmem_configure(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
-	NV_WRITE(NV03_PFIFO_RAMHT,
+	nv_wr32(NV03_PFIFO_RAMHT,
 			(0x03 << 24) /* search 128 */ |
 			((dev_priv->ramht_bits - 9) << 16) |
 			(dev_priv->ramht_offset >> 8)
 			);
 
-	NV_WRITE(NV03_PFIFO_RAMRO, dev_priv->ramro_offset>>8);
+	nv_wr32(NV03_PFIFO_RAMRO, dev_priv->ramro_offset>>8);
 
 	switch(dev_priv->card_type)
 	{
@@ -65,28 +65,28 @@ static int nouveau_fifo_instmem_configure(struct drm_device *dev)
 			case 0x47:
 			case 0x49:
 			case 0x4b:
-				NV_WRITE(0x2230, 1);
+				nv_wr32(0x2230, 1);
 				break;
 			default:
 				break;
 			}
-			NV_WRITE(NV40_PFIFO_RAMFC, 0x30002);
+			nv_wr32(NV40_PFIFO_RAMFC, 0x30002);
 			break;
 		case NV_44:
-			NV_WRITE(NV40_PFIFO_RAMFC, ((nouveau_mem_fb_amount(dev)-512*1024+dev_priv->ramfc_offset)>>16) |
+			nv_wr32(NV40_PFIFO_RAMFC, ((nouveau_mem_fb_amount(dev)-512*1024+dev_priv->ramfc_offset)>>16) |
 					(2 << 16));
 			break;
 		case NV_30:
 		case NV_20:
 		case NV_17:
-			NV_WRITE(NV03_PFIFO_RAMFC, (dev_priv->ramfc_offset>>8) |
+			nv_wr32(NV03_PFIFO_RAMFC, (dev_priv->ramfc_offset>>8) |
 					(1 << 16) /* 64 Bytes entry*/);
 			/* XXX nvidia blob set bit 18, 21,23 for nv20 & nv30 */
 			break;
 		case NV_11:
 		case NV_10:
 		case NV_04:
-			NV_WRITE(NV03_PFIFO_RAMFC, dev_priv->ramfc_offset>>8);
+			nv_wr32(NV03_PFIFO_RAMFC, dev_priv->ramfc_offset>>8);
 			break;
 	}
 
@@ -98,16 +98,16 @@ int nouveau_fifo_init(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	int ret;
 
-	NV_WRITE(NV03_PMC_ENABLE, NV_READ(NV03_PMC_ENABLE) &
+	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) &
 			~NV_PMC_ENABLE_PFIFO);
-	NV_WRITE(NV03_PMC_ENABLE, NV_READ(NV03_PMC_ENABLE) |
+	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) |
 			 NV_PMC_ENABLE_PFIFO);
 
 	/* Enable PFIFO error reporting */
-	NV_WRITE(NV03_PFIFO_INTR_0, 0xFFFFFFFF);
-	NV_WRITE(NV03_PFIFO_INTR_EN_0, 0xFFFFFFFF);
+	nv_wr32(NV03_PFIFO_INTR_0, 0xFFFFFFFF);
+	nv_wr32(NV03_PFIFO_INTR_EN_0, 0xFFFFFFFF);
 
-	NV_WRITE(NV03_PFIFO_CACHES, 0x00000000);
+	nv_wr32(NV03_PFIFO_CACHES, 0x00000000);
 
 	ret = nouveau_fifo_instmem_configure(dev);
 	if (ret) {
@@ -120,27 +120,27 @@ int nouveau_fifo_init(struct drm_device *dev)
 	DRM_DEBUG("Setting defaults for remaining PFIFO regs\n");
 
 	/* All channels into PIO mode */
-	NV_WRITE(NV04_PFIFO_MODE, 0x00000000);
+	nv_wr32(NV04_PFIFO_MODE, 0x00000000);
 
-	NV_WRITE(NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
-	NV_WRITE(NV04_PFIFO_CACHE1_PULL0, 0x00000000);
+	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
+	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000000);
 	/* Channel 0 active, PIO mode */
-	NV_WRITE(NV03_PFIFO_CACHE1_PUSH1, 0x00000000);
+	nv_wr32(NV03_PFIFO_CACHE1_PUSH1, 0x00000000);
 	/* PUT and GET to 0 */
-	NV_WRITE(NV04_PFIFO_CACHE1_DMA_PUT, 0x00000000);
-	NV_WRITE(NV04_PFIFO_CACHE1_DMA_GET, 0x00000000);
+	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUT, 0x00000000);
+	nv_wr32(NV04_PFIFO_CACHE1_DMA_GET, 0x00000000);
 	/* No cmdbuf object */
-	NV_WRITE(NV04_PFIFO_CACHE1_DMA_INSTANCE, 0x00000000);
-	NV_WRITE(NV03_PFIFO_CACHE0_PUSH0, 0x00000000);
-	NV_WRITE(NV04_PFIFO_CACHE0_PULL0, 0x00000000);
-	NV_WRITE(NV04_PFIFO_SIZE, 0x0000FFFF);
-	NV_WRITE(NV04_PFIFO_CACHE1_HASH, 0x0000FFFF);
-	NV_WRITE(NV04_PFIFO_CACHE0_PULL1, 0x00000001);
-	NV_WRITE(NV04_PFIFO_CACHE1_DMA_CTL, 0x00000000);
-	NV_WRITE(NV04_PFIFO_CACHE1_DMA_STATE, 0x00000000);
-	NV_WRITE(NV04_PFIFO_CACHE1_ENGINE, 0x00000000);
+	nv_wr32(NV04_PFIFO_CACHE1_DMA_INSTANCE, 0x00000000);
+	nv_wr32(NV03_PFIFO_CACHE0_PUSH0, 0x00000000);
+	nv_wr32(NV04_PFIFO_CACHE0_PULL0, 0x00000000);
+	nv_wr32(NV04_PFIFO_SIZE, 0x0000FFFF);
+	nv_wr32(NV04_PFIFO_CACHE1_HASH, 0x0000FFFF);
+	nv_wr32(NV04_PFIFO_CACHE0_PULL1, 0x00000001);
+	nv_wr32(NV04_PFIFO_CACHE1_DMA_CTL, 0x00000000);
+	nv_wr32(NV04_PFIFO_CACHE1_DMA_STATE, 0x00000000);
+	nv_wr32(NV04_PFIFO_CACHE1_ENGINE, 0x00000000);
 
-	NV_WRITE(NV04_PFIFO_CACHE1_DMA_FETCH, NV_PFIFO_CACHE1_DMA_FETCH_TRIG_112_BYTES |
+	nv_wr32(NV04_PFIFO_CACHE1_DMA_FETCH, NV_PFIFO_CACHE1_DMA_FETCH_TRIG_112_BYTES |
 				      NV_PFIFO_CACHE1_DMA_FETCH_SIZE_128_BYTES |
 				      NV_PFIFO_CACHE1_DMA_FETCH_MAX_REQS_4 |
 #ifdef __BIG_ENDIAN
@@ -148,27 +148,27 @@ int nouveau_fifo_init(struct drm_device *dev)
 #endif
 				      0x00000000);
 
-	NV_WRITE(NV04_PFIFO_CACHE1_DMA_PUSH, 0x00000001);
-	NV_WRITE(NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
-	NV_WRITE(NV04_PFIFO_CACHE1_PULL0, 0x00000001);
-	NV_WRITE(NV04_PFIFO_CACHE1_PULL1, 0x00000001);
+	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH, 0x00000001);
+	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
+	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000001);
+	nv_wr32(NV04_PFIFO_CACHE1_PULL1, 0x00000001);
 
 	/* FIXME on NV04 */
 	if (dev_priv->card_type >= NV_10) {
-		NV_WRITE(NV10_PGRAPH_CTX_USER, 0x0);
-		NV_WRITE(NV04_PFIFO_DELAY_0, 0xff /* retrycount*/ );
+		nv_wr32(NV10_PGRAPH_CTX_USER, 0x0);
+		nv_wr32(NV04_PFIFO_DELAY_0, 0xff /* retrycount*/ );
 		if (dev_priv->card_type >= NV_40)
-			NV_WRITE(NV10_PGRAPH_CTX_CONTROL, 0x00002001);
+			nv_wr32(NV10_PGRAPH_CTX_CONTROL, 0x00002001);
 		else
-			NV_WRITE(NV10_PGRAPH_CTX_CONTROL, 0x10110000);
+			nv_wr32(NV10_PGRAPH_CTX_CONTROL, 0x10110000);
 	} else {
-		NV_WRITE(NV04_PGRAPH_CTX_USER, 0x0);
-		NV_WRITE(NV04_PFIFO_DELAY_0, 0xff /* retrycount*/ );
-		NV_WRITE(NV04_PGRAPH_CTX_CONTROL, 0x10110000);
+		nv_wr32(NV04_PGRAPH_CTX_USER, 0x0);
+		nv_wr32(NV04_PFIFO_DELAY_0, 0xff /* retrycount*/ );
+		nv_wr32(NV04_PGRAPH_CTX_CONTROL, 0x10110000);
 	}
 
-	NV_WRITE(NV04_PFIFO_DMA_TIMESLICE, 0x001fffff);
-	NV_WRITE(NV03_PFIFO_CACHES, 0x00000001);
+	nv_wr32(NV04_PFIFO_DMA_TIMESLICE, 0x001fffff);
+	nv_wr32(NV03_PFIFO_CACHES, 0x00000001);
 	return 0;
 }
 
@@ -347,10 +347,10 @@ nouveau_fifo_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	nouveau_wait_for_idle(dev);
 
 	/* disable the fifo caches */
-	NV_WRITE(NV03_PFIFO_CACHES, 0x00000000);
-	NV_WRITE(NV04_PFIFO_CACHE1_DMA_PUSH, NV_READ(NV04_PFIFO_CACHE1_DMA_PUSH)&(~0x1));
-	NV_WRITE(NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
-	NV_WRITE(NV04_PFIFO_CACHE1_PULL0, 0x00000000);
+	nv_wr32(NV03_PFIFO_CACHES, 0x00000000);
+	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH, nv_rd32(NV04_PFIFO_CACHE1_DMA_PUSH)&(~0x1));
+	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
+	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000000);
 
 	/* Create a graphics context for new channel */
 	ret = engine->graph.create_context(chan);
@@ -369,8 +369,8 @@ nouveau_fifo_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	/* setup channel's default get/put values
 	 * XXX: quite possibly extremely pointless..
 	 */
-	NV_WRITE(chan->get, chan->pushbuf_base);
-	NV_WRITE(chan->put, chan->pushbuf_base);
+	nv_wr32(chan->get, chan->pushbuf_base);
+	nv_wr32(chan->put, chan->pushbuf_base);
 
 	/* If this is the first channel, setup PFIFO ourselves.  For any
 	 * other case, the GPU will handle this when it switches contexts.
@@ -390,14 +390,14 @@ nouveau_fifo_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 		}
 	}
 
-	NV_WRITE(NV04_PFIFO_CACHE1_DMA_PUSH,
-		 NV_READ(NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
-	NV_WRITE(NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
-	NV_WRITE(NV04_PFIFO_CACHE1_PULL0, 0x00000001);
-	NV_WRITE(NV04_PFIFO_CACHE1_PULL1, 0x00000001);
+	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH,
+		 nv_rd32(NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
+	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
+	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000001);
+	nv_wr32(NV04_PFIFO_CACHE1_PULL1, 0x00000001);
 
 	/* reenable the fifo caches */
-	NV_WRITE(NV03_PFIFO_CACHES, 1);
+	nv_wr32(NV03_PFIFO_CACHES, 1);
 
 	if (dev_priv->mm_enabled) {
 		ret = nouveau_dma_channel_setup(chan);
@@ -426,8 +426,8 @@ nouveau_channel_idle(struct nouveau_channel *chan)
 		return 1;
 	}
 
-	caches = NV_READ(NV03_PFIFO_CACHES);
-	NV_WRITE(NV03_PFIFO_CACHES, caches & ~1);
+	caches = nv_rd32(NV03_PFIFO_CACHES);
+	nv_wr32(NV03_PFIFO_CACHES, caches & ~1);
 
 	if (engine->fifo.channel_id(dev) != chan->id) {
 		struct nouveau_gpuobj *ramfc =
@@ -443,11 +443,11 @@ nouveau_channel_idle(struct nouveau_channel *chan)
 		else
 			idle = 1;
 	} else {
-		idle = (NV_READ(NV04_PFIFO_CACHE1_DMA_GET) ==
-			NV_READ(NV04_PFIFO_CACHE1_DMA_PUT));
+		idle = (nv_rd32(NV04_PFIFO_CACHE1_DMA_GET) ==
+			nv_rd32(NV04_PFIFO_CACHE1_DMA_PUT));
 	}
 
-	NV_WRITE(NV03_PFIFO_CACHES, caches);
+	nv_wr32(NV03_PFIFO_CACHES, caches);
 	return idle;
 }
 
@@ -476,10 +476,10 @@ void nouveau_fifo_free(struct nouveau_channel *chan)
 	 */
 
 	/* disable the fifo caches */
-	NV_WRITE(NV03_PFIFO_CACHES, 0x00000000);
-	NV_WRITE(NV04_PFIFO_CACHE1_DMA_PUSH, NV_READ(NV04_PFIFO_CACHE1_DMA_PUSH)&(~0x1));
-	NV_WRITE(NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
-	NV_WRITE(NV04_PFIFO_CACHE1_PULL0, 0x00000000);
+	nv_wr32(NV03_PFIFO_CACHES, 0x00000000);
+	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH, nv_rd32(NV04_PFIFO_CACHE1_DMA_PUSH)&(~0x1));
+	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
+	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000000);
 
 	// FIXME XXX needs more code
 
@@ -489,11 +489,11 @@ void nouveau_fifo_free(struct nouveau_channel *chan)
 	engine->graph.destroy_context(chan);
 
 	/* reenable the fifo caches */
-	NV_WRITE(NV04_PFIFO_CACHE1_DMA_PUSH,
-		 NV_READ(NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
-	NV_WRITE(NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
-	NV_WRITE(NV04_PFIFO_CACHE1_PULL0, 0x00000001);
-	NV_WRITE(NV03_PFIFO_CACHES, 0x00000001);
+	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH,
+		 nv_rd32(NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
+	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
+	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000001);
+	nv_wr32(NV03_PFIFO_CACHES, 0x00000001);
 
 	/* Deallocate push buffer */
 	nouveau_gpuobj_ref_del(dev, &chan->pushbuf);
