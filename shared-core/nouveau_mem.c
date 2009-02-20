@@ -202,6 +202,144 @@ void nouveau_mem_release(struct drm_file *file_priv, struct mem_block *heap)
 }
 
 /*
+ * NV50 VM helpers
+ */
+#define VMBLOCK (512*1024*1024)
+static int
+nv50_mem_vm_preinit(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
+	dev_priv->vm_gart_base = roundup(0, VMBLOCK);
+	dev_priv->vm_gart_size = VMBLOCK;
+
+	dev_priv->vm_vram_base = dev_priv->vm_gart_base + dev_priv->vm_gart_size;
+	dev_priv->vm_vram_size = roundup(nouveau_mem_fb_amount(dev), VMBLOCK);
+	dev_priv->vm_end = dev_priv->vm_vram_base + dev_priv->vm_vram_size;
+
+	DRM_DEBUG("NV50VM: GART 0x%016llx-0x%016llx\n",
+		  dev_priv->vm_gart_base,
+		  dev_priv->vm_gart_base + dev_priv->vm_gart_size - 1);
+	DRM_DEBUG("NV50VM: VRAM 0x%016llx-0x%016llx\n",
+		  dev_priv->vm_vram_base,
+		  dev_priv->vm_vram_base + dev_priv->vm_vram_size - 1);
+	return 0;
+}
+
+static void
+nv50_mem_vm_takedown(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	int i;
+
+	if (!dev_priv->vm_vram_pt)
+		return;
+
+	for (i = 0; i < dev_priv->vm_vram_pt_nr; i++) {
+		if (!dev_priv->vm_vram_pt[i])
+			break;
+
+		nouveau_gpuobj_del(dev, &dev_priv->vm_vram_pt[i]);
+	}
+
+	drm_free(dev_priv->vm_vram_pt,
+		 dev_priv->vm_vram_pt_nr * sizeof(struct nouveau_gpuobj *),
+		 DRM_MEM_DRIVER);
+	dev_priv->vm_vram_pt = NULL;
+	dev_priv->vm_vram_pt_nr = 0;
+}
+
+static int
+nv50_mem_vm_init(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	const int nr = dev_priv->vm_vram_size / VMBLOCK;
+	int i, ret;
+
+	dev_priv->vm_vram_pt_nr = nr;
+	dev_priv->vm_vram_pt = drm_calloc(nr, sizeof(struct nouveau_gpuobj *),
+					  DRM_MEM_DRIVER);
+	if (!dev_priv->vm_vram_pt)
+		return -ENOMEM;
+
+	for (i = 0; i < nr; i++) {
+		ret = nouveau_gpuobj_new(dev, NULL, VMBLOCK/65536*8, 0,
+					 NVOBJ_FLAG_ZERO_ALLOC |
+					 NVOBJ_FLAG_ALLOW_NO_REFS,
+					 &dev_priv->vm_vram_pt[i]);
+		if (ret) {
+			DRM_ERROR("Error creating VRAM page tables: %d\n", ret);
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
+int
+nv50_mem_vm_bind_linear(struct drm_device *dev, uint64_t virt, uint32_t size,
+			uint32_t flags, uint64_t phys)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_gpuobj **pgt;
+	unsigned psz, pfl;
+
+	if (virt >= dev_priv->vm_gart_base &&
+	    (virt + size) < (dev_priv->vm_gart_base + dev_priv->vm_gart_size)) {
+		psz = 4096;
+		pgt = &dev_priv->gart_info.sg_ctxdma;
+		pfl = 0x21;
+		virt -= dev_priv->vm_gart_base;
+	} else
+	if (virt >= dev_priv->vm_vram_base &&
+	    (virt + size) < (dev_priv->vm_vram_base + dev_priv->vm_vram_size)) {
+		psz = 65536;
+		pgt = dev_priv->vm_vram_pt;
+		pfl = 0x01;
+		virt -= dev_priv->vm_vram_base;
+	} else {
+		DRM_ERROR("Invalid address: 0x%16llx-0x%16llx\n",
+			  virt, virt + size - 1);
+		return -EINVAL;
+	}
+
+	size &= ~(psz - 1);
+
+	if (flags & 0x80000000) {
+		while (size) {
+			struct nouveau_gpuobj *pt = pgt[virt / (512*1024*1024)];
+			int pte = ((virt % (512*1024*1024)) / psz) * 2;
+
+			INSTANCE_WR(pt, pte++, 0x00000000);
+			INSTANCE_WR(pt, pte++, 0x00000000);
+
+			size -= psz;
+			virt += psz;
+		}
+	} else {
+		while (size) {
+			struct nouveau_gpuobj *pt = pgt[virt / (512*1024*1024)];
+			int pte = ((virt % (512*1024*1024)) / psz) * 2;
+
+			INSTANCE_WR(pt, pte++, phys | pfl);
+			INSTANCE_WR(pt, pte++, flags);
+
+			size -= psz;
+			phys += psz;
+			virt += psz;
+		}
+	}
+
+	return 0;
+}
+
+void
+nv50_mem_vm_unbind(struct drm_device *dev, uint64_t virt, uint32_t size)
+{
+	nv50_mem_vm_bind_linear(dev, virt, size, 0x80000000, 0);
+}
+
+/*
  * Cleanup everything
  */
 void nouveau_mem_takedown(struct mem_block **heap)
@@ -224,6 +362,9 @@ void nouveau_mem_takedown(struct mem_block **heap)
 void nouveau_mem_close(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
+	if (dev_priv->card_type >= NV_50)
+		nv50_mem_vm_takedown(dev);
 
 	if (!dev_priv->mm_enabled) {
 		nouveau_mem_takedown(&dev_priv->agp_heap);
@@ -405,21 +546,6 @@ nouveau_mem_init_agp(struct drm_device *dev, int ttm)
 	return 0;
 }
 
-
-static int
-nv50_mem_vm_preinit(struct drm_device *dev)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-
-	dev_priv->vm_gart_base = 0;
-	dev_priv->vm_gart_size = 512 * 1024 * 1024;
-	dev_priv->vm_vram_base = 512 * 1024 * 1024;
-	dev_priv->vm_vram_size = 512 * 1024 * 1024;
-	dev_priv->vm_end = 1024ULL * 1024 * 1024;
-
-	return 0;
-}
-
 int
 nouveau_mem_init_ttm(struct drm_device *dev)
 {
@@ -484,16 +610,10 @@ nouveau_mem_init_ttm(struct drm_device *dev)
 					 drm_get_resource_len(dev, 1),
 					 DRM_MTRR_WC);
 
-	/* G8x: Allocate shared page table to map real VRAM pages into */
 	if (dev_priv->card_type >= NV_50) {
-		unsigned size = ((512 * 1024 * 1024) / 65536) * 8;
-
-		ret = nouveau_gpuobj_new(dev, NULL, size, 0,
-					 NVOBJ_FLAG_ZERO_ALLOC |
-					 NVOBJ_FLAG_ALLOW_NO_REFS,
-					 &dev_priv->vm_vram_pt);
+		ret = nv50_mem_vm_init(dev);
 		if (ret) {
-			DRM_ERROR("Error creating VRAM page table: %d\n", ret);
+			DRM_ERROR("Error creating VM page tables: %d\n", ret);
 			return ret;
 		}
 	}
@@ -605,20 +725,13 @@ int nouveau_mem_init(struct drm_device *dev)
 		}
 	}
 
-	/* G8x: Allocate shared page table to map real VRAM pages into */
 	if (dev_priv->card_type >= NV_50) {
-		unsigned size = ((512 * 1024 * 1024) / 65536) * 8;
-
-		ret = nouveau_gpuobj_new(dev, NULL, size, 0,
-					 NVOBJ_FLAG_ZERO_ALLOC |
-					 NVOBJ_FLAG_ALLOW_NO_REFS,
-					 &dev_priv->vm_vram_pt);
+		ret = nv50_mem_vm_init(dev);
 		if (ret) {
-			DRM_ERROR("Error creating VRAM page table: %d\n", ret);
+			DRM_ERROR("Error creating VM page tables: %d\n", ret);
 			return ret;
 		}
 	}
-
 
 	return 0;
 }
@@ -755,16 +868,8 @@ alloc_ok:
 	/* On G8x, map memory into VM */
 	if (block->flags & NOUVEAU_MEM_FB && dev_priv->card_type >= NV_50 &&
 	    !(flags & NOUVEAU_MEM_NOVM)) {
-		struct nouveau_gpuobj *pt = dev_priv->vm_vram_pt;
 		unsigned offset = block->start - dev_priv->vm_vram_base;
-		unsigned count = block->size / 65536;
 		unsigned tile = 0;
-
-		if (!pt) {
-			DRM_ERROR("vm alloc without vm pt\n");
-			nouveau_mem_free_block(block);
-			return NULL;
-		}
 
 		/* The tiling stuff is *not* what NVIDIA does - but both the
 		 * 2D and 3D engines seem happy with this simpler method.
@@ -777,12 +882,12 @@ alloc_ok:
 				tile = 0x00007000;
 		}
 
-		while (count--) {
-			unsigned pte = offset / 65536;
-
-			INSTANCE_WR(pt, (pte * 2) + 0, offset | 1);
-			INSTANCE_WR(pt, (pte * 2) + 1, 0x00000000 | tile);
-			offset += 65536;
+		ret = nv50_mem_vm_bind_linear(dev, block->start, block->size,
+					      tile, offset);
+		if (ret) {
+			DRM_ERROR("error binding into vm: %d\n", ret);
+			nouveau_mem_free_block(block);
+			return NULL;
 		}
 	} else
 	if (block->flags & NOUVEAU_MEM_FB && dev_priv->card_type >= NV_50) {
@@ -860,24 +965,9 @@ void nouveau_mem_free(struct drm_device* dev, struct mem_block* block)
 	/* G8x: Remove pages from vm */
 	if (block->flags & NOUVEAU_MEM_FB && dev_priv->card_type >= NV_50 &&
 	    !(block->flags & NOUVEAU_MEM_NOVM)) {
-		struct nouveau_gpuobj *pt = dev_priv->vm_vram_pt;
-		unsigned offset = block->start - dev_priv->vm_vram_base;
-		unsigned count = block->size / 65536;
-
-		if (!pt) {
-			DRM_ERROR("vm free without vm pt\n");
-			goto out_free;
-		}
-
-		while (count--) {
-			unsigned pte = offset / 65536;
-			INSTANCE_WR(pt, (pte * 2) + 0, 0);
-			INSTANCE_WR(pt, (pte * 2) + 1, 0);
-			offset += 65536;
-		}
+		nv50_mem_vm_unbind(dev, block->start, block->size);
 	}
 
-out_free:
 	nouveau_mem_free_block(block);
 }
 
@@ -943,6 +1033,8 @@ nouveau_ioctl_mem_tile(struct drm_device *dev, void *data,
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_nouveau_mem_tile *memtile = data;
 	struct mem_block *block = NULL;
+	unsigned offset, tile = 0;
+	int ret;
 
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
 	NOUVEAU_CHECK_MM_DISABLED_WITH_RETURN;
@@ -953,35 +1045,26 @@ nouveau_ioctl_mem_tile(struct drm_device *dev, void *data,
 	if (memtile->flags & NOUVEAU_MEM_FB)
 		block = find_block(dev_priv->fb_heap, memtile->offset);
 
-	if (!block)
+	if (!block || (memtile->delta + memtile->size > block->size))
 		return -EINVAL;
 
 	if (block->file_priv != file_priv)
 		return -EPERM;
 
-	{
-		struct nouveau_gpuobj *pt = dev_priv->vm_vram_pt;
-		unsigned offset = block->start + memtile->delta;
-		unsigned count = memtile->size / 65536;
-		unsigned tile = 0;
-		
-		offset -= dev_priv->vm_vram_base;
+	offset  = block->start + memtile->delta;	
+	offset -= dev_priv->vm_vram_base;
 
-		if (memtile->flags & NOUVEAU_MEM_TILE) {
-			if (memtile->flags & NOUVEAU_MEM_TILE_ZETA)
-				tile = 0x00002800;
-			else
-				tile = 0x00007000;
-		}
-
-		while (count--) {
-			unsigned pte = offset / 65536;
-
-			INSTANCE_WR(pt, (pte * 2) + 0, offset | 1);
-			INSTANCE_WR(pt, (pte * 2) + 1, 0x00000000 | tile);
-			offset += 65536;
-		}
+	if (memtile->flags & NOUVEAU_MEM_TILE) {
+		if (memtile->flags & NOUVEAU_MEM_TILE_ZETA)
+			tile = 0x00002800;
+		else
+			tile = 0x00007000;
 	}
+
+	ret = nv50_mem_vm_bind_linear(dev, block->start + memtile->delta,
+				      memtile->size, tile, offset);
+	if (ret)
+		return ret;
 
 	return 0;
 }

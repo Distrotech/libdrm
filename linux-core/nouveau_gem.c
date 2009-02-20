@@ -662,12 +662,14 @@ nouveau_gem_ioctl_cpu_fini(struct drm_device *dev, void *data,
 
 int
 nouveau_gem_ioctl_tile(struct drm_device *dev, void *data,
-			   struct drm_file *file_priv)
+		       struct drm_file *file_priv)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_nouveau_gem_tile *req = data;
 	struct nouveau_gem_object *ngem;
 	struct drm_gem_object *gem;
+	unsigned offset, tile = 0;
+	int ret;
 
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
 	NOUVEAU_CHECK_MM_ENABLED_WITH_RETURN;
@@ -677,29 +679,20 @@ nouveau_gem_ioctl_tile(struct drm_device *dev, void *data,
 		return -EINVAL;
 	ngem = gem->driver_private;
 
-	{
-		struct nouveau_gpuobj *pt = dev_priv->vm_vram_pt;
-		unsigned offset = ngem->bo->offset + req->delta;
-		unsigned count = req->size / 65536;
-		unsigned tile = 0;
-		
-		offset -= dev_priv->vm_vram_base;
+	offset  = ngem->bo->offset + req->delta;
+	offset -= dev_priv->vm_vram_base;
 
-		if (req->flags & NOUVEAU_MEM_TILE) {
-			if (req->flags & NOUVEAU_MEM_TILE_ZETA)
-				tile = 0x00002800;
-			else
-				tile = 0x00007000;
-		}
-
-		while (count--) {
-			unsigned pte = offset / 65536;
-
-			INSTANCE_WR(pt, (pte * 2) + 0, offset | 1);
-			INSTANCE_WR(pt, (pte * 2) + 1, 0x00000000 | tile);
-			offset += 65536;
-		}
+	if (req->flags & NOUVEAU_MEM_TILE) {
+		if (req->flags & NOUVEAU_MEM_TILE_ZETA)
+			tile = 0x00002800;
+		else
+			tile = 0x00007000;
 	}
+
+	ret = nv50_mem_vm_bind_linear(dev, ngem->bo->offset + req->delta,
+				      req->size, tile, offset);
+	if (ret)
+		return ret;
 
 	mutex_lock(&dev->struct_mutex);
 	drm_gem_object_unreference(gem);

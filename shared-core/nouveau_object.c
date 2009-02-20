@@ -992,11 +992,11 @@ nouveau_gpuobj_channel_init(struct nouveau_channel *chan,
 
 	/* NV50 VM
 	 *  - Allocate per-channel page-directory
-	 *  - Point offset 0-512MiB at shared PCIEGART table
-	 *  - Point offset 512-1024MiB at shared VRAM table
+	 *  - Map GART and VRAM into the channel's address space at the
+	 *    locations determined during init.
 	 */
 	if (dev_priv->card_type >= NV_50) {
-		uint32_t vm_offset;
+		uint32_t vm_offset, pde;
 
 		vm_offset = (dev_priv->chipset & 0xf0) == 0x50 ? 0x1400 : 0x200;
 		vm_offset += chan->ramin->gpuobj->im_pramin->start;
@@ -1008,21 +1008,35 @@ nouveau_gpuobj_channel_init(struct nouveau_channel *chan,
 			INSTANCE_WR(chan->vm_pd, (i+4)/4, 0xdeadcafe);
 		}
 
-		if ((ret = nouveau_gpuobj_ref_add(dev, NULL, 0,
-						  dev_priv->gart_info.sg_ctxdma,
-						  &chan->vm_gart_pt)))
+		pde = (dev_priv->vm_gart_base / (512*1024*1024)) * 2;
+		ret = nouveau_gpuobj_ref_add(dev, NULL, 0,
+					     dev_priv->gart_info.sg_ctxdma,
+					     &chan->vm_gart_pt);
+		if (ret)
 			return ret;
-		INSTANCE_WR(chan->vm_pd, (0+0)/4,
+		INSTANCE_WR(chan->vm_pd, pde++,
 			    chan->vm_gart_pt->instance | 0x03);
-		INSTANCE_WR(chan->vm_pd, (0+4)/4, 0x00000000);
+		INSTANCE_WR(chan->vm_pd, pde++, 0x00000000);
 
-		if ((ret = nouveau_gpuobj_ref_add(dev, NULL, 0,
-						  dev_priv->vm_vram_pt,
-						  &chan->vm_vram_pt)))
-			return ret;
-		INSTANCE_WR(chan->vm_pd, (8+0)/4,
-			    chan->vm_vram_pt->instance | 0x61);
-		INSTANCE_WR(chan->vm_pd, (8+4)/4, 0x00000000);
+		chan->vm_vram_pt =
+			drm_calloc(dev_priv->vm_vram_pt_nr,
+				   sizeof(struct nouveau_gpuobj_ref *),
+				   DRM_MEM_DRIVER);
+		if (!chan->vm_vram_pt)
+			return -ENOMEM;
+
+		pde = (dev_priv->vm_vram_base / (512*1024*1024)) * 2;
+		for (i = 0; i < dev_priv->vm_vram_pt_nr; i++) {
+			ret = nouveau_gpuobj_ref_add(dev, NULL, 0,
+						     dev_priv->vm_vram_pt[i],
+						     &chan->vm_vram_pt[i]);
+			if (ret)
+				return ret;
+
+			INSTANCE_WR(chan->vm_pd, pde++,
+				    chan->vm_vram_pt[i]->instance | 0x61);
+			INSTANCE_WR(chan->vm_pd, pde++, 0x00000000);
+		}
 	}
 
 	/* RAMHT */
@@ -1100,9 +1114,11 @@ nouveau_gpuobj_channel_init(struct nouveau_channel *chan,
 void
 nouveau_gpuobj_channel_takedown(struct nouveau_channel *chan)
 {
+	struct drm_nouveau_private *dev_priv = chan->dev->dev_private;
 	struct drm_device *dev = chan->dev;
 	struct list_head *entry, *tmp;
 	struct nouveau_gpuobj_ref *ref;
+	int i;
 
 	DRM_DEBUG("ch%d\n", chan->id);
 
@@ -1116,7 +1132,12 @@ nouveau_gpuobj_channel_takedown(struct nouveau_channel *chan)
 
 	nouveau_gpuobj_del(dev, &chan->vm_pd);
 	nouveau_gpuobj_ref_del(dev, &chan->vm_gart_pt);
-	nouveau_gpuobj_ref_del(dev, &chan->vm_vram_pt);
+	if (chan->vm_vram_pt) {
+		for (i = 0; i < dev_priv->vm_vram_pt_nr; i++)
+			nouveau_gpuobj_ref_del(dev, &chan->vm_vram_pt[i]);
+		drm_free(chan->vm_vram_pt, dev_priv->vm_vram_pt_nr *
+			 sizeof(struct nouveau_gpuobj_ref *), DRM_MEM_DRIVER);
+	}
 
 	if (chan->ramin_heap)
 		nouveau_mem_takedown(&chan->ramin_heap);

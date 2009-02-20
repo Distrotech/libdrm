@@ -159,7 +159,7 @@ struct nouveau_channel
 	/* NV50 VM */
 	struct nouveau_gpuobj     *vm_pd;
 	struct nouveau_gpuobj_ref *vm_gart_pt;
-	struct nouveau_gpuobj_ref *vm_vram_pt;
+	struct nouveau_gpuobj_ref **vm_vram_pt;
 
 	/* Objects */
 	struct nouveau_gpuobj_ref *ramin; /* Private instmem */
@@ -320,7 +320,8 @@ struct drm_nouveau_private {
 	uint64_t vm_vram_base;
 	uint64_t vm_vram_size;
 	uint64_t vm_end;
-	struct nouveau_gpuobj *vm_vram_pt;
+	struct nouveau_gpuobj **vm_vram_pt;
+	int vm_vram_pt_nr;
 
 	/* the mtrr covering the FB */
 	int fb_mtrr;
@@ -441,6 +442,11 @@ extern void nouveau_mem_free(struct drm_device *dev, struct mem_block*);
 extern int  nouveau_mem_init(struct drm_device *);
 extern int  nouveau_mem_init_ttm(struct drm_device *);
 extern void nouveau_mem_close(struct drm_device *);
+extern int  nv50_mem_vm_bind_linear(struct drm_device *, uint64_t virt,
+				    uint32_t size, uint32_t flags,
+				    uint64_t phys);
+extern void nv50_mem_vm_unbind(struct drm_device *, uint64_t virt,
+			       uint32_t size);
 
 /* nouveau_notifier.c */
 extern int  nouveau_notifier_init_channel(struct nouveau_channel *);

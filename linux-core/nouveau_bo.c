@@ -296,6 +296,7 @@ nouveau_bo_move(struct drm_buffer_object *bo, int evict, int no_wait,
 {
 	struct drm_nouveau_private *dev_priv = bo->dev->dev_private;
 	struct drm_bo_mem_reg *old_mem = &bo->mem;
+	int ret;
 
 	if (dev_priv->init_state != NOUVEAU_CARD_INIT_DONE)
 		return drm_bo_move_memcpy(bo, evict, no_wait, new_mem);
@@ -304,9 +305,7 @@ nouveau_bo_move(struct drm_buffer_object *bo, int evict, int no_wait,
 	    (new_mem->mem_type == DRM_BO_MEM_VRAM ||
 	     new_mem->mem_type == DRM_BO_MEM_PRIV0) &&
 	    !(new_mem->proposed_flags & DRM_NOUVEAU_BO_FLAG_NOVM)) {
-		struct nouveau_gpuobj *pt = dev_priv->vm_vram_pt;
-		unsigned offset = new_mem->mm_node->start << PAGE_SHIFT;
-		unsigned count = new_mem->size / 65536;
+		uint64_t offset = new_mem->mm_node->start << PAGE_SHIFT;
 		unsigned tile = 0;
 
 		if (new_mem->proposed_flags & DRM_NOUVEAU_BO_FLAG_TILE) {
@@ -316,13 +315,11 @@ nouveau_bo_move(struct drm_buffer_object *bo, int evict, int no_wait,
 				tile = 0x00007000;
 		}
 
-		while (count--) {
-			unsigned pte = offset / 65536;
-
-			INSTANCE_WR(pt, (pte * 2) + 0, offset | 1);
-			INSTANCE_WR(pt, (pte * 2) + 1, 0x00000000 | tile);
-			offset += 65536;
-		}
+		ret = nv50_mem_vm_bind_linear(bo->dev,
+					      offset + dev_priv->vm_vram_base,
+					      new_mem->size, tile, offset);
+		if (ret)
+			return ret;
 	}
 
 	if (old_mem->flags & DRM_BO_FLAG_CLEAN) {
