@@ -471,6 +471,12 @@ void nouveau_fifo_free(struct nouveau_channel *chan)
 		}
 	}
 
+	/* Signal all pending fences, if any */
+	if (dev_priv->mm_enabled) {
+		drm_fence_handler(dev, chan->id, chan->next_sequence,
+				  DRM_FENCE_TYPE_EXE, 0);
+	}
+
 	/*XXX: Maybe should wait for PGRAPH to finish with the stuff it fetched
 	 *     from CACHE1 too?
 	 */
