@@ -6,8 +6,43 @@
 static int
 nv50_fbcon_sync(struct fb_info *info)
 {
-	if (info->state != FBINFO_STATE_RUNNING)
+	struct nv50_fbcon_par *par = info->par;
+	struct drm_device *dev = par->dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_channel *chan = dev_priv->channel;
+	int ret, i;
+
+	if (info->state != FBINFO_STATE_RUNNING ||
+	    info->flags & FBINFO_HWACCEL_DISABLED)
 		return 0;
+
+	if (RING_SPACE(chan, 4)) {
+		DRM_ERROR("GPU lockup - switching to software fbcon\n");
+		info->flags |= FBINFO_HWACCEL_DISABLED;
+		return 0;
+	}
+
+	BEGIN_RING(chan, 0, 0x0104, 1);
+	OUT_RING  (chan, 0);
+	BEGIN_RING(chan, 0, 0x0100, 1);
+	OUT_RING  (chan, 0);
+	chan->m2mf_ntfy_map[3] = 0xffffffff;
+	FIRE_RING (chan);
+
+	ret = -EBUSY;
+	for (i = 0; i < 100000; i++) {
+		if (chan->m2mf_ntfy_map[3] == 0) {
+			ret = 0;
+			break;
+		}
+		DRM_UDELAY(1);
+	}
+
+	if (ret) {
+		DRM_ERROR("GPU lockup - switching to software fbcon\n");
+		info->flags |= FBINFO_HWACCEL_DISABLED;
+		return 0;
+	}
 
 	return 0;
 }

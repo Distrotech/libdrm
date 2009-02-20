@@ -122,6 +122,17 @@ nouveau_dma_channel_setup(struct nouveau_channel *chan)
 		chan->dma.pushbuf = (void *)chan->pushbuf_mem->map->handle;
 	}
 
+	/* Map M2MF notifier object - fbcon. */
+	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
+		ret = drm_bo_kmap(chan->notifier_block->bo, 0,
+				  chan->notifier_block->bo->mem.num_pages,
+				  &chan->notifier_block->kmap);
+		if (ret)
+			return ret;
+		chan->m2mf_ntfy_map  = chan->notifier_block->kmap.virtual;
+		chan->m2mf_ntfy_map += chan->m2mf_ntfy;
+	}
+
 	/* Initialise DMA vars */
 	chan->dma.max  = (chan->pushbuf_mem->size >> 2) - 2;
 	chan->dma.put  = 0;
