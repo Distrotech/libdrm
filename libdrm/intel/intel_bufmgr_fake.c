@@ -1070,6 +1070,7 @@ drm_intel_fake_kick_all_locked(drm_intel_bufmgr_fake *bufmgr_fake)
       if (!(bo_fake->flags & BM_NO_BACKING_STORE))
          bo_fake->dirty = 1;
    }
+
 }
 
 static int

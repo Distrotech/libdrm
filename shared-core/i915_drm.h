@@ -39,7 +39,7 @@
 				 * of chars for next/prev indices */
 #define I915_LOG_MIN_TEX_REGION_SIZE 14
 
-typedef struct drm_i915_init {
+typedef struct _drm_i915_init {
 	enum {
 		I915_INIT_DMA = 0x01,
 		I915_CLEANUP_DMA = 0x02,
@@ -270,7 +270,7 @@ typedef struct drm_i915_batchbuffer {
 /* As above, but pass a pointer to userspace buffer which can be
  * validated by the kernel prior to sending to hardware.
  */
-typedef struct drm_i915_cmdbuffer {
+typedef struct _drm_i915_cmdbuffer {
 	char __user *buf;	/* pointer to userspace command buffer */
 	int sz;			/* nr bytes in buf */
 	int DR1;		/* hw flags for GFX_OP_DRAWRECT_INFO */
@@ -296,6 +296,7 @@ typedef struct drm_i915_irq_wait {
 #define I915_PARAM_LAST_DISPATCH         3
 #define I915_PARAM_CHIPSET_ID            4
 #define I915_PARAM_HAS_GEM               5
+#define I915_PARAM_NUM_FENCES_AVAIL      6
 
 typedef struct drm_i915_getparam {
 	int param;
@@ -307,6 +308,7 @@ typedef struct drm_i915_getparam {
 #define I915_SETPARAM_USE_MI_BATCHBUFFER_START            1
 #define I915_SETPARAM_TEX_LRU_LOG_GRANULARITY             2
 #define I915_SETPARAM_ALLOW_BATCHBUFFER                   3
+#define I915_SETPARAM_NUM_USED_FENCES                     4
 
 typedef struct drm_i915_setparam {
 	int param;
@@ -374,10 +376,6 @@ typedef struct drm_i915_vblank_swap {
 #define MMIO_REGS_CL_INVOCATION_COUNT		6
 #define MMIO_REGS_PS_INVOCATION_COUNT		7
 #define MMIO_REGS_PS_DEPTH_COUNT		8
-#define MMIO_REGS_DOVSTA			9
-#define MMIO_REGS_GAMMA				10
-#define MMIO_REGS_FENCE				11
-#define MMIO_REGS_FENCE_NEW			12
 
 typedef struct drm_i915_mmio_entry {
 	unsigned int flag;

@@ -54,6 +54,7 @@
 #include "errno.h"
 #include "intel_bufmgr.h"
 #include "intel_bufmgr_priv.h"
+#include "intel_chipset.h"
 #include "string.h"
 
 #include "i915_drm.h"
@@ -99,6 +100,8 @@ typedef struct _drm_intel_bufmgr_gem {
     struct drm_intel_gem_bo_bucket cache_bucket[DRM_INTEL_GEM_BO_BUCKETS];
 
     uint64_t gtt_size;
+    int available_fences;
+    int pci_device;
 } drm_intel_bufmgr_gem;
 
 struct _drm_intel_bo_gem {
@@ -165,6 +168,11 @@ struct _drm_intel_bo_gem {
      * the common case.
      */
     int reloc_tree_size;
+    /**
+     * Number of potential fence registers required by this buffer and its
+     * relocations.
+     */
+    int reloc_tree_fences;
 };
 
 static void drm_intel_gem_bo_reference_locked(drm_intel_bo *bo);
@@ -347,6 +355,7 @@ drm_intel_gem_bo_alloc(drm_intel_bufmgr *bufmgr, const char *name,
 	struct drm_i915_gem_busy busy;
 	
 	bo_gem = bucket->head;
+	memset(&busy, 0, sizeof(busy));
         busy.handle = bo_gem->gem_handle;
 
         ret = ioctl(bufmgr_gem->fd, DRM_IOCTL_I915_GEM_BUSY, &busy);
@@ -386,6 +395,7 @@ drm_intel_gem_bo_alloc(drm_intel_bufmgr *bufmgr, const char *name,
     bo_gem->refcount = 1;
     bo_gem->validate_index = -1;
     bo_gem->reloc_tree_size = bo_gem->bo.size;
+    bo_gem->reloc_tree_fences = 0;
     bo_gem->used_as_reloc_target = 0;
     bo_gem->tiling_mode = I915_TILING_NONE;
     bo_gem->swizzle_mode = I915_BIT_6_SWIZZLE_NONE;
@@ -435,6 +445,7 @@ drm_intel_bo_gem_create_from_name(drm_intel_bufmgr *bufmgr, const char *name,
     bo_gem->gem_handle = open_arg.handle;
     bo_gem->global_name = handle;
 
+    memset(&get_tiling, 0, sizeof(get_tiling));
     get_tiling.handle = bo_gem->gem_handle;
     ret = ioctl(bufmgr_gem->fd, DRM_IOCTL_I915_GEM_GET_TILING, &get_tiling);
     if (ret != 0) {
@@ -443,6 +454,10 @@ drm_intel_bo_gem_create_from_name(drm_intel_bufmgr *bufmgr, const char *name,
     }
     bo_gem->tiling_mode = get_tiling.tiling_mode;
     bo_gem->swizzle_mode = get_tiling.swizzle_mode;
+    if (bo_gem->tiling_mode == I915_TILING_NONE)
+	bo_gem->reloc_tree_fences = 0;
+    else
+	bo_gem->reloc_tree_fences = 1;
 
     DBG("bo_create_from_handle: %d (%s)\n", handle, bo_gem->name);
 
@@ -458,14 +473,6 @@ drm_intel_gem_bo_reference(drm_intel_bo *bo)
     pthread_mutex_lock(&bufmgr_gem->lock);
     bo_gem->refcount++;
     pthread_mutex_unlock(&bufmgr_gem->lock);
-}
-
-static void
-dri_gem_bo_reference_locked(dri_bo *bo)
-{
-    drm_intel_bo_gem *bo_gem = (drm_intel_bo_gem *)bo;
-
-    bo_gem->refcount++;
 }
 
 static void
@@ -488,6 +495,7 @@ drm_intel_gem_bo_free(drm_intel_bo *bo)
 	munmap (bo_gem->virtual, bo_gem->bo.size);
 
     /* Close this object */
+    memset(&close, 0, sizeof(close));
     close.handle = bo_gem->gem_handle;
     ret = ioctl(bufmgr_gem->fd, DRM_IOCTL_GEM_CLOSE, &close);
     if (ret != 0) {
@@ -868,6 +876,7 @@ drm_intel_gem_bo_emit_reloc(drm_intel_bo *bo, uint32_t offset,
      */
     assert(!bo_gem->used_as_reloc_target);
     bo_gem->reloc_tree_size += target_bo_gem->reloc_tree_size;
+    bo_gem->reloc_tree_fences += target_bo_gem->reloc_tree_fences;
 
     /* Flag the target to disallow further relocations in it. */
     target_bo_gem->used_as_reloc_target = 1;
@@ -1004,6 +1013,7 @@ drm_intel_gem_bo_pin(drm_intel_bo *bo, uint32_t alignment)
     struct drm_i915_gem_pin pin;
     int ret;
 
+    memset(&pin, 0, sizeof(pin));
     pin.handle = bo_gem->gem_handle;
     pin.alignment = alignment;
 
@@ -1026,6 +1036,7 @@ drm_intel_gem_bo_unpin(drm_intel_bo *bo)
     struct drm_i915_gem_unpin unpin;
     int ret;
 
+    memset(&unpin, 0, sizeof(unpin));
     unpin.handle = bo_gem->gem_handle;
 
     ret = ioctl(bufmgr_gem->fd, DRM_IOCTL_I915_GEM_UNPIN, &unpin);
@@ -1047,6 +1058,11 @@ drm_intel_gem_bo_set_tiling(drm_intel_bo *bo, uint32_t *tiling_mode,
     if (bo_gem->global_name == 0 && *tiling_mode == bo_gem->tiling_mode)
 	return 0;
 
+    /* If we're going from non-tiling to tiling, bump fence count */
+    if (bo_gem->tiling_mode == I915_TILING_NONE)
+	bo_gem->reloc_tree_fences++;
+
+    memset(&set_tiling, 0, sizeof(set_tiling));
     set_tiling.handle = bo_gem->gem_handle;
     set_tiling.tiling_mode = *tiling_mode;
     set_tiling.stride = stride;
@@ -1058,6 +1074,10 @@ drm_intel_gem_bo_set_tiling(drm_intel_bo *bo, uint32_t *tiling_mode,
     }
     bo_gem->tiling_mode = set_tiling.tiling_mode;
     bo_gem->swizzle_mode = set_tiling.swizzle_mode;
+
+    /* If we're going from tiling to non-tiling, drop fence count */
+    if (bo_gem->tiling_mode == I915_TILING_NONE)
+	bo_gem->reloc_tree_fences--;
 
     *tiling_mode = bo_gem->tiling_mode;
     return 0;
@@ -1083,6 +1103,7 @@ drm_intel_gem_bo_flink(drm_intel_bo *bo, uint32_t *name)
     int ret;
 
     if (!bo_gem->global_name) {
+	memset(&flink, 0, sizeof(flink));
 	flink.handle = bo_gem->gem_handle;
     
 	ret = ioctl(bufmgr_gem->fd, DRM_IOCTL_GEM_FLINK, &flink);
@@ -1133,6 +1154,31 @@ drm_intel_gem_bo_get_aperture_space(drm_intel_bo *bo)
     for (i = 0; i < bo_gem->reloc_count; i++)
 	total += drm_intel_gem_bo_get_aperture_space(bo_gem->reloc_target_bo[i]);
 
+    return total;
+}
+
+/**
+ * Count the number of buffers in this list that need a fence reg
+ *
+ * If the count is greater than the number of available regs, we'll have
+ * to ask the caller to resubmit a batch with fewer tiled buffers.
+ *
+ * This function over-counts if the same buffer is used multiple times.
+ */
+static unsigned int
+drm_intel_gem_total_fences(drm_intel_bo **bo_array, int count)
+{
+    int i;
+    unsigned int total = 0;
+
+    for (i = 0; i < count; i++) {
+	drm_intel_bo_gem *bo_gem = (drm_intel_bo_gem *)bo_array[i];
+
+	if (bo_gem == NULL)
+	    continue;
+
+	total += bo_gem->reloc_tree_fences;
+    }
     return total;
 }
 
@@ -1214,9 +1260,17 @@ drm_intel_gem_check_aperture_space(drm_intel_bo **bo_array, int count)
     drm_intel_bufmgr_gem *bufmgr_gem = (drm_intel_bufmgr_gem *)bo_array[0]->bufmgr;
     unsigned int total = 0;
     unsigned int threshold = bufmgr_gem->gtt_size * 3 / 4;
+    int total_fences;
+
+    /* Check for fence reg constraints if necessary */
+    if (bufmgr_gem->available_fences) {
+	total_fences = drm_intel_gem_total_fences(bo_array, count);
+	if (total_fences > bufmgr_gem->available_fences)
+	    return -1;
+    }
 
     total = drm_intel_gem_estimate_batch_space(bo_array, count);
-    
+
     if (total > threshold)
 	total = drm_intel_gem_compute_batch_space(bo_array, count);
 
@@ -1242,6 +1296,7 @@ drm_intel_bufmgr_gem_init(int fd, int batch_size)
 {
     drm_intel_bufmgr_gem *bufmgr_gem;
     struct drm_i915_gem_get_aperture aperture;
+    drm_i915_getparam_t gp;
     int ret, i;
 
     bufmgr_gem = calloc(1, sizeof(*bufmgr_gem));
@@ -1263,6 +1318,25 @@ drm_intel_bufmgr_gem_init(int fd, int batch_size)
 	fprintf(stderr, "Assuming %dkB available aperture size.\n"
 		"May lead to reduced performance or incorrect rendering.\n",
 		(int)bufmgr_gem->gtt_size / 1024);
+    }
+
+    gp.param = I915_PARAM_CHIPSET_ID;
+    gp.value = &bufmgr_gem->pci_device;
+    ret = ioctl(bufmgr_gem->fd, DRM_IOCTL_I915_GETPARAM, &gp);
+    if (ret) {
+	fprintf(stderr, "get chip id failed: %d\n", ret);
+	fprintf(stderr, "param: %d, val: %d\n", gp.param, *gp.value);
+    }
+
+    if (!IS_I965G(bufmgr_gem)) {
+	gp.param = I915_PARAM_NUM_FENCES_AVAIL;
+	gp.value = &bufmgr_gem->available_fences;
+	ret = ioctl(bufmgr_gem->fd, DRM_IOCTL_I915_GETPARAM, &gp);
+	if (ret) {
+	    fprintf(stderr, "get fences failed: %d\n", ret);
+	    fprintf(stderr, "param: %d, val: %d\n", gp.param, *gp.value);
+	    bufmgr_gem->available_fences = 0;
+	}
     }
 
     /* Let's go with one relocation per every 2 dwords (but round down a bit
