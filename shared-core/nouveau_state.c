@@ -31,64 +31,6 @@
 #include "nv50_display.h"
 #include "nv50_fbcon.h"
 
-static int nouveau_init_card_mappings(struct drm_device *dev)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	int ret;
-
-	/* resource 0 is mmio regs */
-	/* resource 1 is linear FB */
-	/* resource 2 is RAMIN (mmio regs + 0x1000000) */
-	/* resource 6 is bios */
-
-	/* map the mmio regs */
-	ret = drm_addmap(dev, drm_get_resource_start(dev, 0),
-			      drm_get_resource_len(dev, 0),
-			      _DRM_REGISTERS, _DRM_READ_ONLY, &dev_priv->mmio);
-	if (ret) {
-		DRM_ERROR("Unable to initialize the mmio mapping (%d). "
-			  "Please report your setup to " DRIVER_EMAIL "\n",
-			  ret);
-		return -EINVAL;
-	}
-	DRM_DEBUG("regs mapped ok at 0x%lx\n", dev_priv->mmio->offset);
-
-	/* map larger RAMIN aperture on NV40 cards */
-	dev_priv->ramin = NULL;
-	if (dev_priv->card_type >= NV_40) {
-		int ramin_resource = 2;
-		if (drm_get_resource_len(dev, ramin_resource) == 0)
-			ramin_resource = 3;
-
-		ret = drm_addmap(dev,
-				 drm_get_resource_start(dev, ramin_resource),
-				 drm_get_resource_len(dev, ramin_resource),
-				 _DRM_REGISTERS, _DRM_READ_ONLY,
-				 &dev_priv->ramin);
-		if (ret) {
-			DRM_ERROR("Failed to init RAMIN mapping, "
-				  "limited instance memory available\n");
-			dev_priv->ramin = NULL;
-		}
-	}
-
-	/* On older cards (or if the above failed), create a map covering
-	 * the BAR0 PRAMIN aperture */
-	if (!dev_priv->ramin) {
-		ret = drm_addmap(dev,
-				 drm_get_resource_start(dev, 0) + NV_RAMIN,
-				 (1*1024*1024),
-				 _DRM_REGISTERS, _DRM_READ_ONLY,
-				 &dev_priv->ramin);
-		if (ret) {
-			DRM_ERROR("Failed to map BAR0 PRAMIN: %d\n", ret);
-			return ret;
-		}
-	}
-
-	return 0;
-}
-
 static int nouveau_stub_init(struct drm_device *dev) { return 0; }
 static void nouveau_stub_takedown(struct drm_device *dev) {}
 
@@ -455,16 +397,53 @@ void nouveau_preclose(struct drm_device *dev, struct drm_file *file_priv)
 	}
 }
 
-int nouveau_setup_mappings(struct drm_device *dev)
+/* first module load, setup the mmio/fb mapping */
+/* KMS: we need mmio at load time, not when the first drm client opens. */
+int nouveau_firstopen(struct drm_device *dev)
 {
+	return 0;
+}
+
+#define NV40_CHIPSET_MASK 0x00000baf
+#define NV44_CHIPSET_MASK 0x00005450
+
+int nouveau_load(struct drm_device *dev, unsigned long flags)
+{
+	struct drm_nouveau_private *dev_priv;
 #if defined(__powerpc__)
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct device_node *dn;
 #endif
+	uint32_t reg0;
+	uint8_t architecture = 0;
 	int ret;
-	/* Map any PCI resources we need on the card */
-	ret = nouveau_init_card_mappings(dev);
-	if (ret) return ret;
+
+	dev_priv = drm_calloc(1, sizeof(*dev_priv), DRM_MEM_DRIVER);
+	if (!dev_priv)
+		return -ENOMEM;
+
+	dev_priv->flags = flags & NOUVEAU_FLAGS;
+	dev_priv->init_state = NOUVEAU_CARD_INIT_DOWN;
+
+	DRM_DEBUG("vendor: 0x%X device: 0x%X class: 0x%X\n",
+		  dev->pci_vendor, dev->pci_device, dev->pdev->class);
+
+	/* resource 0 is mmio regs */
+	/* resource 1 is linear FB */
+	/* resource 2 is RAMIN (mmio regs + 0x1000000) */
+	/* resource 6 is bios */
+
+	/* map the mmio regs */
+	ret = drm_addmap(dev, drm_get_resource_start(dev, 0),
+			      drm_get_resource_len(dev, 0),
+			      _DRM_REGISTERS, _DRM_READ_ONLY |
+			      _DRM_DRIVER, &dev_priv->mmio);
+	if (ret) {
+		DRM_ERROR("Unable to initialize the mmio mapping (%d). "
+			  "Please report your setup to " DRIVER_EMAIL "\n",
+			  ret);
+		return -EINVAL;
+	}
+	DRM_DEBUG("regs mapped ok at 0x%lx\n", dev_priv->mmio->offset);
 
 #if defined(__powerpc__)
 	/* Put the card in BE mode if it's not */
@@ -472,9 +451,7 @@ int nouveau_setup_mappings(struct drm_device *dev)
 		NV_WRITE(NV03_PMC_BOOT_1,0x00000001);
 
 	DRM_MEMORYBARRIER();
-#endif
 
-#if defined(__linux__) && defined(__powerpc__)
 	/* if we have an OF card, copy vbios to RAMIN */
 	dn = pci_device_to_OF_node(dev->pdev);
 	if (dn)
@@ -498,51 +475,9 @@ int nouveau_setup_mappings(struct drm_device *dev)
 	else
 		DRM_INFO("Unable to get the OF node\n");
 #endif
-	return 0;
-}
-
-/* first module load, setup the mmio/fb mapping */
-/* KMS: we need mmio at load time, not when the first drm client opens. */
-int nouveau_firstopen(struct drm_device *dev)
-{
-	if (drm_core_check_feature(dev, DRIVER_MODESET))
-		return 0;
-
-	return nouveau_setup_mappings(dev);
-}
-
-#define NV40_CHIPSET_MASK 0x00000baf
-#define NV44_CHIPSET_MASK 0x00005450
-
-int nouveau_load(struct drm_device *dev, unsigned long flags)
-{
-	struct drm_nouveau_private *dev_priv;
-	void __iomem *regs;
-	uint32_t reg0,reg1;
-	uint8_t architecture = 0;
-
-	dev_priv = drm_calloc(1, sizeof(*dev_priv), DRM_MEM_DRIVER);
-	if (!dev_priv)
-		return -ENOMEM;
-
-	dev_priv->flags = flags & NOUVEAU_FLAGS;
-	dev_priv->init_state = NOUVEAU_CARD_INIT_DOWN;
-
-	DRM_DEBUG("vendor: 0x%X device: 0x%X class: 0x%X\n", dev->pci_vendor, dev->pci_device, dev->pdev->class);
 
 	/* Time to determine the card architecture */
-	regs = ioremap_nocache(pci_resource_start(dev->pdev, 0), 0x8);
-	if (!regs) {
-		DRM_ERROR("Could not ioremap to determine register\n");
-		return -ENOMEM;
-	}
-
-	reg0 = readl(regs+NV03_PMC_BOOT_0);
-	reg1 = readl(regs+NV03_PMC_BOOT_1);
-#if defined(__powerpc__)
-	if (reg1)
-		reg0=___swab32(reg0);
-#endif
+	reg0 = NV_READ(NV03_PMC_BOOT_0);
 
 	/* We're dealing with >=NV10 */
 	if ((reg0 & 0x0f000000) > 0 ) {
@@ -552,8 +487,6 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	} else if ((reg0 & 0xff00fff0) == 0x20004000) {
 		architecture = 0x04;
 	}
-
-	iounmap(regs);
 
 	if (architecture >= 0x80) {
 		dev_priv->card_type = NV_50;
@@ -594,6 +527,40 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 		return -EINVAL;
 	}
 
+	/* map larger RAMIN aperture on NV40 cards */
+	dev_priv->ramin = NULL;
+	if (dev_priv->card_type >= NV_40) {
+		int ramin_resource = 2;
+		if (drm_get_resource_len(dev, ramin_resource) == 0)
+			ramin_resource = 3;
+
+		ret = drm_addmap(dev,
+				 drm_get_resource_start(dev, ramin_resource),
+				 drm_get_resource_len(dev, ramin_resource),
+				 _DRM_REGISTERS, _DRM_READ_ONLY |
+				 _DRM_DRIVER, &dev_priv->ramin);
+		if (ret) {
+			DRM_ERROR("Failed to init RAMIN mapping, "
+				  "limited instance memory available\n");
+			dev_priv->ramin = NULL;
+		}
+	}
+
+	/* On older cards (or if the above failed), create a map covering
+	 * the BAR0 PRAMIN aperture */
+	if (!dev_priv->ramin) {
+		ret = drm_addmap(dev,
+				 drm_get_resource_start(dev, 0) + NV_RAMIN,
+				 (1*1024*1024),
+				 _DRM_REGISTERS, _DRM_READ_ONLY | _DRM_DRIVER,
+				 &dev_priv->ramin);
+		if (ret) {
+			DRM_ERROR("Failed to map BAR0 PRAMIN: %d\n", ret);
+			return ret;
+		}
+	}
+
+
 	/* For those who think they want to be funny. */
 	if (dev_priv->card_type < NV_50)
 		dev->driver->driver_features &= ~DRIVER_MODESET;
@@ -607,17 +574,11 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 
 	dev->dev_private = (void *)dev_priv;
 
-	/* init card now, otherwise bad things happen */
+	/* For kernel modesetting, init card now and bring up fbcon */
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
-		int rval = 0;
-
-		rval = nouveau_setup_mappings(dev);
-		if (rval != 0)
-			return rval;
-
-		rval = nouveau_card_init(dev);
-		if (rval != 0)
-			return rval;
+		ret = nouveau_card_init(dev);
+		if (ret)
+			return ret;
 	}
 
 	return 0;
@@ -643,13 +604,18 @@ void nouveau_lastclose(struct drm_device *dev)
 
 int nouveau_unload(struct drm_device *dev)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
 		nv50_fbcon_destroy(dev);
 		nv50_display_destroy(dev);
 		nouveau_close(dev);
 	}
 
-	drm_free(dev->dev_private, sizeof(*dev->dev_private), DRM_MEM_DRIVER);
+	drm_rmmap(dev, dev_priv->mmio);
+	drm_rmmap(dev, dev_priv->ramin);
+
+	drm_free(dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER);
 	dev->dev_private = NULL;
 	return 0;
 }
