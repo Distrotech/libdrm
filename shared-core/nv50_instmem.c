@@ -304,9 +304,18 @@ nv50_instmem_bind(struct drm_device *dev, struct nouveau_gpuobj *gpuobj)
 	dev_priv->engine.instmem.finish_access(dev);
 
 	nv_wr32(0x100c80, 0x00040001);
-	while(nv_rd32(0x100c80) & 1);
+	if (!nv_wait(0x100c80, 0x00000001, 0x00000000)) {
+		DRM_ERROR("timeout: (0x100c80 & 1) == 0 (1)\n");
+		DRM_ERROR("0x100c80 = 0x%08x\n", nv_rd32(0x100c80));
+		return -EBUSY;
+	}
+
 	nv_wr32(0x100c80, 0x00060001);
-	while(nv_rd32(0x100c80) & 1);
+	if (!nv_wait(0x100c80, 0x00000001, 0x00000000)) {
+		DRM_ERROR("timeout: (0x100c80 & 1) == 0 (2)\n");
+		DRM_ERROR("0x100c80 = 0x%08x\n", nv_rd32(0x100c80));
+		return -EBUSY;
+	}
 
 	gpuobj->im_bound = 1;
 	return 0;
