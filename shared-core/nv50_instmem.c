@@ -303,8 +303,6 @@ nv50_instmem_bind(struct drm_device *dev, struct nouveau_gpuobj *gpuobj)
 	}
 	dev_priv->engine.instmem.finish_access(dev);
 
-	nv_wr32(0x070000, 0x00000001);
-	while(nv_rd32(0x070000) & 1);
 	nv_wr32(0x100c80, 0x00040001);
 	while(nv_rd32(0x100c80) & 1);
 	nv_wr32(0x100c80, 0x00060001);
