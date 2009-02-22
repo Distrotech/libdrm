@@ -196,7 +196,7 @@ nouveau_gpuobj_new(struct drm_device *dev, struct nouveau_channel *chan,
 		   struct nouveau_gpuobj **gpuobj_ret)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 	struct nouveau_gpuobj *gpuobj;
 	struct mem_block *pramin = NULL;
 	int ret;
@@ -336,7 +336,7 @@ int
 nouveau_gpuobj_del(struct drm_device *dev, struct nouveau_gpuobj **pgpuobj)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 	struct nouveau_gpuobj *gpuobj;
 
 	DRM_DEBUG("gpuobj %p\n", pgpuobj ? *pgpuobj : NULL);

@@ -37,7 +37,7 @@ static void nouveau_stub_takedown(struct drm_device *dev) {}
 static int nouveau_init_engine_ptrs(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 
 	switch (dev_priv->chipset & 0xf0) {
 	case 0x00:
@@ -253,7 +253,7 @@ nouveau_card_init(struct drm_device *dev)
 	/* Initialise internal driver API hooks */
 	ret = nouveau_init_engine_ptrs(dev);
 	if (ret) return ret;
-	engine = &dev_priv->Engine;
+	engine = &dev_priv->engine;
 	dev_priv->init_state = NOUVEAU_CARD_INIT_FAILED;
 
 	ret = nouveau_gpuobj_early_init(dev);
@@ -344,7 +344,7 @@ nouveau_card_init(struct drm_device *dev)
 static void nouveau_card_takedown(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 
 	DRM_DEBUG("prev state = %d\n", dev_priv->init_state);
 
@@ -726,7 +726,7 @@ bool nouveau_wait_until(struct drm_device *dev, uint64_t timeout,
 			uint32_t reg, uint32_t mask, uint32_t val)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_timer_engine *ptimer = &dev_priv->Engine.timer;
+	struct nouveau_timer_engine *ptimer = &dev_priv->engine.timer;
 	uint64_t start = ptimer->read(dev);
 
 	do {
@@ -761,7 +761,7 @@ static int nouveau_suspend(struct drm_device *dev)
 	struct mem_block *p;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_suspend_resume *susres = &dev_priv->susres;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 	int i;
 
 	drm_free(susres->ramin_copy, susres->ramin_size, DRM_MEM_DRIVER);
@@ -830,7 +830,7 @@ static int nouveau_resume(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_suspend_resume *susres = &dev_priv->susres;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 	int i;
 
 	if (!susres->ramin_copy)

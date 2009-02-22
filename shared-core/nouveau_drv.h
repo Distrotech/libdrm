@@ -278,7 +278,7 @@ struct drm_nouveau_private {
 	int fifo_alloc_count;
 	struct nouveau_channel *fifos[NOUVEAU_MAX_CHANNEL_NR];
 
-	struct nouveau_engine Engine;
+	struct nouveau_engine engine;
 	struct nouveau_channel *channel;
 
 	/* RAMIN configuration, RAMFC, RAMHT and RAMRO offsets */

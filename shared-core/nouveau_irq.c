@@ -77,7 +77,7 @@ static void
 nouveau_fifo_irq_handler(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 	uint32_t status, reassign;
 
 	reassign = nv_rd32(NV03_PFIFO_CACHES) & 1;
@@ -205,14 +205,14 @@ nouveau_graph_chid_from_grctx(struct drm_device *dev)
 	int i;
 
 	if (dev_priv->card_type < NV_40)
-		return dev_priv->Engine.fifo.channels;
+		return dev_priv->engine.fifo.channels;
 	else
 	if (dev_priv->card_type < NV_50)
 		inst = (nv_rd32(0x40032c) & 0xfffff) << 4;
 	else
 		inst = nv_rd32(0x40032c) & 0xfffff;
 
-	for (i = 0; i < dev_priv->Engine.fifo.channels; i++) {
+	for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
 		struct nouveau_channel *chan = dev_priv->fifos[i];
 
 		if (!chan || !chan->ramin_grctx)
@@ -234,7 +234,7 @@ static int
 nouveau_graph_trapped_channel(struct drm_device *dev, int *channel_ret)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 	int channel;
 
 	if (dev_priv->card_type < NV_10)
@@ -380,7 +380,7 @@ static inline void
 nouveau_pgraph_intr_context_switch(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 	uint32_t chid;
 
 	chid = engine->fifo.channel_id(dev);

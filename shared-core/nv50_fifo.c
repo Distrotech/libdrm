@@ -39,7 +39,7 @@ static void
 nv50_fifo_init_thingo(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nv50_fifo_priv *priv = dev_priv->Engine.fifo.priv;
+	struct nv50_fifo_priv *priv = dev_priv->engine.fifo.priv;
 	struct nouveau_gpuobj_ref *cur;
 	int i, nr;
 
@@ -171,7 +171,7 @@ nv50_fifo_init(struct drm_device *dev)
 	priv = drm_calloc(1, sizeof(*priv), DRM_MEM_DRIVER);
 	if (!priv)
 		return -ENOMEM;
-	dev_priv->Engine.fifo.priv = priv;
+	dev_priv->engine.fifo.priv = priv;
 
 	nv50_fifo_init_reset(dev);
 	nv50_fifo_init_intr(dev);
@@ -201,7 +201,7 @@ void
 nv50_fifo_takedown(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nv50_fifo_priv *priv = dev_priv->Engine.fifo.priv;
+	struct nv50_fifo_priv *priv = dev_priv->engine.fifo.priv;
 
 	DRM_DEBUG("\n");
 
@@ -211,7 +211,7 @@ nv50_fifo_takedown(struct drm_device *dev)
 	nouveau_gpuobj_ref_del(dev, &priv->thingo[0]);
 	nouveau_gpuobj_ref_del(dev, &priv->thingo[1]);
 
-	dev_priv->Engine.fifo.priv = NULL;
+	dev_priv->engine.fifo.priv = NULL;
 	drm_free(priv, sizeof(*priv), DRM_MEM_DRIVER);
 }
 

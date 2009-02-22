@@ -353,7 +353,7 @@ struct graph_state {
 void nouveau_nv04_context_switch(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 	struct nouveau_channel *next, *last;
 	int chid;
 

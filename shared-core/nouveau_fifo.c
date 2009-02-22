@@ -262,7 +262,7 @@ nouveau_fifo_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 {
 	int ret;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 	struct nouveau_channel *chan;
 	int channel;
 
@@ -417,7 +417,7 @@ nouveau_channel_idle(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 	uint32_t caches;
 	int idle;
 
@@ -456,7 +456,7 @@ void nouveau_fifo_free(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 	uint64_t t_start;
 
 	DRM_INFO("%s: freeing fifo %d\n", __func__, chan->id);
@@ -522,7 +522,7 @@ void nouveau_fifo_free(struct nouveau_channel *chan)
 void nouveau_fifo_cleanup(struct drm_device *dev, struct drm_file *file_priv)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 	int i;
 
 	DRM_DEBUG("clearing FIFO enables from file_priv\n");
@@ -539,7 +539,7 @@ nouveau_fifo_owner(struct drm_device *dev, struct drm_file *file_priv,
 		   int channel)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 
 	if (channel >= engine->fifo.channels)
 		return 0;

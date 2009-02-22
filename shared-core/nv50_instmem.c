@@ -67,7 +67,7 @@ nv50_instmem_init(struct drm_device *dev)
 	priv = drm_calloc(1, sizeof(*priv), DRM_MEM_DRIVER);
 	if (!priv)
 		return -ENOMEM;
-	dev_priv->Engine.instmem.priv = priv;
+	dev_priv->engine.instmem.priv = priv;
 
 	/* Save state, will restore at takedown. */
 	for (i = 0x1700; i <= 0x1710; i+=4)
@@ -201,7 +201,7 @@ void
 nv50_instmem_takedown(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	nv50_instmem_priv *priv = dev_priv->Engine.instmem.priv;
+	nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
 	struct nouveau_channel *chan = dev_priv->fifos[0];
 	int i;
 
@@ -228,7 +228,7 @@ nv50_instmem_takedown(struct drm_device *dev)
 		drm_free(chan, sizeof(*chan), DRM_MEM_DRIVER);
 	}
 
-	dev_priv->Engine.instmem.priv = NULL;
+	dev_priv->engine.instmem.priv = NULL;
 	drm_free(priv, sizeof(*priv), DRM_MEM_DRIVER);
 }
 
@@ -261,7 +261,7 @@ nv50_instmem_clear(struct drm_device *dev, struct nouveau_gpuobj *gpuobj)
 
 	if (gpuobj && gpuobj->im_backing) {
 		if (gpuobj->im_bound)
-			dev_priv->Engine.instmem.unbind(dev, gpuobj);
+			dev_priv->engine.instmem.unbind(dev, gpuobj);
 		nouveau_mem_free(dev, gpuobj->im_backing);
 		gpuobj->im_backing = NULL;
 	}
@@ -271,7 +271,7 @@ int
 nv50_instmem_bind(struct drm_device *dev, struct nouveau_gpuobj *gpuobj)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	nv50_instmem_priv *priv = dev_priv->Engine.instmem.priv;
+	nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
 	uint32_t pte, pte_end, vram;
 
 	if (!gpuobj->im_backing || !gpuobj->im_pramin || gpuobj->im_bound)
@@ -312,7 +312,7 @@ int
 nv50_instmem_unbind(struct drm_device *dev, struct nouveau_gpuobj *gpuobj)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	nv50_instmem_priv *priv = dev_priv->Engine.instmem.priv;
+	nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
 	uint32_t pte, pte_end;
 
 	if (gpuobj->im_bound == 0)

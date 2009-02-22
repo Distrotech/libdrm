@@ -709,7 +709,7 @@ void nouveau_nv10_context_switch(struct drm_device *dev)
 		DRM_DEBUG("Invalid drm_nouveau_private->fifos\n");
 		return;
 	}
-	engine = &dev_priv->Engine;
+	engine = &dev_priv->engine;
 
 	chid = (nv_rd32(NV04_PGRAPH_TRAPPED_ADDR) >> 20) &
 		(engine->fifo.channels - 1);
@@ -831,7 +831,7 @@ void nv10_graph_destroy_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
 	int chid;
 

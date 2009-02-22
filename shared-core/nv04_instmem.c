@@ -43,7 +43,7 @@ static void
 nv04_instmem_configure_fixed_tables(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_engine *engine = &dev_priv->engine;
 
 	/* FIFO hash table (RAMHT)
 	 *   use 4k hash table at RAMIN+0x10000
@@ -143,7 +143,7 @@ nv04_instmem_clear(struct drm_device *dev, struct nouveau_gpuobj *gpuobj)
 
 	if (gpuobj && gpuobj->im_backing) {
 		if (gpuobj->im_bound)
-			dev_priv->Engine.instmem.unbind(dev, gpuobj);
+			dev_priv->engine.instmem.unbind(dev, gpuobj);
 		gpuobj->im_backing = NULL;
 	}
 }
