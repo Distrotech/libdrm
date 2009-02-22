@@ -29,14 +29,14 @@
 #include "drm.h"
 #include "nouveau_drv.h"
 
-typedef struct {
+struct nv50_instmem_priv {
 	uint32_t save1700[5]; /* 0x1700->0x1710 */
 
 	struct nouveau_gpuobj_ref *pramin_pt;
 	struct nouveau_gpuobj_ref *pramin_bar;
 
 	bool last_access_wr;
-} nv50_instmem_priv;
+};
 
 #define NV50_INSTMEM_PAGE_SHIFT 12
 #define NV50_INSTMEM_PAGE_SIZE  (1 << NV50_INSTMEM_PAGE_SHIFT)
@@ -62,7 +62,7 @@ nv50_instmem_init(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_channel *chan;
 	uint32_t c_offset, c_size, c_ramfc, c_vmpd, c_base, pt_size;
-	nv50_instmem_priv *priv;
+	struct nv50_instmem_priv *priv;
 	int ret, i;
 	uint32_t v;
 
@@ -205,7 +205,7 @@ void
 nv50_instmem_takedown(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
+	struct nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
 	struct nouveau_channel *chan = dev_priv->fifos[0];
 	int i;
 
@@ -275,7 +275,7 @@ int
 nv50_instmem_bind(struct drm_device *dev, struct nouveau_gpuobj *gpuobj)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
+	struct nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
 	uint32_t pte, pte_end, vram;
 
 	if (!gpuobj->im_backing || !gpuobj->im_pramin || gpuobj->im_bound)
@@ -318,7 +318,7 @@ int
 nv50_instmem_unbind(struct drm_device *dev, struct nouveau_gpuobj *gpuobj)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
+	struct nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
 	uint32_t pte, pte_end;
 
 	if (gpuobj->im_bound == 0)
@@ -343,7 +343,7 @@ void
 nv50_instmem_prepare_access(struct drm_device *dev, bool write)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
+	struct nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
 
 	BUG_ON(dev_priv->ramin_map != NULL);
 	dev_priv->ramin_map = dev_priv->ramin;
@@ -355,7 +355,7 @@ void
 nv50_instmem_finish_access(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
+	struct nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
 
 	BUG_ON(dev_priv->ramin_map == NULL);
 	dev_priv->ramin_map = NULL;
