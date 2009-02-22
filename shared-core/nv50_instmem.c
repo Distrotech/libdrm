@@ -34,6 +34,8 @@ typedef struct {
 
 	struct nouveau_gpuobj_ref *pramin_pt;
 	struct nouveau_gpuobj_ref *pramin_bar;
+
+	bool last_access_wr;
 } nv50_instmem_priv;
 
 #define NV50_INSTMEM_PAGE_SHIFT 12
@@ -341,17 +343,27 @@ void
 nv50_instmem_prepare_access(struct drm_device *dev, bool write)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
 
 	BUG_ON(dev_priv->ramin_map != NULL);
 	dev_priv->ramin_map = dev_priv->ramin;
+
+	priv->last_access_wr = write;
 }
 
 void
 nv50_instmem_finish_access(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	nv50_instmem_priv *priv = dev_priv->engine.instmem.priv;
 
 	BUG_ON(dev_priv->ramin_map == NULL);
 	dev_priv->ramin_map = NULL;
+
+	if (priv->last_access_wr) {
+		nv_wr32(0x070000, 0x00000001);
+		if (!nv_wait(0x070000, 0x00000001, 0x00000000))
+			DRM_ERROR("PRAMIN flush timeout\n");
+	}
 }
 
