@@ -210,7 +210,7 @@ nv50_mem_vm_preinit(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
-	dev_priv->vm_gart_base = roundup(0, VMBLOCK);
+	dev_priv->vm_gart_base = roundup(VMBLOCK, VMBLOCK);
 	dev_priv->vm_gart_size = VMBLOCK;
 
 	dev_priv->vm_vram_base = dev_priv->vm_gart_base + dev_priv->vm_gart_size;
