@@ -753,15 +753,12 @@ bool nouveau_wait_until(struct drm_device *dev, uint64_t timeout,
 void nouveau_wait_for_idle(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv=dev->dev_private;
-	bool ret = true;
 
 	switch(dev_priv->card_type) {
 	case NV_50:
 		break;
 	default:
-		ret = nouveau_wait_until(dev, 1000000000ULL, NV04_PGRAPH_STATUS,
-					 0xFFFFFFFF, 0x00000000);
-		if (ret) {
+		if (!nv_wait(NV04_PGRAPH_STATUS, 0xffffffff, 0x00000000)) {
 			DRM_ERROR("timed out with status 0x%08x\n",
 				  nv_rd32(NV04_PGRAPH_STATUS));
 		}
