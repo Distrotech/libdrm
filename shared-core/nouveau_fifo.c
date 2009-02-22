@@ -438,10 +438,12 @@ nouveau_channel_idle(struct nouveau_channel *chan)
 			return 1;
 		}
 
+		engine->instmem.prepare_access(dev, false);
 		if (INSTANCE_RD(ramfc, 0) != INSTANCE_RD(ramfc, 1))
 			idle = 0;
 		else
 			idle = 1;
+		engine->instmem.finish_access(dev);
 	} else {
 		idle = (nv_rd32(NV04_PFIFO_CACHE1_DMA_GET) ==
 			nv_rd32(NV04_PFIFO_CACHE1_DMA_PUT));

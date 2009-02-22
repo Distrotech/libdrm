@@ -49,11 +49,14 @@ nv50_fifo_init_thingo(struct drm_device *dev)
 	priv->cur_thingo = !priv->cur_thingo;
 
 	/* We never schedule channel 0 or 127 */
+	dev_priv->engine.instmem.prepare_access(dev, true);
 	for (i = 1, nr = 0; i < 127; i++) {
 		if (dev_priv->fifos[i]) {
 			INSTANCE_WR(cur->gpuobj, nr++, i);
 		}
 	}
+	dev_priv->engine.instmem.finish_access(dev);
+
 	nv_wr32(0x32f4, cur->instance >> 12);
 	nv_wr32(0x32ec, nr);
 	nv_wr32(0x2500, 0x101);
@@ -253,6 +256,8 @@ nv50_fifo_create_context(struct nouveau_channel *chan)
 		ramfc = chan->ramfc->gpuobj;
 	}
 
+	dev_priv->engine.instmem.prepare_access(dev, true);
+
 	INSTANCE_WR(ramfc, 0x08/4, chan->pushbuf_base);
 	INSTANCE_WR(ramfc, 0x10/4, chan->pushbuf_base);
 	INSTANCE_WR(ramfc, 0x48/4, chan->pushbuf->instance >> 4);
@@ -274,6 +279,8 @@ nv50_fifo_create_context(struct nouveau_channel *chan)
 		INSTANCE_WR(ramfc, 0x88/4, 0x3d520); /* some vram addy >> 10 */
 		INSTANCE_WR(ramfc, 0x98/4, chan->ramin->instance >> 12);
 	}
+
+	dev_priv->engine.instmem.finish_access(dev);
 
 	ret = nv50_fifo_channel_enable(dev, chan->id, 0);
 	if (ret) {
@@ -315,6 +322,7 @@ nv50_fifo_load_context(struct nouveau_channel *chan)
 	DRM_DEBUG("ch%d\n", chan->id);
 
 	/*XXX: incomplete, only touches the regs that NV does */
+	dev_priv->engine.instmem.prepare_access(dev, false);
 
 	nv_wr32(0x3244, INSTANCE_RD(ramfc, 0x08/4));
 	nv_wr32(0x3240, INSTANCE_RD(ramfc, 0x10/4));
@@ -329,6 +337,8 @@ nv50_fifo_load_context(struct nouveau_channel *chan)
 		nv_wr32(0x340c, INSTANCE_RD(ramfc, 0x88/4));
 		nv_wr32(0x3410, INSTANCE_RD(ramfc, 0x98/4));
 	}
+
+	dev_priv->engine.instmem.finish_access(dev);
 
 	nv_wr32(NV03_PFIFO_CACHE1_PUSH1, chan->id | (1<<16));
 	return 0;

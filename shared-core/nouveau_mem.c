@@ -305,6 +305,7 @@ nv50_mem_vm_bind_linear(struct drm_device *dev, uint64_t virt, uint32_t size,
 
 	size &= ~(psz - 1);
 
+	dev_priv->engine.instmem.prepare_access(dev, true);
 	if (flags & 0x80000000) {
 		while (size) {
 			struct nouveau_gpuobj *pt = pgt[virt / (512*1024*1024)];
@@ -329,6 +330,7 @@ nv50_mem_vm_bind_linear(struct drm_device *dev, uint64_t virt, uint32_t size,
 			virt += psz;
 		}
 	}
+	dev_priv->engine.instmem.finish_access(dev);
 
 	return 0;
 }

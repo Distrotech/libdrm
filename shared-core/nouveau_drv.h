@@ -202,6 +202,8 @@ struct nouveau_instmem_engine {
 	void	(*clear)(struct drm_device *, struct nouveau_gpuobj *);
 	int	(*bind)(struct drm_device *, struct nouveau_gpuobj *);
 	int	(*unbind)(struct drm_device *, struct nouveau_gpuobj *);
+	void	(*prepare_access)(struct drm_device *, bool write);
+	void	(*finish_access)(struct drm_device *);
 };
 
 struct nouveau_mc_engine {
@@ -273,7 +275,8 @@ struct drm_nouveau_private {
 
 	drm_local_map_t *mmio;
 	drm_local_map_t *fb;
-	drm_local_map_t *ramin; /* NV40 onwards */
+	drm_local_map_t *ramin_map;
+	drm_local_map_t *ramin;
 
 	int fifo_alloc_count;
 	struct nouveau_channel *fifos[NOUVEAU_MAX_CHANNEL_NR];
@@ -633,6 +636,8 @@ extern int  nv04_instmem_populate(struct drm_device *, struct nouveau_gpuobj *,
 extern void nv04_instmem_clear(struct drm_device *, struct nouveau_gpuobj *);
 extern int  nv04_instmem_bind(struct drm_device *, struct nouveau_gpuobj *);
 extern int  nv04_instmem_unbind(struct drm_device *, struct nouveau_gpuobj *);
+extern void nv04_instmem_prepare_access(struct drm_device *, bool write);
+extern void nv04_instmem_finish_access(struct drm_device *);
 
 /* nv50_instmem.c */
 extern int  nv50_instmem_init(struct drm_device *);
@@ -642,6 +647,8 @@ extern int  nv50_instmem_populate(struct drm_device *, struct nouveau_gpuobj *,
 extern void nv50_instmem_clear(struct drm_device *, struct nouveau_gpuobj *);
 extern int  nv50_instmem_bind(struct drm_device *, struct nouveau_gpuobj *);
 extern int  nv50_instmem_unbind(struct drm_device *, struct nouveau_gpuobj *);
+extern void nv50_instmem_prepare_access(struct drm_device *, bool write);
+extern void nv50_instmem_finish_access(struct drm_device *);
 
 /* nv04_mc.c */
 extern int  nv04_mc_init(struct drm_device *);
@@ -720,8 +727,8 @@ extern int nouveau_gem_ioctl_cpu_fini(struct drm_device *, void *,
 #define nv_wait(reg,mask,val) nouveau_wait_until(dev, 1000000000ULL, (reg),    \
 						 (mask), (val))
 /* PRAMIN access */
-#define nv_ri32(reg) nv_in32(dev_priv->ramin, (reg))
-#define nv_wi32(reg,val) nv_out32(dev_priv->ramin, (reg), (val))
+#define nv_ri32(reg) nv_in32(dev_priv->ramin_map, (reg))
+#define nv_wi32(reg,val) nv_out32(dev_priv->ramin_map, (reg), (val))
 /* object access */
 #define INSTANCE_RD(o,i) nv_ri32((o)->im_pramin->start + ((i)<<2))
 #define INSTANCE_WR(o,i,v) nv_wi32((o)->im_pramin->start + ((i)<<2), (v))

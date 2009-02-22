@@ -53,6 +53,7 @@ nv40_fifo_create_context(struct nouveau_channel *chan)
 	/* Fill entries that are seen filled in dumps of nvidia driver just
 	 * after channel's is put into DMA mode
 	 */
+	dev_priv->engine.instmem.prepare_access(dev, true);
 	RAMFC_WR(DMA_PUT       , chan->pushbuf_base);
 	RAMFC_WR(DMA_GET       , chan->pushbuf_base);
 	RAMFC_WR(DMA_INSTANCE  , chan->pushbuf->instance >> 4);
@@ -66,6 +67,7 @@ nv40_fifo_create_context(struct nouveau_channel *chan)
 	RAMFC_WR(DMA_SUBROUTINE, 0);
 	RAMFC_WR(GRCTX_INSTANCE, chan->ramin_grctx->instance >> 4);
 	RAMFC_WR(DMA_TIMESLICE , 0x0001FFFF);
+	dev_priv->engine.instmem.finish_access(dev);
 
 	/* enable the fifo dma operation */
 	nv_wr32(NV04_PFIFO_MODE,nv_rd32(NV04_PFIFO_MODE)|(1<<chan->id));
@@ -90,6 +92,8 @@ nv40_fifo_load_context(struct nouveau_channel *chan)
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t tmp, tmp2;
+
+	dev_priv->engine.instmem.prepare_access(dev, false);
 
 	nv_wr32(NV04_PFIFO_CACHE1_DMA_GET          , RAMFC_RD(DMA_GET));
 	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUT          , RAMFC_RD(DMA_PUT));
@@ -134,6 +138,8 @@ nv40_fifo_load_context(struct nouveau_channel *chan)
 	tmp |= RAMFC_RD(DMA_TIMESLICE) & 0x1FFFF;
 	nv_wr32(NV04_PFIFO_DMA_TIMESLICE, tmp);
 
+	dev_priv->engine.instmem.finish_access(dev);
+
 	/* Set channel active, and in DMA mode */
 	nv_wr32(NV03_PFIFO_CACHE1_PUSH1,
 		 NV03_PFIFO_CACHE1_PUSH1_DMA | chan->id);
@@ -151,6 +157,8 @@ nv40_fifo_save_context(struct nouveau_channel *chan)
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t tmp;
+
+	dev_priv->engine.instmem.prepare_access(dev, true);
 
 	RAMFC_WR(DMA_PUT          , nv_rd32(NV04_PFIFO_CACHE1_DMA_PUT));
 	RAMFC_WR(DMA_GET          , nv_rd32(NV04_PFIFO_CACHE1_DMA_GET));
@@ -192,6 +200,7 @@ nv40_fifo_save_context(struct nouveau_channel *chan)
 	RAMFC_WR(UNK_48           , tmp);
 #endif
 
+	dev_priv->engine.instmem.finish_access(dev);
 	return 0;
 }
 

@@ -606,6 +606,7 @@ int nv20_graph_create_context(struct nouveau_channel *chan)
 		return ret;
 
 	/* Initialise default context values */
+	dev_priv->engine.instmem.prepare_access(dev, true);
 	ctx_init(dev, chan->ramin_grctx->gpuobj);
 
 	/* nv20: INSTANCE_WR(chan->ramin_grctx->gpuobj, 10, chan->id<<24); */
@@ -615,6 +616,7 @@ int nv20_graph_create_context(struct nouveau_channel *chan)
 	INSTANCE_WR(dev_priv->ctx_table->gpuobj, chan->id,
 			chan->ramin_grctx->instance >> 4);
 
+	dev_priv->engine.instmem.finish_access(dev);
 	return 0;
 }
 
@@ -626,7 +628,9 @@ void nv20_graph_destroy_context(struct nouveau_channel *chan)
 	if (chan->ramin_grctx)
 		nouveau_gpuobj_ref_del(dev, &chan->ramin_grctx);
 
+	dev_priv->engine.instmem.prepare_access(dev, true);
 	INSTANCE_WR(dev_priv->ctx_table->gpuobj, chan->id, 0);
+	dev_priv->engine.instmem.finish_access(dev);
 }
 
 int nv20_graph_load_context(struct nouveau_channel *chan)

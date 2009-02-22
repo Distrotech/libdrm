@@ -47,6 +47,8 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->instmem.clear		= nv04_instmem_clear;
 		engine->instmem.bind		= nv04_instmem_bind;
 		engine->instmem.unbind		= nv04_instmem_unbind;
+		engine->instmem.prepare_access	= nv04_instmem_prepare_access;
+		engine->instmem.finish_access	= nv04_instmem_finish_access;
 		engine->mc.init		= nv04_mc_init;
 		engine->mc.takedown	= nv04_mc_takedown;
 		engine->timer.init	= nv04_timer_init;
@@ -76,6 +78,8 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->instmem.clear		= nv04_instmem_clear;
 		engine->instmem.bind		= nv04_instmem_bind;
 		engine->instmem.unbind		= nv04_instmem_unbind;
+		engine->instmem.prepare_access	= nv04_instmem_prepare_access;
+		engine->instmem.finish_access	= nv04_instmem_finish_access;
 		engine->mc.init		= nv04_mc_init;
 		engine->mc.takedown	= nv04_mc_takedown;
 		engine->timer.init	= nv04_timer_init;
@@ -105,6 +109,8 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->instmem.clear		= nv04_instmem_clear;
 		engine->instmem.bind		= nv04_instmem_bind;
 		engine->instmem.unbind		= nv04_instmem_unbind;
+		engine->instmem.prepare_access	= nv04_instmem_prepare_access;
+		engine->instmem.finish_access	= nv04_instmem_finish_access;
 		engine->mc.init		= nv04_mc_init;
 		engine->mc.takedown	= nv04_mc_takedown;
 		engine->timer.init	= nv04_timer_init;
@@ -134,6 +140,8 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->instmem.clear		= nv04_instmem_clear;
 		engine->instmem.bind		= nv04_instmem_bind;
 		engine->instmem.unbind		= nv04_instmem_unbind;
+		engine->instmem.prepare_access	= nv04_instmem_prepare_access;
+		engine->instmem.finish_access	= nv04_instmem_finish_access;
 		engine->mc.init		= nv04_mc_init;
 		engine->mc.takedown	= nv04_mc_takedown;
 		engine->timer.init	= nv04_timer_init;
@@ -164,6 +172,8 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->instmem.clear		= nv04_instmem_clear;
 		engine->instmem.bind		= nv04_instmem_bind;
 		engine->instmem.unbind		= nv04_instmem_unbind;
+		engine->instmem.prepare_access	= nv04_instmem_prepare_access;
+		engine->instmem.finish_access	= nv04_instmem_finish_access;
 		engine->mc.init		= nv40_mc_init;
 		engine->mc.takedown	= nv40_mc_takedown;
 		engine->timer.init	= nv04_timer_init;
@@ -196,6 +206,8 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->instmem.clear		= nv50_instmem_clear;
 		engine->instmem.bind		= nv50_instmem_bind;
 		engine->instmem.unbind		= nv50_instmem_unbind;
+		engine->instmem.prepare_access	= nv50_instmem_prepare_access;
+		engine->instmem.finish_access	= nv50_instmem_finish_access;
 		engine->mc.init		= nv50_mc_init;
 		engine->mc.takedown	= nv50_mc_takedown;
 		engine->timer.init	= nv04_timer_init;
@@ -526,7 +538,7 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	}
 
 	/* map larger RAMIN aperture on NV40 cards */
-	dev_priv->ramin = NULL;
+	dev_priv->ramin_map = dev_priv->ramin  = NULL;
 	if (dev_priv->card_type >= NV_40) {
 		int ramin_resource = 2;
 		if (drm_get_resource_len(dev, ramin_resource) == 0)
@@ -812,8 +824,10 @@ static int nouveau_suspend(struct drm_device *dev)
 	engine->graph.save_context(dev_priv->fifos[engine->fifo.channel_id(dev)]);
 	nouveau_wait_for_idle(dev);
 
+	engine->instmem.prepare_access(dev, false);
 	for (i = 0; i < susres->ramin_size / 4; i++)
 		susres->ramin_copy[i] = nv_ri32(i << 2);
+	engine->instmem.finish_access(dev);
 
 	/* reenable the fifo caches */
 	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH,

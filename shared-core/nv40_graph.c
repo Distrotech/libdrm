@@ -1514,7 +1514,9 @@ nv40_graph_create_context(struct nouveau_channel *chan)
 		return ret;
 
 	/* Initialise default context values */
+	dev_priv->engine.instmem.prepare_access(dev, true);
 	ctx_init(dev, chan->ramin_grctx->gpuobj);
+	dev_priv->engine.instmem.finish_access(dev);
 
 	return 0;
 }

@@ -201,7 +201,7 @@ static int
 nouveau_graph_chid_from_grctx(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	uint32_t inst;
+	uint32_t inst, tmp;
 	int i;
 
 	if (dev_priv->card_type < NV_40)
@@ -222,7 +222,11 @@ nouveau_graph_chid_from_grctx(struct drm_device *dev)
 			if (inst == chan->ramin_grctx->instance)
 				break;
 		} else {
-			if (inst == INSTANCE_RD(chan->ramin_grctx->gpuobj, 0))
+			dev_priv->engine.instmem.prepare_access(dev, false);
+			tmp = INSTANCE_RD(chan->ramin_grctx->gpuobj, 0);
+			dev_priv->engine.instmem.finish_access(dev);
+
+			if (inst == tmp)
 				break;
 		}
 	}

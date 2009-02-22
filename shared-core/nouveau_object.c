@@ -102,6 +102,7 @@ static int
 nouveau_ramht_insert(struct drm_device *dev, struct nouveau_gpuobj_ref *ref)
 {
 	struct drm_nouveau_private *dev_priv=dev->dev_private;
+	struct nouveau_instmem_engine *instmem = &dev_priv->engine.instmem;
 	struct nouveau_channel *chan = dev_priv->fifos[ref->channel];
 	struct nouveau_gpuobj *ramht = chan->ramht ? chan->ramht->gpuobj : NULL;
 	struct nouveau_gpuobj *gpuobj = ref->gpuobj;
@@ -126,6 +127,7 @@ nouveau_ramht_insert(struct drm_device *dev, struct nouveau_gpuobj_ref *ref)
 		      (gpuobj->engine << NV40_RAMHT_CONTEXT_ENGINE_SHIFT);
 	}
 
+	instmem->prepare_access(dev, true);
 	co = ho = nouveau_ramht_hash_handle(dev, ref->channel, ref->handle);
 	do {
 		if (!nouveau_ramht_entry_valid(dev, ramht, co)) {
@@ -135,6 +137,7 @@ nouveau_ramht_insert(struct drm_device *dev, struct nouveau_gpuobj_ref *ref)
 			INSTANCE_WR(ramht, (co + 4)/4, ctx);
 
 			list_add_tail(&ref->list, &chan->ramht_refs);
+			instmem->finish_access(dev);
 			return 0;
 		}
 		DRM_DEBUG("collision ch%d 0x%08x: h=0x%08x\n",
@@ -149,6 +152,7 @@ nouveau_ramht_insert(struct drm_device *dev, struct nouveau_gpuobj_ref *ref)
 			break;
 		}
 	} while (co != ho);
+	instmem->finish_access(dev);
 
 	DRM_ERROR("RAMHT space exhausted. ch=%d\n", ref->channel);
 	return -ENOMEM;
@@ -158,6 +162,7 @@ static void
 nouveau_ramht_remove(struct drm_device *dev, struct nouveau_gpuobj_ref *ref)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_instmem_engine *instmem = &dev_priv->engine.instmem;
 	struct nouveau_channel *chan = dev_priv->fifos[ref->channel];
 	struct nouveau_gpuobj *ramht = chan->ramht ? chan->ramht->gpuobj : NULL;
 	uint32_t co, ho;
@@ -167,6 +172,7 @@ nouveau_ramht_remove(struct drm_device *dev, struct nouveau_gpuobj_ref *ref)
 		return;
 	}
 
+	instmem->prepare_access(dev, true);
 	co = ho = nouveau_ramht_hash_handle(dev, ref->channel, ref->handle);
 	do {
 		if (nouveau_ramht_entry_valid(dev, ramht, co) &&
@@ -178,6 +184,7 @@ nouveau_ramht_remove(struct drm_device *dev, struct nouveau_gpuobj_ref *ref)
 			INSTANCE_WR(ramht, (co + 4)/4, 0x00000000);
 
 			list_del(&ref->list);
+			instmem->finish_access(dev);
 			return;
 		}
 
@@ -185,6 +192,7 @@ nouveau_ramht_remove(struct drm_device *dev, struct nouveau_gpuobj_ref *ref)
 		if (co >= dev_priv->ramht_size)
 			co = 0;
 	} while (co != ho);
+	instmem->finish_access(dev);
 
 	DRM_ERROR("RAMHT entry not found. ch=%d, handle=0x%08x\n",
 		  ref->channel, ref->handle);
@@ -263,8 +271,10 @@ nouveau_gpuobj_new(struct drm_device *dev, struct nouveau_channel *chan,
 	if (gpuobj->flags & NVOBJ_FLAG_ZERO_ALLOC) {
 		int i;
 
+		engine->instmem.prepare_access(dev, true);
 		for (i = 0; i < gpuobj->im_pramin->size; i += 4)
 			INSTANCE_WR(gpuobj, i/4, 0);
+		engine->instmem.finish_access(dev);
 	}
 
 	*gpuobj_ret = gpuobj;
@@ -582,8 +592,10 @@ nouveau_gpuobj_new_fake(struct drm_device *dev, uint32_t p_offset,
 	}
 
 	if (gpuobj->flags & NVOBJ_FLAG_ZERO_ALLOC) {
+		dev_priv->engine.instmem.prepare_access(dev, true);
 		for (i = 0; i < gpuobj->im_pramin->size; i += 4)
 			INSTANCE_WR(gpuobj, i/4, 0);
+		dev_priv->engine.instmem.finish_access(dev);
 	}
 
 	if (pref) {
@@ -646,6 +658,7 @@ nouveau_gpuobj_dma_new(struct nouveau_channel *chan, int class,
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_instmem_engine *instmem = &dev_priv->engine.instmem;
 	int ret;
 	uint32_t is_scatter_gather = 0;
 
@@ -681,6 +694,8 @@ nouveau_gpuobj_dma_new(struct nouveau_channel *chan, int class,
 		DRM_ERROR("Error creating gpuobj: %d\n", ret);
 		return ret;
 	}
+
+	instmem->prepare_access(dev, true);
 
 	if (dev_priv->card_type < NV_50) {
 		uint32_t frame, adjust, pte_flags = 0;
@@ -745,6 +760,7 @@ nouveau_gpuobj_dma_new(struct nouveau_channel *chan, int class,
 #else
 					if (dma_mapping_error(dev->sg->busaddr[idx])) {
 #endif
+						instmem->finish_access(dev);
 						return -ENOMEM;
 					}
 				}
@@ -773,6 +789,8 @@ nouveau_gpuobj_dma_new(struct nouveau_channel *chan, int class,
 		INSTANCE_WR(*gpuobj, 2, offset);
 		INSTANCE_WR(*gpuobj, 5, flags5);
 	}
+	
+	instmem->finish_access(dev);
 
 	(*gpuobj)->engine = NVOBJ_ENGINE_SW;
 	(*gpuobj)->class  = class;
@@ -886,30 +904,32 @@ nouveau_gpuobj_gr_new(struct nouveau_channel *chan, int class,
 		return ret;
 	}
 
+	dev_priv->engine.instmem.prepare_access(dev, true);
 	if (dev_priv->card_type >= NV_50) {
 		INSTANCE_WR(*gpuobj, 0, class);
 		INSTANCE_WR(*gpuobj, 5, 0x00010000);
 	} else {
-	switch (class) {
-	case NV_CLASS_NULL:
-		INSTANCE_WR(*gpuobj, 0, 0x00001030);
-		INSTANCE_WR(*gpuobj, 1, 0xFFFFFFFF);
-		break;
-	default:
-		if (dev_priv->card_type >= NV_40) {
-			INSTANCE_WR(*gpuobj, 0, class);
+		switch (class) {
+		case NV_CLASS_NULL:
+			INSTANCE_WR(*gpuobj, 0, 0x00001030);
+			INSTANCE_WR(*gpuobj, 1, 0xFFFFFFFF);
+			break;
+		default:
+			if (dev_priv->card_type >= NV_40) {
+				INSTANCE_WR(*gpuobj, 0, class);
 #ifdef __BIG_ENDIAN
-			INSTANCE_WR(*gpuobj, 2, 0x01000000);
+				INSTANCE_WR(*gpuobj, 2, 0x01000000);
 #endif
-		} else {
+			} else {
 #ifdef __BIG_ENDIAN
-			INSTANCE_WR(*gpuobj, 0, class | 0x00080000);
+				INSTANCE_WR(*gpuobj, 0, class | 0x00080000);
 #else
-			INSTANCE_WR(*gpuobj, 0, class);
+				INSTANCE_WR(*gpuobj, 0, class);
 #endif
+			}
 		}
 	}
-	}
+	dev_priv->engine.instmem.finish_access(dev);
 
 	(*gpuobj)->engine = NVOBJ_ENGINE_GR;
 	(*gpuobj)->class  = class;
@@ -972,6 +992,7 @@ nouveau_gpuobj_channel_init(struct nouveau_channel *chan,
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_instmem_engine *instmem = &dev_priv->engine.instmem;
 	struct nouveau_gpuobj *vram = NULL, *tt = NULL;
 	int ret, i;
 
@@ -998,6 +1019,8 @@ nouveau_gpuobj_channel_init(struct nouveau_channel *chan,
 	if (dev_priv->card_type >= NV_50) {
 		uint32_t vm_offset, pde;
 
+		instmem->prepare_access(dev, true);
+
 		vm_offset = (dev_priv->chipset & 0xf0) == 0x50 ? 0x1400 : 0x200;
 		vm_offset += chan->ramin->gpuobj->im_pramin->start;
 		if ((ret = nouveau_gpuobj_new_fake(dev, vm_offset, ~0, 0x4000,
@@ -1012,8 +1035,10 @@ nouveau_gpuobj_channel_init(struct nouveau_channel *chan,
 		ret = nouveau_gpuobj_ref_add(dev, NULL, 0,
 					     dev_priv->gart_info.sg_ctxdma,
 					     &chan->vm_gart_pt);
-		if (ret)
+		if (ret) {
+			instmem->finish_access(dev);
 			return ret;
+		}
 		INSTANCE_WR(chan->vm_pd, pde++,
 			    chan->vm_gart_pt->instance | 0x03);
 		INSTANCE_WR(chan->vm_pd, pde++, 0x00000000);
@@ -1022,22 +1047,28 @@ nouveau_gpuobj_channel_init(struct nouveau_channel *chan,
 			drm_calloc(dev_priv->vm_vram_pt_nr,
 				   sizeof(struct nouveau_gpuobj_ref *),
 				   DRM_MEM_DRIVER);
-		if (!chan->vm_vram_pt)
+		if (!chan->vm_vram_pt) {
+			instmem->finish_access(dev);
 			return -ENOMEM;
+		}
 
 		pde = (dev_priv->vm_vram_base / (512*1024*1024)) * 2;
 		for (i = 0; i < dev_priv->vm_vram_pt_nr; i++) {
 			ret = nouveau_gpuobj_ref_add(dev, NULL, 0,
 						     dev_priv->vm_vram_pt[i],
 						     &chan->vm_vram_pt[i]);
-			if (ret)
+			if (ret) {
+				instmem->finish_access(dev);
 				return ret;
+			}
 
 			INSTANCE_WR(chan->vm_pd, pde++,
 				    chan->vm_vram_pt[i]->instance | 0x61);
 			INSTANCE_WR(chan->vm_pd, pde++, 0x00000000);
 		}
 	}
+
+	instmem->finish_access(dev);
 
 	/* RAMHT */
 	if (dev_priv->card_type < NV_50) {

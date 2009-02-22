@@ -176,12 +176,14 @@ nv50_instmem_init(struct drm_device *dev)
 
 	/* Assume that praying isn't enough, check that we can re-read the
 	 * entire fake channel back from the PRAMIN BAR */
+	dev_priv->engine.instmem.prepare_access(dev, false);
 	for (i = 0; i < c_size; i+=4) {
 		if (nv_rd32(NV_RAMIN + i) != nv_ri32(i)) {
 			DRM_ERROR("Error reading back PRAMIN at 0x%08x\n", i);
 			return -EINVAL;
 		}
 	}
+	dev_priv->engine.instmem.finish_access(dev);
 
 	/* Global PRAMIN heap */
 	if (nouveau_mem_init_heap(&dev_priv->ramin_heap,
@@ -289,6 +291,7 @@ nv50_instmem_bind(struct drm_device *dev, struct nouveau_gpuobj *gpuobj)
 	DRM_DEBUG("first vram page: 0x%llx\n",
 		  gpuobj->im_backing->start);
 
+	dev_priv->engine.instmem.prepare_access(dev, true);
 	while (pte < pte_end) {
 		INSTANCE_WR(priv->pramin_pt->gpuobj, (pte + 0)/4, vram | 1);
 		INSTANCE_WR(priv->pramin_pt->gpuobj, (pte + 4)/4, 0x00000000);
@@ -296,6 +299,7 @@ nv50_instmem_bind(struct drm_device *dev, struct nouveau_gpuobj *gpuobj)
 		pte += 8;
 		vram += NV50_INSTMEM_PAGE_SIZE;
 	}
+	dev_priv->engine.instmem.finish_access(dev);
 
 	nv_wr32(0x070000, 0x00000001);
 	while(nv_rd32(0x070000) & 1);
@@ -320,12 +324,34 @@ nv50_instmem_unbind(struct drm_device *dev, struct nouveau_gpuobj *gpuobj)
 
 	pte     = (gpuobj->im_pramin->start >> 12) << 3;
 	pte_end = ((gpuobj->im_pramin->size >> 12) << 3) + pte;
+
+	dev_priv->engine.instmem.prepare_access(dev, true);
 	while (pte < pte_end) {
 		INSTANCE_WR(priv->pramin_pt->gpuobj, (pte + 0)/4, 0x00000009);
 		INSTANCE_WR(priv->pramin_pt->gpuobj, (pte + 4)/4, 0x00000000);
 		pte += 8;
 	}
+	dev_priv->engine.instmem.finish_access(dev);
 
 	gpuobj->im_bound = 0;
 	return 0;
 }
+
+void
+nv50_instmem_prepare_access(struct drm_device *dev, bool write)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
+	BUG_ON(dev_priv->ramin_map != NULL);
+	dev_priv->ramin_map = dev_priv->ramin;
+}
+
+void
+nv50_instmem_finish_access(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
+	BUG_ON(dev_priv->ramin_map == NULL);
+	dev_priv->ramin_map = NULL;
+}
+
