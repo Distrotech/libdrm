@@ -314,7 +314,7 @@ static int cs_gem_erase(struct radeon_cs *cs)
 
 static int cs_gem_need_flush(struct radeon_cs *cs)
 {
-    return (cs->relocs_total_size > (32*1024*1024));
+    return 0; //(cs->relocs_total_size > (32*1024*1024));
 }
 
 #define PACKET_TYPE0 0
