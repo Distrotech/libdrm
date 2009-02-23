@@ -182,13 +182,14 @@ int ttm_bo_reserve(struct ttm_buffer_object *bo,
 		   bool no_wait, bool use_sequence, uint32_t sequence)
 {
 	struct ttm_bo_device *bdev = bo->bdev;
-	int put_count;
+	int put_count = 0;
 	int ret;
 
 	spin_lock(&bdev->lru_lock);
 	ret = ttm_bo_reserve_locked(bo, interruptible, no_wait, use_sequence,
 				    sequence);
-	put_count = ttm_bo_del_from_lru(bo);
+	if (likely(ret == 0))
+		put_count = ttm_bo_del_from_lru(bo);
 	spin_unlock(&bdev->lru_lock);
 
 	while (put_count--)
