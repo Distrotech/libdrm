@@ -454,7 +454,7 @@ static void r600_page_table_cleanup(struct drm_device *dev, struct drm_ati_pciga
 }
 
 /* R600 has page table setup */
-static int r600_page_table_init(struct drm_device *dev)
+int r600_page_table_init(struct drm_device *dev)
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	struct drm_ati_pcigart_info *gart_info = &dev_priv->gart_info;
@@ -2460,7 +2460,11 @@ int r600_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init)
 			  dev_priv->gart_info.addr,
 			  dev_priv->pcigart_offset);
 
-		r600_page_table_init(dev);
+		if (!r600_page_table_init(dev)) {
+			DRM_ERROR("Failed to init GART table\n");
+			r600_do_cleanup_cp(dev);
+			return -EINVAL;
+		}
 
 		if (((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_RV770))
 			r700_vm_init(dev);
