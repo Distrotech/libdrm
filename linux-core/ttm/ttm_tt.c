@@ -459,14 +459,6 @@ struct ttm_tt *ttm_tt_create(struct ttm_bo_device *bdev, unsigned long size,
 	return ttm;
 }
 
-/**
- * ttm_tt_unbind:
- *
- * @ttm: the object to unbind from the graphics device
- *
- * Unbind an object from the aperture. This removes the mappings
- * from the graphics device and flushes caches if necessary.
- */
 void ttm_tt_unbind(struct ttm_tt *ttm)
 {
 	int ret;
@@ -478,19 +470,6 @@ void ttm_tt_unbind(struct ttm_tt *ttm)
 	}
 	ttm->state = tt_unbound;
 }
-
-/**
- * ttm_tt_bind:
- *
- * @ttm: the ttm object to bind to the graphics device
- *
- * @bo_mem: the aperture memory region which will hold the object
- *
- * Bind a ttm object to the aperture. This ensures that the necessary
- * pages are allocated, flushes CPU caches as needed and marks the
- * ttm as DRM_TTM_PAGE_USER_DIRTY to indicate that it may have been
- * modified by the GPU
- */
 
 int ttm_tt_bind(struct ttm_tt *ttm, struct ttm_mem_reg *bo_mem)
 {

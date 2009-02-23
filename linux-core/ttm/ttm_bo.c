@@ -113,8 +113,8 @@ static void ttm_bo_add_to_lru(struct ttm_buffer_object *bo)
 	}
 }
 
-/*
- * Call with bdev->lru_lock and bdev->global->swap_lock held..
+/**
+ * Call with the lru_lock held.
  */
 
 static int ttm_bo_del_from_lru(struct ttm_buffer_object *bo)
@@ -1426,14 +1426,6 @@ int ttm_bo_pci_offset(struct ttm_bo_device *bdev,
 
 	return 0;
 }
-
-/**
- * \c Kill all user-space virtual mappings of this buffer object.
- *
- * \param bo The buffer object.
- *
- * Call bo->mutex locked.
- */
 
 void ttm_bo_unmap_virtual(struct ttm_buffer_object *bo)
 {
