@@ -1403,7 +1403,7 @@ static int radeon_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init)
 		}
 
 		if ((dev_priv->flags & RADEON_FAMILY_MASK) == CHIP_RS600) {
-			if (!r600_page_table_init(dev)) {
+			if (r600_page_table_init(dev)) {
 				DRM_ERROR("failed to init PCI GART!\n");
 				radeon_do_cleanup_cp(dev);
 				return -ENOMEM;

@@ -2460,7 +2460,7 @@ int r600_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init)
 			  dev_priv->gart_info.addr,
 			  dev_priv->pcigart_offset);
 
-		if (!r600_page_table_init(dev)) {
+		if (r600_page_table_init(dev)) {
 			DRM_ERROR("Failed to init GART table\n");
 			r600_do_cleanup_cp(dev);
 			return -EINVAL;
