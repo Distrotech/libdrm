@@ -429,13 +429,14 @@ static int r600_do_wait_for_idle(drm_radeon_private_t * dev_priv)
 
 static void r600_page_table_cleanup(struct drm_device *dev, struct drm_ati_pcigart_info *gart_info)
 {
+#ifdef __linux__
 	struct drm_sg_mem *entry = dev->sg;
 	int max_pages;
 	int pages;
 	int i;
-
+#endif
 	if (gart_info->bus_addr) {
-
+#ifdef __linux__
 		max_pages = (gart_info->table_size / sizeof(u32));
 		pages = (entry->pages <= max_pages)
 		  ? entry->pages : max_pages;
@@ -446,7 +447,7 @@ static void r600_page_table_cleanup(struct drm_device *dev, struct drm_ati_pciga
 			pci_unmap_single(dev->pdev, entry->busaddr[i],
 					 PAGE_SIZE, PCI_DMA_TODEVICE);
 		}
-
+#endif
 		if (gart_info->gart_table_location == DRM_ATI_GART_MAIN)
 			gart_info->bus_addr = 0;
 	}
@@ -475,6 +476,7 @@ static int r600_page_table_init(struct drm_device *dev)
 	memset(pci_gart, 0, max_pages * sizeof(u64));
 
 	for (i = 0; i < pages; i++) {
+#ifdef __linux__
 		entry->busaddr[i] = pci_map_single(dev->pdev,
 						   page_address(entry->
 								pagelist[i]),
@@ -485,7 +487,7 @@ static int r600_page_table_init(struct drm_device *dev)
 			ret = -EINVAL;
 			goto done;
 		}
-
+#endif
 		entry_addr = entry->busaddr[i];
 		for (j = 0; j < (PAGE_SIZE / ATI_PCIGART_PAGE_SIZE); j++) {
 			page_base = (u64) entry_addr & ATI_PCIGART_PAGE_MASK;
@@ -495,13 +497,15 @@ static int r600_page_table_init(struct drm_device *dev)
 			*pci_gart = page_base;
 
 			if ((i % 128) == 0)
-				DRM_DEBUG("page entry %d: 0x%016llx\n", i, page_base);
+				DRM_DEBUG("page entry %d: 0x%016llx\n",
+				    i, (unsigned long long)page_base);
 			pci_gart++;
 			entry_addr += ATI_PCIGART_PAGE_SIZE;
 		}
 	}
-
+#ifdef __linux__
 done:
+#endif
 	return ret;
 }
 
