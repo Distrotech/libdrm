@@ -596,7 +596,7 @@ int r600_page_table_init(struct drm_device *dev);
 #define RS690_MC_AGP_BASE_2             0x103
 
 #define RS600_MC_INDEX                          0x70
-#       define RS600_MC_ADDR_MASK               0xff
+#       define RS600_MC_ADDR_MASK               0xffff
 #       define RS600_MC_IND_SEQ_RBS_0           (1 << 16)
 #       define RS600_MC_IND_SEQ_RBS_1           (1 << 17)
 #       define RS600_MC_IND_SEQ_RBS_2           (1 << 18)
