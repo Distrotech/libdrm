@@ -926,61 +926,61 @@ static void rs600_set_igpgart(drm_radeon_private_t * dev_priv, int on)
 			 (long)dev_priv->gart_info.bus_addr,
 			 dev_priv->gart_size);
 
-		temp = IGP_READ_MCIND(dev_priv, RS600_MC_PT0_CNTL);
-
 		IGP_WRITE_MCIND(RS600_MC_PT0_CNTL, (RS600_EFFECTIVE_L2_CACHE_SIZE(6) |
 						    RS600_EFFECTIVE_L2_QUEUE_SIZE(6)));
 
-		temp = IGP_READ_MCIND(dev_priv, RS600_MC_PT0_CLIENT0_CNTL);
 		for (i = 0; i < 19; i++)
 			IGP_WRITE_MCIND(RS600_MC_PT0_CLIENT0_CNTL + i,
 					(RS600_ENABLE_TRANSLATION_MODE_OVERRIDE |
-					 RS600_SYSTEM_ACCESS_MODE(0) | //???
+					 RS600_SYSTEM_ACCESS_MODE_IN_SYS |
 					 RS600_SYSTEM_APERTURE_UNMAPPED_ACCESS_PASSTHROUGH |
 					 RS600_EFFECTIVE_L1_CACHE_SIZE(3) |
+					 RS600_ENABLE_FRAGMENT_PROCESSING |
 					 RS600_EFFECTIVE_L1_QUEUE_SIZE(3)));
 
 		IGP_WRITE_MCIND(RS600_MC_PT0_CONTEXT0_CNTL, (RS600_ENABLE_PAGE_TABLE |
 							     RS600_PAGE_TABLE_TYPE_FLAT));
 
+		/* disable all other contexts */
+		for (i = 1; i < 8; i++)
+			IGP_WRITE_MCIND(RS600_MC_PT0_CONTEXT0_CNTL + i, 0);
+
+		/* setup the page table aperture */
 		IGP_WRITE_MCIND(RS600_MC_PT0_CONTEXT0_FLAT_BASE_ADDR,
-				dev_priv->gart_info.bus_addr >> 12);
+				dev_priv->gart_info.bus_addr);
 		IGP_WRITE_MCIND(RS600_MC_PT0_CONTEXT0_FLAT_START_ADDR,
-				dev_priv->gart_vm_start >> 12);
+				dev_priv->gart_vm_start);
 		IGP_WRITE_MCIND(RS600_MC_PT0_CONTEXT0_FLAT_END_ADDR,
-				(dev_priv->gart_vm_start + dev_priv->gart_size - 1) >> 12);
+				(dev_priv->gart_vm_start + dev_priv->gart_size - 1));
 		IGP_WRITE_MCIND(RS600_MC_PT0_CONTEXT0_DEFAULT_READ_ADDR, 0);
 
-		temp = IGP_READ_MCIND(dev_priv, RS600_MC_FB_LOCATION);
+		/* setup the system aperture */
 		IGP_WRITE_MCIND(RS600_MC_PT0_SYSTEM_APERTURE_LOW_ADDR,
-				dev_priv->gart_vm_start >> 12);
+				dev_priv->gart_vm_start);
 		IGP_WRITE_MCIND(RS600_MC_PT0_SYSTEM_APERTURE_HIGH_ADDR,
-				(dev_priv->gart_vm_start + dev_priv->gart_size - 1) >> 12);
+				(dev_priv->gart_vm_start + dev_priv->gart_size - 1));
 
+		/* enable page tables */
 		temp = IGP_READ_MCIND(dev_priv, RS600_MC_PT0_CNTL);
 		IGP_WRITE_MCIND(RS600_MC_PT0_CNTL, (temp | RS600_ENABLE_PT));
 
 		temp = IGP_READ_MCIND(dev_priv, RS600_MC_CNTL1);
 		IGP_WRITE_MCIND(RS600_MC_CNTL1, (temp | RS600_ENABLE_PAGE_TABLES));
 
-		do {
-			temp = IGP_READ_MCIND(dev_priv, RS600_MC_PT0_CNTL);
-			if ((temp & (RS600_INVALIDATE_ALL_L1_TLBS | RS600_INVALIDATE_L2_CACHE)) == 0)
-				break;
-			DRM_UDELAY(1);
-		} while(1);
-
+		/* invalidate the cache */
 		temp = IGP_READ_MCIND(dev_priv, RS600_MC_PT0_CNTL);
-		IGP_WRITE_MCIND(RS600_MC_PT0_CNTL, (temp |
-						    RS600_INVALIDATE_ALL_L1_TLBS |
-						    RS600_INVALIDATE_L2_CACHE));
 
-		do {
-			temp = IGP_READ_MCIND(dev_priv, RS600_MC_PT0_CNTL);
-			if ((temp & (RS600_INVALIDATE_ALL_L1_TLBS | RS600_INVALIDATE_L2_CACHE)) == 0)
-				break;
-			DRM_UDELAY(1);
-		} while(1);
+		temp &= ~(RS600_INVALIDATE_ALL_L1_TLBS | RS600_INVALIDATE_L2_CACHE);
+		IGP_WRITE_MCIND(RS600_MC_PT0_CNTL, temp);
+		temp = IGP_READ_MCIND(dev_priv, RS600_MC_PT0_CNTL);
+
+		temp |= RS600_INVALIDATE_ALL_L1_TLBS | RS600_INVALIDATE_L2_CACHE;
+		IGP_WRITE_MCIND(RS600_MC_PT0_CNTL, temp);
+		temp = IGP_READ_MCIND(dev_priv, RS600_MC_PT0_CNTL);
+
+		temp &= ~(RS600_INVALIDATE_ALL_L1_TLBS | RS600_INVALIDATE_L2_CACHE);
+		IGP_WRITE_MCIND(RS600_MC_PT0_CNTL, temp);
+		temp = IGP_READ_MCIND(dev_priv, RS600_MC_PT0_CNTL);
 
 	} else {
 		IGP_WRITE_MCIND(RS600_MC_PT0_CNTL, 0);

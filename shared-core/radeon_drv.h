@@ -631,11 +631,17 @@ int r600_page_table_init(struct drm_device *dev);
 #define RS600_MC_PT0_CONTEXT0_FLAT_START_ADDR   0x13c
 #define RS600_MC_PT0_CONTEXT0_FLAT_END_ADDR     0x14c
 #define RS600_MC_PT0_CLIENT0_CNTL               0x16c
-#       define RS600_ENABLE_TRANSLATION_MODE_OVERRIDE        (1 << 0)
-#       define RS600_TRANSLATION_MODE_OVERRIDE  (1 << 1)
-#       define RS600_SYSTEM_ACCESS_MODE(x)      ((x) << 8)
+#       define RS600_ENABLE_TRANSLATION_MODE_OVERRIDE       (1 << 0)
+#       define RS600_TRANSLATION_MODE_OVERRIDE              (1 << 1)
+#       define RS600_SYSTEM_ACCESS_MODE_MASK                (3 << 8)
+#       define RS600_SYSTEM_ACCESS_MODE_PA_ONLY             (0 << 8)
+#       define RS600_SYSTEM_ACCESS_MODE_USE_SYS_MAP         (1 << 8)
+#       define RS600_SYSTEM_ACCESS_MODE_IN_SYS              (2 << 8)
+#       define RS600_SYSTEM_ACCESS_MODE_NOT_IN_SYS          (3 << 8)
 #       define RS600_SYSTEM_APERTURE_UNMAPPED_ACCESS_PASSTHROUGH        (0 << 10)
+#       define RS600_SYSTEM_APERTURE_UNMAPPED_ACCESS_DEFAULT_PAGE       (1 << 10)
 #       define RS600_EFFECTIVE_L1_CACHE_SIZE(x) ((x) << 11)
+#       define RS600_ENABLE_FRAGMENT_PROCESSING (1 << 14)
 #       define RS600_EFFECTIVE_L1_QUEUE_SIZE(x) ((x) << 15)
 #       define RS600_INVALIDATE_L1_TLB          (1 << 20)
 
