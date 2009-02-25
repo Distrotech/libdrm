@@ -2492,10 +2492,13 @@ int r600_do_resume_cp(struct drm_device * dev)
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 
 	DRM_DEBUG("\n");
-	if (((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_RV770))
-	    r700_cp_load_microcode(dev_priv);
-	else
-	    r600_cp_load_microcode(dev_priv);
+	if (((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_RV770)) {
+		r700_vm_init(dev);
+		r700_cp_load_microcode(dev_priv);
+	} else {
+		r600_vm_init(dev);
+		r600_cp_load_microcode(dev_priv);
+	}
 	r600_cp_init_ring_buffer(dev, dev_priv);
 	r600_engine_reset(dev);
 
