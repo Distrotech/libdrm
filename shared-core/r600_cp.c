@@ -427,7 +427,7 @@ static int r600_do_wait_for_idle(drm_radeon_private_t * dev_priv)
 	return -EBUSY;
 }
 
-static void r600_page_table_cleanup(struct drm_device *dev, struct drm_ati_pcigart_info *gart_info)
+void r600_page_table_cleanup(struct drm_device *dev, struct drm_ati_pcigart_info *gart_info)
 {
 #ifdef __linux__
 	struct drm_sg_mem *entry = dev->sg;

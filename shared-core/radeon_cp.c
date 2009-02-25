@@ -1467,8 +1467,13 @@ static int radeon_do_cleanup_cp(struct drm_device * dev)
 		if (dev_priv->gart_info.bus_addr) {
 			/* Turn off PCI GART */
 			radeon_set_pcigart(dev_priv, 0);
-			if (!drm_ati_pcigart_cleanup(dev, &dev_priv->gart_info))
-				DRM_ERROR("failed to cleanup PCI GART!\n");
+
+			if ((dev_priv->flags & RADEON_FAMILY_MASK) == CHIP_RS600)
+				r600_page_table_cleanup(dev, &dev_priv->gart_info);
+			else {
+				if (!drm_ati_pcigart_cleanup(dev, &dev_priv->gart_info))
+					DRM_ERROR("failed to cleanup PCI GART!\n");
+			}
 		}
 
 		if (dev_priv->gart_info.gart_table_location == DRM_ATI_GART_FB)

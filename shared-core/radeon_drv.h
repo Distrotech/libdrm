@@ -459,6 +459,7 @@ int r600_engine_reset(struct drm_device * dev);
 void r600_do_cp_reset(drm_radeon_private_t * dev_priv);
 int r600_do_cleanup_cp(struct drm_device * dev);
 int r600_page_table_init(struct drm_device *dev);
+void r600_page_table_cleanup(struct drm_device *dev, struct drm_ati_pcigart_info *gart_info);
 
 /* Flags for stats.boxes
  */
