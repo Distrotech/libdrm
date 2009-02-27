@@ -86,10 +86,10 @@ static int nv50_crtc_execute_mode(struct nv50_crtc *crtc)
 	hsync_start_to_end = mode->htotal - mode->hsync_start;
 	vsync_start_to_end = mode->vtotal - mode->vsync_start;
 	/* I can't give this a proper name, anyone else can? */
-	hunk1 = mode->htotal - mode->hsync_start + mode->hdisplay + 1;
-	vunk1 = mode->vtotal - mode->vsync_start + mode->vdisplay + 1;
+	hunk1 = mode->htotal - mode->hsync_start + mode->hdisplay;
+	vunk1 = mode->vtotal - mode->vsync_start + mode->vdisplay;
 	/* Another strange value, this time only for interlaced modes. */
-	vunk2a = 2*mode->vtotal - mode->vsync_start + mode->vdisplay + 1;
+	vunk2a = 2*mode->vtotal - mode->vsync_start + mode->vdisplay;
 	vunk2b = mode->vtotal - mode->vsync_start + mode->vtotal;
 
 	if (mode->flags & DRM_MODE_FLAG_INTERLACE) {
