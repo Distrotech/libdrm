@@ -776,7 +776,7 @@ static int drm_bo_vm_fault(struct vm_area_struct *vma,
 			drm_io_prot(_DRM_TTM, vma);
 	}
 
-	err = vm_insert_pfn(vma, (unsigned long)vmf->virtual_address, pfn);
+	err = vm_insert_mixed(vma, (unsigned long)vmf->virtual_address, pfn);
 	if (err) {
 		ret = (err != -EAGAIN) ? VM_FAULT_OOM : VM_FAULT_NOPAGE;
 		goto out_unlock;
@@ -879,7 +879,7 @@ int drm_bo_mmap_locked(struct vm_area_struct *vma,
 	vma->vm_file = filp;
 	vma->vm_flags |= VM_RESERVED | VM_IO;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19))
-	vma->vm_flags |= VM_PFNMAP;
+	vma->vm_flags |= VM_MIXEDMAP;
 #endif
 	drm_bo_vm_open_locked(vma);
 #ifdef DRM_ODD_MM_COMPAT
