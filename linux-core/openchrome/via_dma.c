@@ -60,7 +60,7 @@
 		dev_priv->dma_low += 8;		\
 	}
 
-#define VIA_TRACKER_INTERVAL 0x10000
+#define VIA_TRACKER_INTERVAL 0x100000
 
 struct via_dma_tracker {
 	struct list_head head;
@@ -110,16 +110,18 @@ static inline int via_cmdbuf_wait(struct drm_via_private *dev_priv,
 	return 0;
 }
 
+static bool via_no_tracker(struct drm_via_private *dev_priv)
+{
+	via_traverse_trackers(dev_priv);
+	return (((dev_priv->dma_low - dev_priv->dma_tracker) & VIA_AGPC_MASK) <
+		VIA_TRACKER_INTERVAL);
+}
+
+
 static int via_add_tracker(struct drm_via_private *dev_priv, uint32_t sequence)
 {
 	struct via_dma_tracker *tracker;
 
-	if (likely
-	    (((dev_priv->dma_low - dev_priv->dma_tracker) & VIA_AGPC_MASK) <
-	     VIA_TRACKER_INTERVAL))
-		return 0;
-
-	via_traverse_trackers(dev_priv);
 	dev_priv->dma_tracker = dev_priv->dma_low;
 	tracker = kmalloc(sizeof(*tracker), GFP_KERNEL);
 
@@ -192,13 +194,8 @@ static void via_emit_blit_sequence(struct drm_via_private *dev_priv,
 	VIA_OUT_RING_H1(VIA_REG_DIMENSION, 0);
 	VIA_OUT_RING_H1(VIA_REG_GECMD, VIA_GEC_BLT | VIA_GEC_FIXCOLOR_PAT
 			| (VIA_ROP_PAT << 24));
-#if 0
-	VIA_OUT_RING_QW(VIA_VIDEO_HEADER6, 0x00000002);
-	VIA_OUT_RING_QW(0x00F60000, 0x00000000);
-	VIA_OUT_RING_QW(0x326C, (3 << 30) | (0x1f << 25));
-	VIA_OUT_RING_QW(0x33D0, (1 << 27) | (1 << 7) | (1 << 6) |
-			(1 << 4) | (1 << 0));
-#endif
+
+	atomic_set(&dev_priv->emitted_cmd_seq, value);
 }
 
 static void via_blit_sequence(struct drm_via_private *dev_priv,
@@ -215,6 +212,8 @@ static void via_blit_sequence(struct drm_via_private *dev_priv,
 	VIA_WRITE(VIA_REG_DIMENSION, 0);
 	VIA_WRITE(VIA_REG_GECMD, VIA_GEC_BLT | VIA_GEC_FIXCOLOR_PAT
 		  | (VIA_ROP_PAT << 24));
+
+	atomic_set(&dev_priv->emitted_cmd_seq, value);
 }
 
 /*
@@ -610,7 +609,7 @@ int via_copy_cmdbuf(struct drm_via_private *dev_priv,
 }
 
 int via_dispatch_commands(struct drm_device *dev, unsigned long size,
-			  uint32_t mechanism)
+			  uint32_t mechanism, bool emit_seq)
 {
 	struct drm_via_private *dev_priv = via_priv(dev);
 	uint32_t *vb;
@@ -630,8 +629,11 @@ int via_dispatch_commands(struct drm_device *dev, unsigned long size,
 		dev_priv->dma_low += size;
 		seq =
 		    atomic_add_return(1, &dev_priv->fence_seq[VIA_ENGINE_CMD]);
-		via_emit_fence_seq(dev_priv, VIA_FENCE_OFFSET_CMD, seq);
-		via_add_tracker(dev_priv, seq);
+
+		if (emit_seq || !via_no_tracker(dev_priv)) {
+			via_emit_fence_seq(dev_priv, VIA_FENCE_OFFSET_CMD, seq);
+			via_add_tracker(dev_priv, seq);
+		}
 		via_cmdbuf_pause(dev_priv);
 		return 0;
 	case _VIA_MECHANISM_PCI:
@@ -641,9 +643,11 @@ int via_dispatch_commands(struct drm_device *dev, unsigned long size,
 					       size);
 		seq =
 		    atomic_add_return(1, &dev_priv->fence_seq[VIA_ENGINE_CMD]);
-		via_wait_idle(dev_priv);
-		via_blit_sequence(dev_priv, VIA_FENCE_OFFSET_CMD, seq);
-		via_wait_idle(dev_priv);
+		if (emit_seq) {
+			via_wait_idle(dev_priv);
+			via_blit_sequence(dev_priv, VIA_FENCE_OFFSET_CMD, seq);
+			via_wait_idle(dev_priv);
+		}
 		return ret;
 	default:
 		return -EINVAL;

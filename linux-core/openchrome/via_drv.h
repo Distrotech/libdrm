@@ -179,6 +179,7 @@ struct drm_via_private {
 	struct drm_via_blitq blit_queues[VIA_NUM_BLIT_ENGINES];
 	uint32_t dma_diff;
 	atomic_t fence_seq[VIA_NUM_ENGINES];
+	atomic_t emitted_cmd_seq;
 	uint64_t vram_size;	/* kiB */
 	uint64_t vram_start;
 	int vram_direct;
@@ -262,6 +263,8 @@ extern void via_driver_irq_preinstall(struct drm_device *dev);
 extern int via_driver_irq_postinstall(struct drm_device *dev);
 extern void via_driver_irq_uninstall(struct drm_device *dev);
 
+extern void via_emit_fence_seq_standalone(struct drm_via_private *dev_priv,
+				   uint32_t offset, uint32_t value);
 extern int via_dma_cleanup(struct drm_device *dev);
 extern void via_init_command_verifier(void);
 extern int via_driver_dma_quiescent(struct drm_device *dev);
@@ -298,7 +301,8 @@ extern int via_vt_ioctl(struct drm_device *dev, void *data,
 extern int via_execbuffer(struct drm_device *dev, void *data,
 			  struct drm_file *file_priv);
 extern int via_dispatch_commands(struct drm_device *dev,
-				 unsigned long size, uint32_t mechanism);
+				 unsigned long size, uint32_t mechanism,
+				 bool emit_seq);
 extern void via_ttm_signal_fences(struct drm_via_private *dev_priv);
 extern void via_ttm_fence_cmd_handler(struct drm_via_private *dev_priv, uint32_t signal_types);
 extern void via_ttm_fence_dmablit_handler(struct drm_via_private *dev_priv, int engine);

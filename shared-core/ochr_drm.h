@@ -35,7 +35,7 @@
 #define DRM_VIA_DRIVER_DATE		"20090119"
 
 #define DRM_VIA_DRIVER_MAJOR		0
-#define DRM_VIA_DRIVER_MINOR		1
+#define DRM_VIA_DRIVER_MINOR		2
 #define DRM_VIA_DRIVER_PATCHLEVEL	0
 #define DRM_VIA_DRIVER_VERSION	  (((VIA_DRM_DRIVER_MAJOR) << 16) | (VIA_DRM_DRIVER_MINOR))
 
@@ -361,6 +361,7 @@ struct drm_via_clip_rect {
 #define DRM_VIA_HAVE_CLIP     (1 << 0)
 #define DRM_VIA_FENCE_NO_USER (1 << 1)
 #define DRM_VIA_WAIT_BARRIER  (1 << 2)
+#define DRM_VIA_DEFER_FENCING (1 << 3)
 
 struct drm_via_ttm_execbuf_control {
 	struct drm_via_ttm_fence_rep rep;

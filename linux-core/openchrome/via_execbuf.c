@@ -733,6 +733,7 @@ static int via_dispatch_clip(struct drm_device *dev,
 	uint32_t i;
 	uint64_t cliprect_addr = 0;
 	int ret = 0;
+	bool emit_seq;
 
 	if (exec_buf->exec_flags & DRM_VIA_HAVE_CLIP) {
 		first_clip = control->first_clip;
@@ -746,6 +747,9 @@ static int via_dispatch_clip(struct drm_device *dev,
 	}
 
 	for (i = first_clip; i < num_clip; ++i) {
+		emit_seq = ((i == num_clip - 1) &&
+			    !(exec_buf->exec_flags & DRM_VIA_DEFER_FENCING));
+
 		if (i > first_clip && drm_via_disable_verifier &&
 		    exec_buf->mechanism == _VIA_MECHANISM_AGP) {
 			ret = via_copy_cmdbuf(dev_priv, exec_buf->cmd_buffer,
@@ -790,7 +794,7 @@ static int via_dispatch_clip(struct drm_device *dev,
 		}
 
 		ret = via_dispatch_commands(dev, exec_buf->cmd_buffer_size,
-					    exec_buf->mechanism);
+					    exec_buf->mechanism, emit_seq);
 
 		if (unlikely(ret != 0))
 			goto out;

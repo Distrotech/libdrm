@@ -666,8 +666,9 @@ int via_driver_load(struct drm_device *dev, unsigned long chipset)
 	dev_priv->fence_timer.function = via_ttm_fence_timer_func;
 
 	for (i = 0; i < VIA_NUM_ENGINES; ++i) {
-		atomic_set(&dev_priv->fence_seq[i], 0);
+		atomic_set(&dev_priv->fence_seq[i], -100);
 	}
+	atomic_set(&dev_priv->emitted_cmd_seq, -100);
 
 	ret = via_setup_mmio_map(dev);
 	if (ret)

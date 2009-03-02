@@ -206,12 +206,52 @@ enum hrtimer_restart via_ttm_fence_timer_func(struct hrtimer *timer)
 	return HRTIMER_NORESTART;
 }
 
+/**
+ * Since emitting a sequence blit after each command submission has a
+ * negative performance impact, we defer that emission until fence flushing.
+ */
+
+static void via_ttm_fence_flush(struct ttm_fence_device *fdev,
+				uint32_t fence_class)
+{
+	if (fence_class == VIA_ENGINE_CMD) {
+		struct drm_via_private *dev_priv =
+			container_of(fdev, struct drm_via_private, fdev);
+		uint32_t sequence;
+
+		mutex_lock(&dev_priv->cmdbuf_mutex);
+		sequence = atomic_read(&dev_priv->fence_seq[VIA_ENGINE_CMD]);
+		via_emit_fence_seq_standalone(dev_priv, VIA_FENCE_OFFSET_CMD,
+					      sequence);
+		DRM_INFO("Flushing fence 0x%08x\n", (unsigned) sequence);
+		mutex_unlock(&dev_priv->cmdbuf_mutex);
+	}
+}
+
+/**
+ * If the fence sequence is higher than what we've actually put in the
+ * command stream, indicate that we need to flush this fence type.
+ */
+
+static uint32_t via_ttm_fence_needed_flush(struct ttm_fence_object *fence)
+{
+	struct ttm_fence_device *fdev = fence->fdev;
+	struct ttm_fence_class_manager *fc = &fdev->fence_class[VIA_ENGINE_CMD];
+	struct drm_via_private *dev_priv =
+		container_of(fdev, struct drm_via_private, fdev);
+	uint32_t diff = (uint32_t) atomic_read(&dev_priv->emitted_cmd_seq) -
+		fence->sequence;
+
+	return (diff > fc->wrap_diff) ? TTM_FENCE_TYPE_EXE : 0;
+}
+
+
 static struct ttm_fence_driver via_ttm_fence_driver = {
 	.has_irq = via_ttm_fence_has_irq,
 	.emit = via_ttm_fence_emit_sequence,
-	.flush = NULL,
+	.flush = via_ttm_fence_flush,
 	.poll = via_ttm_fence_poll,
-	.needed_flush = NULL,
+	.needed_flush = via_ttm_fence_needed_flush,
 	.wait = NULL,
 	.signaled = NULL,
 };
