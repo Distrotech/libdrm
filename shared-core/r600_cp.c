@@ -2583,8 +2583,14 @@ static void r600_cp_discard_buffer(struct drm_device * dev, struct drm_buf * buf
 	buf_priv->age = ++dev_priv->sarea_priv->last_dispatch;
 
 	/* Emit the vertex buffer age */
-	BEGIN_RING(2);
+	BEGIN_RING(8);
 	R600_DISPATCH_AGE(buf_priv->age);
+	OUT_RING(CP_PACKET2());
+	OUT_RING(CP_PACKET2());
+	OUT_RING(CP_PACKET2());
+	OUT_RING(CP_PACKET2());
+	OUT_RING(CP_PACKET2());
+	OUT_RING(CP_PACKET2());
 	ADVANCE_RING();
 
 	buf->pending = 1;
