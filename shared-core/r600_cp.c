@@ -2525,7 +2525,7 @@ void r600_do_cp_start(drm_radeon_private_t * dev_priv)
 	RING_LOCALS;
 	DRM_DEBUG("\n");
 
-	BEGIN_RING(8);
+	BEGIN_RING(7);
 	OUT_RING(CP_PACKET3(R600_IT_ME_INITIALIZE, 5));
 	OUT_RING(0x00000001);
 	if (((dev_priv->flags & RADEON_FAMILY_MASK) < CHIP_RV770))
@@ -2536,7 +2536,6 @@ void r600_do_cp_start(drm_radeon_private_t * dev_priv)
 	OUT_RING(R600_ME_INITIALIZE_DEVICE_ID(1));
 	OUT_RING(0x00000000);
 	OUT_RING(0x00000000);
-	OUT_RING(CP_PACKET2());
 	ADVANCE_RING();
         COMMIT_RING();
 
@@ -2583,14 +2582,8 @@ static void r600_cp_discard_buffer(struct drm_device * dev, struct drm_buf * buf
 	buf_priv->age = ++dev_priv->sarea_priv->last_dispatch;
 
 	/* Emit the vertex buffer age */
-	BEGIN_RING(8);
+	BEGIN_RING(2);
 	R600_DISPATCH_AGE(buf_priv->age);
-	OUT_RING(CP_PACKET2());
-	OUT_RING(CP_PACKET2());
-	OUT_RING(CP_PACKET2());
-	OUT_RING(CP_PACKET2());
-	OUT_RING(CP_PACKET2());
-	OUT_RING(CP_PACKET2());
 	ADVANCE_RING();
 
 	buf->pending = 1;
@@ -2620,7 +2613,7 @@ int r600_cp_indirect(struct drm_device *dev, struct drm_buf *buf, drm_radeon_ind
 		/* Indirect buffer data must be modulo 8.
 		 * pad the data with a Type-2 CP packet.
 		 */
-		while (dwords & 7) {
+		while (dwords & 0xf) {
 			u32 *data = (u32 *)
 			    ((char *)dev->agp_buffer_map->handle
 			     + buf->offset + start);
@@ -2628,15 +2621,11 @@ int r600_cp_indirect(struct drm_device *dev, struct drm_buf *buf, drm_radeon_ind
      		}
 
 		/* Fire off the indirect buffer */
-		BEGIN_RING(8);
+		BEGIN_RING(4);
 		OUT_RING(CP_PACKET3(R600_IT_INDIRECT_BUFFER, 2));
 		OUT_RING((offset & 0xfffffffc));
 		OUT_RING((upper_32_bits(offset) & 0xff));
 		OUT_RING(dwords);
-		OUT_RING(CP_PACKET2());
-		OUT_RING(CP_PACKET2());
-		OUT_RING(CP_PACKET2());
-		OUT_RING(CP_PACKET2());
 		ADVANCE_RING();
 	}
 	if (indirect->discard)

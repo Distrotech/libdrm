@@ -399,6 +399,7 @@ extern void radeon_freelist_reset(struct drm_device * dev);
 extern struct drm_buf *radeon_freelist_get(struct drm_device * dev);
 
 extern int radeon_wait_ring(drm_radeon_private_t * dev_priv, int n);
+extern void radeon_commit_ring(drm_radeon_private_t *dev_priv);
 
 extern int radeon_do_cp_idle(drm_radeon_private_t * dev_priv);
 
@@ -1640,29 +1641,9 @@ do {									\
 		dev_priv->ring.tail = write;				\
 } while (0)
 
-#define R600_COMMIT_RING() do {			\
-		DRM_MEMORYBARRIER();		\
-		R600_GET_RING_HEAD( dev_priv ); \
-		RADEON_WRITE( R600_CP_RB_WPTR, dev_priv->ring.tail ); \
-		RADEON_READ( R600_CP_RB_RPTR); \
-} while (0)
 
-#define RADEON_COMMIT_RING() do {					\
-	/* Flush writes to ring */					\
-	DRM_MEMORYBARRIER();						\
-	GET_RING_HEAD( dev_priv );					\
-	RADEON_WRITE( RADEON_CP_RB_WPTR, dev_priv->ring.tail );	        \
-	/* read from PCI bus to ensure correct posting */	        \
-	RADEON_READ( RADEON_CP_RB_RPTR );			        \
-} while (0)
+#define COMMIT_RING() radeon_commit_ring(dev_priv)
 
-#define COMMIT_RING() do {						\
-        if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600) {      \
-	        R600_COMMIT_RING();                             	\
-        } else {                                                        \
-	        RADEON_COMMIT_RING();			                \
-        }                                                               \
-} while (0)
 
 #define OUT_RING( x ) do {						\
 	if ( RADEON_VERBOSE ) {						\
