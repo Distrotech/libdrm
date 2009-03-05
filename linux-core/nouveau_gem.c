@@ -114,8 +114,6 @@ nouveau_gem_new(struct drm_device *dev, struct nouveau_channel *chan,
 out:
 	if (ret) {
 		mutex_lock(&dev->struct_mutex);
-		if (ngem->bo)
-			drm_bo_usage_deref_locked(&ngem->bo);
 		drm_gem_object_unreference(gem);
 		mutex_unlock(&dev->struct_mutex);
 		return ret;
