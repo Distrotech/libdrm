@@ -60,7 +60,7 @@
 		dev_priv->dma_low += 8;		\
 	}
 
-#define VIA_TRACKER_INTERVAL 0x100000
+#define VIA_TRACKER_INTERVAL 0x20000
 
 struct via_dma_tracker {
 	struct list_head head;
