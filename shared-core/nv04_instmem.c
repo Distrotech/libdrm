@@ -27,8 +27,7 @@ nv04_instmem_determine_amount(struct drm_device *dev)
 			break;
 		}
 	} else {
-		/*XXX: what *are* the limits on <NV40 cards?, and does RAMIN
-		 *     exist in vram on those cards as well?
+		/*XXX: what *are* the limits on <NV40 cards?
 		 */
 		dev_priv->ramin_rsvd_vram = (512*1024);
 	}
