@@ -1066,9 +1066,9 @@ nouveau_gpuobj_channel_init(struct nouveau_channel *chan,
 				    chan->vm_vram_pt[i]->instance | 0x61);
 			INSTANCE_WR(chan->vm_pd, pde++, 0x00000000);
 		}
-	}
 
-	instmem->finish_access(dev);
+		instmem->finish_access(dev);
+	}
 
 	/* RAMHT */
 	if (dev_priv->card_type < NV_50) {

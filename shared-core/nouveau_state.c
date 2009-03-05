@@ -461,29 +461,6 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 		nv_wr32(NV03_PMC_BOOT_1,0x00000001);
 
 	DRM_MEMORYBARRIER();
-
-	/* if we have an OF card, copy vbios to RAMIN */
-	dn = pci_device_to_OF_node(dev->pdev);
-	if (dn)
-	{
-		int size;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22))
-		const uint32_t *bios = of_get_property(dn, "NVDA,BMP", &size);
-#else
-		const uint32_t *bios = get_property(dn, "NVDA,BMP", &size);
-#endif
-		if (bios)
-		{
-			int i;
-			for(i=0;i<size;i+=4)
-				nv_wi32(i, bios[i/4]);
-			DRM_INFO("OF bios successfully copied (%d bytes)\n",size);
-		}
-		else
-			DRM_INFO("Unable to get the OF bios\n");
-	}
-	else
-		DRM_INFO("Unable to get the OF node\n");
 #endif
 
 	/* Time to determine the card architecture */
@@ -570,6 +547,32 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 		}
 	}
 
+#if defined(__powerpc__)
+	/* if we have an OF card, copy vbios to RAMIN */
+	dn = pci_device_to_OF_node(dev->pdev);
+	if (dn)
+	{
+		int size;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22))
+		const uint32_t *bios = of_get_property(dn, "NVDA,BMP", &size);
+#else
+		const uint32_t *bios = get_property(dn, "NVDA,BMP", &size);
+#endif
+		if (bios)
+		{
+			int i;
+			dev_priv->engine.instmem.prepare_access(dev, true);
+			for(i=0;i<size;i+=4)
+				nv_wi32(i, bios[i/4]);
+			dev_priv->engine.instmem.finish_access(dev);
+			DRM_INFO("OF bios successfully copied (%d bytes)\n",size);
+		}
+		else
+			DRM_INFO("Unable to get the OF bios\n");
+	}
+	else
+		DRM_INFO("Unable to get the OF node\n");
+#endif
 
 	/* For those who think they want to be funny. */
 	if (dev_priv->card_type < NV_50)
@@ -865,8 +868,10 @@ static int nouveau_resume(struct drm_device *dev)
 		}
 	}
 
+	dev_priv->engine.instmem.prepare_access(dev, true);
 	for (i = 0; i < susres->ramin_size / 4; i++)
 		nv_wi32(i << 2, susres->ramin_copy[i]);
+	dev_priv->engine.instmem.finish_access(dev);
 
 	engine->mc.init(dev);
 	engine->timer.init(dev);
@@ -885,8 +890,10 @@ static int nouveau_resume(struct drm_device *dev)
 	/* PMC power cycling PFIFO in init clobbers some of the stuff stored in
 	 * PRAMIN (such as NV04_PFIFO_CACHE1_DMA_INSTANCE). this is unhelpful
 	 */
+	dev_priv->engine.instmem.prepare_access(dev, true);
 	for (i = 0; i < susres->ramin_size / 4; i++)
 		nv_wi32(i << 2, susres->ramin_copy[i]);
+	dev_priv->engine.instmem.finish_access(dev);
 
 	engine->fifo.load_context(dev_priv->fifos[0]);
 	nv_wr32(NV04_PFIFO_MODE, susres->fifo_mode);
