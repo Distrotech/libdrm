@@ -192,6 +192,7 @@ nouveau_ramht_remove(struct drm_device *dev, struct nouveau_gpuobj_ref *ref)
 		if (co >= dev_priv->ramht_size)
 			co = 0;
 	} while (co != ho);
+	list_del(&ref->list);
 	instmem->finish_access(dev);
 
 	DRM_ERROR("RAMHT entry not found. ch=%d, handle=0x%08x\n",
