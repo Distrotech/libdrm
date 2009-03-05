@@ -207,8 +207,20 @@ enum hrtimer_restart via_ttm_fence_timer_func(struct hrtimer *timer)
 }
 
 /**
- * Since emitting a sequence blit after each command submission has a
- * negative performance impact, we defer that emission until fence flushing.
+ * Openchrome fence flushing:
+ *
+ * Fence flushing means making sure that waiting fences of a particular
+ * fence class will eventually signal completely.
+ *
+ * On Openchrome that has nothing to do with GPU cache flushing. Instead
+ * fence flushing involves the following operations:
+ *
+ * 1) If the fence sequence has not yet been emitted to the command stream
+ *    "(deferred fencing)", make sure that it is.
+ * 2) If the fence type indicates use of either HighQualityVideo or
+ *    Mpeg engines, Block further command submission to these engines to make
+ *    sure that they eventually signal idle. This is done using the
+ *    "barrier" functionality in via_execbuf. (To be implemented.)
  */
 
 static void via_ttm_fence_flush(struct ttm_fence_device *fdev,
@@ -221,17 +233,13 @@ static void via_ttm_fence_flush(struct ttm_fence_device *fdev,
 
 		mutex_lock(&dev_priv->cmdbuf_mutex);
 		sequence = atomic_read(&dev_priv->fence_seq[VIA_ENGINE_CMD]);
-		via_emit_fence_seq_standalone(dev_priv, VIA_FENCE_OFFSET_CMD,
-					      sequence);
-		DRM_INFO("Flushing fence 0x%08x\n", (unsigned) sequence);
+		if (sequence != atomic_read(&dev_priv->emitted_cmd_seq))
+			via_emit_fence_seq_standalone(dev_priv,
+						      VIA_FENCE_OFFSET_CMD,
+						      sequence);
 		mutex_unlock(&dev_priv->cmdbuf_mutex);
 	}
 }
-
-/**
- * If the fence sequence is higher than what we've actually put in the
- * command stream, indicate that we need to flush this fence type.
- */
 
 static uint32_t via_ttm_fence_needed_flush(struct ttm_fence_object *fence)
 {
