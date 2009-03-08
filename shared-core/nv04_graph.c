@@ -502,7 +502,6 @@ int nv04_graph_init(struct drm_device *dev) {
 
 	nv_wr32(NV04_PGRAPH_STATE        , 0xFFFFFFFF);
 	nv_wr32(NV04_PGRAPH_CTX_CONTROL  , 0x10010100);
-	nv_wr32(NV04_PGRAPH_FIFO         , 0x00000001);
 
 	/* These don't belong here, they're part of a per-channel context */
 	nv_wr32(NV04_PGRAPH_PATTERN_SHAPE, 0x00000000);
@@ -514,3 +513,15 @@ int nv04_graph_init(struct drm_device *dev) {
 void nv04_graph_takedown(struct drm_device *dev)
 {
 }
+
+void
+nv04_graph_fifo_access(struct drm_device *dev, bool enabled)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
+	if (enabled)
+		nv_wr32(NV04_PGRAPH_FIFO, nv_rd32(NV04_PGRAPH_FIFO) | 1);
+	else
+		nv_wr32(NV04_PGRAPH_FIFO, nv_rd32(NV04_PGRAPH_FIFO) & ~1);
+}
+

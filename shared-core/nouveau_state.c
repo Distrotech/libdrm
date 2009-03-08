@@ -58,6 +58,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fb.takedown	= nv04_fb_takedown;
 		engine->graph.init	= nv04_graph_init;
 		engine->graph.takedown	= nv04_graph_takedown;
+		engine->graph.fifo_access	= nv04_graph_fifo_access;
 		engine->graph.create_context	= nv04_graph_create_context;
 		engine->graph.destroy_context	= nv04_graph_destroy_context;
 		engine->graph.load_context	= nv04_graph_load_context;
@@ -91,6 +92,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.takedown	= nv10_graph_takedown;
 		engine->graph.create_context	= nv10_graph_create_context;
 		engine->graph.destroy_context	= nv10_graph_destroy_context;
+		engine->graph.fifo_access	= nv04_graph_fifo_access;
 		engine->graph.load_context	= nv10_graph_load_context;
 		engine->graph.save_context	= nv10_graph_save_context;
 		engine->fifo.channels	= 32;
@@ -122,6 +124,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.takedown	= nv20_graph_takedown;
 		engine->graph.create_context	= nv20_graph_create_context;
 		engine->graph.destroy_context	= nv20_graph_destroy_context;
+		engine->graph.fifo_access	= nv04_graph_fifo_access;
 		engine->graph.load_context	= nv20_graph_load_context;
 		engine->graph.save_context	= nv20_graph_save_context;
 		engine->fifo.channels	= 32;
@@ -151,6 +154,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fb.takedown	= nv10_fb_takedown;
 		engine->graph.init	= nv30_graph_init;
 		engine->graph.takedown	= nv20_graph_takedown;
+		engine->graph.fifo_access	= nv04_graph_fifo_access;
 		engine->graph.create_context	= nv20_graph_create_context;
 		engine->graph.destroy_context	= nv20_graph_destroy_context;
 		engine->graph.load_context	= nv20_graph_load_context;
@@ -183,6 +187,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fb.takedown	= nv40_fb_takedown;
 		engine->graph.init	= nv40_graph_init;
 		engine->graph.takedown	= nv40_graph_takedown;
+		engine->graph.fifo_access	= nv04_graph_fifo_access;
 		engine->graph.create_context	= nv40_graph_create_context;
 		engine->graph.destroy_context	= nv40_graph_destroy_context;
 		engine->graph.load_context	= nv40_graph_load_context;
@@ -217,6 +222,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fb.takedown	= nouveau_stub_takedown;
 		engine->graph.init	= nv50_graph_init;
 		engine->graph.takedown	= nv50_graph_takedown;
+		engine->graph.fifo_access	= nv50_graph_fifo_access;
 		engine->graph.create_context	= nv50_graph_create_context;
 		engine->graph.destroy_context	= nv50_graph_destroy_context;
 		engine->graph.load_context	= nv50_graph_load_context;

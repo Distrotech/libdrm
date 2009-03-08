@@ -768,7 +768,6 @@ int nv20_graph_init(struct drm_device *dev) {
 
 	nv_wr32(NV10_PGRAPH_CTX_CONTROL, 0x10000100);
 	nv_wr32(NV10_PGRAPH_STATE      , 0xFFFFFFFF);
-	nv_wr32(NV04_PGRAPH_FIFO       , 0x00000001);
 
 	tmp = nv_rd32(NV10_PGRAPH_SURFACE) & 0x0007ff00;
 	nv_wr32(NV10_PGRAPH_SURFACE, tmp);
@@ -879,7 +878,6 @@ int nv30_graph_init(struct drm_device *dev)
 	nv_wr32(NV10_PGRAPH_CTX_CONTROL, 0x10000100);
 	nv_wr32(NV10_PGRAPH_STATE      , 0xFFFFFFFF);
 	nv_wr32(0x0040075c             , 0x00000001);
-	nv_wr32(NV04_PGRAPH_FIFO       , 0x00000001);
 
 	/* begin RAM config */
 //	vramsz = drm_get_resource_len(dev, 0) - 1;

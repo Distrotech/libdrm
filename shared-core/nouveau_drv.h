@@ -242,6 +242,8 @@ struct nouveau_pgraph_engine {
 	int  (*init)(struct drm_device *);
 	void (*takedown)(struct drm_device *);
 
+	void (*fifo_access)(struct drm_device *, bool);
+
 	int  (*create_context)(struct nouveau_channel *);
 	void (*destroy_context)(struct nouveau_channel *);
 	int  (*load_context)(struct nouveau_channel *);
@@ -589,6 +591,7 @@ extern int  nv50_fifo_save_context(struct nouveau_channel *);
 extern void nouveau_nv04_context_switch(struct drm_device *);
 extern int  nv04_graph_init(struct drm_device *);
 extern void nv04_graph_takedown(struct drm_device *);
+extern void nv04_graph_fifo_access(struct drm_device *, bool);
 extern int  nv04_graph_create_context(struct nouveau_channel *);
 extern void nv04_graph_destroy_context(struct nouveau_channel *);
 extern int  nv04_graph_load_context(struct nouveau_channel *);
@@ -623,6 +626,7 @@ extern int  nv40_graph_save_context(struct nouveau_channel *);
 /* nv50_graph.c */
 extern int  nv50_graph_init(struct drm_device *);
 extern void nv50_graph_takedown(struct drm_device *);
+extern void nv50_graph_fifo_access(struct drm_device *, bool);
 extern int  nv50_graph_create_context(struct nouveau_channel *);
 extern void nv50_graph_destroy_context(struct nouveau_channel *);
 extern int  nv50_graph_load_context(struct nouveau_channel *);

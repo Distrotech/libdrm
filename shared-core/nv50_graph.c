@@ -71,7 +71,7 @@ nv50_graph_init_regs__nv(struct drm_device *dev)
 	nv_wr32(0x400108, 0xffffffff);
 
 	nv_wr32(0x400824, 0x00004000);
-	nv_wr32(0x400500, 0x00010001);
+	nv_wr32(0x400500, 0x00000000);
 }
 
 static void
@@ -144,9 +144,9 @@ nv50_graph_init(struct drm_device *dev)
 	DRM_DEBUG("\n");
 
 	nv50_graph_init_reset(dev);
-	nv50_graph_init_intr(dev);
 	nv50_graph_init_regs__nv(dev);
 	nv50_graph_init_regs(dev);
+	nv50_graph_init_intr(dev);
 
 	ret = nv50_graph_init_ctxctl(dev);
 	if (ret)
@@ -159,6 +159,18 @@ void
 nv50_graph_takedown(struct drm_device *dev)
 {
 	DRM_DEBUG("\n");
+}
+
+void
+nv50_graph_fifo_access(struct drm_device *dev, bool enabled)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	const uint32_t mask = 0x00010001;
+
+	if (enabled)
+		nv_wr32(0x400500, nv_rd32(0x400500) | mask);
+	else
+		nv_wr32(0x400500, nv_rd32(0x400500) & ~mask);
 }
 
 int

@@ -344,6 +344,7 @@ nouveau_fifo_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 		return ret;
 	}
 
+	engine->graph.fifo_access(dev, false);
 	nouveau_wait_for_idle(dev);
 
 	/* disable the fifo caches */
@@ -398,6 +399,8 @@ nouveau_fifo_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 
 	/* reenable the fifo caches */
 	nv_wr32(NV03_PFIFO_CACHES, 1);
+
+	engine->graph.fifo_access(dev, true);
 
 	if (dev_priv->mm_enabled) {
 		ret = nouveau_dma_channel_setup(chan);

@@ -2012,7 +2012,6 @@ nv40_graph_init(struct drm_device *dev)
 
 	nv_wr32(NV10_PGRAPH_CTX_CONTROL, 0x10010100);
 	nv_wr32(NV10_PGRAPH_STATE      , 0xFFFFFFFF);
-	nv_wr32(NV04_PGRAPH_FIFO       , 0x00000001);
 
 	j = nv_rd32(0x1540) & 0xff;
 	if (j) {
