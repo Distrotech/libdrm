@@ -349,6 +349,7 @@ nouveau_gpuobj_del(struct drm_device *dev, struct nouveau_gpuobj **pgpuobj)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_engine *engine = &dev_priv->engine;
 	struct nouveau_gpuobj *gpuobj;
+	int i;
 
 	DRM_DEBUG("gpuobj %p\n", pgpuobj ? *pgpuobj : NULL);
 
@@ -359,6 +360,13 @@ nouveau_gpuobj_del(struct drm_device *dev, struct nouveau_gpuobj **pgpuobj)
 	if (gpuobj->refcount != 0) {
 		DRM_ERROR("gpuobj refcount is %d\n", gpuobj->refcount);
 		return -EINVAL;
+	}
+
+	if (gpuobj->flags & NVOBJ_FLAG_ZERO_FREE) {
+		engine->instmem.prepare_access(dev, true);
+		for (i = 0; i < gpuobj->im_pramin->size; i += 4)
+			INSTANCE_WR(gpuobj, i/4, 0);
+		engine->instmem.finish_access(dev);
 	}
 
 	if (gpuobj->dtor)
