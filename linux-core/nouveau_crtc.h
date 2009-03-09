@@ -24,18 +24,36 @@
  *
  */
 
-#ifndef __NV50_FBCON_H__
-#define __NV50_FBCON_H__
+#ifndef __NOUVEAU_CRTC_H__
+#define __NOUVEAU_CRTC_H__
 
-struct nv50_fbcon_par {
-	struct drm_framebuffer *fb;
-	struct drm_device *dev;
-	bool use_preferred_mode;
+struct nouveau_crtc {
+	struct drm_crtc base;
+
+	int index;
+
+	struct drm_mode_set mode_set;
+
+	struct drm_display_mode *mode;
+	bool use_dithering;
+
+	struct nv50_cursor *cursor;
+	struct {
+		struct mem_block *mem;
+		uint16_t r[256];
+		uint16_t g[256];
+		uint16_t b[256];
+		int depth;
+	} lut;
+
+	int (*set_dither) (struct nouveau_crtc *crtc);
+	int (*set_scale) (struct nouveau_crtc *crtc, int mode, bool update);
+	int (*set_clock) (struct nouveau_crtc *crtc, struct drm_display_mode *);
+	int (*set_clock_mode) (struct nouveau_crtc *crtc);
+	int (*destroy) (struct nouveau_crtc *crtc);
 };
+#define to_nouveau_crtc(x) container_of((x), struct nouveau_crtc, base)
 
-int nv50_fbcon_init(struct drm_device *dev);
-int nv50_fbcon_destroy(struct drm_device *dev);
-int nv50_fbcon_accel_init(struct fb_info *info);
+int nv50_crtc_create(struct drm_device *dev, int index);
 
-#endif /* __NV50_FBCON_H__ */
-
+#endif /* __NOUVEAU_CRTC_H__ */

@@ -25,15 +25,14 @@
  */
 
 #include "nv50_display.h"
-#include "nv50_crtc.h"
-#include "nv50_output.h"
-#include "nv50_connector.h"
-#include "nv50_fb.h"
+#include "nouveau_crtc.h"
+#include "nouveau_encoder.h"
+#include "nouveau_connector.h"
+#include "nouveau_fb.h"
 #include "drm_crtc_helper.h"
 
-static int nv50_display_pre_init(struct nv50_display *display)
+static int nv50_display_pre_init(struct drm_device *dev)
 {
-	struct drm_device *dev = display->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	int i;
 	uint32_t ram_amount;
@@ -60,6 +59,7 @@ static int nv50_display_pre_init(struct nv50_display *display)
 	/* SOR */
 	nv_wr32(0x006101e0 + 0 * 0x4, nv_rd32(0x0061c000 + 0 * 0x800));
 	nv_wr32(0x006101e0 + 1 * 0x4, nv_rd32(0x0061c000 + 1 * 0x800));
+	nv_wr32(0x006101e0 + 2 * 0x4, nv_rd32(0x0061c000 + 2 * 0x800));
 	/* Something not yet in use, tv-out maybe. */
 	nv_wr32(0x006101f0 + 0 * 0x4, nv_rd32(0x0061e000 + 0 * 0x800));
 	nv_wr32(0x006101f0 + 1 * 0x4, nv_rd32(0x0061e000 + 1 * 0x800));
@@ -73,7 +73,7 @@ static int nv50_display_pre_init(struct nv50_display *display)
 	/* This used to be in crtc unblank, but seems out of place there. */
 	nv_wr32(NV50_PDISPLAY_UNK_380, 0);
 	/* RAM is clamped to 256 MiB. */
-	ram_amount = nouveau_mem_fb_amount(display->dev);
+	ram_amount = nouveau_mem_fb_amount(dev);
 	DRM_DEBUG("ram_amount %d\n", ram_amount);
 	if (ram_amount > 256*1024*1024)
 		ram_amount = 256*1024*1024;
@@ -81,40 +81,59 @@ static int nv50_display_pre_init(struct nv50_display *display)
 	nv_wr32(NV50_PDISPLAY_UNK_388, 0x150000);
 	nv_wr32(NV50_PDISPLAY_UNK_38C, 0);
 
-	display->preinit_done = true;
-
 	return 0;
 }
 
-static int nv50_display_init(struct nv50_display *display)
+static int
+nv50_display_init(struct drm_device *dev)
 {
-	struct drm_device *dev = display->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_timer_engine *ptimer = &dev_priv->engine.timer;
+	uint64_t start;
 	uint32_t val;
 
 	DRM_DEBUG("\n");
 
-	/* The precise purpose is unknown, i suspect it has something to do with text mode. */
+	/* The precise purpose is unknown, i suspect it has something to do
+	 * with text mode.
+	 */
 	if (nv_rd32(NV50_PDISPLAY_SUPERVISOR) & 0x100) {
 		nv_wr32(NV50_PDISPLAY_SUPERVISOR, 0x100);
 		nv_wr32(0x006194e8, nv_rd32(0x006194e8) & ~1);
-		while (nv_rd32(0x006194e8) & 2);
+		if (!nv_wait(0x006194e8, 2, 0)) {
+			DRM_ERROR("timeout: (0x6194e8 & 2) != 0\n");
+			DRM_ERROR("0x6194e8 = 0x%08x\n", nv_rd32(0x6194e8));
+			return -EBUSY;
+		}
 	}
 
-	/* taken from nv bug #12637 */
+	/* taken from nv bug #12637, attempts to un-wedge the hw if it's
+	 * stuck in some unspecified state
+	 */
+	start = ptimer->read(dev);
 	nv_wr32(NV50_PDISPLAY_UNK200_CTRL, 0x2b00);
-	do {
-		val = nv_rd32(NV50_PDISPLAY_UNK200_CTRL);
+	while ((val = nv_rd32(NV50_PDISPLAY_UNK200_CTRL)) & 0x1e0000) {
 		if ((val & 0x9f0000) == 0x20000)
 			nv_wr32(NV50_PDISPLAY_UNK200_CTRL, val | 0x800000);
 
 		if ((val & 0x3f0000) == 0x30000)
 			nv_wr32(NV50_PDISPLAY_UNK200_CTRL, val | 0x200000);
-	} while (val & 0x1e0000);
+
+		if (ptimer->read(dev) - start > 1000000000ULL) {
+			DRM_ERROR("timeout: (0x610200 & 0x1e0000) != 0\n");
+			DRM_ERROR("0x610200 = 0x%08x\n", val);
+			return -EBUSY;
+		}
+	}
 
 	nv_wr32(NV50_PDISPLAY_CTRL_STATE, NV50_PDISPLAY_CTRL_STATE_ENABLE);
 	nv_wr32(NV50_PDISPLAY_UNK200_CTRL, 0x1000b03);
-	while (!(nv_rd32(NV50_PDISPLAY_UNK200_CTRL) & 0x40000000));
+	if (!nv_wait(NV50_PDISPLAY_UNK200_CTRL, 0x40000000, 0x40000000)) {
+		DRM_ERROR("timeout: (0x610200 & 0x40000000) == 0x40000000\n");
+		DRM_ERROR("0x610200 = 0x%08x\n",
+			  nv_rd32(NV50_PDISPLAY_UNK200_CTRL));
+		return -EBUSY;
+	}
 
 	/* For the moment this is just a wrapper, which should be replaced with a real fifo at some point. */
 	OUT_MODE(NV50_UNK84, 0);
@@ -124,20 +143,21 @@ static int nv50_display_init(struct nv50_display *display)
 	OUT_MODE(NV50_CRTC0_DISPLAY_START, 0);
 	OUT_MODE(NV50_CRTC0_UNK82C, 0);
 
+	OUT_MODE(NV50_UPDATE_DISPLAY, 0);
+
 	/* enable clock change interrupts. */
-	nv_wr32(NV50_PDISPLAY_SUPERVISOR_INTR, nv_rd32(NV50_PDISPLAY_SUPERVISOR_INTR) | 0x70);
+//	nv_wr32(NV50_PDISPLAY_SUPERVISOR_INTR, nv_rd32(NV50_PDISPLAY_SUPERVISOR_INTR) | 0x70);
 
 	/* enable hotplug interrupts */
-	nv_wr32(NV50_PCONNECTOR_HOTPLUG_INTR, 0x7FFF7FFF);
+	nv_wr32(NV50_PCONNECTOR_HOTPLUG_CTRL, 0x7FFF7FFF);
+//	nv_wr32(NV50_PCONNECTOR_HOTPLUG_INTR, 0x7FFF7FFF);
 
-	display->init_done = true;
 
 	return 0;
 }
 
-static int nv50_display_disable(struct nv50_display *display)
+static int nv50_display_disable(struct drm_device *dev)
 {
-	struct drm_device *dev = display->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_crtc *drm_crtc;
 	int i;
@@ -145,16 +165,16 @@ static int nv50_display_disable(struct nv50_display *display)
 	DRM_DEBUG("\n");
 
 	list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
-		struct nv50_crtc *crtc = to_nv50_crtc(drm_crtc);
+		struct drm_crtc_helper_funcs *helper = drm_crtc->helper_private;
 
-		crtc->blank(crtc, true);
+		helper->dpms(drm_crtc, DRM_MODE_DPMS_OFF);
 	}
 
-	display->update(display);
+	OUT_MODE(NV50_UPDATE_DISPLAY, 0);
 
 	/* Almost like ack'ing a vblank interrupt, maybe in the spirit of cleaning up? */
 	list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
-		struct nv50_crtc *crtc = to_nv50_crtc(drm_crtc);
+		struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
 
 		if (crtc->base.enabled) {
 			uint32_t mask;
@@ -165,124 +185,52 @@ static int nv50_display_disable(struct nv50_display *display)
 				mask = NV50_PDISPLAY_SUPERVISOR_CRTC0;
 
 			nv_wr32(NV50_PDISPLAY_SUPERVISOR, mask);
-			while (!(nv_rd32(NV50_PDISPLAY_SUPERVISOR) & mask));
+			if (!nv_wait(NV50_PDISPLAY_SUPERVISOR, mask, mask)) {
+				DRM_ERROR("timeout: (0x610024 & 0x%08x) == "
+					  "0x%08x\n", mask, mask);
+				DRM_ERROR("0x610024 = 0x%08x\n",
+					  nv_rd32(0x610024));
+			}
 		}
 	}
 
+#if 0
 	nv_wr32(NV50_PDISPLAY_UNK200_CTRL, 0);
 	nv_wr32(NV50_PDISPLAY_CTRL_STATE, 0);
-	while ((nv_rd32(NV50_PDISPLAY_UNK200_CTRL) & 0x1e0000) != 0);
+	if (!nv_wait(NV50_PDISPLAY_UNK200_CTRL, 0x1e0000, 0)) {
+		DRM_ERROR("timeout: (0x610200 & 0x1e0000) == 0\n");
+		DRM_ERROR("0x610200 = 0x%08x\n",
+			  nv_rd32(NV50_PDISPLAY_UNK200_CTRL));
+	}
+#endif
 
-	for (i = 0; i < 2; i++) {
-		while (nv_rd32(NV50_PDISPLAY_SOR_REGS_DPMS_STATE(i)) & NV50_PDISPLAY_SOR_REGS_DPMS_STATE_WAIT);
+	for (i = 0; i < NV50_PDISPLAY_SOR_REGS__LEN; i++) {
+		if (!nv_wait(NV50_PDISPLAY_SOR_REGS_DPMS_STATE(i),
+			     NV50_PDISPLAY_SOR_REGS_DPMS_STATE_WAIT, 0)) {
+			DRM_ERROR("timeout: SOR_DPMS_STATE_WAIT(%d) == 0\n", i);
+			DRM_ERROR("SOR_DPMS_STATE(%d) = 0x%08x\n", i,
+				  nv_rd32(NV50_PDISPLAY_SOR_REGS_DPMS_STATE(i)));
+		}
 	}
 
 	/* disable clock change interrupts. */
-	nv_wr32(NV50_PDISPLAY_SUPERVISOR_INTR, nv_rd32(NV50_PDISPLAY_SUPERVISOR_INTR) & ~0x70);
+	nv_wr32(NV50_PDISPLAY_SUPERVISOR_INTR,
+		nv_rd32(NV50_PDISPLAY_SUPERVISOR_INTR) & ~0x70);
 
 	/* disable hotplug interrupts */
 	nv_wr32(NV50_PCONNECTOR_HOTPLUG_INTR, 0);
 
-	display->init_done = false;
-
 	return 0;
 }
-
-static int nv50_display_update(struct nv50_display *display)
-{
-	struct drm_device *dev = display->dev;
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-
-	DRM_DEBUG("\n");
-
-	OUT_MODE(NV50_UPDATE_DISPLAY, 0);
-
-	return 0;
-}
-
-static void nv50_user_framebuffer_destroy(struct drm_framebuffer *drm_fb)
-{
-	struct nv50_framebuffer *fb = to_nv50_framebuffer(drm_fb);
-	struct drm_device *dev = drm_fb->dev;
-
-	if (drm_fb->fbdev)
-		DRM_ERROR("radeonfb_remove(dev, drm_fb);\n");
-
-	if (fb->gem) {
-		mutex_lock(&dev->struct_mutex);
-		drm_gem_object_unreference(fb->gem);
-		mutex_unlock(&dev->struct_mutex);
-	}
-
-	drm_framebuffer_cleanup(drm_fb);
-	kfree(fb);
-}
-
-static int nv50_user_framebuffer_create_handle(struct drm_framebuffer *drm_fb,
-					       struct drm_file *file_priv,
-					       unsigned int *handle)
-{
-	struct nv50_framebuffer *fb = to_nv50_framebuffer(drm_fb);
-
-	return drm_gem_handle_create(file_priv, fb->gem, handle);
-}
-
-static const struct drm_framebuffer_funcs nv50_framebuffer_funcs = {
-	.destroy = nv50_user_framebuffer_destroy,
-	.create_handle = nv50_user_framebuffer_create_handle,
-};
-
-struct drm_framebuffer *
-nv50_framebuffer_create(struct drm_device *dev, struct drm_gem_object *gem,
-			struct drm_mode_fb_cmd *mode_cmd)
-{
-	struct nv50_framebuffer *fb;
-
-	fb = kzalloc(sizeof(struct nv50_framebuffer), GFP_KERNEL);
-	if (!fb)
-		return NULL;
-
-	drm_framebuffer_init(dev, &fb->base, &nv50_framebuffer_funcs);
-	drm_helper_mode_fill_fb_struct(&fb->base, mode_cmd);
-
-	fb->gem = gem;
-	return &fb->base;
-}
-
-static struct drm_framebuffer *
-nv50_user_framebuffer_create(struct drm_device *dev, struct drm_file *file_priv,
-			     struct drm_mode_fb_cmd *mode_cmd)
-{
-	struct drm_gem_object *gem;
-
-	gem = drm_gem_object_lookup(dev, file_priv, mode_cmd->handle);
-	return nv50_framebuffer_create(dev, gem, mode_cmd);
-}
-
-static int nv50_framebuffer_changed(struct drm_device *dev)
-{
-	return 0; /* not needed until nouveaufb? */
-}
-
-static const struct drm_mode_config_funcs nv50_mode_config_funcs = {
-	.fb_create = nv50_user_framebuffer_create,
-	.fb_changed = nv50_framebuffer_changed,
-};
 
 int nv50_display_create(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nv50_display *display;
 	uint32_t bus_mask = 0;
 	uint32_t bus_digital = 0, bus_analog = 0;
 	int ret, i;
 
 	DRM_DEBUG("\n");
-
-	display = kzalloc(sizeof(*display), GFP_KERNEL);
-	if (!display)
-		return -ENOMEM;
-	dev_priv->display_priv = display;
 
 	/* init basic kernel modesetting */
 	drm_mode_config_init(dev);
@@ -294,7 +242,7 @@ int nv50_display_create(struct drm_device *dev)
 	dev->mode_config.min_width = 0;
 	dev->mode_config.min_height = 0;
 
-	dev->mode_config.funcs = (void *)&nv50_mode_config_funcs;
+	dev->mode_config.funcs = (void *)&nouveau_mode_config_funcs;
 
 	dev->mode_config.max_width = 8192;
 	dev->mode_config.max_height = 8192;
@@ -369,49 +317,90 @@ int nv50_display_create(struct drm_device *dev)
 		bus_mask |= (1 << entry->bus);
 	}
 
-	display->dev = dev;
-
-	/* function pointers */
-	display->init = nv50_display_init;
-	display->pre_init = nv50_display_pre_init;
-	display->disable = nv50_display_disable;
-	display->update = nv50_display_update;
-
-	ret = display->pre_init(display);
+	ret = nv50_display_pre_init(dev);
 	if (ret)
 		return ret;
 
-	ret = display->init(display);
+	ret = nv50_display_init(dev);
 	if (ret)
 		return ret;
 
-	display->update(display);
 	return 0;
 }
 
 int nv50_display_destroy(struct drm_device *dev)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nv50_display *display = nv50_get_display(dev);
-
 	DRM_DEBUG("\n");
 
-	if (display->init_done)
-		display->disable(display);
+	nv50_display_disable(dev);
 
 	drm_mode_config_cleanup(dev);
-
-	kfree(display);
-	dev_priv->display_priv = NULL;
 
 	return 0;
 }
 
 /* This can be replaced with a real fifo in the future. */
-void nv50_display_command(struct drm_nouveau_private *dev_priv,
-			  uint32_t mthd, uint32_t val)
+static void nv50_display_vclk_update(struct drm_device *dev)
 {
-	uint32_t counter = 0;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct drm_encoder *drm_encoder;
+	struct drm_crtc *drm_crtc;
+	struct nouveau_encoder *encoder = NULL;
+	struct nouveau_crtc *crtc = NULL;
+	int crtc_index;
+	uint32_t unk30 = nv_rd32(NV50_PDISPLAY_UNK30_CTRL);
+
+	for (crtc_index = 0; crtc_index < 2; crtc_index++) {
+		bool clock_change = false;
+		bool clock_ack = false;
+
+		if (crtc_index == 0 && (unk30 & NV50_PDISPLAY_UNK30_CTRL_UPDATE_VCLK0))
+			clock_change = true;
+
+		if (crtc_index == 1 && (unk30 & NV50_PDISPLAY_UNK30_CTRL_UPDATE_VCLK1))
+			clock_change = true;
+
+		if (clock_change)
+			clock_ack = true;
+
+#if 0
+		if (dev_priv->last_crtc == crtc_index)
+#endif
+			clock_ack = true;
+
+		list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
+			crtc = to_nouveau_crtc(drm_crtc);
+			if (crtc->index == crtc_index)
+				break;
+		}
+
+		if (clock_change)
+			crtc->set_clock(crtc, crtc->mode);
+
+		DRM_DEBUG("index %d clock_change %d clock_ack %d\n", crtc_index, clock_change, clock_ack);
+
+		if (!clock_ack)
+			continue;
+
+		crtc->set_clock_mode(crtc);
+
+		list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
+			encoder = to_nouveau_encoder(drm_encoder);
+
+			if (!drm_encoder->crtc)
+				continue;
+
+			if (drm_encoder->crtc == drm_crtc)
+				encoder->set_clock_mode(encoder, crtc->mode);
+		}
+	}
+}
+
+void nv50_display_command(struct drm_device *dev, uint32_t mthd, uint32_t val)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_timer_engine *ptimer = &dev_priv->engine.timer;
+	uint64_t start;
 
 	DRM_DEBUG("mthd 0x%03X val 0x%08X\n", mthd, val);
 
@@ -420,13 +409,28 @@ void nv50_display_command(struct drm_nouveau_private *dev_priv,
 					   NV50_PDISPLAY_CTRL_STATE_ENABLE |
 					   0x10000 | mthd);
 
+	start = ptimer->read(dev);
 	while (nv_rd32(NV50_PDISPLAY_CTRL_STATE) & NV50_PDISPLAY_CTRL_STATE_PENDING) {
-		counter++;
-		if (counter > 1000000) {
-			DRM_ERROR("You probably need a reboot now\n");
+		const uint32_t super = nv_rd32(NV50_PDISPLAY_SUPERVISOR);
+		uint32_t state;
+
+		state   = (super & NV50_PDISPLAY_SUPERVISOR_CLK_MASK);
+		state >>= NV50_PDISPLAY_SUPERVISOR_CLK_MASK__SHIFT;
+		if (state) {
+			if (state == 2)
+				nv50_display_vclk_update(dev);
+
+			nv_wr32(NV50_PDISPLAY_SUPERVISOR,
+				(super & NV50_PDISPLAY_SUPERVISOR_CLK_MASK));
+			nv_wr32(NV50_PDISPLAY_UNK30_CTRL,
+				NV50_PDISPLAY_UNK30_CTRL_PENDING);
+		}
+
+		if (ptimer->read(dev) - start > 1000000000ULL) {
+			DRM_ERROR("timeout: 0x610300 = 0x%08x\n",
+				  nv_rd32(NV50_PDISPLAY_CTRL_STATE));
 			break;
 		}
-		udelay(1);
 	}
 }
 

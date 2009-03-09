@@ -24,19 +24,29 @@
  *
  */
 
-#ifndef __NV50_DISPLAY_H__
-#define __NV50_DISPLAY_H__
+#ifndef __NOUVEAU_CONNECTOR_H__
+#define __NOUVEAU_CONNECTOR_H__
 
-#include "drmP.h"
-#include "drm.h"
-#include "nouveau_drv.h"
-#include "nouveau_dma.h"
-#include "nouveau_reg.h"
-#include "nv50_display_commands.h"
+#include "nv50_i2c.h"
 
-void nv50_display_command(struct drm_device *dev, uint32_t mthd, uint32_t val);
-struct nv50_display *nv50_get_display(struct drm_device *dev);
-int nv50_display_create(struct drm_device *dev);
-int nv50_display_destroy(struct drm_device *dev);
+struct nouveau_connector {
+	struct drm_connector base;
 
-#endif /* __NV50_DISPLAY_H__ */
+	struct drm_display_mode *native_mode;
+	bool digital;
+
+	int bus;
+	struct nv50_i2c_channel *i2c_chan;
+
+	int scaling_mode;
+
+	bool use_dithering;
+
+	struct nouveau_encoder *(*to_encoder) (struct nouveau_connector *connector, bool digital);
+};
+#define to_nouveau_connector(x) container_of((x), struct nouveau_connector, base)
+
+int nv50_connector_create(struct drm_device *dev, int bus, int i2c_index, int type);
+void nv50_connector_detect_all(struct drm_device *dev);
+
+#endif /* __NOUVEAU_CONNECTOR_H__ */

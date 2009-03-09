@@ -37,12 +37,8 @@
 #include "nouveau_reg.h"
 #include "nouveau_swmthd.h"
 
-/* needed for interrupt based vpll changes */
-#include "nv50_display.h"
-#include "nv50_crtc.h"
-#include "nv50_output.h"
 /* needed for hotplug irq */
-#include "nv50_connector.h"
+#include "nouveau_connector.h"
 
 void
 nouveau_irq_preinstall(struct drm_device *dev)
@@ -535,8 +531,6 @@ nouveau_nv50_display_irq_handler(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t val = nv_rd32(NV50_PDISPLAY_SUPERVISOR);
-	struct drm_encoder *drm_encoder;
-	struct drm_crtc *drm_crtc;
 
 	DRM_DEBUG("NV50_PDISPLAY_SUPERVISOR - 0x%08X\n", val);
 
@@ -544,71 +538,6 @@ nouveau_nv50_display_irq_handler(struct drm_device *dev)
 	if (val & NV50_PDISPLAY_SUPERVISOR_CRTCn) {
 		nv_wr32(NV50_PDISPLAY_SUPERVISOR, val & NV50_PDISPLAY_SUPERVISOR_CRTCn);
 		val &= ~NV50_PDISPLAY_SUPERVISOR_CRTCn;
-	}
-
-	/* clock setting amongst other things. */
-	if (val & NV50_PDISPLAY_SUPERVISOR_CLK_MASK) {
-		uint32_t state = (val & NV50_PDISPLAY_SUPERVISOR_CLK_MASK) >> NV50_PDISPLAY_SUPERVISOR_CLK_MASK__SHIFT;
-
-		DRM_DEBUG("state %d\n", state);
-
-		/* Set pll */
-		if (state == 2) {
-			struct nv50_display *display = nv50_get_display(dev);
-			struct nv50_output *output = NULL;
-			struct nv50_crtc *crtc = NULL;
-			int crtc_index;
-
-			uint32_t unk30 = nv_rd32(NV50_PDISPLAY_UNK30_CTRL);
-
-			for (crtc_index = 0; crtc_index < 2; crtc_index++) {
-				bool clock_change = false;
-				bool clock_ack = false;
-
-				if (crtc_index == 0 && (unk30 & NV50_PDISPLAY_UNK30_CTRL_UPDATE_VCLK0))
-					clock_change = true;
-
-				if (crtc_index == 1 && (unk30 & NV50_PDISPLAY_UNK30_CTRL_UPDATE_VCLK1))
-					clock_change = true;
-
-				if (clock_change)
-					clock_ack = true;
-
-				if (display->last_crtc == crtc_index)
-					clock_ack = true;
-
-				list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
-					crtc = to_nv50_crtc(drm_crtc);
-					if (crtc->index == crtc_index)
-						break;
-				}
-
-				if (clock_change)
-					crtc->set_clock(crtc);
-
-				DRM_DEBUG("index %d clock_change %d clock_ack %d\n", crtc_index, clock_change, clock_ack);
-
-				if (!clock_ack)
-					continue;
-
-				crtc->set_clock_mode(crtc);
-
-				list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
-					output = to_nv50_output(drm_encoder);
-
-					if (!drm_encoder->crtc)
-						continue;
-
-					if (drm_encoder->crtc == drm_crtc)
-						output->set_clock_mode(output);
-				}
-			}
-		}
-
-		nv_wr32(NV50_PDISPLAY_UNK30_CTRL, NV50_PDISPLAY_UNK30_CTRL_PENDING);
-		nv_wr32(NV50_PDISPLAY_SUPERVISOR, val & NV50_PDISPLAY_SUPERVISOR_CLK_MASK);
-
-		val &= ~NV50_PDISPLAY_SUPERVISOR_CLK_MASK;
 	}
 
 	if (val)

@@ -31,8 +31,11 @@
 int nouveau_mm_enabled = 0;
 module_param_named(mm_enabled, nouveau_mm_enabled, int, 0400);
 
-unsigned int nouveau_modeset = 0; /* kms */
+int nouveau_modeset = 0; /* kms */
 module_param_named(modeset, nouveau_modeset, int, 0400);
+
+int nouveau_fbpercrtc = 0;
+module_param_named(fbpercrtc, nouveau_fbpercrtc, int, 0400);
 
 static struct pci_device_id pciidlist[] = {
 	{

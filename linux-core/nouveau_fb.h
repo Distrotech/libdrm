@@ -24,19 +24,21 @@
  *
  */
 
-#ifndef __NV50_DISPLAY_H__
-#define __NV50_DISPLAY_H__
+#ifndef __NOUVEAU_FB_H__
+#define __NOUVEAU_FB_H__
 
-#include "drmP.h"
-#include "drm.h"
-#include "nouveau_drv.h"
-#include "nouveau_dma.h"
-#include "nouveau_reg.h"
-#include "nv50_display_commands.h"
+struct nouveau_framebuffer {
+	struct drm_framebuffer base;
+	struct drm_gem_object *gem;
+	struct drm_bo_kmap_obj kmap;
+};
 
-void nv50_display_command(struct drm_device *dev, uint32_t mthd, uint32_t val);
-struct nv50_display *nv50_get_display(struct drm_device *dev);
-int nv50_display_create(struct drm_device *dev);
-int nv50_display_destroy(struct drm_device *dev);
+#define to_nouveau_framebuffer(x) container_of((x), struct nouveau_framebuffer, base)
 
-#endif /* __NV50_DISPLAY_H__ */
+extern const struct drm_mode_config_funcs nouveau_mode_config_funcs;
+
+struct drm_framebuffer *
+nouveau_framebuffer_create(struct drm_device *, struct drm_gem_object *,
+			   struct drm_mode_fb_cmd *);
+
+#endif /* __NOUVEAU_FB_H__ */

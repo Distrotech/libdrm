@@ -24,46 +24,69 @@
  *
  */
 
+#include "drmP.h"
+#include "drm_mode.h"
+#include "nouveau_reg.h"
+#include "nouveau_drv.h"
+#include "nouveau_crtc.h"
 #include "nv50_cursor.h"
-#include "nv50_crtc.h"
 #include "nv50_display.h"
 
-static int nv50_cursor_enable(struct nv50_crtc *crtc)
+static int nv50_cursor_enable(struct nouveau_crtc *crtc)
 {
-	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
+	struct drm_device *dev = crtc->base.dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	int idx = crtc->index;
 
 	DRM_DEBUG("\n");
 
-	nv_wr32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index), 0x2000);
-	while(nv_rd32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index)) & NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK);
+	nv_wr32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx), 0x2000);
+	if (!nv_wait(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx),
+		     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK, 0)) {
+		DRM_ERROR("timeout: CURSOR_CTRL2_STATUS == 0\n");
+		DRM_ERROR("CURSOR_CTRL2 = 0x%08x\n",
+			  nv_rd32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx)));
+		return -EBUSY;
+	}
 
-	nv_wr32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index), NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_ON);
-	while((nv_rd32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index)) & NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK)
-		!= NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_ACTIVE);
-
-	crtc->cursor->enabled = true;
+	nv_wr32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index),
+		NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_ON);
+	if (!nv_wait(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx),
+		     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_ACTIVE,
+		     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_ACTIVE)) {
+		DRM_ERROR("timeout: CURSOR_CTRL2_STATUS_ACTIVE(%d)\n", idx);
+		DRM_ERROR("CURSOR_CTRL2(%d) = 0x%08x\n", idx,
+			  nv_rd32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx)));
+		return -EBUSY;
+	}
 
 	return 0;
 }
 
-static int nv50_cursor_disable(struct nv50_crtc *crtc)
+static int nv50_cursor_disable(struct nouveau_crtc *crtc)
 {
-	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
+	struct drm_device *dev = crtc->base.dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	int idx = crtc->index;
 
 	DRM_DEBUG("\n");
 
-	nv_wr32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index), 0);
-	while(nv_rd32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(crtc->index)) & NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK);
-
-	crtc->cursor->enabled = false;
+	nv_wr32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx), 0);
+	if (!nv_wait(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx),
+		     NV50_PDISPLAY_CURSOR_CURSOR_CTRL2_STATUS_MASK, 0)) {
+		DRM_ERROR("timeout: CURSOR_CTRL2_STATUS == 0\n");
+		DRM_ERROR("CURSOR_CTRL2 = 0x%08x\n",
+			  nv_rd32(NV50_PDISPLAY_CURSOR_CURSOR_CTRL2(idx)));
+		return -EBUSY;
+	}
 
 	return 0;
 }
 
 /* Calling update or changing the stored cursor state is left to the higher level ioctl's. */
-static int nv50_cursor_show(struct nv50_crtc *crtc)
+static int nv50_cursor_show(struct nouveau_crtc *crtc)
 {
-	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
+	struct drm_device *dev = crtc->base.dev;
 	uint32_t offset = crtc->index * 0x400;
 
 	DRM_DEBUG("\n");
@@ -81,9 +104,9 @@ static int nv50_cursor_show(struct nv50_crtc *crtc)
 	return 0;
 }
 
-static int nv50_cursor_hide(struct nv50_crtc *crtc)
+static int nv50_cursor_hide(struct nouveau_crtc *crtc)
 {
-	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
+	struct drm_device *dev = crtc->base.dev;
 	uint32_t offset = crtc->index * 0x400;
 
 	DRM_DEBUG("\n");
@@ -94,7 +117,7 @@ static int nv50_cursor_hide(struct nv50_crtc *crtc)
 	return 0;
 }
 
-static int nv50_cursor_set_pos(struct nv50_crtc *crtc, int x, int y)
+static int nv50_cursor_set_pos(struct nouveau_crtc *crtc, int x, int y)
 {
 	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 
@@ -105,9 +128,10 @@ static int nv50_cursor_set_pos(struct nv50_crtc *crtc, int x, int y)
 	return 0;
 }
 
-static int nv50_cursor_set_offset(struct nv50_crtc *crtc)
+static int nv50_cursor_set_offset(struct nouveau_crtc *crtc)
 {
-	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
+	struct drm_device *dev = crtc->base.dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_gem_object *ngem = nouveau_gem_object(crtc->cursor->gem);
 
 	DRM_DEBUG("\n");
@@ -123,7 +147,7 @@ static int nv50_cursor_set_offset(struct nv50_crtc *crtc)
 }
 
 static int
-nv50_cursor_set_bo(struct nv50_crtc *crtc, struct drm_gem_object *gem)
+nv50_cursor_set_bo(struct nouveau_crtc *crtc, struct drm_gem_object *gem)
 {
 	struct nv50_cursor *cursor = crtc->cursor;
 
@@ -139,16 +163,18 @@ nv50_cursor_set_bo(struct nv50_crtc *crtc, struct drm_gem_object *gem)
 	return 0;
 }
 
-int nv50_cursor_create(struct nv50_crtc *crtc)
+int nv50_cursor_create(struct nouveau_crtc *crtc)
 {
 	DRM_DEBUG("\n");
 
-	if (!crtc)
+	if (!crtc || crtc->cursor)
 		return -EINVAL;
 
 	crtc->cursor = kzalloc(sizeof(struct nv50_cursor), GFP_KERNEL);
 	if (!crtc->cursor)
 		return -ENOMEM;
+
+	nv50_cursor_enable(crtc);
 
 	/* function pointers */
 	crtc->cursor->show = nv50_cursor_show;
@@ -156,26 +182,17 @@ int nv50_cursor_create(struct nv50_crtc *crtc)
 	crtc->cursor->set_pos = nv50_cursor_set_pos;
 	crtc->cursor->set_offset = nv50_cursor_set_offset;
 	crtc->cursor->set_bo = nv50_cursor_set_bo;
-	crtc->cursor->enable = nv50_cursor_enable;
-	crtc->cursor->disable = nv50_cursor_disable;
-
 	return 0;
 }
 
-int nv50_cursor_destroy(struct nv50_crtc *crtc)
+int nv50_cursor_destroy(struct nouveau_crtc *crtc)
 {
-	int rval = 0;
-
 	DRM_DEBUG("\n");
 
-	if (!crtc)
+	if (!crtc || !crtc->cursor)
 		return -EINVAL;
 
-	if (crtc->cursor->enabled) {
-		rval = crtc->cursor->disable(crtc);
-		if (rval != 0)
-			return rval;
-	}
+	nv50_cursor_disable(crtc);
 
 	kfree(crtc->cursor);
 	crtc->cursor = NULL;

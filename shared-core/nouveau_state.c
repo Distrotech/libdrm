@@ -26,10 +26,10 @@
 #include "drmP.h"
 #include "drm.h"
 #include "drm_sarea.h"
+#include "drm_crtc_helper.h"
 #include "nouveau_drv.h"
 #include "nouveau_drm.h"
 #include "nv50_display.h"
-#include "nv50_fbcon.h"
 
 static int nouveau_stub_init(struct drm_device *dev) { return 0; }
 static void nouveau_stub_takedown(struct drm_device *dev) {}
@@ -350,11 +350,8 @@ nouveau_card_init(struct drm_device *dev)
 
 	dev_priv->init_state = NOUVEAU_CARD_INIT_DONE;
 
-	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
-		ret = nv50_fbcon_init(dev);
-		if (ret)
-			return ret;
-	}
+	if (drm_core_check_feature(dev, DRIVER_MODESET))
+		drm_helper_initial_config(dev, false);
 
 	return 0;
 }
@@ -626,7 +623,6 @@ int nouveau_unload(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
-		nv50_fbcon_destroy(dev);
 		nv50_display_destroy(dev);
 		nouveau_close(dev);
 	}

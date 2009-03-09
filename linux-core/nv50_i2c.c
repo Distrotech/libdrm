@@ -319,7 +319,7 @@ static bool nv50_i2c_write(struct nv50_i2c_channel *chan, uint8_t address, uint8
 static int nv50_i2c_xfer(struct i2c_adapter *i2c_adap, struct i2c_msg *msgs, int num)
 {
 	struct nv50_i2c_channel *chan = i2c_get_adapdata(i2c_adap);
-	bool rval;
+	bool rval = 0;
 	int i;
 
 	for (i = 0; i < num; i++) {

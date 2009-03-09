@@ -99,7 +99,7 @@ FIRE_RING(struct nouveau_channel *chan)
 
 /* This should allow easy switching to a real fifo in the future. */
 #define OUT_MODE(mthd, val) do {				\
-	nv50_display_command(dev_priv, mthd, val); 		\
+	nv50_display_command(dev, mthd, val);                   \
 } while(0)
 
 #endif

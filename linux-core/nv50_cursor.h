@@ -27,26 +27,19 @@
 #ifndef __NV50_CURSOR_H__
 #define __NV50_CURSOR_H__
 
-#include "nv50_display.h"
-
-struct nv50_crtc;
-
 struct nv50_cursor {
 	struct drm_gem_object *gem;
 	int x, y;
 	bool visible;
-	bool enabled;
 
-	int (*show) (struct nv50_crtc *crtc);
-	int (*hide) (struct nv50_crtc *crtc);
-	int (*set_pos) (struct nv50_crtc *crtc, int x, int y);
-	int (*set_offset) (struct nv50_crtc *crtc);
-	int (*set_bo) (struct nv50_crtc *crtc, struct drm_gem_object *gem);
-	int (*enable) (struct nv50_crtc *crtc);
-	int (*disable) (struct nv50_crtc *crtc);
+	int (*show) (struct nouveau_crtc *crtc);
+	int (*hide) (struct nouveau_crtc *crtc);
+	int (*set_pos) (struct nouveau_crtc *crtc, int x, int y);
+	int (*set_offset) (struct nouveau_crtc *crtc);
+	int (*set_bo) (struct nouveau_crtc *crtc, struct drm_gem_object *gem);
 };
 
-int nv50_cursor_create(struct nv50_crtc *crtc);
-int nv50_cursor_destroy(struct nv50_crtc *crtc);
+int nv50_cursor_create(struct nouveau_crtc *crtc);
+int nv50_cursor_destroy(struct nouveau_crtc *crtc);
 
 #endif /* __NV50_CURSOR_H__ */

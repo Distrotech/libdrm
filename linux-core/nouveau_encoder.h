@@ -24,19 +24,21 @@
  *
  */
 
-#ifndef __NV50_DISPLAY_H__
-#define __NV50_DISPLAY_H__
+#ifndef __NOUVEAU_OUTPUT_H__
+#define __NOUVEAU_OUTPUT_H__
 
-#include "drmP.h"
-#include "drm.h"
-#include "nouveau_drv.h"
-#include "nouveau_dma.h"
-#include "nouveau_reg.h"
-#include "nv50_display_commands.h"
+struct nouveau_encoder {
+	struct drm_encoder base;
 
-void nv50_display_command(struct drm_device *dev, uint32_t mthd, uint32_t val);
-struct nv50_display *nv50_get_display(struct drm_device *dev);
-int nv50_display_create(struct drm_device *dev);
-int nv50_display_destroy(struct drm_device *dev);
+	struct dcb_entry *dcb_entry;
+	int or;
 
-#endif /* __NV50_DISPLAY_H__ */
+	int (*set_clock_mode) (struct nouveau_encoder *encoder,
+			       struct drm_display_mode *mode);
+};
+#define to_nouveau_encoder(x) container_of((x), struct nouveau_encoder, base)
+
+int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry);
+int nv50_dac_create(struct drm_device *dev, struct dcb_entry *entry);
+
+#endif /* __NOUVEAU_OUTPUT_H__ */

@@ -24,19 +24,25 @@
  *
  */
 
-#ifndef __NV50_DISPLAY_H__
-#define __NV50_DISPLAY_H__
+#ifndef __NOUVEAU_FBCON_H__
+#define __NOUVEAU_FBCON_H__
 
-#include "drmP.h"
-#include "drm.h"
-#include "nouveau_drv.h"
-#include "nouveau_dma.h"
-#include "nouveau_reg.h"
-#include "nv50_display_commands.h"
+#define NOUVEAUFB_CONN_LIMIT 4
 
-void nv50_display_command(struct drm_device *dev, uint32_t mthd, uint32_t val);
-struct nv50_display *nv50_get_display(struct drm_device *dev);
-int nv50_display_create(struct drm_device *dev);
-int nv50_display_destroy(struct drm_device *dev);
+struct nouveau_fbcon_par {
+	struct drm_device *dev;
+	struct drm_display_mode *our_mode;
+	struct nouveau_framebuffer *nouveau_fb;
+	int crtc_count;
+	/* crtc currently bound to this */
+	uint32_t crtc_ids[2];
+};
 
-#endif /* __NV50_DISPLAY_H__ */
+int nouveau_fbcon_probe(struct drm_device *dev);
+int nouveau_fbcon_remove(struct drm_device *dev, struct drm_framebuffer *fb);
+void nouveau_fbcon_restore(void);
+
+int nv50_fbcon_accel_init(struct fb_info *info);
+
+#endif /* __NV50_FBCON_H__ */
+
