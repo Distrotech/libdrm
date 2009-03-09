@@ -93,6 +93,7 @@ nouveau_gem_new(struct drm_device *dev, struct nouveau_channel *chan,
 	if (!gem)
 		return -ENOMEM;
 	ngem = gem->driver_private;
+	ngem->mappable = true;
 
 	ret = drm_buffer_object_create(dev, size, drm_bo_type_device, flags,
 				       0, align, 0, &ngem->bo);
@@ -102,8 +103,13 @@ nouveau_gem_new(struct drm_device *dev, struct nouveau_channel *chan,
 	if (chan &&
 	    (domain & (NOUVEAU_GEM_DOMAIN_VRAM | NOUVEAU_GEM_DOMAIN_GART))) {
 		flags = 0;
-		if (domain & NOUVEAU_GEM_DOMAIN_VRAM)
-			flags |= DRM_BO_FLAG_MEM_VRAM | DRM_BO_FLAG_MEM_PRIV0;
+		if (domain & NOUVEAU_GEM_DOMAIN_VRAM) {
+			flags |= DRM_BO_FLAG_MEM_VRAM;
+			if (flags & NOUVEAU_GEM_DOMAIN_NOMAP) {
+				flags |= DRM_BO_FLAG_MEM_PRIV0;
+				ngem->mappable = false;
+			}
+		}
 		if (domain & NOUVEAU_GEM_DOMAIN_GART)
 			flags |= DRM_BO_FLAG_MEM_TT;
 
@@ -207,7 +213,7 @@ nouveau_gem_set_domain(struct nouveau_channel *chan, struct drm_gem_object *gem,
 	if (write_domains) {
 		if ((valid_domains & NOUVEAU_GEM_DOMAIN_VRAM) &&
 		    (write_domains & NOUVEAU_GEM_DOMAIN_VRAM))
-			flags = (DRM_BO_FLAG_MEM_VRAM | DRM_BO_FLAG_MEM_PRIV0);
+			flags = DRM_BO_FLAG_MEM_VRAM;
 		else
 		if ((valid_domains & NOUVEAU_GEM_DOMAIN_GART) &&
 		    (write_domains & NOUVEAU_GEM_DOMAIN_GART))
@@ -219,7 +225,7 @@ nouveau_gem_set_domain(struct nouveau_channel *chan, struct drm_gem_object *gem,
 		    (read_domains & NOUVEAU_GEM_DOMAIN_VRAM) &&
 		    (bo->mem.mem_type == DRM_BO_MEM_VRAM ||
 		     bo->mem.mem_type == DRM_BO_MEM_PRIV0))
-			flags = (DRM_BO_FLAG_MEM_VRAM | DRM_BO_FLAG_MEM_PRIV0);
+			flags = DRM_BO_FLAG_MEM_VRAM;
 		else
 		if ((valid_domains & NOUVEAU_GEM_DOMAIN_GART) &&
 		    (read_domains & NOUVEAU_GEM_DOMAIN_GART) &&
@@ -228,10 +234,13 @@ nouveau_gem_set_domain(struct nouveau_channel *chan, struct drm_gem_object *gem,
 		else
 		if ((valid_domains & NOUVEAU_GEM_DOMAIN_VRAM) &&
 		    (read_domains & NOUVEAU_GEM_DOMAIN_VRAM))
-			flags = (DRM_BO_FLAG_MEM_VRAM | DRM_BO_FLAG_MEM_PRIV0);
+			flags = DRM_BO_FLAG_MEM_VRAM;
 		else
 			flags = DRM_BO_FLAG_MEM_TT;
 	}
+
+	if ((flags & (DRM_BO_FLAG_MEM_VRAM)) && !ngem->mappable)
+		flags |= DRM_BO_FLAG_MEM_PRIV0;
 
 	if (read_domains)
 		flags |= DRM_BO_FLAG_READ;
@@ -590,6 +599,9 @@ nouveau_gem_ioctl_mmap(struct drm_device *dev, void *data,
 	if (!gem)
 		return -EINVAL;
 	ngem = gem->driver_private;
+
+	if (!ngem->mappable)
+		return -EINVAL;
 
 	if (ngem->bo->mem.mem_type == DRM_BO_MEM_LOCAL) {
 		ret = drm_bo_do_validate(ngem->bo, DRM_BO_FLAG_MEM_TT,

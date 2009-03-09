@@ -54,6 +54,7 @@ struct nouveau_gem_object {
 
 	struct drm_gem_object *gem;
 	struct drm_buffer_object *bo;
+	bool mappable;
 };
 
 static inline struct nouveau_gem_object *
