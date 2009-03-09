@@ -522,7 +522,7 @@ int radeon_do_cp_idle(drm_radeon_private_t * dev_priv)
 	DRM_DEBUG("\n");
 
 	if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600) {
-		BEGIN_RING(8);
+		BEGIN_RING(5);
 
 		OUT_RING(CP_PACKET3(R600_IT_EVENT_WRITE, 0));
 		OUT_RING(R600_CACHE_FLUSH_AND_INV_EVENT);
@@ -530,9 +530,6 @@ int radeon_do_cp_idle(drm_radeon_private_t * dev_priv)
 		OUT_RING(CP_PACKET3(R600_IT_SET_CONFIG_REG, 1));
 		OUT_RING((R600_WAIT_UNTIL - R600_SET_CONFIG_REG_OFFSET) >> 2);
 		OUT_RING(RADEON_WAIT_3D_IDLE | RADEON_WAIT_3D_IDLECLEAN);
-		OUT_RING(CP_PACKET2());
-		OUT_RING(CP_PACKET2());
-		OUT_RING(CP_PACKET2());
 
 	} else {
 
