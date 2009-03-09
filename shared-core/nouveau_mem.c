@@ -282,18 +282,18 @@ nv50_mem_vm_bind_linear(struct drm_device *dev, uint64_t virt, uint32_t size,
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_gpuobj **pgt;
-	unsigned psz, pfl;
+	unsigned psz, pfl, pages;
 
 	if (virt >= dev_priv->vm_gart_base &&
 	    (virt + size) < (dev_priv->vm_gart_base + dev_priv->vm_gart_size)) {
-		psz = 4096;
+		psz = 12;
 		pgt = &dev_priv->gart_info.sg_ctxdma;
 		pfl = 0x21;
 		virt -= dev_priv->vm_gart_base;
 	} else
 	if (virt >= dev_priv->vm_vram_base &&
 	    (virt + size) < (dev_priv->vm_vram_base + dev_priv->vm_vram_size)) {
-		psz = 65536;
+		psz = 16;
 		pgt = dev_priv->vm_vram_pt;
 		pfl = 0x01;
 		virt -= dev_priv->vm_vram_base;
@@ -303,31 +303,29 @@ nv50_mem_vm_bind_linear(struct drm_device *dev, uint64_t virt, uint32_t size,
 		return -EINVAL;
 	}
 
-	size &= ~(psz - 1);
+	pages = size >> psz;
 
 	dev_priv->engine.instmem.prepare_access(dev, true);
 	if (flags & 0x80000000) {
-		while (size) {
-			struct nouveau_gpuobj *pt = pgt[virt / (512*1024*1024)];
-			int pte = ((virt % (512*1024*1024)) / psz) * 2;
+		while (pages--) {
+			struct nouveau_gpuobj *pt = pgt[virt >> 29];
+			unsigned pte = ((virt & 0x1fffffffULL) >> psz) << 1;
 
 			INSTANCE_WR(pt, pte++, 0x00000000);
 			INSTANCE_WR(pt, pte++, 0x00000000);
 
-			size -= psz;
-			virt += psz;
+			virt += (1 << psz);
 		}
 	} else {
-		while (size) {
-			struct nouveau_gpuobj *pt = pgt[virt / (512*1024*1024)];
-			int pte = ((virt % (512*1024*1024)) / psz) * 2;
+		while (pages--) {
+			struct nouveau_gpuobj *pt = pgt[virt >> 29];
+			unsigned pte = ((virt & 0x1fffffffULL) >> psz) << 1;
 
 			INSTANCE_WR(pt, pte++, phys | pfl);
 			INSTANCE_WR(pt, pte++, flags);
 
-			size -= psz;
-			phys += psz;
-			virt += psz;
+			phys += (1 << psz);
+			virt += (1 << psz);
 		}
 	}
 	dev_priv->engine.instmem.finish_access(dev);
