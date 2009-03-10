@@ -95,33 +95,34 @@ nv50_crtc_blank(struct nouveau_crtc *crtc, bool blanked)
 	DRM_DEBUG("%s\n", blanked ? "blanked" : "unblanked");
 
 	if (blanked) {
-		crtc->cursor->hide(crtc);
+		crtc->cursor->hide(crtc, false);
 
 		OUT_MODE(NV50_CRTC0_CLUT_MODE + offset,
 			 NV50_CRTC0_CLUT_MODE_BLANK);
+		OUT_MODE(NV50_CRTC0_CLUT_OFFSET + offset, 0);
 		if (dev_priv->chipset != 0x50)
-			OUT_MODE(NV84_CRTC0_BLANK_UNK1 + offset,
-				 NV84_CRTC0_BLANK_UNK1_BLANK);
+			OUT_MODE(NV84_CRTC0_CLUT_DMA + offset,
+				 NV84_CRTC0_CLUT_DMA_DISABLE);
+
 		OUT_MODE(NV50_CRTC0_BLANK_CTRL + offset,
 			 NV50_CRTC0_BLANK_CTRL_BLANK);
-		if (dev_priv->chipset != 0x50)
-			OUT_MODE(NV84_CRTC0_BLANK_UNK2 + offset,
-				 NV84_CRTC0_BLANK_UNK2_BLANK);
 	} else {
 		crtc->cursor->set_offset(crtc);
-
-		if (dev_priv->chipset != 0x50)
-			OUT_MODE(NV84_CRTC0_BLANK_UNK2 + offset,
-				 NV84_CRTC0_BLANK_UNK2_UNBLANK);
-
 		if (crtc->cursor->visible)
-			crtc->cursor->show(crtc);
+			crtc->cursor->show(crtc, false);
 		else
-			crtc->cursor->hide(crtc);
+			crtc->cursor->hide(crtc, false);
 
+		OUT_MODE(NV50_CRTC0_CLUT_MODE + offset, crtc->lut.depth == 8 ?
+			 NV50_CRTC0_CLUT_MODE_OFF : NV50_CRTC0_CLUT_MODE_ON);
+		OUT_MODE(NV50_CRTC0_CLUT_OFFSET + offset,
+			 crtc->lut.mem->start >> 8);
 		if (dev_priv->chipset != 0x50)
-			OUT_MODE(NV84_CRTC0_BLANK_UNK1 + offset,
-				 NV84_CRTC0_BLANK_UNK1_UNBLANK);
+			OUT_MODE(NV84_CRTC0_CLUT_DMA + offset,
+				 NV84_CRTC0_CLUT_DMA_LOCAL);
+
+		OUT_MODE(NV50_CRTC0_FB_OFFSET + offset, crtc->fb.offset >> 8);
+		OUT_MODE(0x864 + offset, 0);
 		OUT_MODE(NV50_CRTC0_BLANK_CTRL + offset,
 			 NV50_CRTC0_BLANK_CTRL_UNBLANK);
 	}
@@ -444,13 +445,12 @@ static int nv50_crtc_cursor_set(struct drm_crtc *drm_crtc,
 
 		crtc->cursor->set_bo(crtc, gem);
 		crtc->cursor->set_offset(crtc);
-		ret = crtc->cursor->show(crtc);
+		ret = crtc->cursor->show(crtc, true);
 	} else {
 		crtc->cursor->set_bo(crtc, NULL);
-		crtc->cursor->hide(crtc);
+		crtc->cursor->hide(crtc, true);
 	}
 
-	OUT_MODE(NV50_UPDATE_DISPLAY, 0);
 	return ret;
 }
 
@@ -525,6 +525,9 @@ static void nv50_crtc_prepare(struct drm_crtc *drm_crtc)
 
 static void nv50_crtc_commit(struct drm_crtc *drm_crtc)
 {
+	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
+
+	nv50_crtc_blank(crtc, false);
 }
 
 static bool nv50_crtc_mode_fixup(struct drm_crtc *drm_crtc,
@@ -533,73 +536,6 @@ static bool nv50_crtc_mode_fixup(struct drm_crtc *drm_crtc,
 {
 	return true;
 }
-
-static int
-nv50_crtc_execute_mode(struct nouveau_crtc *crtc, struct drm_display_mode *mode)
-{
-	struct drm_device *dev = crtc->base.dev;
-	uint32_t hsync_dur,  vsync_dur, hsync_start_to_end, vsync_start_to_end;
-	uint32_t hunk1, vunk1, vunk2a, vunk2b;
-	uint32_t offset = crtc->index * 0x400;
-
-	DRM_DEBUG("index %d\n", crtc->index);
-
-	hsync_dur = mode->hsync_end - mode->hsync_start;
-	vsync_dur = mode->vsync_end - mode->vsync_start;
-	hsync_start_to_end = mode->htotal - mode->hsync_start;
-	vsync_start_to_end = mode->vtotal - mode->vsync_start;
-	/* I can't give this a proper name, anyone else can? */
-	hunk1 = mode->htotal - mode->hsync_start + mode->hdisplay;
-	vunk1 = mode->vtotal - mode->vsync_start + mode->vdisplay;
-	/* Another strange value, this time only for interlaced modes. */
-	vunk2a = 2*mode->vtotal - mode->vsync_start + mode->vdisplay;
-	vunk2b = mode->vtotal - mode->vsync_start + mode->vtotal;
-
-	if (mode->flags & DRM_MODE_FLAG_INTERLACE) {
-		vsync_dur /= 2;
-		vsync_start_to_end  /= 2;
-		vunk1 /= 2;
-		vunk2a /= 2;
-		vunk2b /= 2;
-		/* magic */
-		if (mode->flags & DRM_MODE_FLAG_DBLSCAN) {
-			vsync_start_to_end -= 1;
-			vunk1 -= 1;
-			vunk2a -= 1;
-			vunk2b -= 1;
-		}
-	}
-
-	OUT_MODE(NV50_CRTC0_CLOCK + offset, mode->clock | 0x800000);
-	OUT_MODE(NV50_CRTC0_INTERLACE + offset,
-		 (mode->flags & DRM_MODE_FLAG_INTERLACE) ? 2 : 0);
-	OUT_MODE(NV50_CRTC0_DISPLAY_START + offset, 0);
-	OUT_MODE(NV50_CRTC0_UNK82C + offset, 0);
-	OUT_MODE(NV50_CRTC0_DISPLAY_TOTAL + offset,
-		 mode->vtotal << 16 | mode->htotal);
-	OUT_MODE(NV50_CRTC0_SYNC_DURATION + offset,
-		 (vsync_dur - 1) << 16 | (hsync_dur - 1));
-	OUT_MODE(NV50_CRTC0_SYNC_START_TO_BLANK_END + offset,
-		 (vsync_start_to_end - 1) << 16 | (hsync_start_to_end - 1));
-	OUT_MODE(NV50_CRTC0_MODE_UNK1 + offset,
-		 (vunk1 - 1) << 16 | (hunk1 - 1));
-	if (mode->flags & DRM_MODE_FLAG_INTERLACE) {
-		OUT_MODE(NV50_CRTC0_MODE_UNK2 + offset,
-			 (vunk2b - 1) << 16 | (vunk2a - 1));
-	}
-
-	crtc->set_dither(crtc);
-
-	/* This is the actual resolution of the mode. */
-	OUT_MODE(NV50_CRTC0_REAL_RES + offset,
-		 (crtc->base.mode.vdisplay << 16) | crtc->base.mode.hdisplay);
-	OUT_MODE(NV50_CRTC0_SCALE_CENTER_OFFSET + offset,
-		 NV50_CRTC_SCALE_CENTER_OFFSET_VAL(0,0));
-
-	nv50_crtc_blank(crtc, false);
-	return 0;
-}
-
 
 static void
 nv50_crtc_mode_set(struct drm_crtc *drm_crtc, struct drm_display_mode *mode,
@@ -611,6 +547,9 @@ nv50_crtc_mode_set(struct drm_crtc *drm_crtc, struct drm_display_mode *mode,
 	struct nouveau_encoder *encoder;
 	struct drm_crtc_helper_funcs *crtc_helper = drm_crtc->helper_private;
 	struct nouveau_connector *connector = NULL;
+	uint32_t hsync_dur,  vsync_dur, hsync_start_to_end, vsync_start_to_end;
+	uint32_t hunk1, vunk1, vunk2a, vunk2b;
+	uint32_t offset = crtc->index * 0x400;
 
 	/* Find the connector attached to this CRTC */
 	list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
@@ -634,7 +573,66 @@ nv50_crtc_mode_set(struct drm_crtc *drm_crtc, struct drm_display_mode *mode,
 	*crtc->mode = *adjusted_mode;
 	crtc->use_dithering = connector->use_dithering;
 
-	nv50_crtc_execute_mode(crtc, adjusted_mode);
+	DRM_DEBUG("index %d\n", crtc->index);
+
+	hsync_dur = adjusted_mode->hsync_end - adjusted_mode->hsync_start;
+	vsync_dur = adjusted_mode->vsync_end - adjusted_mode->vsync_start;
+	hsync_start_to_end = adjusted_mode->htotal - adjusted_mode->hsync_start;
+	vsync_start_to_end = adjusted_mode->vtotal - adjusted_mode->vsync_start;
+	/* I can't give this a proper name, anyone else can? */
+	hunk1 = adjusted_mode->htotal -
+		adjusted_mode->hsync_start + adjusted_mode->hdisplay;
+	vunk1 = adjusted_mode->vtotal -
+		adjusted_mode->vsync_start + adjusted_mode->vdisplay;
+	/* Another strange value, this time only for interlaced adjusted_modes. */
+	vunk2a = 2 * adjusted_mode->vtotal -
+		 adjusted_mode->vsync_start + adjusted_mode->vdisplay;
+	vunk2b = adjusted_mode->vtotal -
+		 adjusted_mode->vsync_start + adjusted_mode->vtotal;
+
+	if (adjusted_mode->flags & DRM_MODE_FLAG_INTERLACE) {
+		vsync_dur /= 2;
+		vsync_start_to_end  /= 2;
+		vunk1 /= 2;
+		vunk2a /= 2;
+		vunk2b /= 2;
+		/* magic */
+		if (adjusted_mode->flags & DRM_MODE_FLAG_DBLSCAN) {
+			vsync_start_to_end -= 1;
+			vunk1 -= 1;
+			vunk2a -= 1;
+			vunk2b -= 1;
+		}
+	}
+
+	OUT_MODE(NV50_CRTC0_CLOCK + offset, adjusted_mode->clock | 0x800000);
+	OUT_MODE(NV50_CRTC0_INTERLACE + offset,
+		 (adjusted_mode->flags & DRM_MODE_FLAG_INTERLACE) ? 2 : 0);
+	OUT_MODE(NV50_CRTC0_DISPLAY_START + offset, 0);
+	OUT_MODE(NV50_CRTC0_UNK82C + offset, 0);
+	OUT_MODE(NV50_CRTC0_DISPLAY_TOTAL + offset,
+		 adjusted_mode->vtotal << 16 | adjusted_mode->htotal);
+	OUT_MODE(NV50_CRTC0_SYNC_DURATION + offset,
+		 (vsync_dur - 1) << 16 | (hsync_dur - 1));
+	OUT_MODE(NV50_CRTC0_SYNC_START_TO_BLANK_END + offset,
+		 (vsync_start_to_end - 1) << 16 | (hsync_start_to_end - 1));
+	OUT_MODE(NV50_CRTC0_MODE_UNK1 + offset,
+		 (vunk1 - 1) << 16 | (hunk1 - 1));
+	if (adjusted_mode->flags & DRM_MODE_FLAG_INTERLACE) {
+		OUT_MODE(NV50_CRTC0_MODE_UNK2 + offset,
+			 (vunk2b - 1) << 16 | (vunk2a - 1));
+	}
+
+	crtc->set_dither(crtc);
+
+	/* This is the actual resolution of the mode. */
+	OUT_MODE(NV50_CRTC0_REAL_RES + offset,
+		 (crtc->base.mode.vdisplay << 16) | crtc->base.mode.hdisplay);
+	OUT_MODE(NV50_CRTC0_SCALE_CENTER_OFFSET + offset,
+		 NV50_CRTC_SCALE_CENTER_OFFSET_VAL(0,0));
+
+	nv50_crtc_blank(crtc, false);
+
 	crtc->set_scale(crtc, connector->scaling_mode, false);
 	crtc_helper->mode_set_base(drm_crtc, x, y);
 }
@@ -648,10 +646,11 @@ nv50_crtc_mode_set_base(struct drm_crtc *drm_crtc, int x, int y)
 	struct drm_framebuffer *drm_fb = crtc->base.fb;
 	struct nouveau_framebuffer *fb = to_nouveau_framebuffer(drm_fb);
 	struct nouveau_gem_object *ngem = nouveau_gem_object(fb->gem);
-	uint32_t v_vram = ngem->bo->offset - dev_priv->vm_vram_base;
 	uint32_t offset = crtc->index * 0x400;
 
-	OUT_MODE(NV50_CRTC0_FB_OFFSET + offset, v_vram >> 8);
+	crtc->fb.offset = ngem->bo->offset - dev_priv->vm_vram_base;
+
+	OUT_MODE(NV50_CRTC0_FB_OFFSET + offset, crtc->fb.offset >> 8);
 	OUT_MODE(0x864 + offset, 0);
 
 	OUT_MODE(NV50_CRTC0_FB_SIZE + offset,
@@ -683,10 +682,6 @@ nv50_crtc_mode_set_base(struct drm_crtc *drm_crtc, int x, int y)
 		crtc->lut.depth = fb->base.depth;
 		nv50_crtc_lut_load(crtc);
 	}
-
-	OUT_MODE(NV50_CRTC0_CLUT_MODE + offset, fb->base.depth == 8 ?
-		 NV50_CRTC0_CLUT_MODE_OFF : NV50_CRTC0_CLUT_MODE_ON);
-	OUT_MODE(NV50_CRTC0_CLUT_OFFSET + offset, crtc->lut.mem->start >> 8);
 
 	OUT_MODE(NV50_UPDATE_DISPLAY, 0);
 }

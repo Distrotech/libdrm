@@ -84,8 +84,9 @@ static int nv50_cursor_disable(struct nouveau_crtc *crtc)
 }
 
 /* Calling update or changing the stored cursor state is left to the higher level ioctl's. */
-static int nv50_cursor_show(struct nouveau_crtc *crtc)
+static int nv50_cursor_show(struct nouveau_crtc *crtc, bool update)
 {
+	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 	struct drm_device *dev = crtc->base.dev;
 	uint32_t offset = crtc->index * 0x400;
 
@@ -98,22 +99,37 @@ static int nv50_cursor_show(struct nouveau_crtc *crtc)
 		return -EINVAL;
 	}
 
+	if (dev_priv->chipset != 0x50)
+		OUT_MODE(NV84_CRTC0_CURSOR_DMA + offset,
+			 NV84_CRTC0_CURSOR_DMA_LOCAL);
 	OUT_MODE(NV50_CRTC0_CURSOR_CTRL + offset, NV50_CRTC0_CURSOR_CTRL_SHOW);
+			 
+	if (update) {
+		OUT_MODE(NV50_UPDATE_DISPLAY, 0);
+		crtc->cursor->visible = true;
+	}
 
-	crtc->cursor->visible = true;
 	return 0;
 }
 
-static int nv50_cursor_hide(struct nouveau_crtc *crtc)
+static int nv50_cursor_hide(struct nouveau_crtc *crtc, bool update)
 {
+	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
 	struct drm_device *dev = crtc->base.dev;
 	uint32_t offset = crtc->index * 0x400;
 
 	DRM_DEBUG("\n");
 
 	OUT_MODE(NV50_CRTC0_CURSOR_CTRL + offset, NV50_CRTC0_CURSOR_CTRL_HIDE);
+	if (dev_priv->chipset != 0x50)
+		OUT_MODE(NV84_CRTC0_CURSOR_DMA + offset,
+			 NV84_CRTC0_CURSOR_DMA_DISABLE);
 
-	crtc->cursor->visible = false;
+	if (update) {
+		OUT_MODE(NV50_UPDATE_DISPLAY, 0);
+		crtc->cursor->visible = false;
+	}
+
 	return 0;
 }
 

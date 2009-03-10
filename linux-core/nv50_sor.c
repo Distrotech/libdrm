@@ -44,7 +44,6 @@ nv50_sor_disconnect(struct nouveau_encoder *encoder)
 	DRM_DEBUG("Disconnecting SOR %d\n", encoder->or);
 
 	OUT_MODE(NV50_SOR0_MODE_CTRL + offset, NV50_SOR_MODE_CTRL_OFF);
-	OUT_MODE(NV50_UPDATE_DISPLAY, 0);
 }
 
 static int

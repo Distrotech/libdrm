@@ -37,7 +37,12 @@ struct nouveau_crtc {
 	struct drm_display_mode *mode;
 	bool use_dithering;
 
+	struct {
+		uint32_t offset;
+	} fb;
+
 	struct nv50_cursor *cursor;
+
 	struct {
 		struct mem_block *mem;
 		uint16_t r[256];

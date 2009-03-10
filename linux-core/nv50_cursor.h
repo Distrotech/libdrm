@@ -32,8 +32,8 @@ struct nv50_cursor {
 	int x, y;
 	bool visible;
 
-	int (*show) (struct nouveau_crtc *crtc);
-	int (*hide) (struct nouveau_crtc *crtc);
+	int (*show) (struct nouveau_crtc *crtc, bool update);
+	int (*hide) (struct nouveau_crtc *crtc, bool update);
 	int (*set_pos) (struct nouveau_crtc *crtc, int x, int y);
 	int (*set_offset) (struct nouveau_crtc *crtc);
 	int (*set_bo) (struct nouveau_crtc *crtc, struct drm_gem_object *gem);

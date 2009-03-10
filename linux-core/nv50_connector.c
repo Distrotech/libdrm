@@ -385,7 +385,6 @@ nv50_connector_native_mode(struct nouveau_connector *connector)
 		return NULL;
 
 	list_for_each_entry(mode, &connector->base.probed_modes, head) {
-		DRM_INFO("%d %d 0x%08x\n", mode->hdisplay, mode->vdisplay, mode->type);
 		if (mode->type & DRM_MODE_TYPE_PREFERRED)
 			return drm_mode_duplicate(dev, mode);
 	}

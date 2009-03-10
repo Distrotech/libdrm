@@ -75,10 +75,9 @@
 	#define NV50_CRTC0_CLUT_MODE_ON		0xC0000000
 #define NV50_CRTC0_CLUT_OFFSET		0x844
 
-/* Anyone know what part of the chip is triggered here precisely? */
-#define NV84_CRTC0_BLANK_UNK1		0x85C
-	#define NV84_CRTC0_BLANK_UNK1_BLANK	0x0
-	#define NV84_CRTC0_BLANK_UNK1_UNBLANK	0x1
+#define NV84_CRTC0_CLUT_DMA		0x85C
+	#define NV84_CRTC0_CLUT_DMA_DISABLE	0x0
+	#define NV84_CRTC0_CLUT_DMA_LOCAL	0x1
 
 #define NV50_CRTC0_FB_OFFSET		0x860
 
@@ -105,9 +104,9 @@
 #define NV50_CRTC0_CURSOR_OFFSET	0x884
 
 /* Anyone know what part of the chip is triggered here precisely? */
-#define NV84_CRTC0_BLANK_UNK2		0x89C
-	#define NV84_CRTC0_BLANK_UNK2_BLANK	0x0
-	#define NV84_CRTC0_BLANK_UNK2_UNBLANK	0x1
+#define NV84_CRTC0_CURSOR_DMA		0x89C
+	#define NV84_CRTC0_CURSOR_DMA_DISABLE	0x0
+	#define NV84_CRTC0_CURSOR_DMA_LOCAL	0x1
 
 #define NV50_CRTC0_DITHERING_CTRL	0x8A0
 	#define NV50_CRTC0_DITHERING_CTRL_ON	0x11
