@@ -555,22 +555,18 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	dn = pci_device_to_OF_node(dev->pdev);
 	if (dn)
 	{
-		int size;
+		int size, i;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22))
 		const uint32_t *bios = of_get_property(dn, "NVDA,BMP", &size);
 #else
 		const uint32_t *bios = get_property(dn, "NVDA,BMP", &size);
 #endif
-		if (bios)
-		{
+		if (bios) {
 			int i;
-			dev_priv->engine.instmem.prepare_access(dev, true);
-			for(i=0;i<size;i+=4)
-				nv_wi32(i, bios[i/4]);
-			dev_priv->engine.instmem.finish_access(dev);
+			for(i = 0; i < size; i+=4)
+				nv_out32(dev_priv->ramin, i, bios[i/4]);
 			DRM_INFO("OF bios successfully copied (%d bytes)\n",size);
-		}
-		else
+		} else
 			DRM_INFO("Unable to get the OF bios\n");
 	}
 	else
