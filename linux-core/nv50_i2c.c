@@ -110,7 +110,7 @@ static bool nv50_i2c_raise_clock(struct nv50_i2c_channel *chan, int data)
 		udelay(2);
 	}
 
-	printk("a timeout occured in nv50_i2c_raise_clock\n");
+	DRM_DEBUG("a timeout occured in nv50_i2c_raise_clock\n");
 
 	return false;
 }
@@ -197,7 +197,7 @@ static bool nv50_i2c_write_byte(struct nv50_i2c_channel *chan, uint8_t byte)
 		}
 
 		if (i <= 0) {
-			printk("a timeout occured in nv50_i2c_write_byte\n");
+			DRM_DEBUG("a timeout occured in nv50_i2c_write_byte\n");
 			rval = false;
 		}
 	}
@@ -280,7 +280,7 @@ static bool nv50_i2c_read(struct nv50_i2c_channel *chan, uint8_t address, uint8_
 	}
 
 	if (!rval)
-		printk("nv50_i2c_read failed\n");
+		DRM_DEBUG("nv50_i2c_read failed\n");
 
 	return rval;
 }
@@ -311,7 +311,7 @@ static bool nv50_i2c_write(struct nv50_i2c_channel *chan, uint8_t address, uint8
 	}
 
 	if (!rval)
-		printk("nv50_i2c_write failed\n");
+		DRM_DEBUG("nv50_i2c_write failed\n");
 
 	return rval;
 }
