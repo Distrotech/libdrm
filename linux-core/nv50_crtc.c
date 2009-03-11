@@ -130,7 +130,7 @@ nv50_crtc_blank(struct nouveau_crtc *crtc, bool blanked)
 	return 0;
 }
 
-static int nv50_crtc_set_dither(struct nouveau_crtc *crtc)
+static int nv50_crtc_set_dither(struct nouveau_crtc *crtc, bool update)
 {
 	struct drm_device *dev = crtc->base.dev;
 	uint32_t offset = crtc->index * 0x400;
@@ -140,6 +140,8 @@ static int nv50_crtc_set_dither(struct nouveau_crtc *crtc)
 	OUT_MODE(NV50_CRTC0_DITHERING_CTRL + offset, crtc->use_dithering ?
 		 NV50_CRTC0_DITHERING_CTRL_ON : NV50_CRTC0_DITHERING_CTRL_OFF);
 
+	if (update)
+		OUT_MODE(NV50_UPDATE_DISPLAY, 0);
 	return 0;
 }
 
@@ -663,7 +665,7 @@ nv50_crtc_mode_set(struct drm_crtc *drm_crtc, struct drm_display_mode *mode,
 			 (vunk2b - 1) << 16 | (vunk2a - 1));
 	}
 
-	crtc->set_dither(crtc);
+	crtc->set_dither(crtc, false);
 
 	/* This is the actual resolution of the mode. */
 	OUT_MODE(NV50_CRTC0_REAL_RES + offset,

@@ -362,12 +362,9 @@ static int nv50_connector_set_property(struct drm_connector *drm_connector,
 
 		/* update hw state */
 		crtc->use_dithering = connector->use_dithering;
-		rval = crtc->set_dither(crtc);
+		rval = crtc->set_dither(crtc, true);
 		if (rval)
 			return rval;
-
-		/* process command buffer */
-		OUT_MODE(NV50_UPDATE_DISPLAY, 0);
 
 		return 0;
 	}

@@ -51,7 +51,7 @@ struct nouveau_crtc {
 		int depth;
 	} lut;
 
-	int (*set_dither) (struct nouveau_crtc *crtc);
+	int (*set_dither) (struct nouveau_crtc *crtc, bool update);
 	int (*set_scale) (struct nouveau_crtc *crtc, int mode, bool update);
 	int (*set_clock) (struct nouveau_crtc *crtc, struct drm_display_mode *);
 	int (*set_clock_mode) (struct nouveau_crtc *crtc);
