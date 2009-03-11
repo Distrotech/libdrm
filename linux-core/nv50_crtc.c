@@ -127,7 +127,6 @@ nv50_crtc_blank(struct nouveau_crtc *crtc, bool blanked)
 			 NV50_CRTC0_BLANK_CTRL_UNBLANK);
 	}
 
-	OUT_MODE(NV50_UPDATE_DISPLAY, 0);
 	return 0;
 }
 
@@ -502,18 +501,6 @@ static const struct drm_crtc_funcs nv50_crtc_funcs = {
 
 static void nv50_crtc_dpms(struct drm_crtc *drm_crtc, int mode)
 {
-	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
-
-	switch (mode) {
-	case DRM_MODE_DPMS_ON:
-	case DRM_MODE_DPMS_STANDBY:
-	case DRM_MODE_DPMS_SUSPEND:
-		nv50_crtc_blank(crtc, false);
-		break;
-	case DRM_MODE_DPMS_OFF:
-		nv50_crtc_blank(crtc, true);
-		break;
-	}
 }
 
 static void nv50_crtc_prepare(struct drm_crtc *drm_crtc)
@@ -525,9 +512,12 @@ static void nv50_crtc_prepare(struct drm_crtc *drm_crtc)
 
 static void nv50_crtc_commit(struct drm_crtc *drm_crtc)
 {
+	struct drm_device *dev = drm_crtc->dev;
 	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
 
 	nv50_crtc_blank(crtc, false);
+
+	OUT_MODE(NV50_UPDATE_DISPLAY, 0);
 }
 
 static bool nv50_crtc_mode_fixup(struct drm_crtc *drm_crtc,
@@ -538,6 +528,57 @@ static bool nv50_crtc_mode_fixup(struct drm_crtc *drm_crtc,
 }
 
 static void
+nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
+			   bool update)
+{
+	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
+	struct drm_device *dev = crtc->base.dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct drm_framebuffer *drm_fb = crtc->base.fb;
+	struct nouveau_framebuffer *fb = to_nouveau_framebuffer(drm_fb);
+	struct nouveau_gem_object *ngem = nouveau_gem_object(fb->gem);
+	uint32_t offset = crtc->index * 0x400;
+
+	crtc->fb.offset = ngem->bo->offset - dev_priv->vm_vram_base;
+
+	OUT_MODE(NV50_CRTC0_FB_OFFSET + offset, crtc->fb.offset >> 8);
+	OUT_MODE(0x864 + offset, 0);
+
+	OUT_MODE(NV50_CRTC0_FB_SIZE + offset,
+		 drm_fb->height << 16 | drm_fb->width);
+
+	/* I suspect this flag indicates a linear fb. */
+	OUT_MODE(NV50_CRTC0_FB_PITCH + offset, drm_fb->pitch | 0x100000);
+
+	switch (drm_fb->depth) {
+	case 8:
+		OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_8BPP); 
+		break;
+	case 15:
+		OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_15BPP);
+		break;
+	case 16:
+		OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_16BPP);
+		break;
+	case 24:
+		OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_24BPP); 
+		break;
+	}
+
+	OUT_MODE(NV50_CRTC0_COLOR_CTRL + offset,
+		 NV50_CRTC_COLOR_CTRL_MODE_COLOR);
+	OUT_MODE(NV50_CRTC0_FB_POS + offset, (y << 16) | x);
+
+	if (crtc->lut.depth != fb->base.depth) {
+		crtc->lut.depth = fb->base.depth;
+		nv50_crtc_lut_load(crtc);
+	}
+
+	if (update)
+		OUT_MODE(NV50_UPDATE_DISPLAY, 0);
+}
+
+static void
 nv50_crtc_mode_set(struct drm_crtc *drm_crtc, struct drm_display_mode *mode,
 		   struct drm_display_mode *adjusted_mode, int x, int y)
 {
@@ -545,7 +586,6 @@ nv50_crtc_mode_set(struct drm_crtc *drm_crtc, struct drm_display_mode *mode,
 	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
 	struct drm_encoder *drm_encoder;
 	struct nouveau_encoder *encoder;
-	struct drm_crtc_helper_funcs *crtc_helper = drm_crtc->helper_private;
 	struct nouveau_connector *connector = NULL;
 	uint32_t hsync_dur,  vsync_dur, hsync_start_to_end, vsync_start_to_end;
 	uint32_t hunk1, vunk1, vunk2a, vunk2b;
@@ -631,61 +671,15 @@ nv50_crtc_mode_set(struct drm_crtc *drm_crtc, struct drm_display_mode *mode,
 	OUT_MODE(NV50_CRTC0_SCALE_CENTER_OFFSET + offset,
 		 NV50_CRTC_SCALE_CENTER_OFFSET_VAL(0,0));
 
-	nv50_crtc_blank(crtc, false);
-
 	crtc->set_scale(crtc, connector->scaling_mode, false);
-	crtc_helper->mode_set_base(drm_crtc, x, y);
+	nv50_crtc_do_mode_set_base(drm_crtc, x, y, false);
 }
 
 static void
 nv50_crtc_mode_set_base(struct drm_crtc *drm_crtc, int x, int y)
 {
-	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
-	struct drm_device *dev = crtc->base.dev;
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct drm_framebuffer *drm_fb = crtc->base.fb;
-	struct nouveau_framebuffer *fb = to_nouveau_framebuffer(drm_fb);
-	struct nouveau_gem_object *ngem = nouveau_gem_object(fb->gem);
-	uint32_t offset = crtc->index * 0x400;
-
-	crtc->fb.offset = ngem->bo->offset - dev_priv->vm_vram_base;
-
-	OUT_MODE(NV50_CRTC0_FB_OFFSET + offset, crtc->fb.offset >> 8);
-	OUT_MODE(0x864 + offset, 0);
-
-	OUT_MODE(NV50_CRTC0_FB_SIZE + offset,
-		 drm_fb->height << 16 | drm_fb->width);
-
-	/* I suspect this flag indicates a linear fb. */
-	OUT_MODE(NV50_CRTC0_FB_PITCH + offset, drm_fb->pitch | 0x100000);
-
-	switch (drm_fb->depth) {
-	case 8:
-		OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_8BPP); 
-		break;
-	case 15:
-		OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_15BPP);
-		break;
-	case 16:
-		OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_16BPP);
-		break;
-	case 24:
-		OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_24BPP); 
-		break;
-	}
-
-	OUT_MODE(NV50_CRTC0_COLOR_CTRL + offset,
-		 NV50_CRTC_COLOR_CTRL_MODE_COLOR);
-	OUT_MODE(NV50_CRTC0_FB_POS + offset, (y << 16) | x);
-
-	if (crtc->lut.depth != fb->base.depth) {
-		crtc->lut.depth = fb->base.depth;
-		nv50_crtc_lut_load(crtc);
-	}
-
-	OUT_MODE(NV50_UPDATE_DISPLAY, 0);
+	nv50_crtc_do_mode_set_base(drm_crtc, x, y, true);
 }
-
 
 static const struct drm_crtc_helper_funcs nv50_crtc_helper_funcs = {
 	.dpms = nv50_crtc_dpms,

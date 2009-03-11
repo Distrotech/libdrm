@@ -66,7 +66,8 @@ static int nv50_display_pre_init(struct drm_device *dev)
 	nv_wr32(0x006101f0 + 2 * 0x4, nv_rd32(0x0061e000 + 2 * 0x800));
 
 	for (i = 0; i < 3; i++) {
-		nv_wr32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(i), 0x00550000 | NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
+		nv_wr32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(i), 0x00550000 |
+			NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
 		nv_wr32(NV50_PDISPLAY_DAC_REGS_CLK_CTRL1(i), 0x00000001);
 	}
 
@@ -142,8 +143,6 @@ nv50_display_init(struct drm_device *dev)
 	OUT_MODE(NV50_CRTC0_UNK800, 0);
 	OUT_MODE(NV50_CRTC0_DISPLAY_START, 0);
 	OUT_MODE(NV50_CRTC0_UNK82C, 0);
-
-	OUT_MODE(NV50_UPDATE_DISPLAY, 0);
 
 	/* enable clock change interrupts. */
 //	nv_wr32(NV50_PDISPLAY_SUPERVISOR_INTR, nv_rd32(NV50_PDISPLAY_SUPERVISOR_INTR) | 0x70);
@@ -249,6 +248,10 @@ int nv50_display_create(struct drm_device *dev)
 
 	dev->mode_config.fb_base = dev_priv->fb_phys;
 
+	ret = nv50_display_pre_init(dev);
+	if (ret)
+		return ret;
+
 	/* Create CRTC objects */
 	for (i = 0; i < 2; i++) {
 		nv50_crtc_create(dev, i);
@@ -316,10 +319,6 @@ int nv50_display_create(struct drm_device *dev)
 				      connector);
 		bus_mask |= (1 << entry->bus);
 	}
-
-	ret = nv50_display_pre_init(dev);
-	if (ret)
-		return ret;
 
 	ret = nv50_display_init(dev);
 	if (ret)
