@@ -41,6 +41,7 @@
 #include "via_3d_reg.h"
 
 #define VIA_FENCE_EXTRA (7*8)
+#define VIA_PAD_SUBMISSION_SIZE (0x102)
 
 #define VIA_OUT_RING_H1(nReg, nData)				\
 	{							\
@@ -174,7 +175,7 @@ void via_dma_initialize(struct drm_via_private *dev_priv)
 	dev_priv->dma_offset = dev_priv->agpc_bo->offset;
 	dev_priv->last_pause_ptr = NULL;
 	dev_priv->hw_addr_ptr =
-	    (uint32_t __iomem *) (dev_priv->mmio_map + 0x418);
+	    (uint32_t __iomem *) (dev_priv->mmio_map + 0x40c);
 
 	via_cmdbuf_start(dev_priv);
 }
@@ -587,7 +588,12 @@ int via_copy_cmdbuf(struct drm_via_private *dev_priv,
 	}
 
 	if (mechanism == _VIA_MECHANISM_AGP && drm_via_disable_verifier) {
-		vb = via_check_dma(dev_priv, size + VIA_FENCE_EXTRA);
+		uint32_t check_size = size + VIA_FENCE_EXTRA;
+
+		if (check_size < VIA_PAD_SUBMISSION_SIZE)
+			check_size = VIA_PAD_SUBMISSION_SIZE;
+
+		vb = via_check_dma(dev_priv, check_size);
 		if (unlikely(!vb)) {
 			DRM_ERROR("No space in AGP ring buffer.\n");
 			return -EBUSY;
@@ -608,6 +614,20 @@ int via_copy_cmdbuf(struct drm_via_private *dev_priv,
 	return 0;
 }
 
+static void via_pad_submission(struct drm_via_private *dev_priv, int qwords)
+{
+	uint32_t *vb;
+
+	if (unlikely(qwords == 0))
+		return;
+	vb = via_get_dma(dev_priv);
+	VIA_OUT_RING_QW(HC_HEADER2, HC_ParaType_NotTex << 16);
+	if (unlikely(qwords == 1))
+		return;
+	via_align_buffer(dev_priv, vb, qwords);
+}
+
+
 int via_dispatch_commands(struct drm_device *dev, unsigned long size,
 			  uint32_t mechanism, bool emit_seq)
 {
@@ -619,7 +639,13 @@ int via_dispatch_commands(struct drm_device *dev, unsigned long size,
 	switch (mechanism) {
 	case _VIA_MECHANISM_AGP:
 		if (!drm_via_disable_verifier) {
-			vb = via_check_dma(dev_priv, size + VIA_FENCE_EXTRA);
+		        unsigned long check_size =
+				size + VIA_FENCE_EXTRA;
+
+			if (check_size < VIA_PAD_SUBMISSION_SIZE)
+				check_size = VIA_PAD_SUBMISSION_SIZE;
+
+			vb = via_check_dma(dev_priv, check_size);
 			if (unlikely(!vb)) {
 				DRM_ERROR("No space in AGP ring buffer.\n");
 				return -EBUSY;
@@ -633,7 +659,12 @@ int via_dispatch_commands(struct drm_device *dev, unsigned long size,
 		if (emit_seq || !via_no_tracker(dev_priv)) {
 			via_emit_fence_seq(dev_priv, VIA_FENCE_OFFSET_CMD, seq);
 			via_add_tracker(dev_priv, seq);
+			size += VIA_FENCE_EXTRA;
 		}
+
+		if (size < VIA_PAD_SUBMISSION_SIZE)
+		    via_pad_submission(dev_priv, (VIA_PAD_SUBMISSION_SIZE - size) >> 3);
+
 		via_cmdbuf_pause(dev_priv);
 		return 0;
 	case _VIA_MECHANISM_PCI:
