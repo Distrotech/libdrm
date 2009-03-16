@@ -35,120 +35,6 @@
 
 #include "r600_microcode.h"
 
-#define R600_MCD_RD_A_CNTL                                     0x219c
-#define R600_MCD_RD_B_CNTL                                     0x21a0
-
-#define R600_MCD_WR_A_CNTL                                     0x21a4
-#define R600_MCD_WR_B_CNTL                                     0x21a8
-
-#define R600_MCD_RD_SYS_CNTL                                   0x2200
-#define R600_MCD_WR_SYS_CNTL                                   0x2214
-
-#define R600_MCD_RD_GFX_CNTL                                   0x21fc
-#define R600_MCD_RD_HDP_CNTL                                   0x2204
-#define R600_MCD_RD_PDMA_CNTL                                  0x2208
-#define R600_MCD_RD_SEM_CNTL                                   0x220c
-#define R600_MCD_WR_GFX_CNTL                                   0x2210
-#define R600_MCD_WR_HDP_CNTL                                   0x2218
-#define R600_MCD_WR_PDMA_CNTL                                  0x221c
-#define R600_MCD_WR_SEM_CNTL                                   0x2220
-
-#       define R600_MCD_L1_TLB                                 (1 << 0)
-#       define R600_MCD_L1_FRAG_PROC                           (1 << 1)
-#       define R600_MCD_L1_STRICT_ORDERING                     (1 << 2)
-
-#       define R600_MCD_SYSTEM_ACCESS_MODE_MASK                (3 << 6)
-#       define R600_MCD_SYSTEM_ACCESS_MODE_PA_ONLY             (0 << 6)
-#       define R600_MCD_SYSTEM_ACCESS_MODE_USE_SYS_MAP         (1 << 6)
-#       define R600_MCD_SYSTEM_ACCESS_MODE_IN_SYS              (2 << 6)
-#       define R600_MCD_SYSTEM_ACCESS_MODE_NOT_IN_SYS          (3 << 6)
-
-#       define R600_MCD_SYSTEM_APERTURE_UNMAPPED_ACCESS_PASS_THRU    (0 << 8)
-#       define R600_MCD_SYSTEM_APERTURE_UNMAPPED_ACCESS_DEFAULT_PAGE (1 << 8)
-
-#       define R600_MCD_SEMAPHORE_MODE                         (1 << 10)
-#       define R600_MCD_WAIT_L2_QUERY                          (1 << 11)
-#       define R600_MCD_EFFECTIVE_L1_TLB_SIZE(x)               ((x) << 12)
-#       define R600_MCD_EFFECTIVE_L1_QUEUE_SIZE(x)             ((x) << 15)
-
-#define R700_MC_VM_MD_L1_TLB0_CNTL                             0x2654
-#define R700_MC_VM_MD_L1_TLB1_CNTL                             0x2658
-#define R700_MC_VM_MD_L1_TLB2_CNTL                             0x265c
-
-#define R700_MC_VM_MB_L1_TLB0_CNTL                             0x2234
-#define R700_MC_VM_MB_L1_TLB1_CNTL                             0x2238
-#define R700_MC_VM_MB_L1_TLB2_CNTL                             0x223c
-#define R700_MC_VM_MB_L1_TLB3_CNTL                             0x2240
-
-#       define R700_ENABLE_L1_TLB                              (1 << 0)
-#       define R700_ENABLE_L1_FRAGMENT_PROCESSING              (1 << 1)
-#       define R700_SYSTEM_ACCESS_MODE_IN_SYS                  (2 << 3)
-#       define R700_SYSTEM_APERTURE_UNMAPPED_ACCESS_PASS_THRU  (0 << 5)
-#       define R700_EFFECTIVE_L1_TLB_SIZE(x)                   ((x) << 15)
-#       define R700_EFFECTIVE_L1_QUEUE_SIZE(x)                 ((x) << 18)
-
-#define R700_MC_ARB_RAMCFG                                     0x2760
-#       define R700_NOOFBANK_SHIFT                             0
-#       define R700_NOOFBANK_MASK                              0x3
-#       define R700_NOOFRANK_SHIFT                             2
-#       define R700_NOOFRANK_MASK                              0x1
-#       define R700_NOOFROWS_SHIFT                             3
-#       define R700_NOOFROWS_MASK                              0x7
-#       define R700_NOOFCOLS_SHIFT                             6
-#       define R700_NOOFCOLS_MASK                              0x3
-#       define R700_CHANSIZE_SHIFT                             8
-#       define R700_CHANSIZE_MASK                              0x1
-#       define R700_BURSTLENGTH_SHIFT                          9
-#       define R700_BURSTLENGTH_MASK                           0x1
-#define R600_RAMCFG                                            0x2408
-#       define R600_NOOFBANK_SHIFT                             0
-#       define R600_NOOFBANK_MASK                              0x1
-#       define R600_NOOFRANK_SHIFT                             1
-#       define R600_NOOFRANK_MASK                              0x1
-#       define R600_NOOFROWS_SHIFT                             2
-#       define R600_NOOFROWS_MASK                              0x7
-#       define R600_NOOFCOLS_SHIFT                             5
-#       define R600_NOOFCOLS_MASK                              0x3
-#       define R600_CHANSIZE_SHIFT                             7
-#       define R600_CHANSIZE_MASK                              0x1
-#       define R600_BURSTLENGTH_SHIFT                          8
-#       define R600_BURSTLENGTH_MASK                           0x1
-
-#define R600_VM_L2_CNTL                                        0x1400
-#       define R600_VM_L2_CACHE_EN                             (1 << 0)
-#       define R600_VM_L2_FRAG_PROC                            (1 << 1)
-#       define R600_VM_ENABLE_PTE_CACHE_LRU_W                  (1 << 9)
-#       define R600_VM_L2_CNTL_QUEUE_SIZE(x)                   ((x) << 13)
-#       define R700_VM_L2_CNTL_QUEUE_SIZE(x)                   ((x) << 14)
-
-#define R600_VM_L2_CNTL2 0x1404
-#       define R600_VM_L2_CNTL2_INVALIDATE_ALL_L1_TLBS         (1 << 0)
-#       define R600_VM_L2_CNTL2_INVALIDATE_L2_CACHE            (1 << 1)
-#define R600_VM_L2_CNTL3 0x1408
-#       define R600_VM_L2_CNTL3_BANK_SELECT_0(x)               ((x) << 0)
-#       define R600_VM_L2_CNTL3_BANK_SELECT_1(x)               ((x) << 5)
-#       define R600_VM_L2_CNTL3_CACHE_UPDATE_MODE(x)           ((x) << 10)
-#       define R700_VM_L2_CNTL3_BANK_SELECT(x)                 ((x) << 0)
-#       define R700_VM_L2_CNTL3_CACHE_UPDATE_MODE(x)           ((x) << 6)
-
-#define R600_VM_L2_STATUS                                      0x140c
-
-#define R600_VM_CONTEXT0_CNTL                                  0x1410
-#       define R600_VM_ENABLE_CONTEXT                          (1 << 0)
-#       define R600_VM_PAGE_TABLE_DEPTH_FLAT                   (0 << 1)
-
-#define R600_VM_CONTEXT0_CNTL2                                 0x1430
-#define R600_VM_CONTEXT0_REQUEST_RESPONSE                      0x1470
-#define R600_VM_CONTEXT0_INVALIDATION_LOW_ADDR                 0x1490
-#define R600_VM_CONTEXT0_INVALIDATION_HIGH_ADDR                0x14b0
-#define R600_VM_CONTEXT0_PAGE_TABLE_BASE_ADDR                  0x1574
-#define R600_VM_CONTEXT0_PAGE_TABLE_START_ADDR                 0x1594
-#define R600_VM_CONTEXT0_PAGE_TABLE_END_ADDR                   0x15b4
-
-#define R700_VM_CONTEXT0_PAGE_TABLE_BASE_ADDR                  0x153c
-#define R700_VM_CONTEXT0_PAGE_TABLE_START_ADDR                 0x155c
-#define R700_VM_CONTEXT0_PAGE_TABLE_END_ADDR                   0x157c
-
 # define ATI_PCIGART_PAGE_SIZE		4096	/**< PCI GART page size */
 # define ATI_PCIGART_PAGE_MASK		(~(ATI_PCIGART_PAGE_SIZE-1))
 
@@ -157,237 +43,6 @@
 #define R600_PTE_SNOOPED   (1 << 2)
 #define R600_PTE_READABLE  (1 << 5)
 #define R600_PTE_WRITEABLE (1 << 6)
-
-#define R600_CP_ME_CNTL                                         0x86d8
-#       define R600_CP_ME_HALT                                  (1 << 28)
-
-#define R600_HDP_HOST_PATH_CNTL                                 0x2c00
-
-#define R600_GRBM_CNTL                                   	0x8000
-#       define R600_GRBM_READ_TIMEOUT(x)                        ((x) << 0)
-#define R600_GRBM_SOFT_RESET                               	0x8020
-#       define R600_SOFT_RESET_CP                               (1 << 0)
-
-#define R600_CP_SEM_WAIT_TIMER                             	0x85bc
-#define R600_CP_DEBUG                                      	0xc1fc
-#define R600_PA_SC_MULTI_CHIP_CNTL                         	0x8b20
-#define R600_PA_CL_ENHANCE                                 	0x8a14
-#       define R600_CLIP_VTX_REORDER_ENA                        (1 << 0)
-#       define R600_NUM_CLIP_SEQ(x)                             ((x) << 1)
-#define R600_PA_SC_ENHANCE                                 	0x8bf0
-#       define R600_FORCE_EOV_MAX_CLK_CNT(x)                    ((x) << 0)
-#       define R600_FORCE_EOV_MAX_TILE_CNT(x)                   ((x) << 12)
-
-#define R600_CP_QUEUE_THRESHOLDS                                0x8760
-#       define R600_ROQ_IB1_START(x)                            ((x) << 0)
-#       define R600_ROQ_IB2_START(x)                            ((x) << 8)
-#define R600_CP_MEQ_THRESHOLDS                                  0x8764
-#       define R700_STQ_SPLIT(x)                                ((x) << 0)
-#       define R600_MEQ_END(x)                                  ((x) << 16)
-#       define R600_ROQ_END(x)                                  ((x) << 24)
-#define R600_SX_DEBUG_1                                         0x9054
-#       define R600_SMX_EVENT_RELEASE                           (1 << 0)
-#       define R600_ENABLE_NEW_SMX_ADDRESS                      (1 << 16)
-#define R700_SX_DEBUG_1                                         0x9058
-#       define R700_ENABLE_NEW_SMX_ADDRESS                      (1 << 16)
-#define R600_DB_DEBUG                                           0x9830
-#       define R600_PREZ_MUST_WAIT_FOR_POSTZ_DONE               (1 << 31)
-#define R600_DB_WATERMARKS                                      0x9838
-#       define R600_DEPTH_FREE(x)                               ((x) << 0)
-#       define R600_DEPTH_FLUSH(x)                              ((x) << 5)
-#       define R600_DEPTH_PENDING_FREE(x)                       ((x) << 15)
-#       define R600_DEPTH_CACHELINE_FREE(x)                     ((x) << 20)
-#define R600_VGT_NUM_INSTANCES                                  0x8974
-#define R600_VGT_CACHE_INVALIDATION                             0x88c4
-#       define R600_CACHE_INVALIDATION(x)                       ((x) << 0)
-#       define R600_VC_ONLY                                     0
-#       define R600_TC_ONLY                                     1
-#       define R600_VC_AND_TC                                   2
-#       define R700_AUTO_INVLD_EN(x)                            ((x) << 6)
-#       define R700_NO_AUTO                                     0
-#       define R700_ES_AUTO                                     1
-#       define R700_GS_AUTO                                     2
-#       define R700_ES_AND_GS_AUTO                              3
-#define R600_VGT_VERTEX_REUSE_BLOCK_CNTL                        0x28c58
-#       define R600_VTX_REUSE_DEPTH_MASK                        0xff
-#define R600_VGT_OUT_DEALLOC_CNTL                               0x28c5c
-#       define R600_DEALLOC_DIST_MASK                           0x7f
-#define R600_PA_SC_AA_SAMPLE_LOCS_2S                            0x8b40
-#define R600_PA_SC_AA_SAMPLE_LOCS_4S                            0x8b44
-#define R600_PA_SC_AA_SAMPLE_LOCS_8S_WD0                        0x8b48
-#define R600_PA_SC_AA_SAMPLE_LOCS_8S_WD1                        0x8b4c
-#define R600_CB_COLOR0_BASE                                     0x28040
-#define R600_CB_COLOR1_BASE                                     0x28044
-#define R600_CB_COLOR2_BASE                                     0x28048
-#define R600_CB_COLOR3_BASE                                     0x2804c
-#define R600_CB_COLOR4_BASE                                     0x28050
-#define R600_CB_COLOR5_BASE                                     0x28054
-#define R600_CB_COLOR6_BASE                                     0x28058
-#define R600_CB_COLOR7_BASE                                     0x2805c
-#define R600_TC_CNTL                                            0x9608
-#       define R600_TC_L2_SIZE(x)                               ((x) << 5)
-#       define R600_L2_DISABLE_LATE_HIT                         (1 << 9)
-#define R600_ARB_POP                                            0x2418
-#       define R600_ENABLE_TC128                                (1 << 30)
-#define R600_ARB_GDEC_RD_CNTL                                   0x246c
-#define R600_TA_CNTL_AUX                                        0x9508
-#       define R600_DISABLE_CUBE_WRAP                           (1 << 0)
-#       define R600_DISABLE_CUBE_ANISO                          (1 << 1)
-#       define R700_GETLOD_SELECT(x)                            ((x) << 2)
-#       define R600_SYNC_GRADIENT                               (1 << 24)
-#       define R600_SYNC_WALKER                                 (1 << 25)
-#       define R600_SYNC_ALIGNER                                (1 << 26)
-#       define R600_BILINEAR_PRECISION_6_BIT                    (0 << 31)
-#       define R600_BILINEAR_PRECISION_8_BIT                    (1 << 31)
-#define R600_SMX_DC_CTL0                                        0xa020
-#       define R700_USE_HASH_FUNCTION                           (1 << 0)
-#       define R700_CACHE_DEPTH(x)                              ((x) << 1)
-#       define R700_FLUSH_ALL_ON_EVENT                          (1 << 10)
-#       define R700_STALL_ON_EVENT                              (1 << 11)
-#define R700_SMX_EVENT_CTL                                      0xa02c
-#       define R700_ES_FLUSH_CTL(x)                             ((x) << 0)
-#       define R700_GS_FLUSH_CTL(x)                             ((x) << 3)
-#       define R700_ACK_FLUSH_CTL(x)                            ((x) << 6)
-#       define R700_SYNC_FLUSH_CTL                              (1 << 8)
-#define R700_DB_DEBUG3                                          0x98b0
-#       define R700_DB_CLK_OFF_DELAY(x)                         ((x) << 11)
-#define RV700_DB_DEBUG4                                         0x9b8c
-#       define RV700_DISABLE_TILE_COVERED_FOR_PS_ITER           (1 << 6)
-#define R600_SX_EXPORT_BUFFER_SIZES                             0x900c
-#       define R600_COLOR_BUFFER_SIZE(x)                        ((x) << 0)
-#       define R600_POSITION_BUFFER_SIZE(x)                     ((x) << 8)
-#       define R600_SMX_BUFFER_SIZE(x)                          ((x) << 16)
-#define R600_PA_SC_FIFO_SIZE                                    0x8bd0
-#       define R600_SC_PRIM_FIFO_SIZE(x)                        ((x) << 0)
-#       define R600_SC_HIZ_TILE_FIFO_SIZE(x)                    ((x) << 8)
-#       define R600_SC_EARLYZ_TILE_FIFO_SIZE(x)                 ((x) << 16)
-#define R700_PA_SC_FIFO_SIZE_R7XX                               0x8bcc
-#       define R700_SC_PRIM_FIFO_SIZE(x)                        ((x) << 0)
-#       define R700_SC_HIZ_TILE_FIFO_SIZE(x)                    ((x) << 12)
-#       define R700_SC_EARLYZ_TILE_FIFO_SIZE(x)                 ((x) << 20)
-#define R600_CP_PERFMON_CNTL                                    0x87fc
-#define R600_SQ_MS_FIFO_SIZES                                   0x8cf0
-#       define R600_CACHE_FIFO_SIZE(x)                          ((x) << 0)
-#       define R600_FETCH_FIFO_HIWATER(x)                       ((x) << 8)
-#       define R600_DONE_FIFO_HIWATER(x)                        ((x) << 16)
-#       define R600_ALU_UPDATE_FIFO_HIWATER(x)                  ((x) << 24)
-#define R700_PA_SC_FORCE_EOV_MAX_CNTS                           0x8b24
-#       define R700_FORCE_EOV_MAX_CLK_CNT(x)                    ((x) << 0)
-#       define R700_FORCE_EOV_MAX_REZ_CNT(x)                    ((x) << 16)
-#define R700_TCP_CNTL                                           0x9610
-#define R600_SQ_CONFIG                                          0x8c00
-#       define R600_VC_ENABLE                                   (1 << 0)
-#       define R600_EXPORT_SRC_C                                (1 << 1)
-#       define R600_DX9_CONSTS                                  (1 << 2)
-#       define R600_ALU_INST_PREFER_VECTOR                      (1 << 3)
-#       define R600_DX10_CLAMP                                  (1 << 4)
-#       define R600_CLAUSE_SEQ_PRIO(x)                          ((x) << 8)
-#       define R600_PS_PRIO(x)                                  ((x) << 24)
-#       define R600_VS_PRIO(x)                                  ((x) << 26)
-#       define R600_GS_PRIO(x)                                  ((x) << 28)
-#       define R600_ES_PRIO(x)                                  ((x) << 30)
-#define R600_SQ_GPR_RESOURCE_MGMT_1                             0x8c04
-#       define R600_NUM_PS_GPRS(x)                              ((x) << 0)
-#       define R600_NUM_VS_GPRS(x)                              ((x) << 16)
-#       define R700_DYN_GPR_ENABLE                              (1 << 27)
-#       define R600_NUM_CLAUSE_TEMP_GPRS(x)                     ((x) << 28)
-#define R600_SQ_GPR_RESOURCE_MGMT_2                             0x8c08
-#       define R600_NUM_GS_GPRS(x)                              ((x) << 0)
-#       define R600_NUM_ES_GPRS(x)                              ((x) << 16)
-#define R600_SQ_THREAD_RESOURCE_MGMT                            0x8c0c
-#       define R600_NUM_PS_THREADS(x)                          ((x) << 0)
-#       define R600_NUM_VS_THREADS(x)                          ((x) << 8)
-#       define R600_NUM_GS_THREADS(x)                          ((x) << 16)
-#       define R600_NUM_ES_THREADS(x)                          ((x) << 24)
-#define R600_SQ_STACK_RESOURCE_MGMT_1                           0x8c10
-#       define R600_NUM_PS_STACK_ENTRIES(x)                     ((x) << 0)
-#       define R600_NUM_VS_STACK_ENTRIES(x)                     ((x) << 16)
-#define R600_SQ_STACK_RESOURCE_MGMT_2                           0x8c14
-#       define R600_NUM_GS_STACK_ENTRIES(x)                     ((x) << 0)
-#       define R600_NUM_ES_STACK_ENTRIES(x)                     ((x) << 16)
-#define R700_SQ_DYN_GPR_SIZE_SIMD_AB_0                          0x8db0
-#       define R700_SIMDA_RING0(x)                              ((x) << 0)
-#       define R700_SIMDA_RING1(x)                              ((x) << 8)
-#       define R700_SIMDB_RING0(x)                              ((x) << 16)
-#       define R700_SIMDB_RING1(x)                              ((x) << 24)
-#define R700_SQ_DYN_GPR_SIZE_SIMD_AB_1                          0x8db4
-#define R700_SQ_DYN_GPR_SIZE_SIMD_AB_2                          0x8db8
-#define R700_SQ_DYN_GPR_SIZE_SIMD_AB_3                          0x8dbc
-#define R700_SQ_DYN_GPR_SIZE_SIMD_AB_4                          0x8dc0
-#define R700_SQ_DYN_GPR_SIZE_SIMD_AB_5                          0x8dc4
-#define R700_SQ_DYN_GPR_SIZE_SIMD_AB_6                          0x8dc8
-#define R700_SQ_DYN_GPR_SIZE_SIMD_AB_7                          0x8dcc
-#define R600_VGT_ES_PER_GS                                      0x88cc
-#define R600_VGT_GS_PER_ES                                      0x88c8
-#define R600_VGT_GS_PER_VS                                      0x88e8
-#define R600_VGT_GS_VERTEX_REUSE                                0x88d4
-#define R600_PA_SC_LINE_STIPPLE                                 0x28a0c
-#define R600_PA_SC_LINE_STIPPLE_STATE                           0x8b10
-#define R600_VGT_STRMOUT_EN                                     0x28ab0
-#define R600_SX_MISC                                            0x28350
-#define R600_PA_SC_MODE_CNTL                                    0x28a4c
-#define R700_PA_SC_EDGERULE                                     0x28230
-#define R600_PA_SC_CLIPRECT_RULE                                0x2820c
-#define R600_SPI_PS_IN_CONTROL_0                                0x286cc
-#       define R600_NUM_INTERP(x)                               ((x) << 0)
-#       define R600_POSITION_ENA                                (1 << 8)
-#       define R600_POSITION_CENTROID                           (1 << 9)
-#       define R600_POSITION_ADDR(x)                            ((x) << 10)
-#       define R600_PARAM_GEN(x)                                ((x) << 15)
-#       define R600_PARAM_GEN_ADDR(x)                           ((x) << 19)
-#       define R600_BARYC_SAMPLE_CNTL(x)                        ((x) << 26)
-#       define R600_PERSP_GRADIENT_ENA                          (1 << 28)
-#       define R600_LINEAR_GRADIENT_ENA                         (1 << 29)
-#       define R600_POSITION_SAMPLE                             (1 << 30)
-#       define R600_BARYC_AT_SAMPLE_ENA                         (1 << 31)
-#define R600_SPI_PS_IN_CONTROL_1                                0x286d0
-#       define R600_GEN_INDEX_PIX                               (1 << 0)
-#       define R600_GEN_INDEX_PIX_ADDR(x)                       ((x) << 1)
-#       define R600_FRONT_FACE_ENA                              (1 << 8)
-#       define R600_FRONT_FACE_CHAN(x)                          ((x) << 9)
-#       define R600_FRONT_FACE_ALL_BITS                         (1 << 11)
-#       define R600_FRONT_FACE_ADDR(x)                          ((x) << 12)
-#       define R600_FOG_ADDR(x)                                 ((x) << 17)
-#       define R600_FIXED_PT_POSITION_ENA                       (1 << 24)
-#       define R600_FIXED_PT_POSITION_ADDR(x)                   ((x) << 25)
-#       define R700_POSITION_ULC                                (1 << 30)
-#define R600_PA_SC_AA_CONFIG                                    0x28c04
-#define R600_SPI_INPUT_Z                                        0x286d8
-#define R600_CB_COLOR7_FRAG                                     0x280fc
-
-#define R600_SPI_CONFIG_CNTL                                    0x9100
-#       define R600_GPR_WRITE_PRIORITY(x)                       ((x) << 0)
-#       define R600_DISABLE_INTERP_1                            (1 << 5)
-#define R600_SPI_CONFIG_CNTL_1                                  0x913c
-#       define R600_VTX_DONE_DELAY(x)                           ((x) << 0)
-#       define R600_INTERP_ONE_PRIM_PER_ROW                     (1 << 4)
-
-#define R600_GB_TILING_CONFIG                                   0x98f0
-#       define R600_PIPE_TILING(x)                              ((x) << 1)
-#       define R600_BANK_TILING(x)                              ((x) << 4)
-#       define R600_GROUP_SIZE(x)                               ((x) << 6)
-#       define R600_ROW_TILING(x)                               ((x) << 8)
-#       define R600_BANK_SWAPS(x)                               ((x) << 11)
-#       define R600_SAMPLE_SPLIT(x)                             ((x) << 14)
-#       define R600_BACKEND_MAP(x)                              ((x) << 16)
-#define R600_DCP_TILING_CONFIG                                  0x6ca0
-#define R600_HDP_TILING_CONFIG                                  0x2f3c
-
-#define R600_CC_RB_BACKEND_DISABLE                              0x98f4
-#define R700_CC_SYS_RB_BACKEND_DISABLE                          0x3f88
-#       define R600_BACKEND_DISABLE(x)                          ((x) << 16)
-
-#define R600_CC_GC_SHADER_PIPE_CONFIG                           0x8950
-#define R600_GC_USER_SHADER_PIPE_CONFIG                         0x8954
-#       define R600_INACTIVE_QD_PIPES(x)                        ((x) << 8)
-#       define R600_INACTIVE_QD_PIPES_MASK                      (0xff << 8)
-#       define R600_INACTIVE_SIMDS(x)                           ((x) << 16)
-#       define R600_INACTIVE_SIMDS_MASK                         (0xff << 16)
-
-#define R700_CGTS_SYS_TCC_DISABLE                               0x3f90
-#define R700_CGTS_USER_SYS_TCC_DISABLE                          0x3f94
-#define R700_CGTS_TCC_DISABLE                                   0x9148
-#define R700_CGTS_USER_TCC_DISABLE                              0x914c
 
 /* MAX values used for gfx init */
 #define R6XX_MAX_SH_GPRS           256
@@ -412,18 +67,52 @@
 #define R7XX_MAX_PIPES             8
 #define R7XX_MAX_PIPES_MASK        0xff
 
-static int r600_do_wait_for_idle(drm_radeon_private_t * dev_priv)
+static int r600_do_wait_for_fifo(drm_radeon_private_t *dev_priv, int entries)
 {
-	u32 gbrm_status;
 	int i;
 
-	for (i = 0; i < dev_priv->usec_timeout; i++) {
-		gbrm_status = RADEON_READ(R600_GRBM_STATUS);
+	dev_priv->stats.boxes |= RADEON_BOX_WAIT_IDLE;
 
-		if (!(gbrm_status & (1 << 31)))
+	for (i = 0; i < dev_priv->usec_timeout; i++) {
+		int slots;
+		if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_RV770)
+			slots = (RADEON_READ(R600_GRBM_STATUS)
+				 & R700_CMDFIFO_AVAIL_MASK);
+		else
+			slots = (RADEON_READ(R600_GRBM_STATUS)
+				 & R600_CMDFIFO_AVAIL_MASK);
+		if (slots >= entries)
 			return 0;
 		DRM_UDELAY(1);
 	}
+	DRM_INFO("wait for fifo failed status : 0x%08X 0x%08X\n",
+		 RADEON_READ(R600_GRBM_STATUS),
+		 RADEON_READ(R600_GRBM_STATUS2));
+
+	return -EBUSY;
+}
+
+static int r600_do_wait_for_idle(drm_radeon_private_t *dev_priv)
+{
+	int i, ret;
+
+	dev_priv->stats.boxes |= RADEON_BOX_WAIT_IDLE;
+
+	if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_RV770)
+		ret = r600_do_wait_for_fifo(dev_priv, 8);
+	else
+		ret = r600_do_wait_for_fifo(dev_priv, 16);
+	if (ret)
+		return ret;
+	for (i = 0; i < dev_priv->usec_timeout; i++) {
+		if (!(RADEON_READ(R600_GRBM_STATUS) & R600_GUI_ACTIVE))
+			return 0;
+		DRM_UDELAY(1);
+	}
+	DRM_INFO("wait idle failed status : 0x%08X 0x%08X\n",
+		 RADEON_READ(R600_GRBM_STATUS),
+		 RADEON_READ(R600_GRBM_STATUS2));
+
 	return -EBUSY;
 }
 
@@ -487,7 +176,6 @@ int r600_page_table_init(struct drm_device *dev)
 		if (entry->busaddr[i] == 0) {
 			DRM_ERROR("unable to map PCIGART pages!\n");
 			r600_page_table_cleanup(dev, gart_info);
-			ret = -EINVAL;
 			goto done;
 		}
 #endif
@@ -506,6 +194,7 @@ int r600_page_table_init(struct drm_device *dev)
 			entry_addr += ATI_PCIGART_PAGE_SIZE;
 		}
 	}
+	ret = 1;
 #ifdef __linux__
 done:
 #endif
@@ -600,10 +289,9 @@ static void r600_cp_load_microcode(drm_radeon_private_t * dev_priv)
 	r600_do_cp_stop(dev_priv);
 
 	RADEON_WRITE(R600_CP_RB_CNTL,
-		     (1 << 27) |
-		     (15 << 8) |
-		     3);
-
+		     R600_RB_NO_UPDATE |
+		     R600_RB_BLKSZ(15) |
+		     R600_RB_BUFSZ(3));
 
 	RADEON_WRITE(R600_GRBM_SOFT_RESET, R600_SOFT_RESET_CP);
 	RADEON_READ(R600_GRBM_SOFT_RESET);
@@ -808,8 +496,8 @@ static void r700_cp_load_microcode(drm_radeon_private_t * dev_priv)
 
 	RADEON_WRITE(R600_CP_RB_CNTL,
 		     R600_RB_NO_UPDATE |
-		     (15 << 8) |
-		     (3 << 0));
+		     R600_RB_BLKSZ(15) |
+		     R600_RB_BUFSZ(3));
 
 	RADEON_WRITE(R600_GRBM_SOFT_RESET, R600_SOFT_RESET_CP);
 	RADEON_READ(R600_GRBM_SOFT_RESET);
@@ -921,7 +609,7 @@ static void r600_test_writeback(drm_radeon_private_t * dev_priv)
 	}
 }
 
-int r600_engine_reset(struct drm_device * dev)
+int r600_do_engine_reset(struct drm_device * dev)
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	u32 cp_ptr, cp_me_cntl, cp_rb_cntl;
@@ -1395,35 +1083,34 @@ static void r600_gfx_init(struct drm_device * dev,
 	else
 		RADEON_WRITE(R600_VGT_CACHE_INVALIDATION, R600_CACHE_INVALIDATION(R600_VC_AND_TC));
 
-        RADEON_WRITE(R600_PA_SC_AA_SAMPLE_LOCS_2S, ((0xc << 0) |
-						    (0x4 << 4) |
-						    (0x4 << 8) |
-						    (0xc << 12)));
-        RADEON_WRITE(R600_PA_SC_AA_SAMPLE_LOCS_4S, ((0xe << 0) |
-						    (0xe << 4) |
-						    (0x2 << 8) |
-						    (0x2 << 12) |
-						    (0xa << 16) |
-						    (0x6 << 20) |
-						    (0x6 << 24) |
-						    (0xa << 28)));
-        RADEON_WRITE(R600_PA_SC_AA_SAMPLE_LOCS_8S_WD0, ((0xe << 0) |
-							(0xb << 4) |
-							(0x4 << 8) |
-							(0xc << 12) |
-							(0x1 << 16) |
-							(0x6 << 20) |
-							(0xa << 24) |
-							(0xe << 28)));
-        RADEON_WRITE(R600_PA_SC_AA_SAMPLE_LOCS_8S_WD1, ((0x6 << 0) |
-							(0x1 << 4) |
-							(0x0 << 8) |
-							(0x0 << 12) |
-							(0xb << 16) |
-							(0x4 << 20) |
-							(0x7 << 24) |
-							(0x8 << 28)));
-
+	RADEON_WRITE(R600_PA_SC_AA_SAMPLE_LOCS_2S, (R600_S0_X(0xc) |
+						    R600_S0_Y(0x4) |
+						    R600_S1_X(0x4) |
+						    R600_S1_Y(0xc)));
+	RADEON_WRITE(R600_PA_SC_AA_SAMPLE_LOCS_4S, (R600_S0_X(0xe) |
+						    R600_S0_Y(0xe) |
+						    R600_S1_X(0x2) |
+						    R600_S1_Y(0x2) |
+						    R600_S2_X(0xa) |
+						    R600_S2_Y(0x6) |
+						    R600_S3_X(0x6) |
+						    R600_S3_Y(0xa)));
+	RADEON_WRITE(R600_PA_SC_AA_SAMPLE_LOCS_8S_WD0, (R600_S0_X(0xe) |
+							R600_S0_Y(0xb) |
+							R600_S1_X(0x4) |
+							R600_S1_Y(0xc) |
+							R600_S2_X(0x1) |
+							R600_S2_Y(0x6) |
+							R600_S3_X(0xa) |
+							R600_S3_Y(0xe)));
+	RADEON_WRITE(R600_PA_SC_AA_SAMPLE_LOCS_8S_WD1, (R600_S4_X(0x6) |
+							R600_S4_Y(0x1) |
+							R600_S5_X(0x0) |
+							R600_S5_Y(0x0) |
+							R600_S6_X(0xb) |
+							R600_S6_Y(0x4) |
+							R600_S7_X(0x7) |
+							R600_S7_Y(0x8)));
 
 	switch (dev_priv->flags & RADEON_FAMILY_MASK) {
         case CHIP_R600:
@@ -2128,10 +1815,6 @@ static void r600_cp_init_ring_buffer(struct drm_device * dev,
 
 	RADEON_WRITE(R600_SCRATCH_UMSK, 0x7);
 
-	/* Turn on bus mastering */
-	tmp = RADEON_READ(R600_BUS_CNTL) & ~R600_BUS_MASTER_DIS;
-	RADEON_WRITE(R600_BUS_CNTL, tmp);
-
 	dev_priv->sarea_priv->last_frame = dev_priv->scratch[0] = 0;
 	RADEON_WRITE(R600_LAST_FRAME_REG, dev_priv->sarea_priv->last_frame);
 
@@ -2465,7 +2148,7 @@ int r600_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init)
 			  dev_priv->gart_info.addr,
 			  dev_priv->pcigart_offset);
 
-		if (r600_page_table_init(dev)) {
+		if (!r600_page_table_init(dev)) {
 			DRM_ERROR("Failed to init GART table\n");
 			r600_do_cleanup_cp(dev);
 			return -EINVAL;
@@ -2486,7 +2169,7 @@ int r600_do_init_cp(struct drm_device * dev, drm_radeon_init_t * init)
 
 	dev_priv->last_buf = 0;
 
-	r600_engine_reset(dev);
+	r600_do_engine_reset(dev);
 	r600_test_writeback(dev_priv);
 
 	return 0;
@@ -2505,22 +2188,31 @@ int r600_do_resume_cp(struct drm_device * dev)
 		r600_cp_load_microcode(dev_priv);
 	}
 	r600_cp_init_ring_buffer(dev, dev_priv);
-	r600_engine_reset(dev);
+	r600_do_engine_reset(dev);
 
 	return 0;
 }
 
-#if 0 /* Currently unused, avoid warnings */
 /* Wait for the CP to go idle.
  */
-static int r600_do_cp_idle(drm_radeon_private_t * dev_priv)
+int r600_do_cp_idle(drm_radeon_private_t *dev_priv)
 {
 	RING_LOCALS;
 	DRM_DEBUG("\n");
 
-	return 0;
+	BEGIN_RING(5);
+	OUT_RING(CP_PACKET3(R600_IT_EVENT_WRITE, 0));
+	OUT_RING(R600_CACHE_FLUSH_AND_INV_EVENT);
+	/* wait for 3D idle clean */
+	OUT_RING(CP_PACKET3(R600_IT_SET_CONFIG_REG, 1));
+	OUT_RING((R600_WAIT_UNTIL - R600_SET_CONFIG_REG_OFFSET) >> 2);
+	OUT_RING(RADEON_WAIT_3D_IDLE | RADEON_WAIT_3D_IDLECLEAN);
+
+	ADVANCE_RING();
+	COMMIT_RING();
+
+	return r600_do_wait_for_idle(dev_priv);
 }
-#endif
 
 /* Start the Command Processor.
  */
@@ -2576,37 +2268,13 @@ void r600_do_cp_stop(drm_radeon_private_t * dev_priv)
 	dev_priv->cp_running = 0;
 }
 
-
-
-static void r600_cp_discard_buffer(struct drm_device * dev, struct drm_buf * buf)
+int r600_cp_dispatch_indirect(struct drm_device *dev,
+			      struct drm_buf *buf, int start, int end)
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
-	drm_radeon_buf_priv_t *buf_priv = buf->dev_private;
 	RING_LOCALS;
 
-	buf_priv->age = ++dev_priv->sarea_priv->last_dispatch;
-
-	/* Emit the vertex buffer age */
-	BEGIN_RING(2);
-	R600_DISPATCH_AGE(buf_priv->age);
-	ADVANCE_RING();
-
-	buf->pending = 1;
-	buf->used = 0;
-}
-
-int r600_cp_indirect(struct drm_device *dev, struct drm_buf *buf, drm_radeon_indirect_t *indirect)
-{
-	drm_radeon_private_t *dev_priv = dev->dev_private;
-	int start = indirect->start, end = indirect->end;
-	RING_LOCALS;
-
-	RING_SPACE_TEST_WITH_RETURN(dev_priv);
-	VB_AGE_TEST_WITH_RETURN(dev_priv);
-
-	buf->used = indirect->end;
-
-	if (indirect->start != indirect->end) {
+	if (start != end) {
 		unsigned long offset = (dev_priv->gart_buffers_offset
 					+ buf->offset + start);
 		int dwords = (end - start + 3) / sizeof(u32);
@@ -2615,7 +2283,7 @@ int r600_cp_indirect(struct drm_device *dev, struct drm_buf *buf, drm_radeon_ind
 		DRM_DEBUG("offset 0x%lx\n", offset);
 
 
-		/* Indirect buffer data must be modulo 8.
+		/* Indirect buffer data must be a multiple of 16 dwords.
 		 * pad the data with a Type-2 CP packet.
 		 */
 		while (dwords & 0xf) {
@@ -2623,7 +2291,7 @@ int r600_cp_indirect(struct drm_device *dev, struct drm_buf *buf, drm_radeon_ind
 			    ((char *)dev->agp_buffer_map->handle
 			     + buf->offset + start);
 			data[dwords++] = RADEON_CP_PACKET2;
-     		}
+		}
 
 		/* Fire off the indirect buffer */
 		BEGIN_RING(4);
@@ -2633,9 +2301,6 @@ int r600_cp_indirect(struct drm_device *dev, struct drm_buf *buf, drm_radeon_ind
 		OUT_RING(dwords);
 		ADVANCE_RING();
 	}
-	if (indirect->discard)
-		r600_cp_discard_buffer(dev, buf);
 
-	COMMIT_RING();
 	return 0;
 }

@@ -1554,9 +1554,15 @@ static void radeon_cp_discard_buffer(struct drm_device * dev, struct drm_buf * b
 	buf_priv->age = ++dev_priv->sarea_priv->last_dispatch;
 
 	/* Emit the vertex buffer age */
-	BEGIN_RING(2);
-	RADEON_DISPATCH_AGE(buf_priv->age);
-	ADVANCE_RING();
+	if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600) {
+		BEGIN_RING(3);
+		R600_DISPATCH_AGE(buf_priv->age);
+		ADVANCE_RING();
+	} else {
+		BEGIN_RING(2);
+		RADEON_DISPATCH_AGE(buf_priv->age);
+		ADVANCE_RING();
+	}
 
 	buf->pending = 1;
 	buf->used = 0;
@@ -2482,32 +2488,29 @@ static int radeon_cp_indirect(struct drm_device *dev, void *data, struct drm_fil
 		return -EINVAL;
 	}
 
-	if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600) {
-		return r600_cp_indirect(dev, buf, indirect);
-	}
-
 	RING_SPACE_TEST_WITH_RETURN(dev_priv);
 	VB_AGE_TEST_WITH_RETURN(dev_priv);
 
 	buf->used = indirect->end;
 
-	/* Wait for the 3D stream to idle before the indirect buffer
-	 * containing 2D acceleration commands is processed.
-	 */
-	BEGIN_RING(2);
-
-	RADEON_WAIT_UNTIL_3D_IDLE();
-
-	ADVANCE_RING();
-
 	/* Dispatch the indirect buffer full of commands from the
 	 * X server.  This is insecure and is thus only available to
 	 * privileged clients.
 	 */
-	radeon_cp_dispatch_indirect(dev, buf, indirect->start, indirect->end);
-	if (indirect->discard) {
-		radeon_cp_discard_buffer(dev, buf);
+	if ((dev_priv->flags & RADEON_FAMILY_MASK) >= CHIP_R600)
+		r600_cp_dispatch_indirect(dev, buf, indirect->start, indirect->end);
+	else {
+		/* Wait for the 3D stream to idle before the indirect buffer
+		 * containing 2D acceleration commands is processed.
+		 */
+		BEGIN_RING(2);
+		RADEON_WAIT_UNTIL_3D_IDLE();
+		ADVANCE_RING();
+		radeon_cp_dispatch_indirect(dev, buf, indirect->start, indirect->end);
 	}
+
+	if (indirect->discard)
+		radeon_cp_discard_buffer(dev, buf);
 
 	COMMIT_RING();
 	return 0;
