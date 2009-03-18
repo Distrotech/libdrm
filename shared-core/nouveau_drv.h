@@ -347,6 +347,7 @@ struct drm_nouveau_private {
 	struct list_head gpuobj_list;
 
 	void *display_priv; /* internal modesetting */
+	bool in_modeset;
 
 	struct bios bios;
 

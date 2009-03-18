@@ -80,6 +80,11 @@ static void nv50_sor_dpms(struct drm_encoder *drm_encoder, int mode)
 
 	DRM_DEBUG("or %d\n", encoder->or);
 
+	if (dev_priv->in_modeset) {
+		nv50_sor_disconnect(encoder);
+		return;
+	}
+
 	/* wait for it to be done */
 	if (!nv_wait(NV50_PDISPLAY_SOR_REGS_DPMS_CTRL(or),
 		     NV50_PDISPLAY_SOR_REGS_DPMS_CTRL_PENDING, 0)) {
@@ -147,15 +152,10 @@ static bool nv50_sor_mode_fixup(struct drm_encoder *drm_encoder,
 
 static void nv50_sor_prepare(struct drm_encoder *drm_encoder)
 {
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
-
-	nv50_sor_dpms(drm_encoder, DRM_MODE_DPMS_OFF);
-	nv50_sor_disconnect(encoder);
 }
 
 static void nv50_sor_commit(struct drm_encoder *drm_encoder)
 {
-	nv50_sor_dpms(drm_encoder, DRM_MODE_DPMS_ON);
 }
 
 static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
@@ -174,7 +174,7 @@ static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
 		mode_ctl |= NV50_SOR_MODE_CTRL_LVDS;
 	} else {
 		mode_ctl |= NV50_SOR_MODE_CTRL_TMDS;
-		if (mode->clock > 165000)
+		if (adjusted_mode->clock > 165000)
 			mode_ctl |= NV50_SOR_MODE_CTRL_TMDS_DUAL_LINK;
 	}
 
@@ -183,14 +183,13 @@ static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
 	else
 		mode_ctl |= NV50_SOR_MODE_CTRL_CRTC0;
 
-	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
+	if (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC)
 		mode_ctl |= NV50_SOR_MODE_CTRL_NHSYNC;
 
-	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
+	if (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC)
 		mode_ctl |= NV50_SOR_MODE_CTRL_NVSYNC;
 
 	OUT_MODE(NV50_SOR0_MODE_CTRL + offset, mode_ctl);
-	OUT_MODE(NV50_UPDATE_DISPLAY, 0);
 }
 
 static const struct drm_encoder_helper_funcs nv50_sor_helper_funcs = {

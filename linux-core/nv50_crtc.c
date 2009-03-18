@@ -506,25 +506,39 @@ nv50_crtc_gamma_set(struct drm_crtc *drm_crtc, u16 *r, u16 *g, u16 *b,
 	nv50_crtc_lut_load(crtc);
 }
 
+static int
+nv50_crtc_helper_set_config(struct drm_mode_set *set)
+{
+	struct drm_nouveau_private *dev_priv = set->crtc->dev->dev_private;
+	int ret;
+
+	dev_priv->in_modeset = true;
+	ret = drm_crtc_helper_set_config(set);
+	dev_priv->in_modeset = false;
+	return ret;
+}
+
 static const struct drm_crtc_funcs nv50_crtc_funcs = {
 	.save = NULL,
 	.restore = NULL,
 	.cursor_set = nv50_crtc_cursor_set,
 	.cursor_move = nv50_crtc_cursor_move,
 	.gamma_set = nv50_crtc_gamma_set,
-	.set_config = drm_crtc_helper_set_config,
+	.set_config = nv50_crtc_helper_set_config,
 	.destroy = nv50_crtc_destroy,
 };
 
 static void nv50_crtc_dpms(struct drm_crtc *drm_crtc, int mode)
 {
+	struct drm_nouveau_private *dev_priv = drm_crtc->dev->dev_private;
+	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
+
+	if (dev_priv->in_modeset)
+		nv50_crtc_blank(crtc, true);
 }
 
 static void nv50_crtc_prepare(struct drm_crtc *drm_crtc)
 {
-	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
-
-	nv50_crtc_blank(crtc, true);
 }
 
 static void nv50_crtc_commit(struct drm_crtc *drm_crtc)

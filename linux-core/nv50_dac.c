@@ -121,6 +121,11 @@ static void nv50_dac_dpms(struct drm_encoder *drm_encoder, int mode)
 
 	DRM_DEBUG("or %d\n", or);
 
+	if (dev_priv->in_modeset) {
+		nv50_dac_disconnect(encoder);
+		return;
+	}
+
 	/* wait for it to be done */
 	if (!nv_wait(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or),
 		     NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING, 0)) {
@@ -211,15 +216,14 @@ static void nv50_dac_mode_set(struct drm_encoder *drm_encoder,
 		mode_ctl |= 0x100;
 	}
 
-	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
+	if (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC)
 		mode_ctl2 |= NV50_DAC_MODE_CTRL2_NHSYNC;
 
-	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
+	if (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC)
 		mode_ctl2 |= NV50_DAC_MODE_CTRL2_NVSYNC;
 
 	OUT_MODE(NV50_DAC0_MODE_CTRL + offset, mode_ctl);
 	OUT_MODE(NV50_DAC0_MODE_CTRL2 + offset, mode_ctl2);
-	OUT_MODE(NV50_UPDATE_DISPLAY, 0);
 }
 
 static const struct drm_encoder_helper_funcs nv50_dac_helper_funcs = {
