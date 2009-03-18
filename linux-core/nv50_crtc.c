@@ -34,7 +34,6 @@
 #include "nouveau_fb.h"
 #include "nouveau_fbcon.h"
 #include "nouveau_connector.h"
-#include "nv50_cursor.h"
 
 #define NV50_LUT_INDEX(val, w) ((val << (8 - w)) | (val >> ((w << 1) - 8)))
 static int
@@ -95,7 +94,7 @@ nv50_crtc_blank(struct nouveau_crtc *crtc, bool blanked)
 	DRM_DEBUG("%s\n", blanked ? "blanked" : "unblanked");
 
 	if (blanked) {
-		crtc->cursor->hide(crtc, false);
+		crtc->cursor.hide(crtc, false);
 
 		OUT_MODE(NV50_CRTC0_CLUT_MODE + offset,
 			 NV50_CRTC0_CLUT_MODE_BLANK);
@@ -107,11 +106,11 @@ nv50_crtc_blank(struct nouveau_crtc *crtc, bool blanked)
 		OUT_MODE(NV50_CRTC0_BLANK_CTRL + offset,
 			 NV50_CRTC0_BLANK_CTRL_BLANK);
 	} else {
-		crtc->cursor->set_offset(crtc);
-		if (crtc->cursor->visible)
-			crtc->cursor->show(crtc, false);
+		crtc->cursor.set_offset(crtc, crtc->cursor.offset);
+		if (crtc->cursor.visible)
+			crtc->cursor.show(crtc, false);
 		else
-			crtc->cursor->hide(crtc, false);
+			crtc->cursor.hide(crtc, false);
 
 		OUT_MODE(NV50_CRTC0_CLUT_MODE + offset, crtc->lut.depth == 8 ?
 			 NV50_CRTC0_CLUT_MODE_OFF : NV50_CRTC0_CLUT_MODE_ON);
@@ -410,7 +409,7 @@ static void nv50_crtc_destroy(struct drm_crtc *drm_crtc)
 
 	drm_crtc_cleanup(&crtc->base);
 
-	nv50_cursor_destroy(crtc);
+	nv50_cursor_fini(crtc);
 
 	if (crtc->lut.mem)
 		nouveau_mem_free(drm_crtc->dev, crtc->lut.mem);
@@ -431,10 +430,21 @@ static int nv50_crtc_cursor_set(struct drm_crtc *drm_crtc,
 	if (width != 64 || height != 64)
 		return -EINVAL;
 
+	if (crtc->cursor.gem) {
+		mutex_lock(&dev->struct_mutex);
+		drm_gem_object_unreference(crtc->cursor.gem);
+		mutex_unlock(&dev->struct_mutex);
+		crtc->cursor.gem = NULL;
+	}
+
 	if (buffer_handle) {
+		struct drm_nouveau_private *dev_priv = dev->dev_private;
+		struct nouveau_gem_object *ngem;
+
 		gem = drm_gem_object_lookup(dev, file_priv, buffer_handle);
 		if (!gem)
 			return -EINVAL;
+		ngem = gem->driver_private;
 
 		ret = nouveau_gem_pin(gem, NOUVEAU_GEM_DOMAIN_VRAM);
 		if (ret) {
@@ -444,22 +454,25 @@ static int nv50_crtc_cursor_set(struct drm_crtc *drm_crtc,
 			return ret;
 		}
 
-		crtc->cursor->set_bo(crtc, gem);
-		crtc->cursor->set_offset(crtc);
-		ret = crtc->cursor->show(crtc, true);
+		crtc->cursor.offset = ngem->bo->offset -
+				      dev_priv->vm_vram_base;
+		crtc->cursor.set_offset(crtc, crtc->cursor.offset);
+		crtc->cursor.show(crtc, true);
+		crtc->cursor.gem = gem;
 	} else {
-		crtc->cursor->set_bo(crtc, NULL);
-		crtc->cursor->hide(crtc, true);
+		crtc->cursor.hide(crtc, true);
 	}
 
 	return ret;
 }
 
-static int nv50_crtc_cursor_move(struct drm_crtc *drm_crtc, int x, int y)
+static int
+nv50_crtc_cursor_move(struct drm_crtc *drm_crtc, int x, int y)
 {
 	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_crtc);
 
-	return crtc->cursor->set_pos(crtc, x, y);
+	crtc->cursor.set_pos(crtc, x, y);
+	return 0;
 }
 
 void
@@ -756,6 +769,6 @@ int nv50_crtc_create(struct drm_device *dev, int index)
 	drm_crtc_helper_add(&crtc->base, &nv50_crtc_helper_funcs);
 	drm_mode_crtc_set_gamma_size(&crtc->base, 256);
 
-	nv50_cursor_create(crtc);
+	nv50_cursor_init(crtc);
 	return 0;
 }

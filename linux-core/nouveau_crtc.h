@@ -41,7 +41,15 @@ struct nouveau_crtc {
 		uint32_t offset;
 	} fb;
 
-	struct nv50_cursor *cursor;
+	struct {
+		struct drm_gem_object *gem;
+		bool visible;
+		uint32_t offset;
+		void (*set_offset)(struct nouveau_crtc *, uint32_t offset);
+		void (*set_pos)(struct nouveau_crtc *, int x, int y);
+		void (*hide)(struct nouveau_crtc *, bool update);
+		void (*show)(struct nouveau_crtc *, bool update);
+	} cursor;
 
 	struct {
 		struct mem_block *mem;
@@ -60,5 +68,7 @@ struct nouveau_crtc {
 #define to_nouveau_crtc(x) container_of((x), struct nouveau_crtc, base)
 
 int nv50_crtc_create(struct drm_device *dev, int index);
+int nv50_cursor_init(struct nouveau_crtc *);
+void nv50_cursor_fini(struct nouveau_crtc *);
 
 #endif /* __NOUVEAU_CRTC_H__ */
