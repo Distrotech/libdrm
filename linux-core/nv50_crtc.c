@@ -431,6 +431,8 @@ static int nv50_crtc_cursor_set(struct drm_crtc *drm_crtc,
 		return -EINVAL;
 
 	if (crtc->cursor.gem) {
+		nouveau_gem_unpin(crtc->cursor.gem);
+
 		mutex_lock(&dev->struct_mutex);
 		drm_gem_object_unreference(crtc->cursor.gem);
 		mutex_unlock(&dev->struct_mutex);
