@@ -681,6 +681,8 @@ extern struct drm_bo_driver nouveau_bo_driver;
 /* nouveau_fence.c */
 extern struct drm_fence_driver nouveau_fence_driver;
 extern void nouveau_fence_handler(struct drm_device *dev, int channel);
+extern struct nouveau_channel *
+nouveau_fence_channel(struct drm_device *, uint32_t fence_class);
 
 /* nouveau_gem.c */
 extern int nouveau_gem_object_new(struct drm_gem_object *);

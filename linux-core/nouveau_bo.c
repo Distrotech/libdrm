@@ -161,9 +161,10 @@ nouveau_bo_move_m2mf(struct drm_buffer_object *bo, int evict, int no_wait,
 {
 	struct drm_device *dev = bo->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_channel *chan = dev_priv->fifos[bo->new_fence_class];
+	struct nouveau_channel *chan;
 	uint32_t page_count;
 
+	chan = nouveau_fence_channel(dev, bo->new_fence_class);
 	if (!chan) {
 		DRM_ERROR("channel %d non-existant, using kchan\n",
 			  bo->fence_class);

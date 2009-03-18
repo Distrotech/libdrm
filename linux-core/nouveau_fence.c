@@ -29,7 +29,7 @@
 #include "nouveau_drv.h"
 #include "nouveau_dma.h"
 
-static struct nouveau_channel *
+struct nouveau_channel *
 nouveau_fence_channel(struct drm_device *dev, uint32_t class)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
