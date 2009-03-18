@@ -540,7 +540,10 @@ int nv50_connector_create(struct drm_device *dev, int bus, int i2c_index, int ty
 		break;
 	}
 
-	connector->use_dithering = false;
+	if (type == DRM_MODE_CONNECTOR_LVDS)
+		connector->use_dithering = true;
+	else
+		connector->use_dithering = false;
 
 	if (i2c_index < 0xf) {
 		i2c_index = dev_priv->dcb_table.i2c_read[i2c_index];
