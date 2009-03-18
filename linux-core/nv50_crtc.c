@@ -553,6 +553,19 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 	struct nouveau_framebuffer *fb = to_nouveau_framebuffer(drm_fb);
 	struct nouveau_gem_object *ngem = nouveau_gem_object(fb->gem);
 	uint32_t offset = crtc->index * 0x400;
+	int ret;
+
+	/*FIXME: drm.git is a little behind kernel kms... */
+#if 0
+	ret = nouveau_gem_pin(fb->gem, NOUVEAU_GEM_DOMAIN_VRAM);
+	if (ret)
+		return ret;
+
+	if (old_fb) {
+		struct nouveau_framebuffer *fb = to_nouveau_framebuffer(old_fb);
+		nouveau_gem_unpin(fb->gem);
+	}
+#endif
 
 	crtc->fb.offset = ngem->bo->offset - dev_priv->vm_vram_base;
 

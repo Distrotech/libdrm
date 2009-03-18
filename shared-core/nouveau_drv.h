@@ -691,6 +691,7 @@ extern int nouveau_gem_new(struct drm_device *, struct nouveau_channel *,
 			   int size, int align, uint32_t domain,
 			   struct drm_gem_object **);
 extern int nouveau_gem_pin(struct drm_gem_object *, uint32_t domain);
+extern int nouveau_gem_unpin(struct drm_gem_object *);
 extern int nouveau_gem_ioctl_new(struct drm_device *, void *,
 				 struct drm_file *);
 extern int nouveau_gem_ioctl_pushbuf(struct drm_device *, void *,

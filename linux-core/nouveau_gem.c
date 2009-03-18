@@ -151,6 +151,17 @@ nouveau_gem_pin(struct drm_gem_object *gem, uint32_t domain)
 }
 
 int
+nouveau_gem_unpin(struct drm_gem_object *gem)
+{
+	struct nouveau_gem_object *ngem = gem->driver_private;
+	int ret;
+
+	ret = drm_bo_do_validate(ngem->bo, 0, DRM_BO_FLAG_NO_EVICT,
+				 DRM_BO_HINT_DONT_FENCE, 0);
+	return ret;
+}
+
+int
 nouveau_gem_ioctl_new(struct drm_device *dev, void *data,
 		      struct drm_file *file_priv)
 {
