@@ -253,6 +253,11 @@ int ttm_bo_move_memcpy(struct ttm_buffer_object *bo,
 	return ret;
 }
 
+static void ttm_transfered_destroy(struct ttm_buffer_object *bo)
+{
+	kfree(bo);
+}
+
 /**
  * ttm_buffer_object_transfer
  *
@@ -286,12 +291,14 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 	init_waitqueue_head(&fbo->event_queue);
 	INIT_LIST_HEAD(&fbo->ddestroy);
 	INIT_LIST_HEAD(&fbo->lru);
+	INIT_LIST_HEAD(&fbo->swap);
 
 	fbo->sync_obj = driver->sync_obj_ref(bo->sync_obj);
 	if (fbo->mem.mm_node)
 		fbo->mem.mm_node->private = (void *)fbo;
 	kref_init(&fbo->list_kref);
 	kref_init(&fbo->kref);
+	fbo->destroy = &ttm_transfered_destroy;
 
 	mutex_unlock(&fbo->mutex);
 
@@ -489,7 +496,7 @@ int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
 	int ret;
 	uint32_t save_flags = old_mem->flags;
 	uint32_t save_proposed_flags = old_mem->proposed_flags;
-	struct ttm_buffer_object * old_obj;
+	struct ttm_buffer_object *ghost_obj;
 	if (bo->sync_obj)
 		driver->sync_obj_unref(&bo->sync_obj);
 	bo->sync_obj = driver->sync_obj_ref(sync_obj);
@@ -503,22 +510,32 @@ int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
 			ttm_tt_unbind(bo->ttm); ttm_tt_destroy(bo->ttm); bo->ttm = NULL;
 		}
 	} else {
-
-		/* This should help pipeline ordinary buffer moves.
+		/**
+		 * This should help pipeline ordinary buffer moves.
 		 *
 		 * Hang old buffer memory on a new buffer object,
 		 * and leave it to be released when the GPU
 		 * operation has completed.
 		 */
-		ret = ttm_buffer_object_transfer(bo, &old_obj);
+
+		ret = ttm_buffer_object_transfer(bo, &ghost_obj);
 		if (ret)
 			return ret;
+
+		/**
+		 * If we're not moving to fixed memory, the TTM object
+		 * needs to stay alive. Otherwhise hang it on the ghost
+		 * bo to be unbound and destroyed.
+		 */
+
 		if (!(man->flags & TTM_MEMTYPE_FLAG_FIXED))
-			old_obj->ttm = NULL;
+			ghost_obj->ttm = NULL;
 		else
-			bo->ttm = NULL;
+			ghost_obj = NULL;
+
 		bo->priv_flags |= TTM_BO_PRIV_FLAG_MOVING;
-		ttm_bo_unreserve(old_obj);
+		ttm_bo_unreserve(ghost_obj);
+		ttm_bo_unref(&ghost_obj);
 	}
 
 	*old_mem = *new_mem;
