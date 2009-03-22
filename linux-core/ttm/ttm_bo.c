@@ -380,10 +380,11 @@ static int ttm_bo_expire_sync_obj(struct ttm_buffer_object *bo,
  *   up the list_kref and schedule a delayed list check.
  */
 
-static void ttm_bo_cleanup_refs(struct ttm_buffer_object *bo, bool remove_all)
+static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo, bool remove_all)
 {
 	struct ttm_bo_device *bdev = bo->bdev;
 	struct ttm_bo_driver *driver = bdev->driver;
+	int ret;
 
 	mutex_lock(&bo->mutex);
 
@@ -416,7 +417,7 @@ static void ttm_bo_cleanup_refs(struct ttm_buffer_object *bo, bool remove_all)
 		while (put_count--)
 			kref_put(&bo->list_kref, ttm_bo_release_list);
 
-		return;
+		return 0;
 	}
 
 	spin_lock(&bdev->lru_lock);
@@ -431,11 +432,13 @@ static void ttm_bo_cleanup_refs(struct ttm_buffer_object *bo, bool remove_all)
 		spin_unlock(&bdev->lru_lock);
 		schedule_delayed_work(&bdev->wq,
 				      ((HZ / 100) < 1) ? 1 : HZ / 100);
-	} else
+		ret = 0;
+	} else {
 		spin_unlock(&bdev->lru_lock);
-
+		ret = -EBUSY;
+	}
 	mutex_unlock(&bo->mutex);
-	return;
+	return ret;
 }
 
 /**
@@ -467,14 +470,15 @@ static int ttm_bo_delayed_delete(struct ttm_bo_device *bdev, bool remove_all)
 		kref_get(&entry->list_kref);
 
 		spin_unlock(&bdev->lru_lock);
-		ttm_bo_cleanup_refs(entry, remove_all);
+		ret = ttm_bo_cleanup_refs(entry, remove_all);
 		kref_put(&entry->list_kref, ttm_bo_release_list);
-		spin_lock(&bdev->lru_lock);
 
+		spin_lock(&bdev->lru_lock);
 		if (nentry) {
 			bool next_onlist = !list_empty(next);
+			spin_unlock(&bdev->lru_lock);
 			kref_put(&nentry->list_kref, ttm_bo_release_list);
-
+			spin_lock(&bdev->lru_lock);
 			/*
 			 * Someone might have raced us and removed the
 			 * next entry from the list. We don't bother restarting
@@ -484,6 +488,8 @@ static int ttm_bo_delayed_delete(struct ttm_bo_device *bdev, bool remove_all)
 			if (!next_onlist)
 				break;
 		}
+		if (ret)
+		    break;
 	}
 	ret = !list_empty(&bdev->ddestroy);
 	spin_unlock(&bdev->lru_lock);
