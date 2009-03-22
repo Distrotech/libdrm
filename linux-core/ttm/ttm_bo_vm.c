@@ -391,8 +391,7 @@ int ttm_bo_mmap(struct file *filp, struct vm_area_struct *vma,
 
 	if (unlikely(bo == NULL)) {
 		printk(KERN_ERR "Could not find buffer object to map.\n");
-		ret = -EINVAL;
-		goto out_unref;
+		return -EINVAL;
 	}
 
 	driver = bo->bdev->driver;
