@@ -95,9 +95,18 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	unsigned long address = (unsigned long)vmf->virtual_address;
 	int retval = VM_FAULT_NOPAGE;
 
-	ret = ttm_bo_reserve(bo, true, false, false, 0);
-	if (unlikely(ret != 0))
+	/*
+	 * Work around locking order reversal in fault / nopfn
+	 * between mmap_sem and bo_reserve: Perform a trylock operation
+	 * for reserve, and if it fails, retry the fault after scheduling.
+	 */
+
+	ret = ttm_bo_reserve(bo, true, true, false, 0);
+	if (unlikely(ret != 0)) {
+		if (ret == -EBUSY)
+			set_need_resched();
 		return VM_FAULT_NOPAGE;
+	}
 
 	mutex_lock(&bo->mutex);
 
@@ -230,9 +239,18 @@ static unsigned long ttm_bo_vm_nopfn(struct vm_area_struct *vma,
 	bool is_iomem;
 	unsigned long retval = NOPFN_REFAULT;
 
-	ret = ttm_bo_reserve(bo, true, false, false, 0);
-	if (unlikely(ret != 0))
+	/*
+	 * Work around locking order reversal in fault / nopfn
+	 * between mmap_sem and bo_reserve: Perform a trylock operation
+	 * for reserve, and if it fails, retry the fault after scheduling.
+	 */
+
+	ret = ttm_bo_reserve(bo, true, true, false, 0);
+	if (unlikely(ret != 0)) {
+		if (ret == -EBUSY)
+			set_need_resched();
 		return NOPFN_REFAULT;
+	}
 
 	mutex_lock(&bo->mutex);
 
