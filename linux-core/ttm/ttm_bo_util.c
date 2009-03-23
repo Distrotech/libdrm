@@ -285,13 +285,19 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 		return -ENOMEM;
 
 	*fbo = *bo;
+
+	/**
+	 * Fix up members that we shouldn't copy directly:
+	 * TODO: Explicit member copy would probably be better here.
+	 */
+
 	mutex_init(&fbo->mutex);
 	mutex_lock(&fbo->mutex);
-
 	init_waitqueue_head(&fbo->event_queue);
 	INIT_LIST_HEAD(&fbo->ddestroy);
 	INIT_LIST_HEAD(&fbo->lru);
 	INIT_LIST_HEAD(&fbo->swap);
+	fbo->vm_node = NULL;
 
 	fbo->sync_obj = driver->sync_obj_ref(bo->sync_obj);
 	if (fbo->mem.mm_node)

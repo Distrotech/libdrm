@@ -517,6 +517,7 @@ static void ttm_bo_release(struct kref *kref)
 	if (likely(bo->vm_node != NULL)) {
 		rb_erase(&bo->vm_rb, &bdev->addr_space_rb);
 		drm_mm_put_block(bo->vm_node);
+		bo->vm_node = NULL;
 	}
 	write_unlock(&bdev->vm_lock);
 	ttm_bo_cleanup_refs(bo, false);
