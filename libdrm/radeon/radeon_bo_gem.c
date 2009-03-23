@@ -221,3 +221,9 @@ void radeon_bo_manager_gem_dtor(struct radeon_bo_manager *bom)
     }
     free(bomg);
 }
+
+uint32_t radeon_gem_name_bo(struct radeon_bo *bo)
+{
+    struct radeon_bo_gem *bo_gem = (struct radeon_bo_gem*)bo;
+    return bo_gem->name;
+}

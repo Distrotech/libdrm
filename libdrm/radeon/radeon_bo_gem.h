@@ -37,4 +37,5 @@
 struct radeon_bo_manager *radeon_bo_manager_gem_ctor(int fd);
 void radeon_bo_manager_gem_dtor(struct radeon_bo_manager *bom);
 
+uint32_t radeon_gem_name_bo(struct radeon_bo *bo);
 #endif
