@@ -163,11 +163,13 @@ static int nv50_display_disable(struct drm_device *dev)
 
 	DRM_DEBUG("\n");
 
+	dev_priv->in_modeset = true;
 	list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
 		struct drm_crtc_helper_funcs *helper = drm_crtc->helper_private;
 
 		helper->dpms(drm_crtc, DRM_MODE_DPMS_OFF);
 	}
+	dev_priv->in_modeset = false;
 
 	OUT_MODE(NV50_UPDATE_DISPLAY, 0);
 
