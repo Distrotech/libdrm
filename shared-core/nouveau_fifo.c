@@ -463,6 +463,8 @@ void nouveau_fifo_free(struct nouveau_channel *chan)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_engine *engine = &dev_priv->engine;
 	uint64_t t_start;
+	bool timeout = false;
+	int ret;
 
 	DRM_INFO("%s: freeing fifo %d\n", __func__, chan->id);
 
@@ -472,11 +474,35 @@ void nouveau_fifo_free(struct nouveau_channel *chan)
 		if (engine->timer.read(dev) - t_start > 2000000000ULL) {
 			DRM_ERROR("Failed to idle channel %d before destroy."
 				  "Prepare for strangeness..\n", chan->id);
+			timeout = true;
 			break;
 		}
 	}
 
-	/* Signal all pending fences, if any */
+	/* Wait on a fence until channel goes idle, this ensures the engine
+	 * has finished with the last push buffer completely before we destroy
+	 * the channel.
+	 */
+	if (!timeout && dev_priv->mm_enabled) {
+		struct drm_fence_object *fence = NULL;
+
+		ret = drm_fence_object_create(dev, chan->id, DRM_FENCE_TYPE_EXE,
+					      DRM_FENCE_FLAG_EMIT, &fence);
+		if (ret == 0)
+			ret = drm_fence_object_wait(fence, 0, 1,
+						    DRM_FENCE_TYPE_EXE);
+
+		if (ret) {
+			DRM_ERROR("Failed to idle channel %d before destroy.  "
+				  "Prepare for strangeness..\n", chan->id);
+			timeout = true;
+		}
+	}
+
+	/* Ensure all outstanding fences are signaled.  They should be if the
+	 * above attempts at idling were OK, but if we failed this'll tell TTM
+	 * we're done with the buffers.
+	 */
 	if (dev_priv->mm_enabled) {
 		drm_fence_handler(dev, chan->id, chan->next_sequence,
 				  DRM_FENCE_TYPE_EXE, 0);
@@ -484,6 +510,7 @@ void nouveau_fifo_free(struct nouveau_channel *chan)
 
 	/*XXX: Maybe should wait for PGRAPH to finish with the stuff it fetched
 	 *     from CACHE1 too?
+	 *25/3/2009: handled in the mm_enabled case
 	 */
 
 	/* disable the fifo caches */
