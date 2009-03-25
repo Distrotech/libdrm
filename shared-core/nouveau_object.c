@@ -1162,6 +1162,9 @@ nouveau_gpuobj_channel_takedown(struct nouveau_channel *chan)
 
 	DRM_DEBUG("ch%d\n", chan->id);
 
+	if (!chan->ramht_refs.next)
+		return;
+
 	list_for_each_safe(entry, tmp, &chan->ramht_refs) {
 		ref = list_entry(entry, struct nouveau_gpuobj_ref, list);
 
