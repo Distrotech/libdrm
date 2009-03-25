@@ -91,6 +91,7 @@ FIRE_RING(struct nouveau_channel *chan)
 
 	if (chan->dma.cur == chan->dma.put)
 		return;
+	chan->accel_done = true;
 
 	DRM_MEMORYBARRIER();
 	chan->dma.put = chan->dma.cur;

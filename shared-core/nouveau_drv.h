@@ -173,6 +173,7 @@ struct nouveau_channel
 	volatile uint32_t *m2mf_ntfy_map;
 	uint32_t vram_handle;
 	uint32_t gart_handle;
+	bool accel_done;
 
 	/* Push buffer state (only for drm's channel on !mm_enabled) */
 	struct {

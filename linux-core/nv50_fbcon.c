@@ -12,7 +12,8 @@ nv50_fbcon_sync(struct fb_info *info)
 	struct nouveau_channel *chan = dev_priv->channel;
 	int ret, i;
 
-	if (info->state != FBINFO_STATE_RUNNING ||
+	if (!chan->accel_done ||
+	    info->state != FBINFO_STATE_RUNNING ||
 	    info->flags & FBINFO_HWACCEL_DISABLED)
 		return 0;
 
@@ -44,6 +45,7 @@ nv50_fbcon_sync(struct fb_info *info)
 		return 0;
 	}
 
+	chan->accel_done = false;
 	return 0;
 }
 
