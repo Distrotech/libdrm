@@ -510,13 +510,6 @@ struct drm_buffer_object {
 	unsigned long bus_offset;
 	uint32_t vm_flags;
 	void *iomap;
-
-#ifdef DRM_ODD_MM_COMPAT
-	/* dev->struct_mutex only protected. */
-	struct list_head vma_list;
-	struct list_head p_mm_list;
-#endif
-
 };
 
 #define _DRM_BO_FLAG_UNFENCED 0x00000001
@@ -570,11 +563,7 @@ struct drm_buffer_manager {
 	struct drm_mem_type_manager man[DRM_BO_MEM_TYPES];
 	struct list_head unfenced;
 	struct list_head ddestroy;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)
-	struct work_struct wq;
-#else
 	struct delayed_work wq;
-#endif
 	uint32_t fence_type;
 	unsigned long cur_pages;
 	atomic_t count;

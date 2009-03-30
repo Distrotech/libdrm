@@ -76,7 +76,7 @@ void* drmAllocCpy(void *array, int count, int entry_size)
  * A couple of free functions.
  */
 
-void drmModeFreeModeInfo(struct drm_mode_modeinfo *ptr)
+void drmModeFreeModeInfo(drmModeModeInfoPtr ptr)
 {
 	if (!ptr)
 		return;
@@ -273,7 +273,7 @@ drmModeCrtcPtr drmModeGetCrtc(int fd, uint32_t crtcId)
 
 int drmModeSetCrtc(int fd, uint32_t crtcId, uint32_t bufferId,
                    uint32_t x, uint32_t y, uint32_t *connectors, int count,
-		   struct drm_mode_modeinfo *mode)
+		   drmModeModeInfoPtr mode)
 {
 	struct drm_mode_crtc crtc;
 
@@ -419,7 +419,7 @@ err_allocs:
 	return r;
 }
 
-int drmModeAttachMode(int fd, uint32_t connector_id, struct drm_mode_modeinfo *mode_info)
+int drmModeAttachMode(int fd, uint32_t connector_id, drmModeModeInfoPtr mode_info)
 {
 	struct drm_mode_mode_cmd res;
 
@@ -429,7 +429,7 @@ int drmModeAttachMode(int fd, uint32_t connector_id, struct drm_mode_modeinfo *m
 	return drmIoctl(fd, DRM_IOCTL_MODE_ATTACHMODE, &res);
 }
 
-int drmModeDetachMode(int fd, uint32_t connector_id, struct drm_mode_modeinfo *mode_info)
+int drmModeDetachMode(int fd, uint32_t connector_id, drmModeModeInfoPtr mode_info)
 {
 	struct drm_mode_mode_cmd res;
 
@@ -626,27 +626,6 @@ int drmCheckModesettingSupported(const char *busid)
 #endif
 	return -ENOSYS;
 
-}
-
-int drmModeReplaceFB(int fd, uint32_t buffer_id,
-		     uint32_t width, uint32_t height, uint8_t depth,
-		     uint8_t bpp, uint32_t pitch, uint32_t bo_handle)
-{
-	struct drm_mode_fb_cmd f;
-	int ret;
-
-	f.width = width;
-	f.height = height;
-	f.pitch = pitch;
-	f.bpp = bpp;
-	f.depth = depth;
-	f.handle = bo_handle;
-	f.fb_id = buffer_id;
-
-	if ((ret = drmIoctl(fd, DRM_IOCTL_MODE_REPLACEFB, &f)))
-		return ret;
-
-	return 0;
 }
 
 int drmModeCrtcGetGamma(int fd, uint32_t crtc_id, uint32_t size,

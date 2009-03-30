@@ -37,6 +37,8 @@
  * TODO: use cairo to write the mode info on the selected output once
  *       the mode has been programmed, along with possible test patterns.
  */
+#include "config.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,6 +50,11 @@
 #include "xf86drm.h"
 #include "xf86drmMode.h"
 #include "intel_bufmgr.h"
+
+#ifdef HAVE_CAIRO
+#include <math.h>
+#include <cairo.h>
+#endif
 
 drmModeRes *resources;
 int fd, modes;
@@ -131,7 +138,7 @@ void dump_encoders(void)
 	printf("\n");
 }
 
-void dump_mode(struct drm_mode_modeinfo *mode)
+void dump_mode(drmModeModeInfo *mode)
 {
 	printf("  %s %.02f %d %d %d %d %d %d %d %d\n",
 	       mode->name,
@@ -144,6 +151,19 @@ void dump_mode(struct drm_mode_modeinfo *mode)
 	       mode->vsync_start,
 	       mode->vsync_end,
 	       mode->vtotal);
+}
+
+static void
+dump_props(drmModeConnector *connector)
+{
+	drmModePropertyPtr props;
+	int i;
+
+	for (i = 0; i < connector->count_props; i++) {
+		props = drmModeGetProperty(fd, connector->props[i]);
+		printf("\t%s, flags %d\n", props->name, props->flags);
+		drmModeFreeProperty(props);
+	}
 }
 
 void dump_connectors(void)
@@ -180,6 +200,9 @@ void dump_connectors(void)
 			dump_mode(&connector->modes[j]);
 
 		drmModeFreeConnector(connector);
+
+		printf("  props:\n");
+		dump_props(connector);
 	}
 	printf("\n");
 }
@@ -242,17 +265,22 @@ void dump_framebuffers(void)
  * Then you need to find the encoder attached to that connector so you
  * can bind it with a free crtc.
  */
-void set_mode(int connector_id, char *mode_str)
+struct connector {
+	int id;
+	char mode_str[64];
+	drmModeModeInfo *mode;
+	drmModeEncoder *encoder;
+	int crtc;
+};	
+
+static void
+connector_find_mode(struct connector *c)
 {
 	drmModeConnector *connector;
-	drmModeEncoder *encoder = NULL;
-	struct drm_mode_modeinfo *mode = NULL;
-	drm_intel_bufmgr *bufmgr;
-	drm_intel_bo *bo;
-	unsigned int fb_id, *fb_ptr;
 	int i, j, size, ret, width, height;
 
 	/* First, find the connector & mode */
+	c->mode = NULL;
 	for (i = 0; i < resources->count_connectors; i++) {
 		connector = drmModeGetConnector(fd, resources->connectors[i]);
 
@@ -268,47 +296,187 @@ void set_mode(int connector_id, char *mode_str)
 			continue;
 		}
 
-		if (connector->connector_id != connector_id) {
+		if (connector->connector_id != c->id) {
 			drmModeFreeConnector(connector);
 			continue;
 		}
 
 		for (j = 0; j < connector->count_modes; j++) {
-			mode = &connector->modes[j];
-			if (!strcmp(mode->name, mode_str))
+			c->mode = &connector->modes[j];
+			if (!strcmp(c->mode->name, c->mode_str))
 				break;
 		}
 
 		/* Found it, break out */
-		if (mode)
+		if (c->mode)
 			break;
 
 		drmModeFreeConnector(connector);
 	}
 
-	if (!mode) {
-		fprintf(stderr, "failed to find mode \"%s\"\n", mode_str);
+	if (!c->mode) {
+		fprintf(stderr, "failed to find mode \"%s\"\n", c->mode_str);
 		return;
 	}
 
-	width = mode->hdisplay;
-	height = mode->vdisplay;
-
 	/* Now get the encoder */
 	for (i = 0; i < resources->count_encoders; i++) {
-		encoder = drmModeGetEncoder(fd, resources->encoders[i]);
+		c->encoder = drmModeGetEncoder(fd, resources->encoders[i]);
 
-		if (!encoder) {
+		if (!c->encoder) {
 			fprintf(stderr, "could not get encoder %i: %s\n",
 				resources->encoders[i], strerror(errno));
-			drmModeFreeEncoder(encoder);
+			drmModeFreeEncoder(c->encoder);
 			continue;
 		}
 
-		if (encoder->encoder_id  == connector->encoder_id)
+		if (c->encoder->encoder_id  == connector->encoder_id)
 			break;
 
-		drmModeFreeEncoder(encoder);
+		drmModeFreeEncoder(c->encoder);
+	}
+
+	if (c->crtc == -1)
+		c->crtc = c->encoder->crtc_id;
+}
+
+#ifdef HAVE_CAIRO
+
+static int
+create_test_buffer(drm_intel_bufmgr *bufmgr,
+		   int width, int height, int *stride_out, drm_intel_bo **bo_out)
+{
+	drm_intel_bo *bo;
+	unsigned int *fb_ptr;
+	int size, ret, i, stride;
+	div_t d;
+	cairo_surface_t *surface;
+	cairo_t *cr;
+	char buf[64];
+	int x, y;
+
+	surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
+	stride = cairo_image_surface_get_stride(surface);
+	size = stride * height;
+	fb_ptr = (unsigned int *) cairo_image_surface_get_data(surface);
+
+	/* paint the buffer with colored tiles */
+	for (i = 0; i < width * height; i++) {
+		d = div(i, width);
+		fb_ptr[i] = 0x00130502 * (d.quot >> 6) + 0x000a1120 * (d.rem >> 6);
+	}
+
+	cr = cairo_create(surface);
+	cairo_set_line_cap(cr, CAIRO_LINE_CAP_SQUARE);
+	for (x = 0; x < width; x += 250)
+		for (y = 0; y < height; y += 250) {
+			cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+			cairo_move_to(cr, x, y - 20);
+			cairo_line_to(cr, x, y + 20);
+			cairo_move_to(cr, x - 20, y);
+			cairo_line_to(cr, x + 20, y);
+			cairo_new_sub_path(cr);
+			cairo_arc(cr, x, y, 10, 0, M_PI * 2);
+			cairo_set_line_width(cr, 4);
+			cairo_set_source_rgb(cr, 0, 0, 0);
+			cairo_stroke_preserve(cr);
+			cairo_set_source_rgb(cr, 1, 1, 1);
+			cairo_set_line_width(cr, 2);
+			cairo_stroke(cr);
+			snprintf(buf, sizeof buf, "%d, %d", x, y);
+			cairo_move_to(cr, x + 20, y + 20);
+			cairo_text_path(cr, buf);
+			cairo_set_source_rgb(cr, 0, 0, 0);
+			cairo_stroke_preserve(cr);
+			cairo_set_source_rgb(cr, 1, 1, 1);
+			cairo_fill(cr);
+		}
+
+	cairo_destroy(cr);
+
+	bo = drm_intel_bo_alloc(bufmgr, "frontbuffer", size, 4096);
+	if (!bo) {
+		fprintf(stderr, "failed to alloc buffer: %s\n",
+			strerror(errno));
+		return -1;
+	}
+
+	drm_intel_bo_subdata(bo, 0, size, fb_ptr);
+
+	cairo_surface_destroy(surface);
+
+	*bo_out = bo;
+	*stride_out = stride;
+
+	return 0;
+}
+
+#else
+
+static int
+create_test_buffer(drm_intel_bufmgr *bufmgr,
+		   int width, int height, int *stride_out, drm_intel_bo **bo_out)
+{
+	drm_intel_bo *bo;
+	unsigned int *fb_ptr;
+	int size, ret, i, stride;
+	div_t d;
+
+	/* Mode size at 32 bpp */
+	stride = width * 4;
+	size = stride * height;
+
+	bo = drm_intel_bo_alloc(bufmgr, "frontbuffer", size, 4096);
+	if (!bo) {
+		fprintf(stderr, "failed to alloc buffer: %s\n",
+			strerror(errno));
+		return -1;
+	}
+
+	ret = drm_intel_gem_bo_map_gtt(bo);
+	if (ret) {
+		fprintf(stderr, "failed to GTT map buffer: %s\n",
+			strerror(errno));
+		return -1;
+	}
+
+	fb_ptr = bo->virtual;
+
+	/* paint the buffer with colored tiles */
+	for (i = 0; i < width * height; i++) {
+		d = div(i, width);
+		fb_ptr[i] = 0x00130502 * (d.quot >> 6) + 0x000a1120 * (d.rem >> 6);
+	}
+	drm_intel_bo_unmap(bo);
+
+	*bo_out = bo;
+	*stride_out = stride;
+
+	return 0;
+}
+
+#endif
+
+static void
+set_mode(struct connector *c, int count)
+{
+	drmModeConnector *connector;
+	drmModeEncoder *encoder = NULL;
+	struct drm_mode_modeinfo *mode = NULL;
+	drm_intel_bufmgr *bufmgr;
+	drm_intel_bo *bo;
+	unsigned int fb_id;
+	int i, j, ret, width, height, x, stride;
+
+	width = 0;
+	height = 0;
+	for (i = 0; i < count; i++) {
+		connector_find_mode(&c[i]);
+		if (c[i].mode == NULL)
+			continue;
+		width += c[i].mode->hdisplay;
+		if (height < c[i].mode->vdisplay)
+			height = c[i].mode->vdisplay;
 	}
 
 	bufmgr = drm_intel_bufmgr_gem_init(fd, 2<<20);
@@ -317,47 +485,33 @@ void set_mode(int connector_id, char *mode_str)
 		return;
 	}
 
-	/* Mode size at 32 bpp */
-	size = width * height * 4;
-
-	bo = drm_intel_bo_alloc(bufmgr, "frontbuffer", size, 4096);
-	if (!bo) {
-		fprintf(stderr, "failed to alloc buffer: %s\n",
-			strerror(errno));
+	if (create_test_buffer(bufmgr, width, height, &stride, &bo))
 		return;
-	}
 
-	ret = drm_intel_bo_pin(bo, 4096);
-	if (ret) {
-		fprintf(stderr, "failed to pin buffer: %s\n", strerror(errno));
-		return;
-	}
-
-	ret = drm_intel_gem_bo_map_gtt(bo);
-	if (ret) {
-		fprintf(stderr, "failed to GTT map buffer: %s\n",
-			strerror(errno));
-		return;
-	}
-
-	fb_ptr = bo->virtual;
-
-	/* paint the buffer blue */
-	for (i = 0; i < width * height; i++)
-		fb_ptr[i] = 0xff;
-
-	ret = drmModeAddFB(fd, width, height, 32, 32, width * 4, bo->handle,
+	ret = drmModeAddFB(fd, width, height, 32, 32, stride, bo->handle,
 			   &fb_id);
 	if (ret) {
 		fprintf(stderr, "failed to add fb: %s\n", strerror(errno));
 		return;
 	}
 
-	ret = drmModeSetCrtc(fd, encoder->crtc_id, fb_id, 0, 0,
-			     &connector->connector_id, 1, mode);
-	if (ret) {
-		fprintf(stderr, "failed to set mode: %s\n", strerror(errno));
-		return;
+	x = 0;
+	for (i = 0; i < count; i++) {
+		int crtc_id;
+		if (c[i].mode == NULL)
+			continue;
+
+		printf("setting mode %s on connector %d, crtc %d\n",
+		       c[i].mode_str, c[i].id, c[i].crtc);
+
+		ret = drmModeSetCrtc(fd, c[i].crtc, fb_id, x, 0,
+				     &c[i].id, 1, c[i].mode);
+		x += c[i].mode->hdisplay;
+
+		if (ret) {
+			fprintf(stderr, "failed to set mode: %s\n", strerror(errno));
+			return;
+		}
 	}
 }
 
@@ -374,6 +528,7 @@ void usage(char *name)
 	fprintf(stderr, "\t-m\tlist modes\n");
 	fprintf(stderr, "\t-f\tlist framebuffers\n");
 	fprintf(stderr, "\t-s <connector_id>:<mode>\tset a mode\n");
+	fprintf(stderr, "\t-s <connector_id>@<crtc_id>:<mode>\tset a mode\n");
 	fprintf(stderr, "\n\tDefault is to dump all info.\n");
 	exit(0);
 }
@@ -386,8 +541,9 @@ int main(int argc, char **argv)
 	int encoders = 0, connectors = 0, crtcs = 0, framebuffers = 0;
 	char *modules[] = { "i915", "radeon" };
 	char *modeset = NULL, *mode, *connector;
-	int i, connector_id;
-
+	int i, connector_id, count = 0;
+	struct connector con_args[2];
+	
 	opterr = 0;
 	while ((c = getopt(argc, argv, optstr)) != -1) {
 		switch (c) {
@@ -408,6 +564,16 @@ int main(int argc, char **argv)
 			break;
 		case 's':
 			modeset = strdup(optarg);
+			con_args[count].crtc = -1;
+			if (sscanf(optarg, "%d:%64s",
+				   &con_args[count].id,
+				   &con_args[count].mode_str) != 2 &&
+			    sscanf(optarg, "%d@%d:%64s",
+				   &con_args[count].id,
+				   &con_args[count].crtc,
+				   &con_args[count].mode_str) != 3)
+				usage(argv[0]);
+			count++;				      
 			break;
 		default:
 			usage(argv[0]);
@@ -447,22 +613,10 @@ int main(int argc, char **argv)
 	dump_resource(crtcs);
 	dump_resource(framebuffers);
 
-	if (modeset) {
-		connector = strtok(modeset, ":");
-		if (!connector)
-			usage(argv[0]);
-		connector_id = atoi(connector);
-
-		mode = strtok(NULL, ":");
-		if (!mode)
-			usage(argv[0]);
-		printf("setting connector %d to mode %s\n", connector_id,
-		       mode);
-		set_mode(connector_id, mode);
-		sleep(3);
+	if (count > 0) {
+		set_mode(con_args, count);
+		getchar();
 	}
-
-	sleep(3);
 
 	drmModeFreeResources(resources);
 

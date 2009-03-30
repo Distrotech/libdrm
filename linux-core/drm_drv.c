@@ -397,6 +397,8 @@ static void drm_cleanup(struct drm_device * dev)
 		return;
 	}
 
+	drm_vblank_cleanup(dev);
+
 	drm_lastclose(dev);
 	drm_fence_manager_takedown(dev);
 
@@ -455,9 +457,6 @@ void drm_exit(struct drm_driver *driver)
 		idr_for_each(&drm_minors_idr, &drm_minors_cleanup, driver);
 	} else
 		pci_unregister_driver(&driver->pci_driver);
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,15))
-	free_nopage_retry();
-#endif
 	DRM_INFO("Module unloaded\n");
 }
 EXPORT_SYMBOL(drm_exit);

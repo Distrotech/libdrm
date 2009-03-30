@@ -58,7 +58,7 @@ endif
 
 # Modules for all architectures
 MODULE_LIST := drm.o tdfx.o r128.o radeon.o mga.o sis.o savage.o via.o \
-               mach64.o nv.o nouveau.o xgi.o
+               mach64.o nouveau.o xgi.o
 
 # Modules only for ix86 architectures
 ifneq (,$(findstring 86,$(MACHINE)))
@@ -83,19 +83,15 @@ R128HEADERS =   r128_drv.h r128_drm.h $(DRMHEADERS)
 RADEONHEADERS = radeon_drv.h radeon_drm.h r300_reg.h $(DRMHEADERS)
 MGAHEADERS =    mga_drv.h mga_drm.h mga_ucode.h $(DRMHEADERS)
 I810HEADERS =   i810_drv.h i810_drm.h $(DRMHEADERS)
-I915HEADERS =   i915_drv.h i915_drm.h $(DRMHEADERS)
 SISHEADERS=     sis_drv.h sis_drm.h drm_hashtab.h drm_sman.h $(DRMHEADERS)
 SAVAGEHEADERS=  savage_drv.h savage_drm.h $(DRMHEADERS)
 VIAHEADERS =	via_drm.h via_drv.h via_3d_reg.h via_verifier.h $(DRMHEADERS)
 MACH64HEADERS = mach64_drv.h mach64_drm.h $(DRMHEADERS)
-NVHEADERS =     nv_drv.h $(DRMHEADERS)
 FFBHEADERS = 	ffb_drv.h $(DRMHEADERS)
 NOUVEAUHEADERS = nouveau_drv.h nouveau_drm.h nouveau_reg.h $(DRMHEADERS)
 XGIHEADERS = xgi_cmdlist.h xgi_drv.h xgi_misc.h xgi_regs.h $(DRMHEADERS)
 
-PROGS = dristat drmstat
-
-CLEANFILES = *.o *.ko $(PROGS) .depend .*.flags .*.d .*.cmd *.mod.c drm_pciids.h .tmp_versions
+CLEANFILES = *.o *.ko .depend .*.flags .*.d .*.cmd *.mod.c drm_pciids.h .tmp_versions
 
 # VERSION is not defined from the initial invocation.  It is defined when
 # this Makefile is invoked from the kernel's root Makefile.
@@ -221,23 +217,6 @@ clean cleandir:
 $(MODULE_LIST)::
 	make DRM_MODULES=$@ modules
 
-# Build test utilities
-
-PRGCFLAGS = $(CFLAGS) -g -ansi -pedantic -DPOSIX_C_SOURCE=199309L \
-	    -D_POSIX_SOURCE -D_XOPEN_SOURCE -D_BSD_SOURCE -D_SVID_SOURCE \
-	    -I. -I../../..
-
-DRMSTATLIBS = -L../../.. -L.. -ldrm -lxf86_os \
-	      -L../../../../dummylib -ldummy -lm
-
-programs: $(PROGS)
-
-dristat: dristat.c
-	$(CC) $(PRGCFLAGS) $< -o $@
-
-drmstat: drmstat.c
-	$(CC) $(PRGCFLAGS) $< -o $@ $(DRMSTATLIBS)
-
 install:
 	make -C $(LINUXDIR) $(GETCONFIG) SUBDIRS=`/bin/pwd` DRMSRCDIR=`/bin/pwd` modules_install
 
@@ -286,7 +265,6 @@ CONFIG_DRM_FFB := n
 CONFIG_DRM_SAVAGE := n
 CONFIG_DRM_VIA := n
 CONFIG_DRM_MACH64 := n
-CONFIG_DRM_NV := n
 CONFIG_DRM_NOUVEAU := n
 CONFIG_DRM_XGI := n
 
@@ -318,9 +296,6 @@ CONFIG_DRM_SAVAGE := m
 endif
 ifneq (,$(findstring mga,$(DRM_MODULES)))
 CONFIG_DRM_MGA := m
-endif
-ifneq (,$(findstring nv,$(DRM_MODULES)))
-CONFIG_DRM_NV := m
 endif
 ifneq (,$(findstring nouveau,$(DRM_MODULES)))
 CONFIG_DRM_NOUVEAU := m
@@ -354,7 +329,6 @@ $(ffb-objs):	$(FFBHEADERS)
 $(savage-objs): $(SAVAGEHEADERS)
 $(via-objs):	$(VIAHEADERS)
 $(mach64-objs): $(MACH64HEADERS)
-$(nv-objs):     $(NVHEADERS)
 $(nouveau-objs): $(NOUVEAUHEADERS)
 $(xgi-objs):    $(XGIHEADERS)
 

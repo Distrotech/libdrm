@@ -19,7 +19,7 @@
 #  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 AC_PREREQ(2.57)
-AC_INIT([libdrm], 2.4.3, [dri-devel@lists.sourceforge.net], libdrm)
+AC_INIT([libdrm], 2.4.5, [dri-devel@lists.sourceforge.net], libdrm)
 AC_CONFIG_SRCDIR([Makefile.am])
 AM_INIT_AUTOMAKE([dist-bzip2])
 
@@ -42,6 +42,10 @@ AC_ARG_ENABLE(udev,	AS_HELP_STRING([--enable-udev],
 				[Enable support for using udev instead of mknod (default: disabled)]),
 				[UDEV=$enableval], [UDEV=no])
 
+AC_ARG_ENABLE(nouveau-experimental-api,
+	      AS_HELP_STRING([--enable-nouveau-experimental-api],
+	      [Enable support for nouveau's experimental API (default: disabled)]),
+	      [NOUVEAU=$enableval], [NOUVEAU=no])
 
 dnl ===========================================================================
 dnl check compiler flags
@@ -61,6 +65,13 @@ AC_DEFUN([LIBDRM_CC_TRY_FLAG], [
   fi
   AC_MSG_RESULT([$libdrm_cc_flag])
 ])
+
+dnl We use clock_gettime to check for timeouts in drmWaitVBlank
+
+AC_CHECK_FUNCS([clock_gettime], [CLOCK_LIB=],
+               [AC_CHECK_LIB([rt], [clock_gettime], [CLOCK_LIB=-lrt],
+                             [AC_MSG_ERROR([Couldn't find clock_gettime])])])
+AC_SUBST([CLOCK_LIB])
 
 dnl Use lots of warning flags with with gcc and compatible compilers
 
@@ -112,13 +123,25 @@ if test "x$UDEV" = xyes; then
 	AC_DEFINE(UDEV, 1, [Have UDEV support])
 fi
 
+AM_CONDITIONAL(HAVE_NOUVEAU, [test "x$NOUVEAU" = xyes])
+
+PKG_CHECK_MODULES(CAIRO, cairo, [HAVE_CAIRO=yes], [HAVE_CAIRO=no])
+if test "x$HAVE_CAIRO" = xyes; then
+	AC_DEFINE(HAVE_CAIRO, 1, [Have cairo support])
+fi
+AM_CONDITIONAL(HAVE_CAIRO, [test "x$HAVE_CAIRO" = xyes])
+
+
 AC_SUBST(WARN_CFLAGS)
 AC_OUTPUT([
 	Makefile
 	libdrm/Makefile
 	libdrm/intel/Makefile
+	libdrm/nouveau/Makefile
+	libdrm/nouveau/libdrm_nouveau.pc
 	shared-core/Makefile
 	tests/Makefile
 	tests/modeprint/Makefile
 	tests/modetest/Makefile
-	libdrm.pc])
+	libdrm.pc
+	libdrm_intel.pc])

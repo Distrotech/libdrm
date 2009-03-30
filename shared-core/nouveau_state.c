@@ -363,6 +363,11 @@ nouveau_card_init(struct drm_device *dev)
 	ret = nouveau_dma_channel_init(dev);
 	if (ret) return ret;
 
+	ret = nouveau_backlight_init(dev);
+	if (ret)
+		DRM_ERROR("Error code %d when trying to register backlight\n",
+			  ret);
+
 	dev_priv->init_state = NOUVEAU_CARD_INIT_DONE;
 	return 0;
 }
@@ -375,6 +380,8 @@ static void nouveau_card_takedown(struct drm_device *dev)
 	DRM_DEBUG("prev state = %d\n", dev_priv->init_state);
 
 	if (dev_priv->init_state != NOUVEAU_CARD_INIT_DOWN) {
+		nouveau_backlight_exit(dev);
+
 		nouveau_dma_channel_takedown(dev);
 
 		engine->fifo.takedown(dev);
@@ -630,6 +637,15 @@ int nouveau_ioctl_getparam(struct drm_device *dev, void *data, struct drm_file *
 	case NOUVEAU_GETPARAM_AGP_SIZE:
 		getparam->value=dev_priv->gart_info.aper_size;
 		break;
+	case NOUVEAU_GETPARAM_MM_ENABLED:
+		getparam->value = 0;
+		break;
+	case NOUVEAU_GETPARAM_VM_VRAM_BASE:
+		if (dev_priv->card_type >= NV_50)
+			getparam->value = 0x20000000;
+		else
+			getparam->value = 0;
+		break;
 	default:
 		DRM_ERROR("unknown parameter %lld\n", getparam->param);
 		return -EINVAL;
@@ -707,7 +723,13 @@ static int nouveau_suspend(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_suspend_resume *susres = &dev_priv->susres;
 	struct nouveau_engine *engine = &dev_priv->Engine;
+	struct nouveau_channel *current_fifo;
 	int i;
+
+	if (dev_priv->card_type >= NV_50) {
+		DRM_DEBUG("Suspend not supported for NV50+\n");
+		return -ENODEV;
+	}
 
 	drm_free(susres->ramin_copy, susres->ramin_size, DRM_MEM_DRIVER);
 	susres->ramin_size = 0;
@@ -753,8 +775,12 @@ static int nouveau_suspend(struct drm_device *dev)
 		susres->graph_ctx_control = NV_READ(NV04_PGRAPH_CTX_CONTROL);
 	}
 
-	engine->fifo.save_context(dev_priv->fifos[engine->fifo.channel_id(dev)]);
-	engine->graph.save_context(dev_priv->fifos[engine->fifo.channel_id(dev)]);
+	current_fifo = dev_priv->fifos[engine->fifo.channel_id(dev)];
+	/* channel may have been deleted but no replacement yet loaded */
+	if (current_fifo) {
+		engine->fifo.save_context(current_fifo);
+		engine->graph.save_context(current_fifo);
+	}
 	nouveau_wait_for_idle(dev);
 
 	for (i = 0; i < susres->ramin_size / 4; i++)

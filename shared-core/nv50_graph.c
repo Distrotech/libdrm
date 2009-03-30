@@ -106,7 +106,14 @@ nv50_graph_init_ctxctl(struct drm_device *dev)
 		voodoo = nv92_ctxprog;
 		break;
 	case 0x94:
+	case 0x96:
 		voodoo = nv94_ctxprog;
+		break;
+	case 0x98:
+		voodoo = nv98_ctxprog;
+		break;
+	case 0xa0:
+		voodoo = nva0_ctxprog;
 		break;
 	case 0xaa:
 		voodoo = nvaa_ctxprog;
@@ -200,6 +207,15 @@ nv50_graph_create_context(struct nouveau_channel *chan)
 	case 0x94:
 		ctxvals = nv94_ctxvals;
 		break;
+	case 0x96:
+		ctxvals = nv96_ctxvals;
+		break;
+	case 0x98:
+		ctxvals = nv98_ctxvals;
+		break;
+	case 0xa0:
+		ctxvals = nva0_ctxvals;
+		break;
 	case 0xaa:
 		ctxvals = nvaa_ctxvals;
 		break;
@@ -231,7 +247,7 @@ nv50_graph_create_context(struct nouveau_channel *chan)
 	}
 
 	INSTANCE_WR(ctx, 0x00000/4, chan->ramin->instance >> 12);
-	if (dev_priv->chipset == 0xaa)
+	if ((dev_priv->chipset & 0xf0) == 0xa0)
 		INSTANCE_WR(ctx, 0x00004/4, 0x00000002);
 	else
 		INSTANCE_WR(ctx, 0x0011c/4, 0x00000002);

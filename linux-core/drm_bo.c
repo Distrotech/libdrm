@@ -91,42 +91,11 @@ void drm_bo_add_to_lru(struct drm_buffer_object *bo)
 
 static int drm_bo_vm_pre_move(struct drm_buffer_object *bo, int old_is_pci)
 {
-#ifdef DRM_ODD_MM_COMPAT
-	int ret;
-
-	if (!bo->map_list.map)
-		return 0;
-
-	ret = drm_bo_lock_kmm(bo);
-	if (ret)
-		return ret;
-	drm_bo_unmap_virtual(bo);
-	if (old_is_pci)
-		drm_bo_finish_unmap(bo);
-#else
 	if (!bo->map_list.map)
 		return 0;
 
 	drm_bo_unmap_virtual(bo);
-#endif
 	return 0;
-}
-
-static void drm_bo_vm_post_move(struct drm_buffer_object *bo)
-{
-#ifdef DRM_ODD_MM_COMPAT
-	int ret;
-
-	if (!bo->map_list.map)
-		return;
-
-	ret = drm_bo_remap_bound(bo);
-	if (ret) {
-		DRM_ERROR("Failed to remap a bound buffer object.\n"
-			  "\tThis might cause a sigbus later.\n");
-	}
-	drm_bo_unlock_kmm(bo);
-#endif
 }
 
 /*
@@ -237,9 +206,6 @@ static int drm_bo_handle_move_mem(struct drm_buffer_object *bo,
 		goto out_err;
 
 moved:
-	if (old_is_pci || new_is_pci)
-		drm_bo_vm_post_move(bo);
-
 	if (bo->priv_flags & _DRM_BO_FLAG_EVICTED) {
 		ret =
 		    dev->driver->bo_driver->invalidate_caches(dev,
@@ -260,9 +226,6 @@ moved:
 	return 0;
 
 out_err:
-	if (old_is_pci || new_is_pci)
-		drm_bo_vm_post_move(bo);
-
 	new_man = &bm->man[bo->mem.mem_type];
 	if ((new_man->flags & _DRM_FLAG_MEMTYPE_FIXED) && bo->ttm) {
 		drm_ttm_unbind(bo->ttm);
@@ -467,11 +430,6 @@ static void drm_bo_destroy_locked(struct drm_buffer_object *bo)
 			return;
 		}
 
-#ifdef DRM_ODD_MM_COMPAT
-		BUG_ON(!list_empty(&bo->vma_list));
-		BUG_ON(!list_empty(&bo->p_mm_list));
-#endif
-
 		if (bo->ttm) {
 			drm_ttm_unbind(bo->ttm);
 			drm_ttm_destroy(bo->ttm);
@@ -523,20 +481,11 @@ static void drm_bo_delayed_delete(struct drm_device *dev, int remove_all)
 	}
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)
-static void drm_bo_delayed_workqueue(void *data)
-#else
 static void drm_bo_delayed_workqueue(struct work_struct *work)
-#endif
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)
-	struct drm_device *dev = (struct drm_device *) data;
-	struct drm_buffer_manager *bm = &dev->bm;
-#else
 	struct drm_buffer_manager *bm =
 	    container_of(work, struct drm_buffer_manager, wq.work);
 	struct drm_device *dev = container_of(bm, struct drm_device, bm);
-#endif
 
 	DRM_DEBUG("Delayed delete Worker\n");
 
@@ -1784,10 +1733,6 @@ int drm_buffer_object_create(struct drm_device *dev,
 	INIT_LIST_HEAD(&bo->lru);
 	INIT_LIST_HEAD(&bo->pinned_lru);
 	INIT_LIST_HEAD(&bo->ddestroy);
-#ifdef DRM_ODD_MM_COMPAT
-	INIT_LIST_HEAD(&bo->p_mm_list);
-	INIT_LIST_HEAD(&bo->vma_list);
-#endif
 	bo->dev = dev;
 	bo->type = type;
 	bo->num_pages = num_pages;
@@ -2362,9 +2307,6 @@ int drm_bo_driver_finish(struct drm_device *dev)
 	if (list_empty(&bm->unfenced))
 		DRM_DEBUG("Unfenced list was clean\n");
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,15))
-	ClearPageReserved(bm->dummy_read_page);
-#endif
 	__free_page(bm->dummy_read_page);
 
 out:
@@ -2397,10 +2339,6 @@ int drm_bo_driver_init(struct drm_device *dev)
 		goto out_unlock;
 	}
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,15))
-	SetPageReserved(bm->dummy_read_page);
-#endif
-
 	/*
 	 * Initialize the system memory buffer type.
 	 * Other types need to be driver / IOCTL initialized.
@@ -2409,11 +2347,7 @@ int drm_bo_driver_init(struct drm_device *dev)
 	if (ret)
 		goto out_unlock;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)
-	INIT_WORK(&bm->wq, &drm_bo_delayed_workqueue, dev);
-#else
 	INIT_DELAYED_WORK(&bm->wq, drm_bo_delayed_workqueue);
-#endif
 	bm->initialized = 1;
 	bm->nice_mode = 1;
 	atomic_set(&bm->count, 0);

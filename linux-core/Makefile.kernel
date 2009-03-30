@@ -22,6 +22,7 @@ i810-objs   := i810_drv.o i810_dma.o
 nouveau-objs := nouveau_drv.o nouveau_state.o nouveau_fifo.o nouveau_mem.o \
 		nouveau_object.o nouveau_irq.o nouveau_notifier.o nouveau_swmthd.o \
 		nouveau_sgdma.o nouveau_dma.o nouveau_bo.o nouveau_fence.o \
+		nouveau_backlight.o \
 		nv04_timer.o \
 		nv04_mc.o nv40_mc.o nv50_mc.o \
 		nv04_fb.o nv10_fb.o nv40_fb.o \
@@ -36,7 +37,6 @@ savage-objs := savage_drv.o savage_bci.o savage_state.o
 via-objs    := via_irq.o via_drv.o via_map.o via_mm.o via_dma.o via_verifier.o \
 		via_video.o via_dmablit.o via_fence.o via_buffer.o
 mach64-objs := mach64_drv.o mach64_dma.o mach64_irq.o mach64_state.o
-nv-objs := nv_drv.o
 xgi-objs    := xgi_cmdlist.o xgi_drv.o xgi_fb.o xgi_misc.o xgi_pcie.o \
 		xgi_fence.o
 
@@ -60,6 +60,5 @@ obj-$(CONFIG_DRM_FFB)   += ffb.o
 obj-$(CONFIG_DRM_SAVAGE)+= savage.o
 obj-$(CONFIG_DRM_VIA)   += via.o
 obj-$(CONFIG_DRM_MACH64)+= mach64.o
-obj-$(CONFIG_DRM_NV)    += nv.o
 obj-$(CONFIG_DRM_NOUVEAU) += nouveau.o
 obj-$(CONFIG_DRM_XGI)   += xgi.o

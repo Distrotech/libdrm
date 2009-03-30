@@ -56,9 +56,7 @@
 #include <linux/mm.h>
 #include <linux/kref.h>
 #include <linux/pagemap.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
 #include <linux/mutex.h>
-#endif
 #if defined(__alpha__) || defined(__powerpc__)
 #include <asm/pgtable.h>	/* For pte_wrprotect */
 #endif
@@ -517,9 +515,7 @@ struct drm_agp_head {
 	DRM_AGP_KERN agp_info;		/**< AGP device information */
 	struct list_head memory;
 	unsigned long mode;		/**< AGP mode */
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,11)
 	struct agp_bridge_data *bridge;
-#endif
 	int enabled;			/**< whether the AGP bus as been enabled */
 	int acquired;			/**< whether the AGP device has been acquired */
 	unsigned long base;
@@ -889,6 +885,7 @@ struct drm_device {
 	/*@{ */
 	int irq;			/**< Interrupt used by board */
 	int irq_enabled;		/**< True if irq handler is enabled */
+	int msi_enabled;		/**< True if irq is MSI */
 	__volatile__ long context_flag;	/**< Context swapping flag */
 	__volatile__ long interrupt_flag; /**< Interruption handler flag */
 	__volatile__ long dma_flag;	/**< DMA dispatch flag */
@@ -1239,6 +1236,7 @@ extern void drm_driver_irq_postinstall(struct drm_device *dev);
 extern void drm_driver_irq_uninstall(struct drm_device *dev);
 
 extern int drm_vblank_init(struct drm_device *dev, int num_crtcs);
+extern void drm_vblank_cleanup(struct drm_device *dev);
 extern int drm_wait_vblank(struct drm_device *dev, void *data, struct drm_file *filp);
 extern int drm_vblank_wait(struct drm_device * dev, unsigned int *vbl_seq);
 extern void drm_locked_tasklet(struct drm_device *dev, void(*func)(struct drm_device*));
@@ -1277,11 +1275,7 @@ extern int drm_agp_unbind_ioctl(struct drm_device *dev, void *data,
 extern int drm_agp_bind(struct drm_device *dev, struct drm_agp_binding *request);
 extern int drm_agp_bind_ioctl(struct drm_device *dev, void *data,
 			struct drm_file *file_priv);
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,11)
-extern DRM_AGP_MEM *drm_agp_allocate_memory(size_t pages, u32 type);
-#else
 extern DRM_AGP_MEM *drm_agp_allocate_memory(struct agp_bridge_data *bridge, size_t pages, u32 type);
-#endif
 extern int drm_agp_free_memory(DRM_AGP_MEM * handle);
 extern int drm_agp_bind_memory(DRM_AGP_MEM * handle, off_t start);
 extern int drm_agp_unbind_memory(DRM_AGP_MEM * handle);
