@@ -175,7 +175,7 @@ void via_dma_initialize(struct drm_via_private *dev_priv)
 	dev_priv->dma_offset = dev_priv->agpc_bo->offset;
 	dev_priv->last_pause_ptr = NULL;
 	dev_priv->hw_addr_ptr =
-	    (uint32_t __iomem *) (dev_priv->mmio_map + 0x40c);
+	    (uint32_t __iomem *) (dev_priv->mmio_map + 0x418);
 
 	via_cmdbuf_start(dev_priv);
 }
