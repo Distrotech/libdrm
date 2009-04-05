@@ -2224,9 +2224,6 @@ static int radeon_cp_swap(struct drm_device *dev, void *data, struct drm_file *f
 	if (sarea_priv->nbox > RADEON_NR_SAREA_CLIPRECTS)
 		sarea_priv->nbox = RADEON_NR_SAREA_CLIPRECTS;
 
-	if (dev_priv->mm.vram_offset)
-		radeon_gem_update_offsets(dev, file_priv->master);
-
 	radeon_cp_dispatch_swap(dev, file_priv->master);
 	sarea_priv->ctx_owner = 0;
 
@@ -3121,9 +3118,6 @@ static int radeon_cp_getparam(struct drm_device *dev, void *data, struct drm_fil
 	case RADEON_PARAM_NUM_GB_PIPES:
 		value = dev_priv->num_gb_pipes;
 		break;
-	case RADEON_PARAM_KERNEL_MM:
-		value = dev_priv->mm_enabled;
-		break;
 	default:
 		DRM_DEBUG( "Invalid parameter %d\n", param->param );
 		return -EINVAL;
@@ -3185,10 +3179,6 @@ static int radeon_cp_setparam(struct drm_device *dev, void *data, struct drm_fil
 	case RADEON_SETPARAM_VBLANK_CRTC:
 		return radeon_vblank_crtc_set(dev, sp->value);
 		break;
-	case RADEON_SETPARAM_MM_INIT:
-		dev_priv->user_mm_enable = true;
-		dev_priv->new_memmap = true;
-		return radeon_gem_mm_init(dev);
 	default:
 		DRM_DEBUG("Invalid parameter %d\n", sp->param);
 		return -EINVAL;
@@ -3284,12 +3274,10 @@ struct drm_ioctl_desc radeon_ioctls[] = {
 	DRM_IOCTL_DEF(DRM_RADEON_GEM_CREATE, radeon_gem_create_ioctl, DRM_AUTH),
 
 	DRM_IOCTL_DEF(DRM_RADEON_GEM_MMAP, radeon_gem_mmap_ioctl, DRM_AUTH),
-	DRM_IOCTL_DEF(DRM_RADEON_GEM_PIN, radeon_gem_pin_ioctl, DRM_AUTH),
-	DRM_IOCTL_DEF(DRM_RADEON_GEM_UNPIN, radeon_gem_unpin_ioctl, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_RADEON_GEM_PREAD, radeon_gem_pread_ioctl, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_RADEON_GEM_PWRITE, radeon_gem_pwrite_ioctl, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_RADEON_GEM_SET_DOMAIN, radeon_gem_set_domain_ioctl, DRM_AUTH),
-	DRM_IOCTL_DEF(DRM_RADEON_GEM_WAIT_RENDERING, radeon_gem_wait_rendering, DRM_AUTH),
+	DRM_IOCTL_DEF(DRM_RADEON_GEM_WAIT_IDLE, radeon_gem_wait_idle, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_RADEON_CS, radeon_cs_ioctl, DRM_AUTH),
 };
 

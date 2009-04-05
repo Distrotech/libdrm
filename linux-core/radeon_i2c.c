@@ -154,7 +154,6 @@ struct radeon_i2c_chan *radeon_i2c_create(struct drm_device *dev,
 		return NULL;
 
 	i2c->adapter.owner = THIS_MODULE;
-	i2c->adapter.id = I2C_HW_B_RADEON;
 	i2c->adapter.algo_data = &i2c->algo;
 	i2c->dev = dev;
 	i2c->algo.setsda = set_data;

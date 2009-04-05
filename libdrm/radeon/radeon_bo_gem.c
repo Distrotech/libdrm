@@ -94,7 +94,7 @@ static struct radeon_bo *bo_open(struct radeon_bo_manager *bom,
         args.size = size;
         args.alignment = alignment;
         args.initial_domain = bo->base.domains;
-        args.no_backing_store = 0;
+        args.flags = 0;
         args.handle = 0;
         r = drmCommandWriteRead(bom->fd, DRM_RADEON_GEM_CREATE,
                                 &args, sizeof(args));
@@ -179,12 +179,12 @@ static int bo_unmap(struct radeon_bo *bo)
 
 static int bo_wait(struct radeon_bo *bo)
 {
-    struct drm_radeon_gem_wait_rendering args;
+    struct drm_radeon_gem_wait_idle args;
     int ret;
 
     args.handle = bo->handle;
     do {
-        ret = drmCommandWriteRead(bo->bom->fd, DRM_RADEON_GEM_WAIT_RENDERING,
+        ret = drmCommandWriteRead(bo->bom->fd, DRM_RADEON_GEM_WAIT_IDLE,
                                   &args, sizeof(args));
     } while (ret == -EAGAIN);
     return ret;

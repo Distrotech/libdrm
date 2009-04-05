@@ -63,11 +63,9 @@ int radeon_gem_info_ioctl(struct drm_device *dev, void *data,
 	struct drm_radeon_private *dev_priv = dev->dev_private;
 	struct drm_radeon_gem_info *args = data;
 
-	args->vram_start = dev_priv->mm.vram_offset;
 	args->vram_size = dev_priv->mm.vram_size;
 	args->vram_visible = dev_priv->mm.vram_visible;
 
-	args->gart_start = dev_priv->mm.gart_start;
 	args->gart_size = dev_priv->mm.gart_useable;
 
 	return 0;
@@ -131,7 +129,7 @@ int radeon_gem_create_ioctl(struct drm_device *dev, void *data,
 	/* create a gem object to contain this object in */
 	args->size = roundup(args->size, PAGE_SIZE);
 
-	obj = radeon_gem_object_alloc(dev, args->size, args->alignment, args->initial_domain, args->no_backing_store);
+	obj = radeon_gem_object_alloc(dev, args->size, args->alignment, args->initial_domain, args->flags & RADEON_GEM_NO_BACKING_STORE);
 	if (!obj)
 		return -EINVAL;
 
@@ -340,86 +338,16 @@ int radeon_gem_mmap_ioctl(struct drm_device *dev, void *data,
 
 }
 
-int radeon_gem_pin_ioctl(struct drm_device *dev, void *data,
-			 struct drm_file *file_priv)
-{
-	struct drm_radeon_gem_pin *args = data;
-	struct drm_gem_object *obj;
-	struct drm_radeon_gem_object *obj_priv;
-	int ret;
-	int flags = DRM_BO_FLAG_NO_EVICT;
-	int mask = DRM_BO_FLAG_NO_EVICT;
-
-	/* check for valid args */
-	if (args->pin_domain) {
-		mask |= DRM_BO_MASK_MEM;
-		if (args->pin_domain == RADEON_GEM_DOMAIN_GTT)
-			flags |= DRM_BO_FLAG_MEM_TT;
-		else if (args->pin_domain == RADEON_GEM_DOMAIN_VRAM)
-			flags |= DRM_BO_FLAG_MEM_VRAM;
-		else /* hand back the offset we currently have if no args supplied
-		      - this is to allow old mesa to work - its a hack */
-			flags = 0;
-	}
-
-	obj = drm_gem_object_lookup(dev, file_priv, args->handle);
-	if (obj == NULL)
-		return -EINVAL;
-
-	obj_priv = obj->driver_private;
-
-	/* validate into a pin with no fence */
-	DRM_DEBUG("got here %p %p %d\n", obj, obj_priv->bo, atomic_read(&obj_priv->bo->usage));
-	if (flags && !(obj_priv->bo->type != drm_bo_type_kernel && !DRM_SUSER(DRM_CURPROC))) {
-		ret = drm_bo_do_validate(obj_priv->bo, flags, mask,
-					 DRM_BO_HINT_DONT_FENCE, 0);
-	} else
-		ret = 0;
-
-	args->offset = obj_priv->bo->offset;
-	DRM_DEBUG("got here %p %p %x\n", obj, obj_priv->bo, obj_priv->bo->offset);
-
-	mutex_lock(&dev->struct_mutex);
-	drm_gem_object_unreference(obj);
-	mutex_unlock(&dev->struct_mutex);
-	return ret;
-}
-
-int radeon_gem_unpin_ioctl(struct drm_device *dev, void *data,
-			   struct drm_file *file_priv)
-{
-	struct drm_radeon_gem_unpin *args = data;
-	struct drm_gem_object *obj;
-	struct drm_radeon_gem_object *obj_priv;
-	int ret;
-
-	obj = drm_gem_object_lookup(dev, file_priv, args->handle);
-	if (obj == NULL)
-		return -EINVAL;
-
-	obj_priv = obj->driver_private;
-
-	/* validate into a pin with no fence */
-
-	ret = drm_bo_do_validate(obj_priv->bo, 0, DRM_BO_FLAG_NO_EVICT,
-				 DRM_BO_HINT_DONT_FENCE, 0);
-
-	mutex_lock(&dev->struct_mutex);
-	drm_gem_object_unreference(obj);
-	mutex_unlock(&dev->struct_mutex);
-	return ret;
-}
-
 int radeon_gem_busy(struct drm_device *dev, void *data,
 		     struct drm_file *file_priv)
 {
 	return 0;
 }
 
-int radeon_gem_wait_rendering(struct drm_device *dev, void *data,
-			      struct drm_file *file_priv)
+int radeon_gem_wait_idle(struct drm_device *dev, void *data,
+			 struct drm_file *file_priv)
 {
-	struct drm_radeon_gem_wait_rendering *args = data;
+	struct drm_radeon_gem_wait_idle *args = data;
 	struct drm_gem_object *obj;
 	struct drm_radeon_gem_object *obj_priv;
 	int ret;
@@ -1558,51 +1486,4 @@ static void radeon_gem_dma_bufs_destroy(struct drm_device *dev)
 		drm_bo_usage_deref_unlocked(&dev_priv->mm.dma_bufs.bo);
 	}
 }
-
-
-static struct drm_gem_object *gem_object_get(struct drm_device *dev, uint32_t name)
-{
-	struct drm_gem_object *obj;
-
-	spin_lock(&dev->object_name_lock);
-	obj = idr_find(&dev->object_name_idr, name);
-	if (obj)
-		drm_gem_object_reference(obj);
-	spin_unlock(&dev->object_name_lock);
-	return obj;
-}
-
-void radeon_gem_update_offsets(struct drm_device *dev, struct drm_master *master)
-{
-	drm_radeon_private_t *dev_priv = dev->dev_private;
-	struct drm_radeon_master_private *master_priv = master->driver_priv;
-	drm_radeon_sarea_t *sarea_priv = master_priv->sarea_priv;
-	struct drm_gem_object *obj;
-	struct drm_radeon_gem_object *obj_priv;
-
-	/* update front_pitch_offset and back_pitch_offset */
-	obj = gem_object_get(dev, sarea_priv->front_handle);
-	if (obj) {
-		obj_priv = obj->driver_private;
-
-		dev_priv->front_offset = obj_priv->bo->offset;
-		dev_priv->front_pitch_offset = (((sarea_priv->front_pitch / 64) << 22) |
-						((obj_priv->bo->offset
-						  + dev_priv->fb_location) >> 10));
-		drm_gem_object_unreference(obj);
-	}
-
-	obj = gem_object_get(dev, sarea_priv->back_handle);
-	if (obj) {
-		obj_priv = obj->driver_private;
-		dev_priv->back_offset = obj_priv->bo->offset;
-		dev_priv->back_pitch_offset = (((sarea_priv->back_pitch / 64) << 22) |
-						((obj_priv->bo->offset
-						  + dev_priv->fb_location) >> 10));
-		drm_gem_object_unreference(obj);
-	}
-	dev_priv->color_fmt = RADEON_COLOR_FORMAT_ARGB8888;
-
-}
-
 

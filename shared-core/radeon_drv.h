@@ -1662,18 +1662,11 @@ extern uint64_t radeon_evict_flags(struct drm_buffer_object *bo);
 static inline int radeon_update_breadcrumb(struct drm_device *dev)
 {
 	struct drm_radeon_private *dev_priv = dev->dev_private;
-	struct drm_radeon_master_private *master_priv;
 
 	++dev_priv->counter;
 	if (dev_priv->counter > BREADCRUMB_MASK)
 		dev_priv->counter = 1;
 
-	if (dev->primary->master) {
-		master_priv = dev->primary->master->driver_priv;
-		       
-		if (master_priv->sarea_priv)
-			master_priv->sarea_priv->last_fence = dev_priv->counter;
-	}
 	return dev_priv->counter;
 }
 
@@ -1713,16 +1706,12 @@ extern void radeon_gem_free_object(struct drm_gem_object *obj);
 extern int radeon_gem_init_object(struct drm_gem_object *obj);
 extern int radeon_gem_mm_init(struct drm_device *dev);
 extern void radeon_gem_mm_fini(struct drm_device *dev);
-extern int radeon_gem_pin_ioctl(struct drm_device *dev, void *data,
-				struct drm_file *file_priv);
-extern int radeon_gem_unpin_ioctl(struct drm_device *dev, void *data,
-				  struct drm_file *file_priv);
 int radeon_gem_object_pin(struct drm_gem_object *obj,
 			  uint32_t alignment, uint32_t pin_domain);
 int radeon_gem_object_unpin(struct drm_gem_object *obj);
 int radeon_gem_set_domain_ioctl(struct drm_device *dev, void *data,
 				struct drm_file *file_priv);
-int radeon_gem_wait_rendering(struct drm_device *dev, void *data,
+int radeon_gem_wait_idle(struct drm_device *dev, void *data,
 			      struct drm_file *file_priv);
 struct drm_gem_object *radeon_gem_object_alloc(struct drm_device *dev, int size, int alignment,
 					       int initial_domain, bool discardable);
