@@ -29,6 +29,7 @@
  *      Nicolai Haehnle <prefect_@gmx.net>
  *      Jérôme Glisse <glisse@freedesktop.org>
  */
+#include <assert.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <sys/mman.h>
@@ -116,6 +117,8 @@ static int cs_gem_write_reloc(struct radeon_cs *cs,
     struct cs_reloc_gem *reloc;
     uint32_t idx;
     unsigned i;
+
+    assert(bo->space_accounted);
 
     /* check domains */
     if ((read_domain && write_domain) || (!read_domain && !write_domain)) {
@@ -269,8 +272,9 @@ static int cs_gem_emit(struct radeon_cs *cs)
     r = drmCommandWriteRead(cs->csm->fd, DRM_RADEON_CS,
                             &csg->cs, sizeof(struct drm_radeon_cs));
     for (i = 0; i < csg->base.crelocs; i++) {
-        radeon_bo_unref(csg->relocs_bo[i]);
-        csg->relocs_bo[i] = NULL;
+	    csg->relocs_bo[i]->space_accounted = 0;
+	    radeon_bo_unref(csg->relocs_bo[i]);
+	    csg->relocs_bo[i] = NULL;
     }
 
     cs->csm->read_used = 0;
@@ -435,11 +439,14 @@ static int cs_gem_check_space(struct radeon_cs *cs, struct radeon_cs_space_check
       write_domain = bos[i].write_domain;
 		
       /* already accounted this bo */
-      if (write_domain && (write_domain == bo->space_accounted))
-	  continue;
-
-      if (read_domains && ((read_domains << 16) == bo->space_accounted))
-	  continue;
+      if (write_domain && (write_domain == bo->space_accounted)) {
+	      bos[i].new_accounted = bo->space_accounted;
+	      continue;
+      }
+      if (read_domains && ((read_domains << 16) == bo->space_accounted)) {
+	      bos[i].new_accounted = bo->space_accounted;
+	      continue;
+      }
       
       if (bo->space_accounted == 0) {
 	  if (write_domain == RADEON_GEM_DOMAIN_VRAM)
@@ -476,32 +483,32 @@ static int cs_gem_check_space(struct radeon_cs *cs, struct radeon_cs_space_check
 	      return RADEON_CS_SPACE_FLUSH;
 	  }
       }
-	}
+    }
 	
-	if (this_op_read < 0)
-		this_op_read = 0;
+    if (this_op_read < 0)
+	    this_op_read = 0;
 
-	/* check sizes - operation first */
-	if ((this_op_read + this_op_gart_write > csm->gart_limit) ||
-	    (this_op_vram_write > csm->vram_limit)) {
+    /* check sizes - operation first */
+    if ((this_op_read + this_op_gart_write > csm->gart_limit) ||
+	(this_op_vram_write > csm->vram_limit)) {
 	    return RADEON_CS_SPACE_OP_TO_BIG;
-	}
-
-	if (((csm->vram_write_used + this_op_vram_write) > csm->vram_limit) ||
-	    ((csm->read_used + csm->gart_write_used + this_op_gart_write + this_op_read) > csm->gart_limit)) {
-		return RADEON_CS_SPACE_FLUSH;
-	}
-
-	csm->gart_write_used += this_op_gart_write;
-	csm->vram_write_used += this_op_vram_write;
-	csm->read_used += this_op_read;
-	/* commit */
-	for (i = 0; i < num_bo; i++) {
-		bo = bos[i].bo;
-		bo->space_accounted = bos[i].new_accounted;
-	}
-
-	return RADEON_CS_SPACE_OK;
+    }
+    
+    if (((csm->vram_write_used + this_op_vram_write) > csm->vram_limit) ||
+	((csm->read_used + csm->gart_write_used + this_op_gart_write + this_op_read) > csm->gart_limit)) {
+	    return RADEON_CS_SPACE_FLUSH;
+    }
+    
+    csm->gart_write_used += this_op_gart_write;
+    csm->vram_write_used += this_op_vram_write;
+    csm->read_used += this_op_read;
+    /* commit */
+    for (i = 0; i < num_bo; i++) {
+	    bo = bos[i].bo;
+	    bo->space_accounted = bos[i].new_accounted;
+    }
+    
+    return RADEON_CS_SPACE_OK;
 }
 
 static struct radeon_cs_funcs radeon_cs_gem_funcs = {
