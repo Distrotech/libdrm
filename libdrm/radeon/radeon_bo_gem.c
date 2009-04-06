@@ -29,6 +29,9 @@
  *      Dave Airlie
  *      Jérôme Glisse <glisse@freedesktop.org>
  */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -144,6 +147,7 @@ static int bo_map(struct radeon_bo *bo, int write)
     struct radeon_bo_gem *bo_gem = (struct radeon_bo_gem*)bo;
     struct drm_radeon_gem_mmap args;
     int r;
+    void *ptr;
 
     if (bo_gem->map_count++ != 0) {
         return 0;
@@ -156,12 +160,16 @@ static int bo_map(struct radeon_bo *bo, int write)
                             DRM_RADEON_GEM_MMAP,
                             &args,
                             sizeof(args));
-    if (!r) {
-        bo->ptr = (void *)(unsigned long)args.addr_ptr;
-    } else {
+    if (r) {
         fprintf(stderr, "error mapping %p 0x%08X (error = %d)\n",
                 bo, bo->handle, r);
+        return r;
     }
+    ptr = mmap(0, args.size, PROT_READ|PROT_WRITE, MAP_SHARED, bo->bom->fd, args.addr_ptr);
+    if (ptr == MAP_FAILED)
+        return -errno;
+    bo->ptr = ptr;
+
     return r;
 }
 
