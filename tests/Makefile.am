@@ -1,6 +1,8 @@
 AM_CFLAGS = \
 	-I $(top_srcdir)/shared-core \
-	-I $(top_srcdir)/libdrm
+	-I $(top_srcdir)/libdrm \
+	-I $(top_srcdir)/libdrm/radeon
+
 
 noinst_PROGRAMS = \
 	dristat \
@@ -13,7 +15,7 @@ libdrmtest_la_SOURCES = \
 libdrmtest_la_LIBADD = \
 	$(top_builddir)/libdrm/libdrm.la
 
-LDADD = libdrmtest.la
+LDADD = libdrmtest.la $(top_builddir)/libdrm/radeon/libdrm_radeon.la
 
 TESTS = auth \
 	openclose \
@@ -28,7 +30,8 @@ TESTS = auth \
 	gem_readwrite \
 	gem_mmap \
 	radeon_gem_mmap \
-	radeon_gem_basic
+	radeon_gem_basic \
+	radeon_bo_test
 
 EXTRA_PROGRAMS = $(TESTS)
 CLEANFILES = $(EXTRA_PROGRAMS) $(EXTRA_LTLIBRARIES)

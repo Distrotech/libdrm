@@ -235,3 +235,20 @@ uint32_t radeon_gem_name_bo(struct radeon_bo *bo)
     struct radeon_bo_gem *bo_gem = (struct radeon_bo_gem*)bo;
     return bo_gem->name;
 }
+
+int radeon_gem_set_domain(struct radeon_bo *bo, uint32_t read_domains, uint32_t write_domain)
+{
+    struct radeon_bo_gem *bo_gem = (struct radeon_bo_gem*)bo;
+    struct drm_radeon_gem_set_domain args;
+    int r;
+
+    args.handle = bo->handle;
+    args.read_domains = read_domains;
+    args.write_domain = write_domain;
+
+    r = drmCommandWriteRead(bo->bom->fd,
+                            DRM_RADEON_GEM_SET_DOMAIN,
+                            &args,
+                            sizeof(args));
+    return r;
+}
