@@ -194,7 +194,7 @@ static int bo_wait(struct radeon_bo *bo)
     do {
         ret = drmCommandWriteRead(bo->bom->fd, DRM_RADEON_GEM_WAIT_IDLE,
                                   &args, sizeof(args));
-    } while (ret == -EAGAIN);
+    } while (ret == -EBUSY);
     return ret;
 }
 
