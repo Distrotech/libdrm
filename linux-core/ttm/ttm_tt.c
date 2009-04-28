@@ -467,8 +467,8 @@ void ttm_tt_unbind(struct ttm_tt *ttm)
 	if (ttm->state == tt_bound) {
 		ret = be->func->unbind(be);
 		BUG_ON(ret);
+		ttm->state = tt_unbound;
 	}
-	ttm->state = tt_unbound;
 }
 
 int ttm_tt_bind(struct ttm_tt *ttm, struct ttm_mem_reg *bo_mem)
