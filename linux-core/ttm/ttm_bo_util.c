@@ -537,7 +537,7 @@ int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
 		if (!(man->flags & TTM_MEMTYPE_FLAG_FIXED))
 			ghost_obj->ttm = NULL;
 		else
-			ghost_obj = NULL;
+			bo->ttm = NULL;
 
 		bo->priv_flags |= TTM_BO_PRIV_FLAG_MOVING;
 		ttm_bo_unreserve(ghost_obj);
