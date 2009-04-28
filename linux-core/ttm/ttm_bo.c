@@ -1384,6 +1384,14 @@ int ttm_bo_device_init(struct ttm_bo_device *bdev,
 		printk(KERN_ERR "Could not register buffer object swapout.\n");
 		goto out_err2;
 	}
+
+	bdev->ttm_bo_extra_size =
+		ttm_round_pot(sizeof(struct ttm_tt)) +
+		ttm_round_pot(sizeof(struct ttm_backend));
+
+	bdev->ttm_bo_size = bdev->ttm_bo_extra_size +
+		ttm_round_pot(sizeof(struct ttm_buffer_object));
+
 	return 0;
       out_err2:
 	ttm_bo_clean_mm(bdev, 0);

@@ -51,7 +51,7 @@ static size_t ttm_pl_size(struct ttm_bo_device *bdev, unsigned long num_pages)
 		    ttm_round_pot(sizeof(struct ttm_bo_user_object));
 	}
 
-	return bdev->ttm_bo_size + 2 * page_array_size;
+	return pl_bo_size + 2 * page_array_size;
 }
 
 static struct ttm_bo_user_object *ttm_bo_user_lookup(struct ttm_object_file
