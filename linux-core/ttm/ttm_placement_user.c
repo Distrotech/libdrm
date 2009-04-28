@@ -275,7 +275,7 @@ int ttm_pl_ub_create_ioctl(struct ttm_object_file *tfile,
 	mutex_unlock(&bo->mutex);
 	ttm_bo_unref(&bo);
       out:
-	return 0;
+	return ret;
       out_err:
 	ttm_bo_unref(&tmp);
 	ttm_bo_unref(&bo);
