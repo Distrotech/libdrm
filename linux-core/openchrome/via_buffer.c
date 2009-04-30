@@ -122,8 +122,12 @@ uint32_t via_evict_flags(struct ttm_buffer_object * bo)
 		 */
 	case TTM_PL_PRIV0:
 		return cur_placement | TTM_PL_FLAG_SYSTEM | TTM_PL_FLAG_WC;
+	case TTM_PL_TT:
+		return cur_placement | TTM_PL_FLAG_SYSTEM;
 	default:
-		return cur_placement | TTM_PL_FLAG_SYSTEM | TTM_PL_FLAG_WC;
+		return (cur_placement & ~TTM_PL_MASK_CACHING) |
+			TTM_PL_FLAG_SYSTEM |
+			TTM_PL_FLAG_CACHED;
 	}
 }
 
