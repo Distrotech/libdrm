@@ -270,4 +270,23 @@ struct drm_mode_crtc_lut {
 	uint64_t blue;
 };
 
+#define DRM_PAGE_FLIP_WAIT		(1<<0) /* block on previous page flip */
+#define DRM_PAGE_FLIP_FLAGS_MASK	(DRM_PAGE_FLIP_WAIT)
+
+struct drm_gem_page_flip {
+	/** Handle of new front buffer */
+	uint32_t fb_id;
+
+	/**
+	 * crtcs to flip
+	 */
+	uint32_t crtc_count;
+	uint64_t crtc_ids_ptr;
+
+	/**
+	 * page flip flags (wait on flip only for now)
+	 */
+	uint32_t flags;
+};
+
 #endif
