@@ -287,8 +287,7 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 	 * TODO: Explicit member copy would probably be better here.
 	 */
 
-	mutex_init(&fbo->mutex);
-	mutex_lock(&fbo->mutex);
+	spin_lock_init(&fbo->lock);
 	init_waitqueue_head(&fbo->event_queue);
 	INIT_LIST_HEAD(&fbo->ddestroy);
 	INIT_LIST_HEAD(&fbo->lru);
@@ -301,8 +300,6 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 	kref_init(&fbo->list_kref);
 	kref_init(&fbo->kref);
 	fbo->destroy = &ttm_transfered_destroy;
-
-	mutex_unlock(&fbo->mutex);
 
 	*new_obj = fbo;
 	return 0;
@@ -497,17 +494,28 @@ int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
 	int ret;
 	uint32_t save_flags = old_mem->placement;
 	struct ttm_buffer_object *ghost_obj;
-	if (bo->sync_obj)
-		driver->sync_obj_unref(&bo->sync_obj);
+	void *tmp_obj = NULL;
+
+	spin_lock(&bo->lock);
+	if (bo->sync_obj) {
+		tmp_obj = bo->sync_obj;
+		bo->sync_obj = NULL;
+	}
 	bo->sync_obj = driver->sync_obj_ref(sync_obj);
 	bo->sync_obj_arg = sync_obj_arg;
-	if (evict) {
+	if (evict) {	  
 		ret = ttm_bo_wait(bo, false, false, false);
+		spin_unlock(&bo->lock);
+		driver->sync_obj_unref(&bo->sync_obj);
+
 		if (ret)
 			return ret;
+
 		ttm_bo_free_old_node(bo);
 		if ((man->flags & TTM_MEMTYPE_FLAG_FIXED) && (bo->ttm != NULL)) {
-			ttm_tt_unbind(bo->ttm); ttm_tt_destroy(bo->ttm); bo->ttm = NULL;
+			ttm_tt_unbind(bo->ttm); 
+			ttm_tt_destroy(bo->ttm); 
+			bo->ttm = NULL;
 		}
 	} else {
 		/**
@@ -517,6 +525,9 @@ int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
 		 * and leave it to be released when the GPU
 		 * operation has completed.
 		 */
+
+		set_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags);
+		spin_unlock(&bo->lock);
 
 		ret = ttm_buffer_object_transfer(bo, &ghost_obj);
 		if (ret)
@@ -533,7 +544,6 @@ int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
 		else
 			bo->ttm = NULL;
 
-		set_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags);
 		ttm_bo_unreserve(ghost_obj);
 		ttm_bo_unref(&ghost_obj);
 	}

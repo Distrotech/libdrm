@@ -320,9 +320,13 @@ static int ttm_bo_handle_move_mem(struct ttm_buffer_object *bo,
 		bo->evicted = false;
 	}
 
-	if (bo->mem.mm_node)
+	if (bo->mem.mm_node) {
+		spin_lock(&bo->lock);
 		bo->offset = (bo->mem.mm_node->start << PAGE_SHIFT) +
 		    bdev->man[bo->mem.mem_type].gpu_offset;
+		bo->cur_placement = bo->mem.placement;
+		spin_unlock(&bo->lock);
+	}
 
 	return 0;
 
@@ -335,37 +339,6 @@ static int ttm_bo_handle_move_mem(struct ttm_buffer_object *bo,
 	}
 
 	return ret;
-}
-
-static int ttm_bo_expire_sync_obj(struct ttm_buffer_object *bo,
-				  bool allow_errors)
-{
-	struct ttm_bo_device *bdev = bo->bdev;
-	struct ttm_bo_driver *driver = bdev->driver;
-
-	if (bo->sync_obj) {
-		if (bdev->nice_mode) {
-			unsigned long _end = jiffies + 3 * HZ;
-			int ret;
-			do {
-				ret = ttm_bo_wait(bo, false, false, false);
-				if (ret && allow_errors)
-					return ret;
-
-			} while (ret && !time_after_eq(jiffies, _end));
-
-			if (bo->sync_obj) {
-				bdev->nice_mode = false;
-				printk(KERN_ERR "Detected probable GPU lockup. "
-				       "Evicting buffer.\n");
-			}
-		}
-		if (bo->sync_obj) {
-			driver->sync_obj_unref(&bo->sync_obj);
-			clear_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags);
-		}
-	}
-	return 0;
 }
 
 /**
@@ -381,23 +354,20 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo, bool remove_all)
 	struct ttm_bo_driver *driver = bdev->driver;
 	int ret;
 
-	mutex_lock(&bo->mutex);
-
-	if (bo->sync_obj && driver->sync_obj_signaled(bo->sync_obj,
-						      bo->sync_obj_arg)) {
-		driver->sync_obj_unref(&bo->sync_obj);
-		clear_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags);
-	}
-
-	if (bo->sync_obj && remove_all)
-		(void)ttm_bo_expire_sync_obj(bo, false);
+	spin_lock(&bo->lock);
+	(void) ttm_bo_wait(bo, false, false, !remove_all);
 
 	if (!bo->sync_obj) {
 		int put_count;
 
+		spin_unlock(&bo->lock);
+
+		spin_lock(&bdev->lru_lock);
+		ret = ttm_bo_reserve_locked(bo, false, false, false, 0);
+		BUG_ON(ret);
 		if (bo->ttm)
 			ttm_tt_unbind(bo->ttm);
-		spin_lock(&bdev->lru_lock);
+
 		if (!list_empty(&bo->ddestroy)) {
 			list_del_init(&bo->ddestroy);
 			kref_put(&bo->list_kref, ttm_bo_ref_bug);
@@ -408,7 +378,9 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo, bool remove_all)
 		}
 		put_count = ttm_bo_del_from_lru(bo);
 		spin_unlock(&bdev->lru_lock);
-		mutex_unlock(&bo->mutex);
+
+		atomic_set(&bo->reserved, 0);
+
 		while (put_count--)
 			kref_put(&bo->list_kref, ttm_bo_release_list);
 
@@ -417,22 +389,26 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo, bool remove_all)
 
 	spin_lock(&bdev->lru_lock);
 	if (list_empty(&bo->ddestroy)) {
+		void *sync_obj = bo->sync_obj;
+		void *sync_obj_arg = bo->sync_obj_arg;
+
+		kref_get(&bo->list_kref);
+		list_add_tail(&bo->ddestroy, &bdev->ddestroy);
 		spin_unlock(&bdev->lru_lock);
-		driver->sync_obj_flush(bo->sync_obj, bo->sync_obj_arg);
-		spin_lock(&bdev->lru_lock);
-		if (list_empty(&bo->ddestroy)) {
-			kref_get(&bo->list_kref);
-			list_add_tail(&bo->ddestroy, &bdev->ddestroy);
-		}
-		spin_unlock(&bdev->lru_lock);
+		spin_unlock(&bo->lock);
+
+		if (sync_obj)
+			driver->sync_obj_flush(sync_obj, sync_obj_arg);
 		schedule_delayed_work(&bdev->wq,
 				      ((HZ / 100) < 1) ? 1 : HZ / 100);
 		ret = 0;
+
 	} else {
 		spin_unlock(&bdev->lru_lock);
+		spin_unlock(&bo->lock);
 		ret = -EBUSY;
 	}
-	mutex_unlock(&bo->mutex);
+
 	return ret;
 }
 
@@ -542,7 +518,10 @@ static int ttm_bo_evict(struct ttm_buffer_object *bo, unsigned mem_type,
 	if (bo->mem.mem_type != mem_type)
 		goto out;
 
+	spin_lock(&bo->lock);
 	ret = ttm_bo_wait(bo, false, interruptible, no_wait);
+	spin_unlock(&bo->lock);
+
 	if (ret && ret != -ERESTART) {
 		printk(KERN_ERR "Failed to expire sync object before "
 		       "buffer eviction.\n");
@@ -637,9 +616,7 @@ static int ttm_bo_mem_force_space(struct ttm_bo_device *bdev,
 		while (put_count--)
 			kref_put(&entry->list_kref, ttm_bo_ref_bug);
 
-		mutex_lock(&entry->mutex);
 		ret = ttm_bo_evict(entry, mem_type, interruptible, no_wait);
-		mutex_unlock(&entry->mutex);
 
 		ttm_bo_unreserve(entry);
 
@@ -807,33 +784,6 @@ int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 	return ret;
 }
 
-/*
- * Call bo->mutex locked.
- * Returns 1 if the buffer is currently rendered to or from. 0 otherwise.
- */
-
-static int ttm_bo_busy(struct ttm_buffer_object *bo)
-{
-	void *sync_obj = bo->sync_obj;
-	struct ttm_bo_driver *driver = bo->bdev->driver;
-
-	if (sync_obj) {
-		if (driver->sync_obj_signaled(sync_obj, bo->sync_obj_arg)) {
-			driver->sync_obj_unref(&bo->sync_obj);
-			clear_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags);
-			return 0;
-		}
-		driver->sync_obj_flush(sync_obj, bo->sync_obj_arg);
-		if (driver->sync_obj_signaled(sync_obj, bo->sync_obj_arg)) {
-			driver->sync_obj_unref(&bo->sync_obj);
-			clear_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags);
-			return 0;
-		}
-		return 1;
-	}
-	return 0;
-}
-
 int ttm_bo_wait_cpu(struct ttm_buffer_object *bo, bool no_wait)
 {
 	int ret = 0;
@@ -866,8 +816,10 @@ int ttm_bo_move_buffer(struct ttm_buffer_object *bo,
 	 * instead of doing it here.
 	 */
 
-	ttm_bo_busy(bo);
+	spin_lock(&bo->lock);
 	ret = ttm_bo_wait(bo, false, interruptible, no_wait);
+	spin_unlock(&bo->lock);
+
 	if (ret)
 		return ret;
 
@@ -1011,8 +963,7 @@ int ttm_buffer_object_init(struct ttm_bo_device *bdev,
 	}
 	bo->destroy = destroy;
 
-	mutex_init(&bo->mutex);
-	mutex_lock(&bo->mutex);
+	spin_lock_init(&bo->lock);
 	kref_init(&bo->kref);
 	kref_init(&bo->list_kref);
 	atomic_set(&bo->cpu_writers, 0);
@@ -1061,12 +1012,10 @@ int ttm_buffer_object_init(struct ttm_bo_device *bdev,
 	if (ret)
 		goto out_err;
 
-	mutex_unlock(&bo->mutex);
 	ttm_bo_unreserve(bo);
 	return 0;
 
       out_err:
-	mutex_unlock(&bo->mutex);
 	ttm_bo_unreserve(bo);
 	ttm_bo_unref(&bo);
 
@@ -1124,10 +1073,11 @@ static int ttm_bo_leave_list(struct ttm_buffer_object *bo,
 {
 	int ret;
 
-	mutex_lock(&bo->mutex);
+	spin_lock(&bo->lock);
+	ret = ttm_bo_wait(bo, false, false, false);
+	spin_unlock(&bo->lock);
 
-	ret = ttm_bo_expire_sync_obj(bo, allow_errors);
-	if (ret)
+	if (ret && allow_errors)
 		goto out;
 
 	if (bo->mem.mem_type == mem_type)
@@ -1143,7 +1093,6 @@ static int ttm_bo_leave_list(struct ttm_buffer_object *bo,
 	}
 
       out:
-	mutex_unlock(&bo->mutex);
 	return ret;
 }
 
@@ -1522,36 +1471,48 @@ int ttm_bo_wait(struct ttm_buffer_object *bo,
 	void *sync_obj;
 	void *sync_obj_arg;
 	int ret = 0;
+	
+	if (likely(bo->sync_obj == NULL))
+	    return 0;
 
 	while (bo->sync_obj) {
+
 		if (driver->sync_obj_signaled(bo->sync_obj, bo->sync_obj_arg)) {
-			driver->sync_obj_unref(&bo->sync_obj);
+			void *tmp_obj = bo->sync_obj;
+			bo->sync_obj = NULL;
 			clear_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags);
-			goto out;
+			spin_unlock(&bo->lock);
+			driver->sync_obj_unref(&tmp_obj);
+			spin_lock(&bo->lock);
+			continue;
 		}
-		if (no_wait) {
-			ret = -EBUSY;
-			goto out;
-		}
+
+		if (no_wait)
+			return -EBUSY;
+
 		sync_obj = driver->sync_obj_ref(bo->sync_obj);
 		sync_obj_arg = bo->sync_obj_arg;
-		mutex_unlock(&bo->mutex);
+		spin_unlock(&bo->lock);
 		ret = driver->sync_obj_wait(sync_obj, sync_obj_arg,
 					    lazy, interruptible);
-
-		mutex_lock(&bo->mutex);
 		if (unlikely(ret != 0)) {
 			driver->sync_obj_unref(&sync_obj);
+			spin_lock(&bo->lock);
 			return ret;
 		}
-
-		if (bo->sync_obj == sync_obj) {
-			driver->sync_obj_unref(&bo->sync_obj);
-			clear_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags);
+		spin_lock(&bo->lock);
+		if (likely(bo->sync_obj == sync_obj &&
+			   bo->sync_obj_arg == sync_obj_arg)) {
+			void *tmp_obj = bo->sync_obj;
+			bo->sync_obj = NULL;
+			clear_bit(TTM_BO_PRIV_FLAG_MOVING, 
+				  &bo->priv_flags);
+			spin_unlock(&bo->lock);
+			driver->sync_obj_unref(&sync_obj);
+			driver->sync_obj_unref(&tmp_obj);
+			spin_lock(&bo->lock);
 		}
-		driver->sync_obj_unref(&sync_obj);
 	}
-      out:
 	return 0;
 }
 
@@ -1594,13 +1555,11 @@ int ttm_bo_synccpu_write_grab(struct ttm_buffer_object *bo, bool no_wait)
 	ret = ttm_bo_reserve(bo, true, no_wait, false, 0);
 	if (unlikely(ret != 0))
 		return ret;
-	mutex_lock(&bo->mutex);
+	spin_lock(&bo->lock);
 	ret = ttm_bo_wait(bo, false, true, no_wait);
-	if (unlikely(ret != 0))
-		goto out_err0;
-	atomic_inc(&bo->cpu_writers);
-      out_err0:
-	mutex_unlock(&bo->mutex);
+	spin_unlock(&bo->lock);
+	if (likely(ret == 0))
+		atomic_inc(&bo->cpu_writers);
 	ttm_bo_unreserve(bo);
 	return ret;
 }
@@ -1662,8 +1621,10 @@ static int ttm_bo_swapout(struct ttm_mem_shrink *shrink)
 	 * Wait for GPU, then move to system cached.
 	 */
 
-	mutex_lock(&bo->mutex);
+	spin_lock(&bo->lock);
 	ret = ttm_bo_wait(bo, false, false, false);
+	spin_unlock(&bo->lock);
+
 	if (unlikely(ret != 0))
 		goto out;
 
@@ -1689,7 +1650,6 @@ static int ttm_bo_swapout(struct ttm_mem_shrink *shrink)
 
 	ret = ttm_tt_swapout(bo->ttm, bo->persistant_swap_storage);
       out:
-	mutex_unlock(&bo->mutex);
 
 	/**
 	 *

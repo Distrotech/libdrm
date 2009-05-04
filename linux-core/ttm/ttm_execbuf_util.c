@@ -102,11 +102,11 @@ void ttm_eu_fence_buffer_objects(struct list_head *list, void *sync_obj)
 		struct ttm_bo_driver *driver = bo->bdev->driver;
 		void *old_sync_obj;
 
-		mutex_lock(&bo->mutex);
+		spin_lock(&bo->lock);
 		old_sync_obj = bo->sync_obj;
 		bo->sync_obj = driver->sync_obj_ref(sync_obj);
 		bo->sync_obj_arg = entry->new_sync_obj_arg;
-		mutex_unlock(&bo->mutex);
+		spin_unlock(&bo->lock);
 		ttm_bo_unreserve(bo);
 		entry->reserved = false;
 		if (old_sync_obj)

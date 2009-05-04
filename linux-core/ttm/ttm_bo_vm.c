@@ -108,21 +108,23 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 		return VM_FAULT_NOPAGE;
 	}
 
-	mutex_lock(&bo->mutex);
-
 	/*
 	 * Wait for buffer data in transit, due to a pipelined
 	 * move.
 	 */
 
+	spin_lock(&bo->lock);
 	if (test_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags)) {
 		ret = ttm_bo_wait(bo, false, true, false);
+		spin_unlock(&bo->lock);
 		if (unlikely(ret != 0)) {
 			retval = (ret != -ERESTART) ?
 			    VM_FAULT_SIGBUS : VM_FAULT_NOPAGE;
 			goto out_unlock;
 		}
-	}
+	} else
+		spin_unlock(&bo->lock);
+		
 
 	ret = ttm_bo_pci_offset(bdev, &bo->mem, &bus_base, &bus_offset,
 				&bus_size);
@@ -213,7 +215,6 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	}
 
       out_unlock:
-	mutex_unlock(&bo->mutex);
 	ttm_bo_unreserve(bo);
 	return retval;
 }
@@ -252,21 +253,21 @@ static unsigned long ttm_bo_vm_nopfn(struct vm_area_struct *vma,
 		return NOPFN_REFAULT;
 	}
 
-	mutex_lock(&bo->mutex);
-
 	/*
 	 * Wait for buffer data in transit, due to a pipelined
 	 * move.
 	 */
-
+	spin_lock(&bo->lock);
 	if (test_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags)) {
 		ret = ttm_bo_wait(bo, false, true, false);
+		spin_unlock(&bo->lock);
 		if (unlikely(ret != 0)) {
 			retval = (ret != -ERESTART) ?
 			    NOPFN_SIGBUS : NOPFN_REFAULT;
 			goto out_unlock;
 		}
-	}
+	} else 
+		spin_unlock(&bo->lock);
 
 	ret = ttm_bo_pci_offset(bdev, &bo->mem, &bus_base, &bus_offset,
 				&bus_size);
@@ -360,7 +361,6 @@ static unsigned long ttm_bo_vm_nopfn(struct vm_area_struct *vma,
 	}
 
       out_unlock:
-	mutex_unlock(&bo->mutex);
 	ttm_bo_unreserve(bo);
 	return retval;
 }

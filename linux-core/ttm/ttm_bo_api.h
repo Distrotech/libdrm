@@ -110,14 +110,11 @@ struct ttm_tt;
  * keeps one refcount. When this refcount reaches zero,
  * the object is destroyed.
  * @event_queue: Queue for processes waiting on buffer object status change.
- * @mutex: Lock protecting all members with the exception of constant members
- * and list heads. We should really use a spinlock here.
+ * @lock: spinlock protecting mostly synchronization members.
  * @proposed_placement: Proposed placement for the buffer. Changed only by the
  * creator prior to validation as opposed to bo->mem.proposed_flags which is
  * changed by the implementation prior to a buffer move if it wants to outsmart
  * the buffer creator / user. This latter happens, for example, at eviction.
- * @offset: The current GPU offset, which can have different meanings
- * depending on the memory type. For SYSTEM type memory, it should be 0.
  * @mem: structure describing current placement.
  * @persistant_swap_storage: Usually the swap storage is deleted for buffers
  * pinned in physical memory. If this behaviour is not desired, this member
@@ -139,6 +136,9 @@ struct ttm_tt;
  * @priv_flags: Flags describing buffer object internal state.
  * @vm_rb: Rb node for the vm rb tree.
  * @vm_node: Address space manager node.
+ * @offset: The current GPU offset, which can have different meanings
+ * depending on the memory type. For SYSTEM type memory, it should be 0.
+ * @cur_placement: Hint of current placement.
  *
  * Base class for TTM buffer object, that deals with data placement and CPU
  * mappings. GPU mappings are really up to the driver, but for simpler GPUs
@@ -172,14 +172,13 @@ struct ttm_buffer_object {
 	struct kref kref;
 	struct kref list_kref;
 	wait_queue_head_t event_queue;
-	struct mutex mutex;
+	spinlock_t lock;
 
 	/**
 	 * Members protected by the bo::reserved lock.
 	 */
 
 	uint32_t proposed_placement;
-	unsigned long offset;
 	struct ttm_mem_reg mem;
 	struct file *persistant_swap_storage;
 	struct ttm_tt *ttm;
@@ -210,7 +209,7 @@ struct ttm_buffer_object {
 
 
 	/**
-	 * Members protected by the bo::mutex
+	 * Members protected by the bo::lock
 	 */
 
 	void *sync_obj_arg;
@@ -225,6 +224,14 @@ struct ttm_buffer_object {
 	struct drm_mm_node *vm_node;
 
 
+	/**
+	 * Special members that are protected by the reserve lock
+	 * and the bo::lock when written to. Can be read with 
+	 * either of these locks held.
+	 */
+
+	unsigned long offset;
+        uint32_t cur_placement;
 };
 
 /**

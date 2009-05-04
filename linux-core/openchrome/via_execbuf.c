@@ -551,7 +551,6 @@ static int via_validate_buffer_list(struct drm_file *file_priv,
 		item->ret = 0;
 		req = &item->req;
 
-		mutex_lock(&bo->mutex);
 		ret = via_placement_fence_type(bo,
 					       req->set_flags,
 					       req->clear_flags,
@@ -570,7 +569,6 @@ static int via_validate_buffer_list(struct drm_file *file_priv,
 
 		item->offset = bo->offset;
 		item->flags = bo->mem.placement;
-		mutex_unlock(&bo->mutex);
 
 		ret = via_check_presumed(&item->req, bo, item->user_val_arg,
 					 &item->po_correct);
@@ -587,7 +585,6 @@ static int via_validate_buffer_list(struct drm_file *file_priv,
 
 	return 0;
       out_err:
-	mutex_unlock(&bo->mutex);
 	item->ret = ret;
 	return ret;
 }
@@ -612,13 +609,13 @@ static int via_handle_copyback(struct drm_device *dev,
 			if (!arg.ret) {
 				struct ttm_buffer_object *bo = entry->bo;
 
-				mutex_lock(&bo->mutex);
-				arg.d.rep.gpu_offset = bo->offset;
-				arg.d.rep.placement = bo->mem.placement;
+				arg.d.rep.gpu_offset = vbuf->offset;
+				arg.d.rep.placement = vbuf->flags;
+				spin_lock(&bo->lock);
 				arg.d.rep.fence_type_mask =
 				    (uint32_t) (unsigned long)
 				    entry->new_sync_obj_arg;
-				mutex_unlock(&bo->mutex);
+				spin_unlock(&bo->lock);
 			}
 
 			if (__copy_to_user(vbuf->user_val_arg,

@@ -139,12 +139,15 @@ static void ttm_pl_fill_rep(struct ttm_buffer_object *bo,
 	struct ttm_bo_user_object *user_bo =
 	    container_of(bo, struct ttm_bo_user_object, bo);
 
-	rep->gpu_offset = bo->offset;
 	rep->bo_size = bo->num_pages << PAGE_SHIFT;
 	rep->map_handle = bo->addr_space_offset;
-	rep->placement = bo->mem.placement;
 	rep->handle = user_bo->base.hash.key;
+
+	spin_lock(&bo->lock);
+	rep->placement = bo->cur_placement;
+	rep->gpu_offset = bo->offset;
 	rep->sync_object_arg = (uint32_t) (unsigned long)bo->sync_obj_arg;
+	spin_unlock(&bo->lock);
 }
 
 int ttm_pl_create_ioctl(struct ttm_object_file *tfile,
@@ -204,9 +207,7 @@ int ttm_pl_create_ioctl(struct ttm_object_file *tfile,
 	if (unlikely(ret != 0))
 		goto out_err;
 
-	mutex_lock(&bo->mutex);
 	ttm_pl_fill_rep(bo, rep);
-	mutex_unlock(&bo->mutex);
 	ttm_bo_unref(&bo);
       out:
 	return 0;
@@ -270,9 +271,7 @@ int ttm_pl_ub_create_ioctl(struct ttm_object_file *tfile,
 	if (unlikely(ret != 0))
 		goto out_err;
 
-	mutex_lock(&bo->mutex);
 	ttm_pl_fill_rep(bo, rep);
-	mutex_unlock(&bo->mutex);
 	ttm_bo_unref(&bo);
       out:
 	return ret;
@@ -305,9 +304,7 @@ int ttm_pl_reference_ioctl(struct ttm_object_file *tfile, void *data)
 		goto out;
 	}
 
-	mutex_lock(&bo->mutex);
 	ttm_pl_fill_rep(bo, rep);
-	mutex_unlock(&bo->mutex);
 
       out:
 	base = &user_bo->base;
@@ -397,7 +394,6 @@ int ttm_pl_setstatus_ioctl(struct ttm_object_file *tfile,
 	if (unlikely(ret != 0))
 		goto out_err2;
 
-	mutex_lock(&bo->mutex);
 	ret = ttm_bo_check_placement(bo, req->set_placement,
 				     req->clr_placement);
 	if (unlikely(ret != 0))
@@ -411,7 +407,6 @@ int ttm_pl_setstatus_ioctl(struct ttm_object_file *tfile,
 
 	ttm_pl_fill_rep(bo, rep);
       out_err2:
-	mutex_unlock(&bo->mutex);
 	ttm_bo_unreserve(bo);
       out_err1:
 	ttm_read_unlock(lock);
@@ -437,11 +432,11 @@ int ttm_pl_waitidle_ioctl(struct ttm_object_file *tfile, void *data)
 				     arg->mode & TTM_PL_WAITIDLE_MODE_NO_BLOCK);
 	if (unlikely(ret != 0))
 		goto out;
-	mutex_lock(&bo->mutex);
+	spin_lock(&bo->lock);
 	ret = ttm_bo_wait(bo,
 			  arg->mode & TTM_PL_WAITIDLE_MODE_LAZY,
 			  true, arg->mode & TTM_PL_WAITIDLE_MODE_NO_BLOCK);
-	mutex_unlock(&bo->mutex);
+	spin_unlock(&bo->lock);
 	ttm_bo_unblock_reservation(bo);
       out:
 	ttm_bo_unref(&bo);
