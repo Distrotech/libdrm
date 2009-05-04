@@ -92,7 +92,7 @@ via_placement_fence_type(struct ttm_buffer_object *bo,
 		/*
 		 * FIXME
 		 */
-		if (bo->mem.proposed_flags & TTM_PL_FLAG_SYSTEM)
+		if (bo->mem.proposed_placement & TTM_PL_FLAG_SYSTEM)
 			n_fence_type |= VIA_FENCE_TYPE_SYSMEM;
 #endif
 		break;
@@ -110,8 +110,8 @@ via_placement_fence_type(struct ttm_buffer_object *bo,
 			return ret;
 	}
 
-	bo->proposed_flags |= set_flags & TTM_PL_MASK_MEMTYPE;
-	bo->proposed_flags &= ~(clr_flags & TTM_PL_MASK_MEMTYPE);
+	bo->proposed_placement |= set_flags & TTM_PL_MASK_MEMTYPE;
+	bo->proposed_placement &= ~(clr_flags & TTM_PL_MASK_MEMTYPE);
 
 	return 0;
 }
@@ -439,7 +439,7 @@ static int via_check_presumed(struct drm_via_validate_req *req,
 
 	if (bo->offset == req->presumed_gpu_offset &&
 	    !((req->presumed_flags & VIA_PRESUMED_AGP) &&
-	      !(bo->mem.flags & (TTM_PL_FLAG_PRIV0 | TTM_PL_FLAG_TT)))) {
+	      !(bo->mem.placement & (TTM_PL_FLAG_PRIV0 | TTM_PL_FLAG_TT)))) {
 		*presumed_ok = 1;
 		return 0;
 	}
@@ -559,7 +559,7 @@ static int via_validate_buffer_list(struct drm_file *file_priv,
 		if (unlikely(ret != 0))
 			goto out_err;
 
-		ret = ttm_buffer_object_validate(bo, bo->proposed_flags,
+		ret = ttm_buffer_object_validate(bo, bo->proposed_placement,
 						 true, false);
 
 		if (unlikely(ret != 0))
@@ -569,7 +569,7 @@ static int via_validate_buffer_list(struct drm_file *file_priv,
 		entry->new_sync_obj_arg = (void *)(unsigned long)cur_fence_type;
 
 		item->offset = bo->offset;
-		item->flags = bo->mem.flags;
+		item->flags = bo->mem.placement;
 		mutex_unlock(&bo->mutex);
 
 		ret = via_check_presumed(&item->req, bo, item->user_val_arg,
@@ -614,7 +614,7 @@ static int via_handle_copyback(struct drm_device *dev,
 
 				mutex_lock(&bo->mutex);
 				arg.d.rep.gpu_offset = bo->offset;
-				arg.d.rep.placement = bo->mem.flags;
+				arg.d.rep.placement = bo->mem.placement;
 				arg.d.rep.fence_type_mask =
 				    (uint32_t) (unsigned long)
 				    entry->new_sync_obj_arg;

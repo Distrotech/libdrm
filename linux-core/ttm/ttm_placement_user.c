@@ -142,7 +142,7 @@ static void ttm_pl_fill_rep(struct ttm_buffer_object *bo,
 	rep->gpu_offset = bo->offset;
 	rep->bo_size = bo->num_pages << PAGE_SHIFT;
 	rep->map_handle = bo->addr_space_offset;
-	rep->placement = bo->mem.flags;
+	rep->placement = bo->mem.placement;
 	rep->handle = user_bo->base.hash.key;
 	rep->sync_object_arg = (uint32_t) (unsigned long)bo->sync_obj_arg;
 }
@@ -403,9 +403,9 @@ int ttm_pl_setstatus_ioctl(struct ttm_object_file *tfile,
 	if (unlikely(ret != 0))
 		goto out_err2;
 
-	bo->proposed_flags = (bo->proposed_flags | req->set_placement)
+	bo->proposed_placement = (bo->proposed_placement | req->set_placement)
 	    & ~req->clr_placement;
-	ret = ttm_buffer_object_validate(bo, bo->proposed_flags, true, false);
+	ret = ttm_buffer_object_validate(bo, bo->proposed_placement, true, false);
 	if (unlikely(ret != 0))
 		goto out_err2;
 

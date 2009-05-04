@@ -112,7 +112,7 @@ int via_init_mem_type(struct ttm_bo_device *bdev, uint32_t type,
 
 uint32_t via_evict_flags(struct ttm_buffer_object * bo)
 {
-	uint32_t cur_placement = bo->mem.flags & ~TTM_PL_MASK_MEMTYPE;
+	uint32_t cur_placement = bo->mem.placement & ~TTM_PL_MASK_MEMTYPE;
 
 	switch (bo->mem.mem_type) {
 		/*

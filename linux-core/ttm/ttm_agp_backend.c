@@ -75,7 +75,7 @@ static int ttm_agp_bind(struct ttm_backend *backend, struct ttm_mem_reg *bo_mem)
 	struct ttm_agp_backend *agp_be =
 	    container_of(backend, struct ttm_agp_backend, backend);
 	struct agp_memory *mem = agp_be->mem;
-	int cached = (bo_mem->flags & TTM_PL_FLAG_CACHED);
+	int cached = (bo_mem->placement & TTM_PL_FLAG_CACHED);
 	int ret;
 
 	mem->is_flushed = 1;

@@ -158,13 +158,13 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	 */
 
 	if (is_iomem) {
-		vma->vm_page_prot = ttm_io_prot(bo->mem.flags,
+		vma->vm_page_prot = ttm_io_prot(bo->mem.placement,
 						vma->vm_page_prot);
 	} else {
 		ttm = bo->ttm;
-		vma->vm_page_prot = (bo->mem.flags & TTM_PL_FLAG_CACHED) ?
+		vma->vm_page_prot = (bo->mem.placement & TTM_PL_FLAG_CACHED) ?
 		    vm_get_page_prot(vma->vm_flags) :
-		    ttm_io_prot(bo->mem.flags, vma->vm_page_prot);
+		    ttm_io_prot(bo->mem.placement, vma->vm_page_prot);
 	}
 
 	/*
@@ -307,13 +307,13 @@ static unsigned long ttm_bo_vm_nopfn(struct vm_area_struct *vma,
 	 */
 
 	if (is_iomem) {
-		vma->vm_page_prot = ttm_io_prot(bo->mem.flags,
+		vma->vm_page_prot = ttm_io_prot(bo->mem.placement,
 						vma->vm_page_prot);
 	} else {
 		ttm = bo->ttm;
-		vma->vm_page_prot = (bo->mem.flags & TTM_PL_FLAG_CACHED) ?
+		vma->vm_page_prot = (bo->mem.placement & TTM_PL_FLAG_CACHED) ?
 		    vm_get_page_prot(vma->vm_flags) :
-		    ttm_io_prot(bo->mem.flags, vma->vm_page_prot);
+		    ttm_io_prot(bo->mem.placement, vma->vm_page_prot);
 	}
 
 	/*

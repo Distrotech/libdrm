@@ -98,7 +98,7 @@ static void ttm_bo_add_to_lru(struct ttm_buffer_object *bo)
 
 	BUG_ON(!atomic_read(&bo->reserved));
 
-	if (!(bo->mem.flags & TTM_PL_FLAG_NO_EVICT)) {
+	if (!(bo->mem.placement & TTM_PL_FLAG_NO_EVICT)) {
 
 		BUG_ON(!list_empty(&bo->lru));
 
@@ -264,7 +264,7 @@ static int ttm_bo_handle_move_mem(struct ttm_buffer_object *bo,
 	int ret = 0;
 
 	if (old_is_pci || new_is_pci ||
-	    ((mem->flags & bo->mem.flags & TTM_PL_MASK_CACHING) == 0))
+	    ((mem->placement & bo->mem.placement & TTM_PL_MASK_CACHING) == 0))
 		ttm_bo_unmap_virtual(bo);
 
 	/*
@@ -276,7 +276,7 @@ static int ttm_bo_handle_move_mem(struct ttm_buffer_object *bo,
 		if (ret)
 			goto out_err;
 
-		ret = ttm_tt_set_placement_caching(bo->ttm, mem->flags);
+		ret = ttm_tt_set_placement_caching(bo->ttm, mem->placement);
 		if (ret)
 			return ret;
 
@@ -289,11 +289,11 @@ static int ttm_bo_handle_move_mem(struct ttm_buffer_object *bo,
 		if (bo->mem.mem_type == TTM_PL_SYSTEM) {
 
 			struct ttm_mem_reg *old_mem = &bo->mem;
-			uint32_t save_flags = old_mem->flags;
+			uint32_t save_flags = old_mem->placement;
 
 			*old_mem = *mem;
 			mem->mm_node = NULL;
-			ttm_flag_masked(&save_flags, mem->flags,
+			ttm_flag_masked(&save_flags, mem->placement,
 					TTM_PL_MASK_MEMTYPE);
 			goto moved;
 		}
@@ -314,7 +314,7 @@ static int ttm_bo_handle_move_mem(struct ttm_buffer_object *bo,
 
       moved:
 	if (bo->evicted) {
-		ret = bdev->driver->invalidate_caches(bdev, bo->mem.flags);
+		ret = bdev->driver->invalidate_caches(bdev, bo->mem.placement);
 		if (ret)
 			printk(KERN_ERR "Can not flush read caches\n");
 		bo->evicted = false;
@@ -768,7 +768,7 @@ int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 	if ((type_ok && (mem_type == TTM_PL_SYSTEM)) || node) {
 		mem->mm_node = node;
 		mem->mem_type = mem_type;
-		mem->flags = cur_flags;
+		mem->placement = cur_flags;
 		return 0;
 	}
 
@@ -795,7 +795,7 @@ int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 					     interruptible, no_wait);
 
 		if (ret == 0 && mem->mm_node) {
-			mem->flags = cur_flags;
+			mem->placement = cur_flags;
 			return 0;
 		}
 
@@ -898,9 +898,9 @@ int ttm_bo_move_buffer(struct ttm_buffer_object *bo,
 static int ttm_bo_mem_compat(uint32_t proposed_placement,
 			     struct ttm_mem_reg *mem)
 {
-	if ((proposed_placement & mem->flags & TTM_PL_MASK_MEM) == 0)
+	if ((proposed_placement & mem->placement & TTM_PL_MASK_MEM) == 0)
 		return 0;
-	if ((proposed_placement & mem->flags & TTM_PL_MASK_CACHING) == 0)
+	if ((proposed_placement & mem->placement & TTM_PL_MASK_CACHING) == 0)
 		return 0;
 
 	return 1;
@@ -913,24 +913,24 @@ int ttm_buffer_object_validate(struct ttm_buffer_object *bo,
 	int ret;
 
 	BUG_ON(!atomic_read(&bo->reserved));
-	bo->proposed_flags = proposed_placement;
+	bo->proposed_placement = proposed_placement;
 
 	TTM_DEBUG("Proposed placement 0x%08lx, Old flags 0x%08lx\n",
 		  (unsigned long)proposed_placement,
-		  (unsigned long)bo->mem.flags);
+		  (unsigned long)bo->mem.placement);
 
 	/*
 	 * Check whether we need to move buffer.
 	 */
 
-	if (!ttm_bo_mem_compat(bo->proposed_flags, &bo->mem)) {
-		ret = ttm_bo_move_buffer(bo, bo->proposed_flags,
+	if (!ttm_bo_mem_compat(bo->proposed_placement, &bo->mem)) {
+		ret = ttm_bo_move_buffer(bo, bo->proposed_placement,
 					 interruptible, no_wait);
 		if (ret) {
 			if (ret != -ERESTART)
 				printk(KERN_ERR "Failed moving buffer. "
 				       "Proposed placement 0x%08x\n",
-				       bo->proposed_flags);
+				       bo->proposed_placement);
 			if (ret == -ENOMEM)
 				printk(KERN_ERR "Out of aperture space or "
 				       "DRM memory quota.\n");
@@ -953,7 +953,7 @@ int ttm_buffer_object_validate(struct ttm_buffer_object *bo,
 	 * the active flags
 	 */
 
-	ttm_flag_masked(&bo->mem.flags, bo->proposed_flags,
+	ttm_flag_masked(&bo->mem.placement, bo->proposed_placement,
 			~TTM_PL_MASK_MEMTYPE);
 
 	return 0;
@@ -978,8 +978,8 @@ ttm_bo_check_placement(struct ttm_buffer_object *bo,
 			return -EINVAL;
 		}
 
-		if ((clr_flags & bo->mem.flags & TTM_PL_MASK_MEMTYPE) &&
-		    (bo->mem.flags & TTM_PL_FLAG_NO_EVICT)) {
+		if ((clr_flags & bo->mem.placement & TTM_PL_MASK_MEMTYPE) &&
+		    (bo->mem.placement & TTM_PL_FLAG_NO_EVICT)) {
 			printk(KERN_ERR "Incompatible memory specification"
 			       " for NO_EVICT buffer.\n");
 			return -EINVAL;
@@ -1030,7 +1030,7 @@ int ttm_buffer_object_init(struct ttm_bo_device *bdev,
 	bo->mem.page_alignment = page_alignment;
 	bo->buffer_start = buffer_start & PAGE_MASK;
 	bo->priv_flags = 0;
-	bo->mem.flags = (TTM_PL_FLAG_SYSTEM | TTM_PL_FLAG_CACHED);
+	bo->mem.placement = (TTM_PL_FLAG_SYSTEM | TTM_PL_FLAG_CACHED);
 	bo->seq_valid = false;
 	bo->persistant_swap_storage = persistant_swap_storage;
 	bo->acc_size = acc_size;
@@ -1404,7 +1404,7 @@ bool ttm_mem_reg_is_pci(struct ttm_bo_device *bdev, struct ttm_mem_reg *mem)
 		if (man->flags & TTM_MEMTYPE_FLAG_CMA)
 			return false;
 
-		if (mem->flags & TTM_PL_FLAG_CACHED)
+		if (mem->placement & TTM_PL_FLAG_CACHED)
 			return false;
 	}
 	return true;
@@ -1667,12 +1667,12 @@ static int ttm_bo_swapout(struct ttm_mem_shrink *shrink)
 	if (unlikely(ret != 0))
 		goto out;
 
-	if ((bo->mem.flags & swap_placement) != swap_placement) {
+	if ((bo->mem.placement & swap_placement) != swap_placement) {
 		struct ttm_mem_reg evict_mem;
 
 		evict_mem = bo->mem;
 		evict_mem.mm_node = NULL;
-		evict_mem.flags = TTM_PL_FLAG_SYSTEM | TTM_PL_FLAG_CACHED;
+		evict_mem.placement = TTM_PL_FLAG_SYSTEM | TTM_PL_FLAG_CACHED;
 		evict_mem.mem_type = TTM_PL_SYSTEM;
 
 		ret = ttm_bo_handle_move_mem(bo, &evict_mem, true, false, false);

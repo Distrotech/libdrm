@@ -53,8 +53,7 @@ struct drm_mm_node;
  * @size: Requested size of memory region.
  * @num_pages: Actual size of memory region in pages.
  * @page_alignment: Page alignment.
- * @flags: Placement flags.
- * @proposed_flags: Proposed placement flags.
+ * @placement: Placement flags.
  *
  * Structure indicating the placement and space resources used by a
  * buffer object.
@@ -66,7 +65,7 @@ struct ttm_mem_reg {
 	unsigned long num_pages;
 	uint32_t page_alignment;
 	uint32_t mem_type;
-	uint32_t flags;
+	uint32_t placement;
 };
 
 /**
@@ -113,7 +112,7 @@ struct ttm_tt;
  * @event_queue: Queue for processes waiting on buffer object status change.
  * @mutex: Lock protecting all members with the exception of constant members
  * and list heads. We should really use a spinlock here.
- * @proposed_flags: Proposed placement for the buffer. Changed only by the
+ * @proposed_placement: Proposed placement for the buffer. Changed only by the
  * creator prior to validation as opposed to bo->mem.proposed_flags which is
  * changed by the implementation prior to a buffer move if it wants to outsmart
  * the buffer creator / user. This latter happens, for example, at eviction.
@@ -179,7 +178,7 @@ struct ttm_buffer_object {
 	 * Members protected by the bo::reserved lock.
 	 */
 
-	uint32_t proposed_flags;
+	uint32_t proposed_placement;
 	unsigned long offset;
 	struct ttm_mem_reg mem;
 	struct file *persistant_swap_storage;
