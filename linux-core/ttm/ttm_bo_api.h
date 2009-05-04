@@ -40,6 +40,7 @@
 #include <linux/mutex.h>
 #include <linux/mm.h>
 #include <linux/rbtree.h>
+#include <linux/bitmap.h>
 
 struct ttm_bo_device;
 
@@ -96,6 +97,13 @@ struct ttm_tt;
  * struct ttm_buffer_object
  *
  * @bdev: Pointer to the buffer object device structure.
+ * @buffer_start: The virtual user-space start address of ttm_bo_type_user
+ * buffers.
+ * @type: The bo type.
+ * @destroy: Destruction function. If NULL, kfree is used.
+ * @num_pages: Actual number of pages.
+ * @addr_space_offset: Address space offset.
+ * @acc_size: Accounted size for this object.
  * @kref: Reference count of this buffer object. When this refcount reaches
  * zero, the object is put on the delayed delete list.
  * @list_kref: List reference count of this buffer object. This member is
@@ -103,43 +111,36 @@ struct ttm_tt;
  * Lru lists may keep one refcount, the delayed delete list, and kref != 0
  * keeps one refcount. When this refcount reaches zero,
  * the object is destroyed.
+ * @event_queue: Queue for processes waiting on buffer object status change.
+ * @mutex: Lock protecting all members with the exception of constant members
+ * and list heads. We should really use a spinlock here.
  * @proposed_flags: Proposed placement for the buffer. Changed only by the
  * creator prior to validation as opposed to bo->mem.proposed_flags which is
  * changed by the implementation prior to a buffer move if it wants to outsmart
  * the buffer creator / user. This latter happens, for example, at eviction.
- * @buffer_start: The virtual user-space start address of ttm_bo_type_user
- * buffers.
- * @type: The bo type.
  * @offset: The current GPU offset, which can have different meanings
  * depending on the memory type. For SYSTEM type memory, it should be 0.
  * @mem: structure describing current placement.
+ * @persistant_swap_storage: Usually the swap storage is deleted for buffers
+ * pinned in physical memory. If this behaviour is not desired, this member
+ * holds a pointer to a persistant shmem object.
+ * @ttm: TTM structure holding system pages.
+ * @evicted: Whether the object was evicted without user-space knowing.
+ * @cpu_writes: For synchronization. Number of cpu writers.
+ * @lru: List head for the lru list.
+ * @ddestroy: List head for the delayed destroy list.
+ * @swap: List head for swap LRU list.
  * @val_seq: Sequence of the validation holding the @reserved lock.
  * Used to avoid starvation when many processes compete to validate the
  * buffer. This member is protected by the bo_device::lru_lock.
  * @seq_valid: The value of @val_seq is valid. This value is protected by
  * the bo_device::lru_lock.
- * @lru: List head for the lru list.
- * @ddestroy: List head for the delayed destroy list.
- * @swap: List head for swap LRU list.
- * @persistant_swap_storage: Usually the swap storage is deleted for buffers
- * pinned in physical memory. If this behaviour is not desired, this member
- * holds a pointer to a persistant shmem object.
- * @destroy: Destruction function. If NULL, kfree is used.
+ * @reserved: Deadlock-free lock used for synchronization state transitions.
  * @sync_obj_arg: Opaque argument to synchronization object function.
  * @sync_obj: Pointer to a synchronization object.
  * @priv_flags: Flags describing buffer object internal state.
- * @event_queue: Queue for processes waiting on buffer object status change.
- * @mutex: Lock protecting all members with the exception of constant members
- * and list heads. We should really use a spinlock here.
- * @num_pages: Actual number of pages.
- * @ttm: TTM structure holding system pages.
- * @vm_hash: Hash item for fast address space lookup. Need to change to a
- * rb-tree node.
+ * @vm_rb: Rb node for the vm rb tree.
  * @vm_node: Address space manager node.
- * @addr_space_offset: Address space offset.
- * @cpu_writes: For synchronization. Number of cpu writers.
- * @reserved: Deadlock-free lock used for synchronization state transitions.
- * @acc_size: Accounted size for this object.
  *
  * Base class for TTM buffer object, that deals with data placement and CPU
  * mappings. GPU mappings are really up to the driver, but for simpler GPUs
@@ -154,48 +155,78 @@ struct ttm_tt;
  */
 
 struct ttm_buffer_object {
+	/**
+	 * Members constant at init.
+	 */
+
 	struct ttm_bo_device *bdev;
+	unsigned long buffer_start;
+	enum ttm_bo_type type;
+	void (*destroy) (struct ttm_buffer_object *);
+	unsigned long num_pages;
+	uint64_t addr_space_offset;
+	size_t acc_size;
+
+	/**
+	* Members not needing protection.
+	*/
+
 	struct kref kref;
 	struct kref list_kref;
+	wait_queue_head_t event_queue;
+	struct mutex mutex;
 
-	/*
-	 * If there is a possibility that the usage variable is zero,
-	 * then dev->struct_mutex should be locked before incrementing it.
+	/**
+	 * Members protected by the bo::reserved lock.
 	 */
 
 	uint32_t proposed_flags;
-	unsigned long buffer_start;
-	enum ttm_bo_type type;
 	unsigned long offset;
 	struct ttm_mem_reg mem;
-	uint32_t val_seq;
-	bool seq_valid;
+	struct file *persistant_swap_storage;
+	struct ttm_tt *ttm;
+	bool evicted;
+
+	/**
+	 * Members protected by the bo::reserved lock only when written to.
+	 */
+
+	atomic_t cpu_writers;
+
+	/**
+	 * Members protected by the bdev::lru_lock.
+	 */
 
 	struct list_head lru;
 	struct list_head ddestroy;
 	struct list_head swap;
+	uint32_t val_seq;
+	bool seq_valid;
 
-	struct file *persistant_swap_storage;
+	/**
+	 * Members protected by the bdev::lru_lock
+	 * only when written to.
+	 */
 
-	void (*destroy) (struct ttm_buffer_object *);
+	atomic_t reserved;
+
+
+	/**
+	 * Members protected by the bo::mutex
+	 */
 
 	void *sync_obj_arg;
 	void *sync_obj;
+	unsigned long priv_flags;
 
-	uint32_t priv_flags;
-	wait_queue_head_t event_queue;
-	struct mutex mutex;
-	unsigned long num_pages;
+	/**
+	 * Members protected by the bdev::vm_lock
+	 */
 
-	struct ttm_tt *ttm;
 	struct rb_node vm_rb;
 	struct drm_mm_node *vm_node;
-	uint64_t addr_space_offset;
 
-	atomic_t cpu_writers;
-	atomic_t reserved;
 
-	size_t acc_size;
 };
 
 /**

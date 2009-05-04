@@ -315,15 +315,12 @@ static int ttm_bo_handle_move_mem(struct ttm_buffer_object *bo,
 		goto out_err;
 
       moved:
-	if (bo->priv_flags & TTM_BO_PRIV_FLAG_EVICTED) {
+	if (bo->evicted) {
 		ret = bdev->driver->invalidate_caches(bdev, bo->mem.flags);
 		if (ret)
 			printk(KERN_ERR "Can not flush read caches\n");
+		bo->evicted = false;
 	}
-
-	ttm_flag_masked(&bo->priv_flags,
-			(evict) ? TTM_BO_PRIV_FLAG_EVICTED : 0,
-			TTM_BO_PRIV_FLAG_EVICTED);
 
 	if (bo->mem.mm_node)
 		bo->offset = (bo->mem.mm_node->start << PAGE_SHIFT) +
@@ -367,7 +364,7 @@ static int ttm_bo_expire_sync_obj(struct ttm_buffer_object *bo,
 		}
 		if (bo->sync_obj) {
 			driver->sync_obj_unref(&bo->sync_obj);
-			bo->priv_flags &= ~TTM_BO_PRIV_FLAG_MOVING;
+			clear_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags);
 		}
 	}
 	return 0;
@@ -391,7 +388,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo, bool remove_all)
 	if (bo->sync_obj && driver->sync_obj_signaled(bo->sync_obj,
 						      bo->sync_obj_arg)) {
 		driver->sync_obj_unref(&bo->sync_obj);
-		bo->priv_flags &= ~TTM_BO_PRIV_FLAG_MOVING;
+		clear_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags);
 	}
 
 	if (bo->sync_obj && remove_all)
@@ -588,10 +585,7 @@ static int ttm_bo_evict(struct ttm_buffer_object *bo, unsigned mem_type,
 		evict_mem.mm_node = NULL;
 	}
 	spin_unlock(&bdev->lru_lock);
-
-	ttm_flag_masked(&bo->priv_flags, TTM_BO_PRIV_FLAG_EVICTED,
-			TTM_BO_PRIV_FLAG_EVICTED);
-
+	bo->evicted = true;
       out:
 	return ret;
 }
@@ -827,13 +821,13 @@ static int ttm_bo_busy(struct ttm_buffer_object *bo)
 	if (sync_obj) {
 		if (driver->sync_obj_signaled(sync_obj, bo->sync_obj_arg)) {
 			driver->sync_obj_unref(&bo->sync_obj);
-			bo->priv_flags &= ~TTM_BO_PRIV_FLAG_MOVING;
+			clear_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags);
 			return 0;
 		}
 		driver->sync_obj_flush(sync_obj, bo->sync_obj_arg);
 		if (driver->sync_obj_signaled(sync_obj, bo->sync_obj_arg)) {
 			driver->sync_obj_unref(&bo->sync_obj);
-			bo->priv_flags &= ~TTM_BO_PRIV_FLAG_MOVING;
+			clear_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags);
 			return 0;
 		}
 		return 1;
@@ -1538,7 +1532,7 @@ int ttm_bo_wait(struct ttm_buffer_object *bo,
 	while (bo->sync_obj) {
 		if (driver->sync_obj_signaled(bo->sync_obj, bo->sync_obj_arg)) {
 			driver->sync_obj_unref(&bo->sync_obj);
-			bo->priv_flags &= ~TTM_BO_PRIV_FLAG_MOVING;
+			clear_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags);
 			goto out;
 		}
 		if (no_wait) {
@@ -1559,7 +1553,7 @@ int ttm_bo_wait(struct ttm_buffer_object *bo,
 
 		if (bo->sync_obj == sync_obj) {
 			driver->sync_obj_unref(&bo->sync_obj);
-			bo->priv_flags &= ~TTM_BO_PRIV_FLAG_MOVING;
+			clear_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags);
 		}
 		driver->sync_obj_unref(&sync_obj);
 	}

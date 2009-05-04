@@ -356,9 +356,9 @@ struct ttm_bo_driver {
 
 #define TTM_NUM_MEM_TYPES 8
 
-#define TTM_BO_PRIV_FLAG_EVICTED  (1 << 0)	/* Buffer object is evicted. */
-#define TTM_BO_PRIV_FLAG_MOVING   (1 << 1)	/* Buffer object is moving and needs
-						   idling before CPU mapping */
+#define TTM_BO_PRIV_FLAG_MOVING  0	/* Buffer object is moving and needs
+					   idling before CPU mapping */
+#define TTM_BO_PRIV_FLAG_MAX 1
 /**
  * struct ttm_bo_device - Buffer object driver device-specific data.
  *

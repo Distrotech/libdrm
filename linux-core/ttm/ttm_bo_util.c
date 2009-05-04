@@ -539,7 +539,7 @@ int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
 		else
 			bo->ttm = NULL;
 
-		bo->priv_flags |= TTM_BO_PRIV_FLAG_MOVING;
+		set_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags);
 		ttm_bo_unreserve(ghost_obj);
 		ttm_bo_unref(&ghost_obj);
 	}

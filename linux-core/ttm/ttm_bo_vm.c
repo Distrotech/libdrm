@@ -115,7 +115,7 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	 * move.
 	 */
 
-	if (bo->priv_flags & TTM_BO_PRIV_FLAG_MOVING) {
+	if (test_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags)) {
 		ret = ttm_bo_wait(bo, false, true, false);
 		if (unlikely(ret != 0)) {
 			retval = (ret != -ERESTART) ?
@@ -259,7 +259,7 @@ static unsigned long ttm_bo_vm_nopfn(struct vm_area_struct *vma,
 	 * move.
 	 */
 
-	if (bo->priv_flags & TTM_BO_PRIV_FLAG_MOVING) {
+	if (test_bit(TTM_BO_PRIV_FLAG_MOVING, &bo->priv_flags)) {
 		ret = ttm_bo_wait(bo, false, true, false);
 		if (unlikely(ret != 0)) {
 			retval = (ret != -ERESTART) ?
