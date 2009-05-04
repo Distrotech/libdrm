@@ -56,7 +56,6 @@ int ttm_bo_move_ttm(struct ttm_buffer_object *bo,
 	struct ttm_tt *ttm = bo->ttm;
 	struct ttm_mem_reg *old_mem = &bo->mem;
 	uint32_t save_flags = old_mem->flags;
-	uint32_t save_proposed_flags = old_mem->proposed_flags;
 	int ret;
 
 	if (old_mem->mem_type != TTM_PL_SYSTEM) {
@@ -80,7 +79,6 @@ int ttm_bo_move_ttm(struct ttm_buffer_object *bo,
 
 	*old_mem = *new_mem;
 	new_mem->mm_node = NULL;
-	old_mem->proposed_flags = save_proposed_flags;
 	ttm_flag_masked(&save_flags, new_mem->flags, TTM_PL_MASK_MEMTYPE);
 	return 0;
 }
@@ -192,7 +190,6 @@ int ttm_bo_move_memcpy(struct ttm_buffer_object *bo,
 	void *new_iomap;
 	int ret;
 	uint32_t save_flags = old_mem->flags;
-	uint32_t save_proposed_flags = old_mem->proposed_flags;
 	unsigned long i;
 	unsigned long page;
 	unsigned long add = 0;
@@ -237,7 +234,6 @@ int ttm_bo_move_memcpy(struct ttm_buffer_object *bo,
 
 	*old_mem = *new_mem;
 	new_mem->mm_node = NULL;
-	old_mem->proposed_flags = save_proposed_flags;
 	ttm_flag_masked(&save_flags, new_mem->flags, TTM_PL_MASK_MEMTYPE);
 
 	if ((man->flags & TTM_MEMTYPE_FLAG_FIXED) && (ttm != NULL)) {
@@ -501,7 +497,6 @@ int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
 	struct ttm_mem_reg * old_mem = &bo->mem;
 	int ret;
 	uint32_t save_flags = old_mem->flags;
-	uint32_t save_proposed_flags = old_mem->proposed_flags;
 	struct ttm_buffer_object *ghost_obj;
 	if (bo->sync_obj)
 		driver->sync_obj_unref(&bo->sync_obj);
@@ -546,7 +541,6 @@ int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
 
 	*old_mem = *new_mem;
 	new_mem->mm_node = NULL;
-	old_mem->proposed_flags = save_proposed_flags;
 	ttm_flag_masked(&save_flags, new_mem->flags, TTM_PL_MASK_MEMTYPE);
 	return 0;
 }

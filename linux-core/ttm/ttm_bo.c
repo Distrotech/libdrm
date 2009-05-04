@@ -290,11 +290,9 @@ static int ttm_bo_handle_move_mem(struct ttm_buffer_object *bo,
 
 			struct ttm_mem_reg *old_mem = &bo->mem;
 			uint32_t save_flags = old_mem->flags;
-			uint32_t save_proposed_flags = old_mem->proposed_flags;
 
 			*old_mem = *mem;
 			mem->mm_node = NULL;
-			old_mem->proposed_flags = save_proposed_flags;
 			ttm_flag_masked(&save_flags, mem->flags,
 					TTM_PL_MASK_MEMTYPE);
 			goto moved;
@@ -539,6 +537,7 @@ static int ttm_bo_evict(struct ttm_buffer_object *bo, unsigned mem_type,
 	int ret = 0;
 	struct ttm_bo_device *bdev = bo->bdev;
 	struct ttm_mem_reg evict_mem;
+	uint32_t proposed_placement;
 
 	if (bo->mem.mem_type != mem_type)
 		goto out;
@@ -555,15 +554,13 @@ static int ttm_bo_evict(struct ttm_buffer_object *bo, unsigned mem_type,
 	evict_mem = bo->mem;
 	evict_mem.mm_node = NULL;
 
-	evict_mem.proposed_flags = bdev->driver->evict_flags(bo);
-	BUG_ON(ttm_bo_type_flags(mem_type) & evict_mem.proposed_flags);
+	proposed_placement = bdev->driver->evict_flags(bo);
 
-	ret = ttm_bo_mem_space(bo, &evict_mem, interruptible, no_wait);
-	if (unlikely(ret != 0 && ret != -ERESTART)) {
-		evict_mem.proposed_flags = TTM_PL_FLAG_SYSTEM;
-		BUG_ON(ttm_bo_type_flags(mem_type) & evict_mem.proposed_flags);
-		ret = ttm_bo_mem_space(bo, &evict_mem, interruptible, no_wait);
-	}
+	ret = ttm_bo_mem_space(bo, proposed_placement,
+			       &evict_mem, interruptible, no_wait);
+	if (unlikely(ret != 0 && ret != -ERESTART))
+		ret = ttm_bo_mem_space(bo, TTM_PL_FLAG_SYSTEM,
+				       &evict_mem, interruptible, no_wait);
 
 	if (ret) {
 		if (ret != -ERESTART)
@@ -707,7 +704,9 @@ static bool ttm_bo_mt_compatible(struct ttm_mem_type_manager *man,
  * space.
  */
 int ttm_bo_mem_space(struct ttm_buffer_object *bo,
-		     struct ttm_mem_reg *mem, bool interruptible, bool no_wait)
+		     uint32_t proposed_placement,
+		     struct ttm_mem_reg *mem,
+		     bool interruptible, bool no_wait)
 {
 	struct ttm_bo_device *bdev = bo->bdev;
 	struct ttm_mem_type_manager *man;
@@ -730,7 +729,7 @@ int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 
 		type_ok = ttm_bo_mt_compatible(man,
 					       bo->type == ttm_bo_type_user,
-					       mem_type, mem->proposed_flags,
+					       mem_type, proposed_placement,
 					       &cur_flags);
 
 		if (!type_ok)
@@ -789,7 +788,7 @@ int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 		if (!ttm_bo_mt_compatible(man,
 					  bo->type == ttm_bo_type_user,
 					  mem_type,
-					  mem->proposed_flags, &cur_flags))
+					  proposed_placement, &cur_flags))
 			continue;
 
 		ret = ttm_bo_mem_force_space(bdev, mem, mem_type,
@@ -851,12 +850,8 @@ int ttm_bo_wait_cpu(struct ttm_buffer_object *bo, bool no_wait)
 	return ret;
 }
 
-/*
- * bo->mutex locked.
- * Note that new_mem_flags are NOT transferred to the bo->mem.proposed_flags.
- */
-
-int ttm_bo_move_buffer(struct ttm_buffer_object *bo, uint32_t new_mem_flags,
+int ttm_bo_move_buffer(struct ttm_buffer_object *bo,
+		       uint32_t proposed_placement,
 		       bool interruptible, bool no_wait)
 {
 	struct ttm_bo_device *bdev = bo->bdev;
@@ -878,14 +873,14 @@ int ttm_bo_move_buffer(struct ttm_buffer_object *bo, uint32_t new_mem_flags,
 
 	mem.num_pages = bo->num_pages;
 	mem.size = mem.num_pages << PAGE_SHIFT;
-	mem.proposed_flags = new_mem_flags;
 	mem.page_alignment = bo->mem.page_alignment;
 
 	/*
 	 * Determine where to move the buffer.
 	 */
 
-	ret = ttm_bo_mem_space(bo, &mem, interruptible, no_wait);
+	ret = ttm_bo_mem_space(bo, proposed_placement, &mem,
+			       interruptible, no_wait);
 	if (ret)
 		goto out_unlock;
 
@@ -900,40 +895,42 @@ int ttm_bo_move_buffer(struct ttm_buffer_object *bo, uint32_t new_mem_flags,
 	return ret;
 }
 
-static int ttm_bo_mem_compat(struct ttm_mem_reg *mem)
+static int ttm_bo_mem_compat(uint32_t proposed_placement,
+			     struct ttm_mem_reg *mem)
 {
-	if ((mem->proposed_flags & mem->flags & TTM_PL_MASK_MEM) == 0)
+	if ((proposed_placement & mem->flags & TTM_PL_MASK_MEM) == 0)
 		return 0;
-	if ((mem->proposed_flags & mem->flags & TTM_PL_MASK_CACHING) == 0)
+	if ((proposed_placement & mem->flags & TTM_PL_MASK_CACHING) == 0)
 		return 0;
 
 	return 1;
 }
 
 int ttm_buffer_object_validate(struct ttm_buffer_object *bo,
+			       uint32_t proposed_placement,
 			       bool interruptible, bool no_wait)
 {
 	int ret;
 
 	BUG_ON(!atomic_read(&bo->reserved));
-	bo->mem.proposed_flags = bo->proposed_flags;
+	bo->proposed_flags = proposed_placement;
 
-	TTM_DEBUG("Proposed flags 0x%08lx, Old flags 0x%08lx\n",
-		  (unsigned long)bo->mem.proposed_flags,
+	TTM_DEBUG("Proposed placement 0x%08lx, Old flags 0x%08lx\n",
+		  (unsigned long)proposed_placement,
 		  (unsigned long)bo->mem.flags);
 
 	/*
 	 * Check whether we need to move buffer.
 	 */
 
-	if (!ttm_bo_mem_compat(&bo->mem)) {
-		ret = ttm_bo_move_buffer(bo, bo->mem.proposed_flags,
+	if (!ttm_bo_mem_compat(bo->proposed_flags, &bo->mem)) {
+		ret = ttm_bo_move_buffer(bo, bo->proposed_flags,
 					 interruptible, no_wait);
 		if (ret) {
 			if (ret != -ERESTART)
 				printk(KERN_ERR "Failed moving buffer. "
 				       "Proposed placement 0x%08x\n",
-				       bo->mem.proposed_flags);
+				       bo->proposed_flags);
 			if (ret == -ENOMEM)
 				printk(KERN_ERR "Out of aperture space or "
 				       "DRM memory quota.\n");
@@ -1049,9 +1046,6 @@ int ttm_buffer_object_init(struct ttm_bo_device *bdev,
 	if ((flags & TTM_PL_MASK_CACHING) == 0)
 		flags |= TTM_PL_MASK_CACHING;
 
-	bo->proposed_flags = flags;
-	bo->mem.proposed_flags = flags;
-
 	/*
 	 * For ttm_bo_type_device buffers, allocate
 	 * address space from the device.
@@ -1063,7 +1057,7 @@ int ttm_buffer_object_init(struct ttm_bo_device *bdev,
 			goto out_err;
 	}
 
-	ret = ttm_buffer_object_validate(bo, interruptible, false);
+	ret = ttm_buffer_object_validate(bo, flags, interruptible, false);
 	if (ret)
 		goto out_err;
 
@@ -1678,8 +1672,6 @@ static int ttm_bo_swapout(struct ttm_mem_shrink *shrink)
 
 		evict_mem = bo->mem;
 		evict_mem.mm_node = NULL;
-		evict_mem.proposed_flags =
-		    TTM_PL_FLAG_SYSTEM | TTM_PL_FLAG_CACHED;
 		evict_mem.flags = TTM_PL_FLAG_SYSTEM | TTM_PL_FLAG_CACHED;
 		evict_mem.mem_type = TTM_PL_SYSTEM;
 

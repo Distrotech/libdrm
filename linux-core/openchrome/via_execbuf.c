@@ -110,8 +110,8 @@ via_placement_fence_type(struct ttm_buffer_object *bo,
 			return ret;
 	}
 
-	bo->proposed_flags = (bo->proposed_flags | set_flags)
-	    & ~clr_flags & TTM_PL_MASK_MEMTYPE;
+	bo->proposed_flags |= set_flags & TTM_PL_MASK_MEMTYPE;
+	bo->proposed_flags &= ~(clr_flags & TTM_PL_MASK_MEMTYPE);
 
 	return 0;
 }
@@ -559,7 +559,8 @@ static int via_validate_buffer_list(struct drm_file *file_priv,
 		if (unlikely(ret != 0))
 			goto out_err;
 
-		ret = ttm_buffer_object_validate(bo, true, false);
+		ret = ttm_buffer_object_validate(bo, bo->proposed_flags,
+						 true, false);
 
 		if (unlikely(ret != 0))
 			goto out_err;

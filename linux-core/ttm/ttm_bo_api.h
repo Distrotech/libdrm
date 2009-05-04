@@ -67,7 +67,6 @@ struct ttm_mem_reg {
 	uint32_t page_alignment;
 	uint32_t mem_type;
 	uint32_t flags;
-	uint32_t proposed_flags;
 };
 
 /**
@@ -288,6 +287,7 @@ extern int ttm_bo_wait(struct ttm_buffer_object *bo, bool lazy,
  * ttm_buffer_object_validate
  *
  * @bo: The buffer object.
+ * @proposed_placement: Proposed_placement for the buffer object.
  * @interruptible: Sleep interruptible if sleeping.
  * @no_wait: Return immediately if the buffer is busy.
  *
@@ -300,6 +300,7 @@ extern int ttm_bo_wait(struct ttm_buffer_object *bo, bool lazy,
  * -ERESTART if interrupted by a signal.
  */
 extern int ttm_buffer_object_validate(struct ttm_buffer_object *bo,
+				      uint32_t proposed_placement,
 				      bool interruptible, bool no_wait);
 /**
  * ttm_bo_unref

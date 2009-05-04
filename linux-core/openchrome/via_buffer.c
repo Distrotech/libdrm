@@ -178,9 +178,6 @@ static int via_move_vram_tt(struct ttm_buffer_object *bo,
 		struct ttm_mem_reg tmp_mem = *old_mem;
 
 		tmp_mem.mm_node = NULL;
-		tmp_mem.proposed_flags &= ~TTM_PL_MASK_MEM;
-		tmp_mem.proposed_flags |= (TTM_PL_FLAG_SYSTEM |
-					   TTM_PL_FLAG_CACHED);
 		tmp_mem.mem_type = TTM_PL_SYSTEM;
 		ret = ttm_bo_move_ttm(bo, evict, no_wait, &tmp_mem);
 		if (ret)
@@ -191,9 +188,6 @@ static int via_move_vram_tt(struct ttm_buffer_object *bo,
 		struct ttm_mem_reg tmp_mem = *new_mem;
 
 		tmp_mem.mm_node = NULL;
-		tmp_mem.proposed_flags &= ~TTM_PL_MASK_MEM;
-		tmp_mem.proposed_flags |= (TTM_PL_FLAG_SYSTEM |
-					   TTM_PL_FLAG_CACHED);
 		tmp_mem.mem_type = TTM_PL_SYSTEM;
 		ret = via_move_dmablit(bo, true, no_wait, &tmp_mem);
 		if (ret)
@@ -207,12 +201,10 @@ static void via_move_null(struct ttm_buffer_object *bo,
 			  struct ttm_mem_reg *new_mem)
 {
 	struct ttm_mem_reg *old_mem = &bo->mem;
-	uint32_t save_proposed_flags = old_mem->proposed_flags;
 
 	BUG_ON(old_mem->mm_node != NULL);
 	*old_mem = *new_mem;
 	new_mem->mm_node = NULL;
-	old_mem->proposed_flags = save_proposed_flags;
 }
 
 int via_bo_move(struct ttm_buffer_object *bo,

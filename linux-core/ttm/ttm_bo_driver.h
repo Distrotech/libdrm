@@ -575,8 +575,8 @@ extern bool ttm_mem_reg_is_pci(struct ttm_bo_device *bdev,
  *
  * @bo: Pointer to a struct ttm_buffer_object. the data of which
  * we want to allocate space for.
- * @mem: A struct ttm_mem_reg with the struct ttm_mem_reg::proposed_flags set
- * up.
+ * @proposed_placement: Proposed new placement for the buffer object.
+ * @mem: A struct ttm_mem_reg.
  * @interruptible: Sleep interruptible when sliping.
  * @no_wait: Don't sleep waiting for space to become available.
  *
@@ -590,6 +590,7 @@ extern bool ttm_mem_reg_is_pci(struct ttm_bo_device *bdev,
  * -ERESTART: An interruptible sleep was interrupted by a signal.
  */
 extern int ttm_bo_mem_space(struct ttm_buffer_object *bo,
+			    uint32_t proposed_placement,
 			    struct ttm_mem_reg *mem,
 			    bool interruptible, bool no_wait);
 /**

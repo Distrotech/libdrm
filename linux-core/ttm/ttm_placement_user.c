@@ -405,7 +405,7 @@ int ttm_pl_setstatus_ioctl(struct ttm_object_file *tfile,
 
 	bo->proposed_flags = (bo->proposed_flags | req->set_placement)
 	    & ~req->clr_placement;
-	ret = ttm_buffer_object_validate(bo, true, false);
+	ret = ttm_buffer_object_validate(bo, bo->proposed_flags, true, false);
 	if (unlikely(ret != 0))
 		goto out_err2;
 
