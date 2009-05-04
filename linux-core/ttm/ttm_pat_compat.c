@@ -43,6 +43,8 @@
 #include <linux/notifier.h>
 #include <linux/cpu.h>
 
+#define TTM_PFX "[TTM] "
+
 #ifndef MSR_IA32_CR_PAT
 #define MSR_IA32_CR_PAT 0x0277
 #endif
@@ -77,7 +79,7 @@ static void ttm_pat_enable(void)
 #else
 	if (on_each_cpu(ttm_pat_ipi_handler, NULL, 1) != 0) {
 #endif
-		printk(KERN_ERR "Timed out setting up CPU PAT.\n");
+		printk(KERN_ERR TTM_PFX "Timed out setting up CPU PAT.\n");
 	}
 }
 

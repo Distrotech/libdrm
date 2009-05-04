@@ -36,6 +36,8 @@
  * and release on file close.
  */
 
+#define TTM_PFX "[TTM] "
+
 /**
  * struct ttm_object_file
  *
@@ -126,7 +128,6 @@ static void ttm_object_file_destroy(struct kref *kref)
 	struct ttm_object_file *tfile =
 		container_of(kref, struct ttm_object_file, refcount);
 
-	printk(KERN_INFO "Freeing 0x%08lx\n", (unsigned long) tfile);
 	kfree(tfile);
 }
 
@@ -198,7 +199,6 @@ void ttm_base_object_unref(struct ttm_base_object **p_base)
 	struct ttm_base_object *base = *p_base;
 	struct ttm_object_device *tdev = base->tfile->tdev;
 
-	//      printk(KERN_INFO "TTM base object unref.\n");
 	*p_base = NULL;
 
 	/*
@@ -232,7 +232,7 @@ struct ttm_base_object *ttm_base_object_lookup(struct ttm_object_file *tfile,
 		return NULL;
 
 	if (tfile != base->tfile && !base->shareable) {
-		printk(KERN_ERR "Attempted access of non-shareable object.\n");
+		printk(KERN_ERR TTM_PFX "Attempted access of non-shareable object.\n");
 		ttm_base_object_unref(&base);
 		return NULL;
 	}

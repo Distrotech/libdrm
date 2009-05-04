@@ -244,7 +244,7 @@ static int ttm_bo_add_ttm(struct ttm_buffer_object *bo)
 			ttm_tt_destroy(bo->ttm);
 		break;
 	default:
-		printk(KERN_ERR "Illegal buffer object type\n");
+		printk(KERN_ERR TTM_PFX "Illegal buffer object type\n");
 		ret = -EINVAL;
 		break;
 	}
@@ -316,7 +316,7 @@ static int ttm_bo_handle_move_mem(struct ttm_buffer_object *bo,
 	if (bo->evicted) {
 		ret = bdev->driver->invalidate_caches(bdev, bo->mem.placement);
 		if (ret)
-			printk(KERN_ERR "Can not flush read caches\n");
+			printk(KERN_ERR TTM_PFX "Can not flush read caches\n");
 		bo->evicted = false;
 	}
 
@@ -523,7 +523,7 @@ static int ttm_bo_evict(struct ttm_buffer_object *bo, unsigned mem_type,
 	spin_unlock(&bo->lock);
 
 	if (ret && ret != -ERESTART) {
-		printk(KERN_ERR "Failed to expire sync object before "
+		printk(KERN_ERR TTM_PFX "Failed to expire sync object before "
 		       "buffer eviction.\n");
 		goto out;
 	}
@@ -543,7 +543,7 @@ static int ttm_bo_evict(struct ttm_buffer_object *bo, unsigned mem_type,
 
 	if (ret) {
 		if (ret != -ERESTART)
-			printk(KERN_ERR "Failed to find memory space for "
+			printk(KERN_ERR TTM_PFX "Failed to find memory space for "
 			       "buffer 0x%p eviction.\n", bo);
 		goto out;
 	}
@@ -551,7 +551,7 @@ static int ttm_bo_evict(struct ttm_buffer_object *bo, unsigned mem_type,
 	ret = ttm_bo_handle_move_mem(bo, &evict_mem, true, interruptible, no_wait);
 	if (ret) {
 		if (ret != -ERESTART)
-			printk(KERN_ERR "Buffer eviction failed\n");
+			printk(KERN_ERR TTM_PFX "Buffer eviction failed\n");
 		goto out;
 	}
 
@@ -880,11 +880,11 @@ int ttm_buffer_object_validate(struct ttm_buffer_object *bo,
 					 interruptible, no_wait);
 		if (ret) {
 			if (ret != -ERESTART)
-				printk(KERN_ERR "Failed moving buffer. "
+				printk(KERN_ERR TTM_PFX "Failed moving buffer. "
 				       "Proposed placement 0x%08x\n",
 				       bo->proposed_placement);
 			if (ret == -ENOMEM)
-				printk(KERN_ERR "Out of aperture space or "
+				printk(KERN_ERR TTM_PFX "Out of aperture space or "
 				       "DRM memory quota.\n");
 			return ret;
 		}
@@ -918,21 +918,21 @@ ttm_bo_check_placement(struct ttm_buffer_object *bo,
 	uint32_t new_mask = set_flags | clr_flags;
 
 	if ((bo->type == ttm_bo_type_user) && (clr_flags & TTM_PL_FLAG_CACHED)) {
-		printk(KERN_ERR
+		printk(KERN_ERR TTM_PFX
 		       "User buffers require cache-coherent memory.\n");
 		return -EINVAL;
 	}
 
 	if (!capable(CAP_SYS_ADMIN)) {
 		if (new_mask & TTM_PL_FLAG_NO_EVICT) {
-			printk(KERN_ERR "Need to be root to modify"
+			printk(KERN_ERR TTM_PFX "Need to be root to modify"
 			       " NO_EVICT status.\n");
 			return -EINVAL;
 		}
 
 		if ((clr_flags & bo->mem.placement & TTM_PL_MASK_MEMTYPE) &&
 		    (bo->mem.placement & TTM_PL_FLAG_NO_EVICT)) {
-			printk(KERN_ERR "Incompatible memory specification"
+			printk(KERN_ERR TTM_PFX "Incompatible memory specification"
 			       " for NO_EVICT buffer.\n");
 			return -EINVAL;
 		}
@@ -958,7 +958,7 @@ int ttm_buffer_object_init(struct ttm_bo_device *bdev,
 	size += buffer_start & ~PAGE_MASK;
 	num_pages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	if (num_pages == 0) {
-		printk(KERN_ERR "Illegal buffer object size.\n");
+		printk(KERN_ERR TTM_PFX "Illegal buffer object size.\n");
 		return -EINVAL;
 	}
 	bo->destroy = destroy;
@@ -1088,7 +1088,7 @@ static int ttm_bo_leave_list(struct ttm_buffer_object *bo,
 			goto out;
 		} else {
 			ret = 0;
-			printk(KERN_ERR "Cleanup eviction failed\n");
+			printk(KERN_ERR TTM_PFX "Cleanup eviction failed\n");
 		}
 	}
 
@@ -1136,12 +1136,12 @@ int ttm_bo_clean_mm(struct ttm_bo_device *bdev, unsigned mem_type)
 	int ret = -EINVAL;
 
 	if (mem_type >= TTM_NUM_MEM_TYPES) {
-		printk(KERN_ERR "Illegal memory type %d\n", mem_type);
+		printk(KERN_ERR TTM_PFX "Illegal memory type %d\n", mem_type);
 		return ret;
 	}
 
 	if (!man->has_type) {
-		printk(KERN_ERR "Trying to take down uninitialized "
+		printk(KERN_ERR TTM_PFX "Trying to take down uninitialized "
 		       "memory manager type %u\n", mem_type);
 		return ret;
 	}
@@ -1170,13 +1170,13 @@ int ttm_bo_evict_mm(struct ttm_bo_device *bdev, unsigned mem_type)
 	struct ttm_mem_type_manager *man = &bdev->man[mem_type];
 
 	if (mem_type == 0 || mem_type >= TTM_NUM_MEM_TYPES) {
-		printk(KERN_ERR "Illegal memory manager memory type %u.\n",
+		printk(KERN_ERR TTM_PFX "Illegal memory manager memory type %u.\n",
 		       mem_type);
 		return -EINVAL;
 	}
 
 	if (!man->has_type) {
-		printk(KERN_ERR "Memory type %u has not been initialized.\n",
+		printk(KERN_ERR TTM_PFX "Memory type %u has not been initialized.\n",
 		       mem_type);
 		return 0;
 	}
@@ -1191,13 +1191,13 @@ int ttm_bo_init_mm(struct ttm_bo_device *bdev, unsigned type,
 	struct ttm_mem_type_manager *man;
 
 	if (type >= TTM_NUM_MEM_TYPES) {
-		printk(KERN_ERR "Illegal memory type %d\n", type);
+		printk(KERN_ERR TTM_PFX "Illegal memory type %d\n", type);
 		return ret;
 	}
 
 	man = &bdev->man[type];
 	if (man->has_type) {
-		printk(KERN_ERR
+		printk(KERN_ERR TTM_PFX
 		       "Memory manager already initialized for type %d\n",
 		       type);
 		return ret;
@@ -1210,7 +1210,7 @@ int ttm_bo_init_mm(struct ttm_bo_device *bdev, unsigned type,
 	ret = 0;
 	if (type != TTM_PL_SYSTEM) {
 		if (!p_size) {
-			printk(KERN_ERR "Zero size memory manager type %d\n",
+			printk(KERN_ERR TTM_PFX "Zero size memory manager type %d\n",
 			       type);
 			return ret;
 		}
@@ -1239,7 +1239,7 @@ int ttm_bo_device_release(struct ttm_bo_device *bdev)
 			man->use_type = false;
 			if ((i != TTM_PL_SYSTEM) && ttm_bo_clean_mm(bdev, i)) {
 				ret = -EBUSY;
-				printk(KERN_ERR "DRM memory manager type %d "
+				printk(KERN_ERR TTM_PFX "DRM memory manager type %d "
 				       "is not clean.\n", i);
 			}
 			man->has_type = false;
@@ -1318,7 +1318,7 @@ int ttm_bo_device_init(struct ttm_bo_device *bdev,
 	ttm_mem_init_shrink(&bdev->shrink, ttm_bo_swapout);
 	ret = ttm_mem_register_shrink(mem_glob, &bdev->shrink);
 	if (unlikely(ret != 0)) {
-		printk(KERN_ERR "Could not register buffer object swapout.\n");
+		printk(KERN_ERR TTM_PFX "Could not register buffer object swapout.\n");
 		goto out_err2;
 	}
 

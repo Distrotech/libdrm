@@ -33,6 +33,7 @@
 #include <linux/wait.h>
 #include <linux/mm.h>
 
+#define TTM_PFX "[TTM] "
 #define TTM_MEMORY_ALLOC_RETRIES 4
 
 /**
@@ -119,9 +120,9 @@ int ttm_mem_global_init(struct ttm_mem_global *glob)
 
 	glob->total_memory_swap_limit = glob->max_total_memory - (mem >> 3);
 
-	printk(KERN_INFO "TTM available graphics memory: %llu MiB\n",
+	printk(KERN_INFO TTM_PFX "TTM available graphics memory: %llu MiB\n",
 	       glob->max_total_memory >> 20);
-	printk(KERN_INFO "TTM available object memory: %llu MiB\n",
+	printk(KERN_INFO TTM_PFX "TTM available object memory: %llu MiB\n",
 	       glob->max_memory >> 20);
 
 	return 0;
@@ -129,7 +130,7 @@ int ttm_mem_global_init(struct ttm_mem_global *glob)
 
 void ttm_mem_global_release(struct ttm_mem_global *glob)
 {
-	printk(KERN_INFO "Used total memory is %llu bytes.\n",
+	printk(KERN_INFO TTM_PFX "Used total memory is %llu bytes.\n",
 	       (unsigned long long)glob->used_total_memory);
 	flush_workqueue(glob->swap_queue);
 	destroy_workqueue(glob->swap_queue);

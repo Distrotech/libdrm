@@ -61,14 +61,14 @@ static struct ttm_bo_user_object *ttm_bo_user_lookup(struct ttm_object_file
 
 	base = ttm_base_object_lookup(tfile, handle);
 	if (unlikely(base == NULL)) {
-		printk(KERN_ERR "Invalid buffer object handle 0x%08lx.\n",
+		printk(KERN_ERR TTM_PFX "Invalid buffer object handle 0x%08lx.\n",
 		       (unsigned long)handle);
 		return NULL;
 	}
 
 	if (unlikely(base->object_type != ttm_buffer_type)) {
 		ttm_base_object_unref(&base);
-		printk(KERN_ERR "Invalid buffer object handle 0x%08lx.\n",
+		printk(KERN_ERR TTM_PFX "Invalid buffer object handle 0x%08lx.\n",
 		       (unsigned long)handle);
 		return NULL;
 	}
@@ -292,14 +292,14 @@ int ttm_pl_reference_ioctl(struct ttm_object_file *tfile, void *data)
 
 	user_bo = ttm_bo_user_lookup(tfile, arg->req.handle);
 	if (unlikely(user_bo == NULL)) {
-		printk(KERN_ERR "Could not reference buffer object.\n");
+		printk(KERN_ERR TTM_PFX "Could not reference buffer object.\n");
 		return -EINVAL;
 	}
 
 	bo = &user_bo->bo;
 	ret = ttm_ref_object_add(tfile, &user_bo->base, TTM_REF_USAGE, NULL);
 	if (unlikely(ret != 0)) {
-		printk(KERN_ERR
+		printk(KERN_ERR TTM_PFX
 		       "Could not add a reference to buffer object.\n");
 		goto out;
 	}
@@ -332,7 +332,7 @@ int ttm_pl_synccpu_ioctl(struct ttm_object_file *tfile, void *data)
 	case TTM_PL_SYNCCPU_OP_GRAB:
 		user_bo = ttm_bo_user_lookup(tfile, arg->handle);
 		if (unlikely(user_bo == NULL)) {
-			printk(KERN_ERR
+			printk(KERN_ERR TTM_PFX
 			       "Could not find buffer object for synccpu.\n");
 			return -EINVAL;
 		}
@@ -375,7 +375,7 @@ int ttm_pl_setstatus_ioctl(struct ttm_object_file *tfile,
 
 	bo = ttm_buffer_object_lookup(tfile, req->handle);
 	if (unlikely(bo == NULL)) {
-		printk(KERN_ERR
+		printk(KERN_ERR TTM_PFX
 		       "Could not find buffer object for setstatus.\n");
 		return -EINVAL;
 	}
@@ -423,7 +423,7 @@ int ttm_pl_waitidle_ioctl(struct ttm_object_file *tfile, void *data)
 
 	bo = ttm_buffer_object_lookup(tfile, arg->handle);
 	if (unlikely(bo == NULL)) {
-		printk(KERN_ERR "Could not find buffer object for waitidle.\n");
+		printk(KERN_ERR TTM_PFX "Could not find buffer object for waitidle.\n");
 		return -EINVAL;
 	}
 

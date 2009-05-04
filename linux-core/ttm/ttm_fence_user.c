@@ -60,14 +60,14 @@ static struct ttm_fence_user_object *ttm_fence_user_object_lookup(struct
 
 	base = ttm_base_object_lookup(tfile, handle);
 	if (unlikely(base == NULL)) {
-		printk(KERN_ERR "Invalid fence handle 0x%08lx\n",
+		printk(KERN_ERR TTM_PFX "Invalid fence handle 0x%08lx\n",
 		       (unsigned long)handle);
 		return NULL;
 	}
 
 	if (unlikely(base->object_type != ttm_fence_type)) {
 		ttm_base_object_unref(&base);
-		printk(KERN_ERR "Invalid fence handle 0x%08lx\n",
+		printk(KERN_ERR TTM_PFX "Invalid fence handle 0x%08lx\n",
 		       (unsigned long)handle);
 		return NULL;
 	}

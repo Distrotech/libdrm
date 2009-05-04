@@ -272,7 +272,7 @@ static unsigned long ttm_bo_vm_nopfn(struct vm_area_struct *vma,
 	ret = ttm_bo_pci_offset(bdev, &bo->mem, &bus_base, &bus_offset,
 				&bus_size);
 	if (unlikely(ret != 0)) {
-		printk(KERN_ERR "Attempted buffer object access "
+		printk(KERN_ERR TTM_PFX "Attempted buffer object access "
 		       "of unmappable object.\n");
 		retval = NOPFN_SIGBUS;
 		goto out_unlock;
@@ -287,7 +287,7 @@ static unsigned long ttm_bo_vm_nopfn(struct vm_area_struct *vma,
 	    bo->vm_node->start - vma->vm_pgoff;
 
 	if (unlikely(page_offset >= bo->num_pages)) {
-		printk(KERN_ERR "Attempted buffer object access "
+		printk(KERN_ERR TTM_PFX "Attempted buffer object access "
 		       "outside object.\n");
 		retval = NOPFN_SIGBUS;
 		goto out_unlock;
@@ -408,7 +408,7 @@ int ttm_bo_mmap(struct file *filp, struct vm_area_struct *vma,
 	read_unlock(&bdev->vm_lock);
 
 	if (unlikely(bo == NULL)) {
-		printk(KERN_ERR "Could not find buffer object to map.\n");
+		printk(KERN_ERR TTM_PFX "Could not find buffer object to map.\n");
 		return -EINVAL;
 	}
 

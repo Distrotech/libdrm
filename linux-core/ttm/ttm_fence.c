@@ -35,8 +35,7 @@
 #include <linux/wait.h>
 #include <linux/sched.h>
 
-#include "drmP.h"
-
+#define TTM_PFX "[TTM] "
 /*
  * Simple implementation for now.
  */
@@ -45,7 +44,7 @@ static void ttm_fence_lockup(struct ttm_fence_object *fence, uint32_t mask)
 {
 	struct ttm_fence_class_manager *fc = ttm_fence_fc(fence);
 
-	printk(KERN_ERR "GPU lockup dectected on engine %u "
+	printk(KERN_ERR TTM_PFX "GPU lockup dectected on engine %u "
 	       "fence type 0x%08x\n",
 	       (unsigned int)fence->fence_class, (unsigned int)mask);
 	/*
@@ -143,10 +142,6 @@ void ttm_fence_handler(struct ttm_fence_device *fdev, uint32_t fence_class,
 		if (&fence->ring == &fc->ring)
 			break;
 
-		DRM_DEBUG("Fence 0x%08lx, sequence 0x%08x, type 0x%08x\n",
-			  (unsigned long)fence, fence->sequence,
-			  fence->fence_type);
-
 		if (error) {
 			fence->info.error = error;
 			fence->info.signaled_types = fence->fence_type;
@@ -161,10 +156,6 @@ void ttm_fence_handler(struct ttm_fence_device *fdev, uint32_t fence_class,
 
 		if (new_type) {
 			fence->info.signaled_types |= new_type;
-			DRM_DEBUG("Fence 0x%08lx signaled 0x%08x\n",
-				  (unsigned long)fence,
-				  fence->info.signaled_types);
-
 			if (unlikely(driver->signaled))
 				driver->signaled(fence);
 
@@ -180,8 +171,6 @@ void ttm_fence_handler(struct ttm_fence_device *fdev, uint32_t fence_class,
 		    fence->waiting_types & ~fence->info.signaled_types;
 
 		if (!(fence->fence_type & ~fence->info.signaled_types)) {
-			DRM_DEBUG("Fence completely signaled 0x%08lx\n",
-				  (unsigned long)fence);
 			list_del_init(&fence->ring);
 		}
 	}
@@ -250,8 +239,8 @@ int ttm_fence_object_flush(struct ttm_fence_object *fence, uint32_t type)
 	bool call_flush;
 
 	if (type & ~fence->fence_type) {
-		DRM_ERROR("Flush trying to extend fence type, "
-			  "0x%x, 0x%x\n", type, fence->fence_type);
+		printk(KERN_ERR TTM_PFX "Flush trying to extend fence type, "
+		       "0x%x, 0x%x\n", type, fence->fence_type);
 		return -EINVAL;
 	}
 
@@ -342,8 +331,8 @@ int ttm_fence_object_wait(struct ttm_fence_object *fence,
 	unsigned long to_jiffies;
 
 	if (mask & ~fence->fence_type) {
-		DRM_ERROR("Wait trying to extend fence type"
-			  " 0x%08x 0x%08x\n", mask, fence->fence_type);
+		printk(KERN_ERR TTM_PFX "Wait trying to extend fence type"
+		       " 0x%08x 0x%08x\n", mask, fence->fence_type);
 		BUG();
 		return -EINVAL;
 	}
@@ -460,13 +449,13 @@ int ttm_fence_object_create(struct ttm_fence_device *fdev,
 
 	ret = ttm_mem_global_alloc(fdev->mem_glob, sizeof(*fence), false, false, false);
 	if (unlikely(ret != 0)) {
-		printk(KERN_ERR "Out of memory creating fence object\n");
+		printk(KERN_ERR TTM_PFX "Out of memory creating fence object\n");
 		return ret;
 	}
 
 	fence = kmalloc(sizeof(*fence), GFP_KERNEL);
 	if (!fence) {
-		printk(KERN_ERR "Out of memory creating fence object\n");
+		printk(KERN_ERR TTM_PFX "Out of memory creating fence object\n");
 		ttm_mem_global_free(fdev->mem_glob, sizeof(*fence), false);
 		return -ENOMEM;
 	}

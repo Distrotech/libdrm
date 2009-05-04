@@ -86,7 +86,7 @@ void ttm_tt_cache_flush(struct page *pages[], unsigned long num_pages)
 	}
 #else
 	if (on_each_cpu(ttm_tt_ipi_handler, NULL, 1, 1) != 0)
-		printk(KERN_ERR "Timed out waiting for drm cache flush.\n");
+		printk(KERN_ERR TTM_PFX "Timed out waiting for drm cache flush.\n");
 #endif
 }
 
@@ -341,7 +341,7 @@ static void ttm_tt_free_alloced_pages(struct ttm_tt *ttm)
 		ttm->pages[i] = NULL;
 		if (cur_page) {
 			if (page_count(cur_page) != 1)
-				printk(KERN_ERR
+				printk(KERN_ERR TTM_PFX
 				       "Erroneous page count. Leaking pages.\n");
 			ttm_mem_global_free(ttm->bdev->mem_glob, PAGE_SIZE,
 					    PageHighMem(cur_page));
@@ -446,13 +446,13 @@ struct ttm_tt *ttm_tt_create(struct ttm_bo_device *bdev, unsigned long size,
 	ttm_tt_alloc_page_directory(ttm);
 	if (!ttm->pages) {
 		ttm_tt_destroy(ttm);
-		printk(KERN_ERR "Failed allocating page table\n");
+		printk(KERN_ERR TTM_PFX "Failed allocating page table\n");
 		return NULL;
 	}
 	ttm->be = bo_driver->create_ttm_backend_entry(bdev);
 	if (!ttm->be) {
 		ttm_tt_destroy(ttm);
-		printk(KERN_ERR "Failed creating ttm backend entry\n");
+		printk(KERN_ERR TTM_PFX "Failed creating ttm backend entry\n");
 		return NULL;
 	}
 	ttm->state = tt_unpopulated;
@@ -490,7 +490,7 @@ int ttm_tt_bind(struct ttm_tt *ttm, struct ttm_mem_reg *bo_mem)
 
 	ret = be->func->bind(be, bo_mem);
 	if (ret) {
-		printk(KERN_ERR "Couldn't bind backend.\n");
+		printk(KERN_ERR TTM_PFX "Couldn't bind backend.\n");
 		return ret;
 	}
 
@@ -587,7 +587,7 @@ int ttm_tt_swapout(struct ttm_tt *ttm, struct file *persistant_swap_storage)
 						ttm->num_pages << PAGE_SHIFT,
 						0);
 		if (unlikely(IS_ERR(swap_storage))) {
-			printk(KERN_ERR "Failed allocating swap storage.\n");
+			printk(KERN_ERR TTM_PFX "Failed allocating swap storage.\n");
 			return -ENOMEM;
 		}
 #else
