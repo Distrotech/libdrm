@@ -1113,7 +1113,7 @@ struct drm_gem_open {
 #define DRM_IOCTL_MODE_GETFB		DRM_IOWR(0xAD, struct drm_mode_fb_cmd)
 #define DRM_IOCTL_MODE_ADDFB		DRM_IOWR(0xAE, struct drm_mode_fb_cmd)
 #define DRM_IOCTL_MODE_RMFB		DRM_IOWR(0xAF, uint32_t)
-#define DRM_IOCTL_GEM_PAGE_FLIP		DRM_IOW( 0xB0, struct drm_gem_page_flip)
+#define DRM_IOCTL_MODE_PAGE_FLIP	DRM_IOW( 0xB0, struct drm_mode_page_flip)
 
 /*@}*/
 
@@ -1127,6 +1127,30 @@ struct drm_gem_open {
  */
 #define DRM_COMMAND_BASE                0x40
 #define DRM_COMMAND_END                 0xA0
+
+/**
+ * Header for events written back to userspace on the drm fd.  The
+ * type defines the type of event, the length specifies the total
+ * length of the event (including the header), and user_data is
+ * typically a 64 bit value passed with the ioctl that triggered the
+ * event.  A read on the drm fd will always only return complete
+ * events, that is, if for example the read buffer is 100 bytes, and
+ * there are two 64 byte events pending, only one will be returned.
+ */
+struct drm_event {
+	uint32_t type;
+	uint32_t length;
+	uint64_t user_data;
+};
+
+#define DRM_EVENT_MODE_PAGE_FLIP 0x01
+
+struct drm_event_page_flip {
+	struct drm_event base;
+	uint32_t tv_sec;
+	uint32_t tv_usec;
+	uint32_t frame;
+};
 
 /* typedef area */
 #ifndef __KERNEL__
