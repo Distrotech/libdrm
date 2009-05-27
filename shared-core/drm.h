@@ -1140,13 +1140,13 @@ struct drm_gem_open {
 struct drm_event {
 	uint32_t type;
 	uint32_t length;
-	uint64_t user_data;
 };
 
 #define DRM_EVENT_MODE_PAGE_FLIP 0x01
 
 struct drm_event_page_flip {
 	struct drm_event base;
+	uint64_t user_data;
 	uint32_t tv_sec;
 	uint32_t tv_usec;
 	uint32_t frame;

@@ -676,3 +676,44 @@ int drmModePageFlip(int fd, uint32_t crtc_id, uint32_t fb_id, void *user_data)
 
 	return drmIoctl(fd, DRM_IOCTL_MODE_PAGE_FLIP, &flip);
 }
+
+int drmHandleEvent(int fd, drmEventContextPtr evctx)
+{
+	char buffer[1024];
+	int len, i;
+	struct drm_event *e;
+	struct drm_event_page_flip *page_flip;
+	
+	/* The DRM read semantics guarantees that we always get only
+	 * complete events. */
+
+	len = read(fd, buffer, sizeof buffer);
+	if (len == 0)
+		return 0;
+	if (len < sizeof *e)
+		return -1;
+
+	i = 0;
+	while (i < len) {
+		e = (struct drm_event *) &buffer[i];
+		switch (e->type) {
+		case DRM_EVENT_MODE_PAGE_FLIP:
+			if (evctx->version < 1 ||
+			    evctx->page_flip_handler == NULL)
+				break;
+			page_flip = (struct drm_event_page_flip *) e;
+			evctx->page_flip_handler(fd,
+						 page_flip->frame, 
+						 page_flip->tv_sec,
+						 page_flip->tv_usec,
+						 U642VOID (page_flip->user_data));
+			break;
+			
+		default:
+			break;
+		}
+		i += e->length;
+	}
+
+	return 0;
+}
