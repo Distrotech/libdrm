@@ -145,6 +145,17 @@
 
 #endif /* _DRM_MODE_H */
 
+
+/*
+ * Feature defines
+ *
+ * Just because these are defined doesn't mean that the kernel
+ * can do that feature, its just for new code vs old libdrm.
+ */
+#define DRM_MODE_FEATURE_KMS		1
+#define DRM_MODE_FEATURE_DIRTYFB	1
+
+
 typedef struct _drmModeRes {
 
 	int count_fbs;
