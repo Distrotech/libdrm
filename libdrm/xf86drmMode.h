@@ -185,6 +185,11 @@ typedef struct _drmModeFB {
 	uint32_t handle;
 } drmModeFB, *drmModeFBPtr;
 
+typedef struct _drmModeClip {
+	uint16_t x, y;
+	uint16_t width, height;
+} drmModeClip, *drmModeClipPtr;
+
 typedef struct _drmModePropertyBlob {
 	uint32_t id;
 	uint32_t length;
@@ -292,6 +297,13 @@ extern int drmModeAddFB(int fd, uint32_t width, uint32_t height, uint8_t depth,
  * Destroies the given framebuffer.
  */
 extern int drmModeRmFB(int fd, uint32_t bufferId);
+
+/**
+ * Mark a region of a framebuffer as dirty.
+ */
+extern int drmModeDirtyFB(int fd, uint32_t bufferId,
+			  drmModeClipPtr clips, uint32_t num_clips);
+
 
 /*
  * Crtc functions

@@ -227,6 +227,22 @@ struct drm_mode_fb_cmd {
 	uint32_t handle;
 };
 
+struct drm_mode_fb_dirty_cmd {
+	uint32_t fb_id;
+	uint32_t flags;
+	uint32_t num_clips;
+	uint32_t reserved1;
+	uint64_t reserved2;
+	uint64_t clips_ptr;
+};
+
+struct drm_mode_fb_clip {
+	uint16_t x;
+	uint16_t y;
+	uint16_t width;
+	uint16_t height;
+};
+
 struct drm_mode_mode_cmd {
 	uint32_t connector_id;
 	struct drm_mode_modeinfo mode;
