@@ -40,7 +40,8 @@ TESTS =						\
 	gem_basic				\
 	gem_flink				\
 	gem_readwrite				\
-	gem_mmap
+	gem_mmap				\
+	vblank
 
 EXTRA_PROGRAMS = $(TESTS)
 
