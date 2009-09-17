@@ -270,4 +270,20 @@ struct drm_mode_crtc_lut {
 	uint64_t blue;
 };
 
+#define DRM_MODE_PAGE_FLIP_WAIT		(1<<0) /* block on previous page flip */
+#define DRM_MODE_PAGE_FLIP_FLAGS_MASK	(DRM_MODE_PAGE_FLIP_WAIT)
+
+struct drm_mode_page_flip {
+	/** Handle of new front buffer */
+	uint32_t fb_id;
+	uint32_t crtc_id;
+
+	/* 64 bit cookie returned to userspace in the page flip event. */
+	uint64_t user_data;
+	/**
+	 * page flip flags (wait on flip only for now)
+	 */
+	uint32_t flags;
+};
+
 #endif

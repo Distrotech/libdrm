@@ -707,3 +707,14 @@ int drmHandleEvent(int fd, drmEventContextPtr evctx)
 	return 0;
 }
 
+int drmModePageFlip(int fd, uint32_t crtc_id, uint32_t fb_id, void *user_data)
+{
+	struct drm_mode_page_flip flip;
+
+	flip.fb_id = fb_id;
+	flip.crtc_id = crtc_id;
+	flip.user_data = VOID2U64(user_data);
+	flip.flags = 0;
+
+	return drmIoctl(fd, DRM_IOCTL_MODE_PAGE_FLIP, &flip);
+}
