@@ -838,14 +838,14 @@ struct drm_event_vblank {
 	uint32_t reserved;
 };
 
-#define DRM_EVENT_MODE_PAGE_FLIP 0x01
+#define DRM_EVENT_MODE_PAGE_FLIP 0x02
 
 struct drm_event_page_flip {
 	struct drm_event base;
+	uint64_t user_data;
 	uint32_t tv_sec;
 	uint32_t tv_usec;
 	uint32_t frame;
-	uint64_t user_data;
 };
 
 /* typedef area */

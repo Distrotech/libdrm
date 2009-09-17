@@ -681,6 +681,11 @@ typedef struct _drmEventContext {
 			       unsigned int tv_sec,
 			       unsigned int tv_usec,
 			       void *user_data);
+	void (*page_flip_handler)(int fd,
+				  unsigned int frame, 
+				  unsigned int tv_sec,
+				  unsigned int tv_usec,
+				  void *user_data);
 
 } drmEventContext, *drmEventContextPtr;
 

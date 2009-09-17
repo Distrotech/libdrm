@@ -672,7 +672,8 @@ int drmHandleEvent(int fd, drmEventContextPtr evctx)
 	int len, i;
 	struct drm_event *e;
 	struct drm_event_vblank *vblank;
-	
+	struct drm_event_page_flip *page_flip;
+
 	/* The DRM read semantics guarantees that we always get only
 	 * complete events. */
 
@@ -697,7 +698,17 @@ int drmHandleEvent(int fd, drmEventContextPtr evctx)
 					      vblank->tv_usec,
 					      U642VOID (vblank->user_data));
 			break;
-			
+		case DRM_EVENT_MODE_PAGE_FLIP:
+			if (evctx->version < 1 ||
+			    evctx->page_flip_handler == NULL)
+				break;
+			page_flip = (struct drm_event_page_flip *) e;
+			evctx->page_flip_handler(fd,
+						 page_flip->frame, 
+						 page_flip->tv_sec,
+						 page_flip->tv_usec,
+						 U642VOID (page_flip->user_data));
+			break;
 		default:
 			break;
 		}
@@ -718,3 +729,4 @@ int drmModePageFlip(int fd, uint32_t crtc_id, uint32_t fb_id, void *user_data)
 
 	return drmIoctl(fd, DRM_IOCTL_MODE_PAGE_FLIP, &flip);
 }
+

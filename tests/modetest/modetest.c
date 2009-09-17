@@ -272,8 +272,9 @@ struct connector {
 	drmModeModeInfo *mode;
 	drmModeEncoder *encoder;
 	int crtc;
-	unsigned int fb_id;
+	unsigned int fb_id[2], current_fb_id;
 	struct timeval start;
+
 	int swap_count;
 };	
 
@@ -462,8 +463,8 @@ create_test_buffer(drm_intel_bufmgr *bufmgr,
 #endif
 
 static int
-create_black_buffer(drm_intel_bufmgr *bufmgr,
-		    int width, int height, int *stride_out, drm_intel_bo **bo_out)
+create_grey_buffer(drm_intel_bufmgr *bufmgr,
+		   int width, int height, int *stride_out, drm_intel_bo **bo_out)
 {
 	drm_intel_bo *bo;
 	unsigned int *fb_ptr;
@@ -488,13 +489,46 @@ create_black_buffer(drm_intel_bufmgr *bufmgr,
 		return -1;
 	}
 
-	memset(bo->virtual, 0, size);
+	memset(bo->virtual, 0x77, size);
 	drm_intel_gem_bo_unmap_gtt(bo);
 
 	*bo_out = bo;
 	*stride_out = stride;
 
 	return 0;
+}
+
+void
+page_flip_handler(int fd, unsigned int frame,
+		  unsigned int sec, unsigned int usec, void *data)
+{
+	struct connector *c;
+	unsigned int new_fb_id;
+	int len, ms;
+	struct drm_event_page_flip event;
+	struct timeval end;
+	double t;
+
+	fprintf(stderr, "flip done, frame %d, time %d.%03d\n",
+		frame, sec % 100, usec / 1000);
+
+	c = data;
+	if (c->current_fb_id == c->fb_id[0])
+		new_fb_id = c->fb_id[1];
+	else
+		new_fb_id = c->fb_id[0];
+			
+	drmModePageFlip(fd, c->crtc, new_fb_id, c);
+	c->current_fb_id = new_fb_id;
+	c->swap_count++;
+	if (c->swap_count == 60) {
+		gettimeofday(&end, NULL);
+		t = end.tv_sec + end.tv_usec * 1e-6 -
+			(c->start.tv_sec + c->start.tv_usec * 1e-6);
+		fprintf(stderr, "freq: %.02fHz\n", c->swap_count / t);
+		c->swap_count = 0;
+		c->start = end;
+	}
 }
 
 static void
@@ -505,8 +539,10 @@ set_mode(struct connector *c, int count, int page_flip)
 	struct drm_mode_modeinfo *mode = NULL;
 	drm_intel_bufmgr *bufmgr;
 	drm_intel_bo *bo, *other_bo;
-	unsigned int fb_id, other_fb_id;
-	int i, j, ret, width, height, x, stride;
+	unsigned int fb_id, other_fb_id, new_fb_id;
+	int i, j, ret, width, height, x, stride, len;
+	drmEventContext evctx;
+	struct drm_event_page_flip event;
 
 	width = 0;
 	height = 0;
@@ -546,7 +582,6 @@ set_mode(struct connector *c, int count, int page_flip)
 		ret = drmModeSetCrtc(fd, c[i].crtc, fb_id, x, 0,
 				     &c[i].id, 1, c[i].mode);
 		x += c[i].mode->hdisplay;
-		c[i].fb_id = fb_id;
 
 		if (ret) {
 			fprintf(stderr, "failed to set mode: %s\n", strerror(errno));
@@ -557,7 +592,7 @@ set_mode(struct connector *c, int count, int page_flip)
 	if (!page_flip)
 		return;
 
-	if (create_black_buffer(bufmgr, width, height, &stride, &other_bo))
+	if (create_grey_buffer(bufmgr, width, height, &stride, &other_bo))
 		return;
 
 	ret = drmModeAddFB(fd, width, height, 32, 32, stride, other_bo->handle,
@@ -574,13 +609,16 @@ set_mode(struct connector *c, int count, int page_flip)
 		drmModePageFlip(fd, c[i].crtc, other_fb_id, &c[i]);
 		gettimeofday(&c[i].start, NULL);
 		c[i].swap_count = 0;
+ 		c[i].fb_id[0] = fb_id;
+ 		c[i].fb_id[1] = other_fb_id;
+ 		c[i].current_fb_id = fb_id;
 	}
 
+	memset(&evctx, 0, sizeof evctx);
+	evctx.version = DRM_EVENT_CONTEXT_VERSION;
+	evctx.page_flip_handler = page_flip_handler;
+	
 	while (1) {
-		struct connector *c;
-		unsigned int new_fb_id;
-		int len, ms;
-		struct drm_event_page_flip event;
 		struct pollfd pfd[2];
 
 		pfd[0].fd = 0;
@@ -611,13 +649,13 @@ set_mode(struct connector *c, int count, int page_flip)
 			event.tv_usec / 1000);
 
 		c = (struct connector *) (long) event.user_data;
-		if (c->fb_id == fb_id)
+		if (c->fb_id[0] == fb_id)
 			new_fb_id = other_fb_id;
 		else
 			new_fb_id = fb_id;
 			
 		drmModePageFlip(fd, c->crtc, new_fb_id, c);
-		c->fb_id = new_fb_id;
+		c->fb_id[0] = new_fb_id;
 		c->swap_count++;
 		if (c->swap_count == 60) {
 			struct timeval end;
@@ -630,6 +668,7 @@ set_mode(struct connector *c, int count, int page_flip)
 			c->swap_count = 0;
 			c->start = end;
 		}
+		drmHandleEvent(fd, &evctx);
 	}
 }
 
