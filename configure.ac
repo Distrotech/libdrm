@@ -19,7 +19,7 @@
 #  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 AC_PREREQ(2.60)
-AC_INIT([libdrm], 2.4.12, [dri-devel@lists.sourceforge.net], libdrm)
+AC_INIT([libdrm], 2.4.15, [dri-devel@lists.sourceforge.net], libdrm)
 AC_USE_SYSTEM_EXTENSIONS
 AC_CONFIG_SRCDIR([Makefile.am])
 AM_INIT_AUTOMAKE([dist-bzip2])
@@ -42,6 +42,11 @@ AC_SUBST(pkgconfigdir)
 AC_ARG_ENABLE(udev,	AS_HELP_STRING([--enable-udev],
 				[Enable support for using udev instead of mknod (default: disabled)]),
 				[UDEV=$enableval], [UDEV=no])
+
+AC_ARG_ENABLE(intel,
+	      AS_HELP_STRING([--disable-intel],
+	      [Enable support for intel's KMS API (default: auto)]),
+	      [INTEL=$enableval], [INTEL=auto])
 
 AC_ARG_ENABLE(nouveau-experimental-api,
 	      AS_HELP_STRING([--enable-nouveau-experimental-api],
@@ -145,6 +150,44 @@ if test "x$HAVE_LIBUDEV" = xyes; then
    	AC_DEFINE(HAVE_LIBUDEV, 1, [Have libudev support])
 fi
 AM_CONDITIONAL(HAVE_LIBUDEV, [test "x$HAVE_LIBUDEV" = xyes])
+
+if test "x$INTEL" != "xno"; then
+    # Check for atomic intrinsics
+    AC_CACHE_CHECK([for native atomic primitives], drm_cv_atomic_primitives,
+    [
+	    drm_cv_atomic_primitives="none"
+
+	    AC_TRY_LINK([
+    int atomic_add(int i) { return __sync_fetch_and_add (&i, 1); }
+    int atomic_cmpxchg(int i, int j, int k) { return __sync_val_compare_and_swap (&i, j, k); }
+    ], [],
+	      drm_cv_atomic_primitives="Intel"
+	      )
+
+	    if test "x$drm_cv_atomic_primitives" = "xnone"; then
+		    AC_CHECK_HEADER([atomic_ops.h], drm_cv_atomic_primitives="libatomic-ops")
+	    fi
+
+    ])
+    if test "x$drm_cv_atomic_primitives" = xIntel; then
+	    AC_DEFINE(HAVE_INTEL_ATOMIC_PRIMITIVES, 1,
+		      [Enable if your compiler supports the Intel __sync_* atomic primitives])
+    fi
+    if test "x$drm_cv_atomic_primitives" = "xlibatomic-ops"; then
+	    AC_DEFINE(HAVE_LIB_ATOMIC_OPS, 1, [Enable if you have libatomic-ops-dev installed])
+    fi
+
+    if test "x$drm_cv_atomic_primitives" = "xnone"; then
+	    if test "x$INTEL" != "xauto"; then
+		    AC_MSG_ERROR([libdrm_intel depends upon atomic operations, which were not found for your compiler/cpu. Try compiling with -march=native, or install the libatomics-op-dev package, or, failing both of those, disable support for Intel GPUs by passing --disable-intel to ./configure])
+	   else
+		    INTEL=no
+	   fi
+    fi
+fi
+
+AM_CONDITIONAL(HAVE_INTEL, [test "x$INTEL" != "xno"])
+
 
 AC_SUBST(WARN_CFLAGS)
 AC_OUTPUT([
