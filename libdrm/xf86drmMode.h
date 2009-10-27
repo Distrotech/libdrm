@@ -196,10 +196,7 @@ typedef struct _drmModeFB {
 	uint32_t handle;
 } drmModeFB, *drmModeFBPtr;
 
-typedef struct _drmModeClip {
-	uint16_t x, y;
-	uint16_t width, height;
-} drmModeClip, *drmModeClipPtr;
+typedef struct drm_clip_rect drmModeClip, *drmModeClipPtr;
 
 typedef struct _drmModePropertyBlob {
 	uint32_t id;
