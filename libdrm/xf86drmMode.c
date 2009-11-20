@@ -700,7 +700,17 @@ int drmHandleEvent(int fd, drmEventContextPtr evctx)
 					      vblank->tv_usec,
 					      U642VOID (vblank->user_data));
 			break;
-			
+		case DRM_EVENT_FLIP_COMPLETE:
+			if (evctx->version < 1 ||
+			    evctx->pageflip_handler == NULL)
+				break;
+			vblank = (struct drm_event_vblank *) e;
+			evctx->pageflip_handler(fd,
+						vblank->sequence,
+						vblank->tv_sec,
+						vblank->tv_usec,
+						U642VOID (vblank->user_data));
+			break;
 		default:
 			break;
 		}

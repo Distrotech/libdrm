@@ -682,6 +682,12 @@ typedef struct _drmEventContext {
 			       unsigned int tv_usec,
 			       void *user_data);
 
+	void (*pageflip_handler)(int fd,
+				 unsigned int sequence,
+				 unsigned int tv_sec,
+				 unsigned int tv_usec,
+				 void *user_data);
+
 } drmEventContext, *drmEventContextPtr;
 
 extern int drmHandleEvent(int fd, drmEventContextPtr evctx);
