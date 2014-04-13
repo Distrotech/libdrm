@@ -1,4 +1,4 @@
-# generated automatically by aclocal 1.14 -*- Autoconf -*-
+# generated automatically by aclocal 1.14.1 -*- Autoconf -*-
 
 # Copyright (C) 1996-2013 Free Software Foundation, Inc.
 
@@ -220,6 +220,21 @@ m4_popdef([pkg_default])
 m4_popdef([pkg_description])
 ]) dnl PKG_NOARCH_INSTALLDIR
 
+
+# PKG_CHECK_VAR(VARIABLE, MODULE, CONFIG-VARIABLE,
+# [ACTION-IF-FOUND], [ACTION-IF-NOT-FOUND])
+# -------------------------------------------
+# Retrieves the value of the pkg-config variable for the given module.
+AC_DEFUN([PKG_CHECK_VAR],
+[AC_REQUIRE([PKG_PROG_PKG_CONFIG])dnl
+AC_ARG_VAR([$1], [value of $3 for $2, overriding pkg-config])dnl
+
+_PKG_CONFIG([$1], [variable="][$3]["], [$2])
+AS_VAR_COPY([$1], [pkg_cv_][$1])
+
+AS_VAR_IF([$1], [""], [$5], [$4])dnl
+])# PKG_CHECK_VAR
+
 # Copyright (C) 2002-2013 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
@@ -235,7 +250,7 @@ AC_DEFUN([AM_AUTOMAKE_VERSION],
 [am__api_version='1.14'
 dnl Some users find AM_AUTOMAKE_VERSION and mistake it for a way to
 dnl require some minimum version.  Point them to the right macro.
-m4_if([$1], [1.14], [],
+m4_if([$1], [1.14.1], [],
       [AC_FATAL([Do not call $0, use AM_INIT_AUTOMAKE([$1]).])])dnl
 ])
 
@@ -251,7 +266,7 @@ m4_define([_AM_AUTOCONF_VERSION], [])
 # Call AM_AUTOMAKE_VERSION and AM_AUTOMAKE_VERSION so they can be traced.
 # This function is AC_REQUIREd by AM_INIT_AUTOMAKE.
 AC_DEFUN([AM_SET_CURRENT_AUTOMAKE_VERSION],
-[AM_AUTOMAKE_VERSION([1.14])dnl
+[AM_AUTOMAKE_VERSION([1.14.1])dnl
 m4_ifndef([AC_AUTOCONF_VERSION],
   [m4_copy([m4_PACKAGE_VERSION], [AC_AUTOCONF_VERSION])])dnl
 _AM_AUTOCONF_VERSION(m4_defn([AC_AUTOCONF_VERSION]))])
