@@ -104,7 +104,7 @@ modetest_OBJECTS = $(am_modetest_OBJECTS)
 am__DEPENDENCIES_1 =
 @HAVE_CAIRO_TRUE@am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
 modetest_DEPENDENCIES = $(top_builddir)/libdrm.la \
-	$(top_builddir)/libkms/libkms.la $(am__DEPENDENCIES_2)
+	$(am__DEPENDENCIES_2)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -314,11 +314,9 @@ MODETEST_FILES := \
 	modetest.c
 
 AM_CFLAGS = $(filter-out -Wpointer-arith, $(WARN_CFLAGS)) \
-	-I$(top_srcdir)/include/drm -I$(top_srcdir)/libkms/ \
-	-I$(top_srcdir) $(am__append_1)
+	-I$(top_srcdir)/include/drm -I$(top_srcdir) $(am__append_1)
 modetest_SOURCES = $(MODETEST_FILES)
-modetest_LDADD = $(top_builddir)/libdrm.la \
-	$(top_builddir)/libkms/libkms.la $(am__append_2)
+modetest_LDADD = $(top_builddir)/libdrm.la -lpthread $(am__append_2)
 EXTRA_DIST = Android.mk
 all: all-am
 

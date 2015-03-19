@@ -230,7 +230,8 @@ am__klibdrminclude_HEADERS_DIST = include/drm/drm.h \
 	include/drm/nouveau_drm.h include/drm/qxl_drm.h \
 	include/drm/r128_drm.h include/drm/radeon_drm.h \
 	include/drm/savage_drm.h include/drm/sis_drm.h \
-	include/drm/via_drm.h include/drm/vmwgfx_drm.h
+	include/drm/tegra_drm.h include/drm/via_drm.h \
+	include/drm/vmwgfx_drm.h
 HEADERS = $(klibdrminclude_HEADERS) $(libdrminclude_HEADERS)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
@@ -262,7 +263,7 @@ ETAGS = etags
 CTAGS = ctags
 CSCOPE = cscope
 DIST_SUBDIRS = . libkms intel nouveau radeon omap exynos freedreno \
-	tests man
+	tegra tests man
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -469,6 +470,7 @@ LIBDRM_INCLUDE_H_FILES := \
 	include/drm/radeon_drm.h \
 	include/drm/savage_drm.h \
 	include/drm/sis_drm.h \
+	include/drm/tegra_drm.h \
 	include/drm/via_drm.h
 
 LIBDRM_INCLUDE_VMWGFX_H_FILES := \
@@ -483,7 +485,8 @@ pkgconfig_DATA = libdrm.pc
 @HAVE_OMAP_TRUE@OMAP_SUBDIR = omap
 @HAVE_EXYNOS_TRUE@EXYNOS_SUBDIR = exynos
 @HAVE_FREEDRENO_TRUE@FREEDRENO_SUBDIR = freedreno
-SUBDIRS = . $(LIBKMS_SUBDIR) $(INTEL_SUBDIR) $(NOUVEAU_SUBDIR) $(RADEON_SUBDIR) $(OMAP_SUBDIR) $(EXYNOS_SUBDIR) $(FREEDRENO_SUBDIR) tests man
+@HAVE_TEGRA_TRUE@TEGRA_SUBDIR = tegra
+SUBDIRS = . $(LIBKMS_SUBDIR) $(INTEL_SUBDIR) $(NOUVEAU_SUBDIR) $(RADEON_SUBDIR) $(OMAP_SUBDIR) $(EXYNOS_SUBDIR) $(FREEDRENO_SUBDIR) $(TEGRA_SUBDIR) tests man
 libdrm_la_LTLIBRARIES = libdrm.la
 libdrm_ladir = $(libdir)
 libdrm_la_LDFLAGS = -version-number 2:4:0 -no-undefined
